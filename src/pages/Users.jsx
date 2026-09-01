@@ -33,6 +33,8 @@ export default function Users() {
   };
   useEffect(() => { load(); }, []);
 
+  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+
   const updateRole = async (id, role) => {
     await base44.entities.User.update(id, { role });
     await logAction(user, 'user_role_changed', `Role set to ${role}`);
