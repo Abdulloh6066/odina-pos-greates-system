@@ -1,0 +1,78 @@
+{
+  "name": "Shift",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "user_name": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "closed"
+      ],
+      "default": "open"
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "starting_cash": {
+      "type": "number",
+      "default": 0
+    },
+    "expected_cash": {
+      "type": "number",
+      "default": 0
+    },
+    "actual_cash": {
+      "type": "number",
+      "default": 0
+    },
+    "difference": {
+      "type": "number",
+      "default": 0
+    },
+    "cash_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "uzcard_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "humo_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "online_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "total_sales": {
+      "type": "number",
+      "default": 0
+    },
+    "order_count": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "user_id",
+    "shop_id"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Settings",
+  "type": "object",
+  "properties": {
+    "shop_name": {
+      "type": "string",
+      "default": "Odina Shop"
+    },
+    "thank_you_message": {
+      "type": "string"
+    },
+    "receipt_footer": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string",
+      "default": "UZS"
+    }
+  },
+  "required": [
+    "shop_name"
+  ]
+}

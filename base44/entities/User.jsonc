@@ -1,0 +1,26 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "manager",
+        "cashier"
+      ],
+      "default": "cashier"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": []
+}
