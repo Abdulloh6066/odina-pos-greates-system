@@ -18,5 +18,46 @@
   },
   "required": [
     "name"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "production"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
