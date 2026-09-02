@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 
 const ROLE_COLORS = {
   admin: 'bg-red-50 text-red-700',
-  manager: 'bg-primary/15 text-primary-strong',
   cashier: 'bg-blue-50 text-blue-700',
+  accountant: 'bg-violet-50 text-violet-700',
+  production: 'bg-amber-50 text-amber-700',
 };
 
 export default function Users() {
@@ -74,8 +75,9 @@ export default function Users() {
                 <div className="flex items-center gap-2">
                   <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="admin">Admin</option>
-                    <option value="manager">Manager</option>
                     <option value="cashier">Cashier</option>
+                    <option value="accountant">Accountant</option>
+                    <option value="production">Production</option>
                   </select>
                   <select value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="">No shop</option>
@@ -126,8 +128,9 @@ function InviteDialog({ open, shops, onClose, onDone, user }) {
             <Label className="text-xs mb-1.5 block">Role</Label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium">
               <option value="cashier">Cashier</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
+              <option value="accountant">Accountant</option>
+              <option value="production">Production</option>
+              <option value="admin">Owner / Admin</option>
             </select>
           </div>
         </div>
