@@ -41,7 +41,7 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
               >
                 {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-            )
+            )}
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Starting cash amount</label>
