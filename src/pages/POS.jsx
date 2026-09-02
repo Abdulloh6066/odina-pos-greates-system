@@ -60,7 +60,7 @@ export default function POS() {
   useEffect(() => { if (user) loadAll(); }, [user]);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.subtotal, 0), [cart]);
-  const discount = useMemo(() => Math.round(subtotal * discountPct) / 100 * (100 * (discountPct / 100)) || Math.round(subtotal * discountPct / 100 * 100) / 100, [subtotal, discountPct]);
+  const discount = useMemo(() => Math.round(subtotal * discountPct / 100), [subtotal, discountPct]);
   const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
 
   const addToCart = (product) => {
@@ -88,6 +88,10 @@ export default function POS() {
       const found = await base44.entities.DiscountCode.filter({ code: code.trim(), active: true });
       const dc = found?.[0];
       if (!dc) { setDiscountError('Invalid or inactive code.'); return; }
+      if (dc.single_use !== false && Number(dc.usage_count || 0) >= 1) {
+        setDiscountError('This discount code has already been used.');
+        return;
+      }
       setDiscountPct(dc.percentage);
       setDiscountCode(dc.code);
       setDiscountError('');
@@ -115,50 +119,22 @@ export default function POS() {
   const completeSale = async (payments) => {
     setPaying(true);
     try {
-      const summary = payments.map((p) => p.method).join(' + ');
-      const sale = await base44.entities.Sale.create({
+      const result = await base44.functions.invoke('complete-sale', {
         shift_id: shift.id,
-        user_id: user.id,
-        user_name: user.full_name || user.email,
-        shop_id: shift.shop_id,
-        shop_name: shift.shop_name,
-        items: cart,
-        subtotal,
+        items: cart.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        })),
         discount_code: discountCode || undefined,
-        discount_amount: discount,
-        total,
         payments,
-        payment_methods_summary: summary,
-        status: 'completed',
       });
-
-      // update shift totals
-      const cashInc = payments.filter((p) => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
-      const uzcardInc = payments.filter((p) => p.method === 'uzcard').reduce((s, p) => s + p.amount, 0);
-      const humoInc = payments.filter((p) => p.method === 'humo').reduce((s, p) => s + p.amount, 0);
-      const onlineInc = payments.filter((p) => ['click', 'payme', 'other'].includes(p.method)).reduce((s, p) => s + p.amount, 0);
-      await base44.entities.Shift.update(shift.id, {
-        cash_sales: shift.cash_sales + cashInc,
-        uzcard_sales: shift.uzcard_sales + uzcardInc,
-        humo_sales: shift.humo_sales + humoInc,
-        online_sales: shift.online_sales + onlineInc,
-        total_sales: shift.total_sales + total,
-        expected_cash: (shift.starting_cash + shift.cash_sales) + cashInc,
-        order_count: shift.order_count + 1,
-      });
-
-      // bump discount usage
-      if (discountCode) {
-        try {
-          const dc = (await base44.entities.DiscountCode.filter({ code: discountCode }))?.[0];
-          if (dc) await base44.entities.DiscountCode.update(dc.id, { usage_count: (dc.usage_count || 0) + 1 });
-        } catch {}
+      const payload = result?.data || result;
+      if (!payload?.sale) {
+        throw new Error(payload?.error || 'The sale could not be completed.');
       }
 
-      await logAction(user, 'sale_completed', `Total ${formatUZS(total)} via ${summary}. ${cart.length} items.`);
-
-      setLastSale({ ...sale, items: cart, user_name: sale.user_name, shop_name: sale.shop_name, created_date: sale.created_date });
-      setShift({ ...shift, cash_sales: shift.cash_sales + cashInc, uzcard_sales: shift.uzcard_sales + uzcardInc, humo_sales: shift.humo_sales + humoInc, online_sales: shift.online_sales + onlineInc, total_sales: shift.total_sales + total, expected_cash: (shift.starting_cash + shift.cash_sales) + cashInc, order_count: shift.order_count + 1 });
+      setLastSale(payload.sale);
+      if (payload.shift) setShift(payload.shift);
       setPayOpen(false);
       setReceiptOpen(true);
       clearCart();
