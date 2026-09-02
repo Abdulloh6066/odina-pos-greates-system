@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Search, Star, Clock, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatUZS, logAction, todayISO } from '@/lib/pos';
+import { formatUZS } from '@/lib/pos';
 import ProductCard from '@/components/pos/ProductCard';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
@@ -85,13 +85,9 @@ export default function POS() {
   const applyDiscount = async (code) => {
     if (!code) return;
     try {
-      const found = await base44.entities.DiscountCode.filter({ code: code.trim(), active: true });
-      const dc = found?.[0];
-      if (!dc) { setDiscountError('Invalid or inactive code.'); return; }
-      if (dc.single_use !== false && Number(dc.usage_count || 0) >= 1) {
-        setDiscountError('This discount code has already been used.');
-        return;
-      }
+      const result = await base44.functions.invoke('validate-discount', { code });
+      const dc = result?.data || result;
+      if (!dc?.code) { setDiscountError(dc?.error || 'Invalid or inactive code.'); return; }
       setDiscountPct(dc.percentage);
       setDiscountCode(dc.code);
       setDiscountError('');
@@ -148,19 +144,14 @@ export default function POS() {
   const openShift = async ({ shop, starting_cash }) => {
     setShiftLoading(true);
     try {
-      const newShift = await base44.entities.Shift.create({
-        user_id: user.id,
-        user_name: user.full_name || user.email,
-        shop_id: shop.id,
-        shop_name: shop.name,
-        status: 'open',
-        opened_at: todayISO(),
+      const result = await base44.functions.invoke('open-shift', {
+        shop_id: shop?.id,
         starting_cash,
-        expected_cash: starting_cash,
       });
-      setShift(newShift);
+      const payload = result?.data || result;
+      if (!payload?.shift) throw new Error(payload?.error || 'The shift could not be opened.');
+      setShift(payload.shift);
       setOpenShiftOpen(false);
-      await logAction(user, 'shift_opened', `${shop.name}, starting cash ${formatUZS(starting_cash)}`);
     } catch (e) { alert('Could not open shift: ' + (e?.message || e)); }
     finally { setShiftLoading(false); }
   };
@@ -168,14 +159,13 @@ export default function POS() {
   const closeShift = async ({ actual_cash }) => {
     setShiftLoading(true);
     try {
-      const expected = shift.expected_cash;
-      await base44.entities.Shift.update(shift.id, {
-        status: 'closed',
-        closed_at: todayISO(),
+      const result = await base44.functions.invoke('close-shift', {
+        shift_id: shift.id,
         actual_cash,
-        difference: actual_cash - expected,
       });
-      await logAction(user, 'shift_closed', `${shift.shop_name}. Difference ${formatUZS(actual_cash - expected)}`);
+      const payload = result?.data || result;
+      if (!payload?.shift) throw new Error(payload?.error || 'The shift could not be closed.');
+      window.print();
       setShift(null);
       setCloseShiftOpen(false);
     } catch (e) { alert('Could not close shift: ' + (e?.message || e)); }
@@ -285,7 +275,7 @@ export default function POS() {
 
       <PaymentModal open={payOpen} total={total} onClose={() => setPayOpen(false)} onConfirm={completeSale} loading={paying} />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => setReceiptOpen(false)} />
-      <OpenShiftDialog open={openShiftOpen} shops={shops} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
+      <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
     </div>
   );
