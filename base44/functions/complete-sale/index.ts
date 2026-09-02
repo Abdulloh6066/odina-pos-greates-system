@@ -195,6 +195,9 @@ Deno.serve(async (req) => {
     const onlineIncrement = normalizedPayments
       .filter((payment) => ["click", "payme", "other"].includes(payment.method))
       .reduce((sum, payment) => sum + payment.amount, 0);
+    const bankTransferIncrement = normalizedPayments
+      .filter((payment) => payment.method === "bank_transfer")
+      .reduce((sum, payment) => sum + payment.amount, 0);
 
     const shiftUpdate = await service.entities.Shift.updateMany(
       { id: shift.id, status: "open" },
@@ -204,6 +207,7 @@ Deno.serve(async (req) => {
           uzcard_sales: uzcardIncrement,
           humo_sales: humoIncrement,
           online_sales: onlineIncrement,
+          bank_transfer_sales: bankTransferIncrement,
           total_sales: total,
           expected_cash: cashIncrement,
           order_count: 1,
@@ -215,7 +219,17 @@ Deno.serve(async (req) => {
       throw new Error("The shift changed while the sale was being completed.");
     }
 
-    const updatedShift = await service.entities.Shift.get(shift.id);
+    const updatedShift = {
+      ...shift,
+      cash_sales: Number(shift.cash_sales || 0) + cashIncrement,
+      uzcard_sales: Number(shift.uzcard_sales || 0) + uzcardIncrement,
+      humo_sales: Number(shift.humo_sales || 0) + humoIncrement,
+      online_sales: Number(shift.online_sales || 0) + onlineIncrement,
+      bank_transfer_sales: Number(shift.bank_transfer_sales || 0) + bankTransferIncrement,
+      total_sales: Number(shift.total_sales || 0) + total,
+      expected_cash: Number(shift.expected_cash || 0) + cashIncrement,
+      order_count: Number(shift.order_count || 0) + 1,
+    };
 
     try {
       await service.entities.ActionHistory.create({
