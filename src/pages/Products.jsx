@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2 } from 'lucide-react';
-import { formatUZS, canAccess, logAction } from '@/lib/pos';
+import { formatUZS, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
