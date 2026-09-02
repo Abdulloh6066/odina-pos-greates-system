@@ -16,6 +16,17 @@
       "type": "number",
       "default": 0
     },
+    "single_use": {
+      "type": "boolean",
+      "default": true
+    },
+    "used_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "used_by_sale_id": {
+      "type": "string"
+    },
     "note": {
       "type": "string"
     }
