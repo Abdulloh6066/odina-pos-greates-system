@@ -20,6 +20,9 @@ export default function Settings() {
   const [thankYou, setThankYou] = useState('Rahmat! Sizning tabassumingiz biz uchun juda muhim ❤️');
   const [receiptFooter, setReceiptFooter] = useState('');
   const [currency, setCurrency] = useState('UZS');
+  const [ownerPin, setOwnerPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -47,6 +50,21 @@ export default function Settings() {
       alert('Settings saved.');
     } catch (e) { alert('Save failed: ' + (e?.message || e)); }
     finally { setSaving(false); }
+  };
+
+  const saveOwnerPin = async () => {
+    if (!/^\d{4,8}$/.test(ownerPin)) return alert('PIN must contain 4 to 8 digits.');
+    if (ownerPin !== confirmPin) return alert('PIN confirmation does not match.');
+    setSavingPin(true);
+    try {
+      const result = await base44.functions.invoke('set-owner-pin', { pin: ownerPin });
+      const payload = result?.data || result;
+      if (!payload?.success) throw new Error(payload?.error || 'Could not save PIN.');
+      setOwnerPin('');
+      setConfirmPin('');
+      alert('Owner approval PIN saved securely.');
+    } catch (e) { alert('PIN save failed: ' + (e?.message || e)); }
+    finally { setSavingPin(false); }
   };
 
   const addShop = async () => {
@@ -84,6 +102,26 @@ export default function Settings() {
             </div>
             <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
               <Save className="w-4 h-4 mr-1.5" /> {saving ? 'Saving…' : 'Save settings'}
+            </Button>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border premium-shadow p-5 mt-5 space-y-4">
+            <div>
+              <h2 className="font-display text-lg font-bold">Owner approval PIN</h2>
+              <p className="text-xs text-muted-foreground mt-1">Used later for refunds and protected cashier actions. The PIN is stored only as a secure hash.</p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1.5 block">New PIN (4–8 digits)</Label>
+                <Input type="password" inputMode="numeric" autoComplete="new-password" value={ownerPin} onChange={(e) => setOwnerPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+              </div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Confirm PIN</Label>
+                <Input type="password" inputMode="numeric" autoComplete="new-password" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+              </div>
+            </div>
+            <Button onClick={saveOwnerPin} disabled={savingPin || !ownerPin || !confirmPin} variant="outline">
+              {savingPin ? 'Saving securely…' : 'Set owner PIN'}
             </Button>
           </div>
 
