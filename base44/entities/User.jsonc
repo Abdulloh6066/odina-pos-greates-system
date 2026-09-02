@@ -6,8 +6,9 @@
       "type": "string",
       "enum": [
         "admin",
-        "manager",
-        "cashier"
+        "cashier",
+        "accountant",
+        "production"
       ],
       "default": "cashier"
     },
