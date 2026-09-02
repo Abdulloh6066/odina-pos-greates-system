@@ -1,0 +1,49 @@
+{
+  "name": "SecuritySettings",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "pin_hash": {
+      "type": "string"
+    },
+    "pin_salt": {
+      "type": "string"
+    },
+    "pin_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "pin_updated_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "pin_hash",
+    "pin_salt"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
