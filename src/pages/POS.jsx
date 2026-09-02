@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Search, Star, Clock, Building2, Plus } from 'lucide-react';
+import { Search, Star, Clock, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatUZS, formatNum, logAction, todayISO, isSameDay } from '@/lib/pos';
+import { formatUZS, logAction, todayISO } from '@/lib/pos';
 import ProductCard from '@/components/pos/ProductCard';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
