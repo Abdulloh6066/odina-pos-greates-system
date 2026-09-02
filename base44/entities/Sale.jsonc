@@ -2,6 +2,17 @@
   "name": "Sale",
   "type": "object",
   "properties": {
+    "sale_number": {
+      "type": "string"
+    },
+    "financial_records_version": {
+      "type": "number",
+      "default": 2
+    },
+    "sale_items_count": {
+      "type": "number",
+      "default": 0
+    },
     "shift_id": {
       "type": "string"
     },
@@ -79,6 +90,11 @@
     }
   },
   "required": [
-    "total"
+    "shift_id",
+    "user_id",
+    "shop_id",
+    "subtotal",
+    "total",
+    "status"
   ]
 }
