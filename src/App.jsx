@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
+import RoleRoute from '@/components/RoleRoute';
 // Auth pages
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -60,16 +61,16 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<AuthGate />}>
               <Route element={<Layout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/pos" element={<POS />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/discounts" element={<DiscountCodes />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/sales" element={<SalesHistory />} />
-                <Route path="/shifts" element={<Shifts />} />
+                <Route path="/" element={<RoleRoute pageKey="dashboard"><Dashboard /></RoleRoute>} />
+                <Route path="/pos" element={<RoleRoute pageKey="pos"><POS /></RoleRoute>} />
+                <Route path="/products" element={<RoleRoute pageKey="products"><Products /></RoleRoute>} />
+                <Route path="/categories" element={<RoleRoute pageKey="categories"><Categories /></RoleRoute>} />
+                <Route path="/users" element={<RoleRoute pageKey="users"><Users /></RoleRoute>} />
+                <Route path="/reports" element={<RoleRoute pageKey="reports"><Reports /></RoleRoute>} />
+                <Route path="/discounts" element={<RoleRoute pageKey="discounts"><DiscountCodes /></RoleRoute>} />
+                <Route path="/settings" element={<RoleRoute pageKey="settings"><Settings /></RoleRoute>} />
+                <Route path="/sales" element={<RoleRoute pageKey="sales"><SalesHistory /></RoleRoute>} />
+                <Route path="/shifts" element={<RoleRoute pageKey="shifts"><Shifts /></RoleRoute>} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />
