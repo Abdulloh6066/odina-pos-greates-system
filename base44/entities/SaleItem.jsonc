@@ -68,6 +68,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
           "data.cashier_id": "{{user.id}}"
         }
       ]
