@@ -81,6 +81,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
             <SummaryRow label="Uzcard sales" value={formatUZS(shift?.uzcard_sales)} />
             <SummaryRow label="Humo sales" value={formatUZS(shift?.humo_sales)} />
             <SummaryRow label="Online sales" value={formatUZS(shift?.online_sales)} />
+            <SummaryRow label="Bank transfers" value={formatUZS(shift?.bank_transfer_sales)} />
             <SummaryRow label="Total sales" value={formatUZS(shift?.total_sales)} bold />
             <SummaryRow label="Starting cash" value={formatUZS(shift?.starting_cash)} />
             <SummaryRow label="Expected cash" value={formatUZS(expected)} bold />
