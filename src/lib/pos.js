@@ -6,6 +6,7 @@ export const PAYMENT_METHODS = [
   { id: 'humo', label: 'Humo', short: 'Humo', group: 'card' },
   { id: 'click', label: 'Click', short: 'Click', group: 'online' },
   { id: 'payme', label: 'Payme', short: 'Payme', group: 'online' },
+  { id: 'bank_transfer', label: 'Bank transfer', short: 'Bank', group: 'bank' },
   { id: 'other', label: 'Other online', short: 'Other', group: 'online' },
 ];
 
