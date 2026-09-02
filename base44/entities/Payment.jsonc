@@ -1,0 +1,80 @@
+{
+  "name": "Payment",
+  "type": "object",
+  "properties": {
+    "sale_id": {
+      "type": "string"
+    },
+    "sale_number": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shift_id": {
+      "type": "string"
+    },
+    "cashier_id": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "uzcard",
+        "humo",
+        "click",
+        "payme",
+        "bank_transfer",
+        "other"
+      ]
+    },
+    "amount": {
+      "type": "number"
+    },
+    "reference": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "sale_id",
+    "shop_id",
+    "shift_id",
+    "cashier_id",
+    "method",
+    "amount"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.cashier_id": "{{user.id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
