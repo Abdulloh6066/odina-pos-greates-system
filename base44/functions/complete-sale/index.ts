@@ -25,6 +25,9 @@ Deno.serve(async (req) => {
     if (!user) {
       return Response.json({ error: "Authentication required." }, { status: 401 });
     }
+    if (!["admin", "cashier"].includes(user.role)) {
+      return Response.json({ error: "Your role cannot complete Kassa sales." }, { status: 403 });
+    }
 
     const body = await req.json();
     const shiftId = String(body?.shift_id || "");
@@ -43,7 +46,10 @@ Deno.serve(async (req) => {
     if (shift.user_id !== user.id) {
       return Response.json({ error: "This shift belongs to another user." }, { status: 403 });
     }
-    if (user.role === "cashier" && user.shop_id && user.shop_id !== shift.shop_id) {
+    if (user.role === "cashier" && !user.shop_id) {
+      return Response.json({ error: "Owner must assign this cashier to a shop first." }, { status: 403 });
+    }
+    if (user.role === "cashier" && user.shop_id !== shift.shop_id) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
