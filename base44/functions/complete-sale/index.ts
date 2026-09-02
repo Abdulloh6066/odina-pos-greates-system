@@ -215,6 +215,8 @@ Deno.serve(async (req) => {
       throw new Error("The shift changed while the sale was being completed.");
     }
 
+    const updatedShift = await service.entities.Shift.get(shift.id);
+
     try {
       await service.entities.ActionHistory.create({
         user_id: user.id,
@@ -230,6 +232,7 @@ Deno.serve(async (req) => {
       sale,
       sale_items: saleItems,
       payments: paymentRecords,
+      shift: updatedShift,
     });
   } catch (error) {
     if (claimedDiscount && sale) {
