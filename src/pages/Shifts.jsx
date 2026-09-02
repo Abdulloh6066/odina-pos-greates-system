@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Clock, CheckCircle2, PlayCircle } from 'lucide-react';
-import { formatUZS, formatNum, canAccess } from '@/lib/pos';
+import { formatUZS, formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 
 export default function Shifts() {
