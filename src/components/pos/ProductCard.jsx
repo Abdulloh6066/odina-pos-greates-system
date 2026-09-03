@@ -7,7 +7,7 @@ export default function ProductCard({ product, onAdd }) {
   return (
     <button
       onClick={() => onAdd(product)}
-      className="group relative text-left bg-card rounded-2xl overflow-hidden border border-border/70 premium-shadow hover:premium-shadow-lg transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary"
+      className="group relative text-left bg-card rounded-2xl overflow-hidden border border-border/70 premium-shadow hover:premium-shadow-lg transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 touch-manipulation select-none"
     >
       <div className="relative aspect-square bg-secondary overflow-hidden">
         {product.image_url ? (
@@ -22,7 +22,7 @@ export default function ProductCard({ product, onAdd }) {
             {product.name.charAt(0)}
           </div>
         )}
-        <div className="absolute top-2 right-2 w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+        <div className="absolute top-2 right-2 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow-lg">
           <Plus className="w-5 h-5" strokeWidth={2.5} />
         </div>
       </div>
