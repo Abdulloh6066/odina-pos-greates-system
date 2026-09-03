@@ -25,29 +25,31 @@ export default function Reports() {
     })();
   }, []);
 
+  const completedSales = useMemo(() => sales.filter((sale) => sale.status !== 'refunded'), [sales]);
+
   const last7 = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      const daySales = sales.filter((s) => isSameDay(s.created_date, d));
+      const daySales = completedSales.filter((s) => isSameDay(s.created_date, d));
       days.push({ date: d.toLocaleDateString('en-GB', { weekday: 'short' }), total: daySales.reduce((sum, s) => sum + s.total, 0), orders: daySales.length });
     }
     return days;
-  }, [sales]);
+  }, [completedSales]);
 
   const byMethod = useMemo(() => {
     const map = {};
-    sales.forEach((s) => s.payments?.forEach((p) => { map[p.method] = (map[p.method] || 0) + p.amount; }));
+    completedSales.forEach((s) => s.payments?.forEach((p) => { map[p.method] = (map[p.method] || 0) + p.amount; }));
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [sales]);
+  }, [completedSales]);
 
   const byShop = useMemo(() => {
     const map = {};
-    sales.forEach((s) => { if (s.shop_name) map[s.shop_name] = (map[s.shop_name] || 0) + s.total; });
+    completedSales.forEach((s) => { if (s.shop_name) map[s.shop_name] = (map[s.shop_name] || 0) + s.total; });
     return Object.entries(map).map(([name, total]) => ({ name, total }));
-  }, [sales]);
+  }, [completedSales]);
 
-  const totalRev = sales.reduce((s, x) => s + x.total, 0);
+  const totalRev = completedSales.reduce((s, x) => s + x.total, 0);
 
   if (role === 'cashier') return <Navigate to="/pos" replace />;
 
