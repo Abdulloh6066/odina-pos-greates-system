@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Search, Star, Clock, Building2 } from 'lucide-react';
+import { Search, Star, Clock, Building2, BanknoteArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -85,7 +85,13 @@ export default function POS() {
   const applyDiscount = async (code) => {
     if (!code) return;
     try {
-      const result = await base44.functions.invoke('validate-discount', { code });
+      const ownerPin = user?.role === 'cashier' ? window.prompt('Owner PIN required for discount:') : undefined;
+      if (user?.role === 'cashier' && !ownerPin) return;
+      const result = await base44.functions.invoke('complete-sale', {
+        action: 'validate_discount',
+        code,
+        owner_pin: ownerPin,
+      });
       const dc = result?.data || result;
       if (!dc?.code) { setDiscountError(dc?.error || 'Invalid or inactive code.'); return; }
       setDiscountPct(dc.percentage);
@@ -144,7 +150,8 @@ export default function POS() {
   const openShift = async ({ shop, starting_cash }) => {
     setShiftLoading(true);
     try {
-      const result = await base44.functions.invoke('open-shift', {
+      const result = await base44.functions.invoke('complete-sale', {
+        action: 'open_shift',
         shop_id: shop?.id,
         starting_cash,
       });
@@ -159,7 +166,8 @@ export default function POS() {
   const closeShift = async ({ actual_cash }) => {
     setShiftLoading(true);
     try {
-      const result = await base44.functions.invoke('close-shift', {
+      const result = await base44.functions.invoke('complete-sale', {
+        action: 'close_shift',
         shift_id: shift.id,
         actual_cash,
       });
@@ -170,6 +178,29 @@ export default function POS() {
       setCloseShiftOpen(false);
     } catch (e) { alert('Could not close shift: ' + (e?.message || e)); }
     finally { setShiftLoading(false); }
+  };
+
+  const recordCashWithdrawal = async () => {
+    if (!shift) return alert('Open a shift first.');
+    const amount = Number(window.prompt('Cash amount removed from drawer:'));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const reason = window.prompt('Reason for removing cash:')?.trim();
+    if (!reason) return;
+    const employeeName = window.prompt('Employee name:')?.trim();
+    if (!employeeName) return;
+    try {
+      const result = await base44.functions.invoke('complete-sale', {
+        action: 'cash_withdrawal',
+        shift_id: shift.id,
+        amount,
+        reason,
+        employee_name: employeeName,
+      });
+      const payload = result?.data || result;
+      if (!payload?.shift) throw new Error(payload?.error || 'Could not record withdrawal.');
+      setShift(payload.shift);
+      alert('Cash withdrawal recorded.');
+    } catch (e) { alert('Withdrawal failed: ' + (e?.message || e)); }
   };
 
   return (
@@ -193,6 +224,9 @@ export default function POS() {
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
               <Clock className="w-3.5 h-3.5" /> Shift open
             </div>
+            <Button variant="outline" size="sm" onClick={recordCashWithdrawal} className="h-9">
+              <BanknoteArrowDown className="w-4 h-4 mr-1.5" /> Cash out
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-9">
               Close shift
             </Button>
