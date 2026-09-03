@@ -61,6 +61,50 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const action = String(body?.action || "complete_sale");
 
+    if (action === "open_shift") {
+      const startingCash = money(body?.starting_cash);
+      if (startingCash < 0) return Response.json({ error: "Starting cash must be zero or more." }, { status: 400 });
+      const existing = await service.entities.Shift.filter({ user_id: user.id, status: "open" });
+      if (existing?.length) return Response.json({ error: "You already have an open shift." }, { status: 409 });
+      let shopId = String(body?.shop_id || "");
+      if (user.role === "cashier") {
+        if (!user.shop_id) return Response.json({ error: "Owner must assign this cashier to a shop first." }, { status: 403 });
+        shopId = user.shop_id;
+      }
+      const shop = shopId ? await service.entities.Shop.get(shopId) : null;
+      if (!shop) return Response.json({ error: "Shop not found." }, { status: 404 });
+      const now = new Date().toISOString();
+      const newShift = await service.entities.Shift.create({
+        user_id: user.id, user_name: user.full_name || user.email,
+        shop_id: shop.id, shop_name: shop.name, status: "open", opened_at: now,
+        starting_cash: startingCash, expected_cash: startingCash,
+      });
+      await service.entities.ActionHistory.create({
+        user_id: user.id, user_name: user.full_name || user.email,
+        action: "shift_opened", details: `${shop.name}, starting cash ${startingCash} UZS`,
+      });
+      return Response.json({ shift: newShift });
+    }
+
+    if (action === "close_shift") {
+      const shiftId = String(body?.shift_id || "");
+      const actualCash = money(body?.actual_cash);
+      if (!shiftId || actualCash < 0) return Response.json({ error: "Valid shift and counted cash are required." }, { status: 400 });
+      const closingShift = await service.entities.Shift.get(shiftId);
+      if (!closingShift || closingShift.status !== "open") return Response.json({ error: "The shift is not open." }, { status: 409 });
+      if (closingShift.user_id !== user.id) return Response.json({ error: "This shift belongs to another user." }, { status: 403 });
+      const expected = money(closingShift.expected_cash);
+      const updated = await service.entities.Shift.update(closingShift.id, {
+        status: "closed", closed_at: new Date().toISOString(),
+        actual_cash: actualCash, difference: actualCash - expected,
+      });
+      await service.entities.ActionHistory.create({
+        user_id: user.id, user_name: user.full_name || user.email,
+        action: "shift_closed", details: `${closingShift.shop_name}. Difference ${actualCash - expected} UZS`,
+      });
+      return Response.json({ shift: updated, print_report_required: true });
+    }
+
     if (action === "validate_discount") {
       if (user.role === "cashier" && !(await verifyOwnerPin(service, body?.owner_pin))) {
         return Response.json({ error: "Owner PIN is incorrect." }, { status: 403 });
