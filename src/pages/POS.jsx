@@ -56,7 +56,7 @@ export default function POS() {
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active));
-    setShops(shopList || []);
+    setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
     setSettings(settingsList?.[0] || null);
     const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
     setShift(myOpen || null);
