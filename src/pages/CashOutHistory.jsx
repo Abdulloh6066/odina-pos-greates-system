@@ -86,18 +86,18 @@ export default function CashOutHistory() {
   return (
     <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
-        title="Cash-out History"
-        subtitle={ownerView ? 'Cash removed from every shop' : 'Cash removed by your account only'}
+        title="Kassadan pul olish tarixi"
+        subtitle={ownerView ? 'Barcha do‘konlardan olingan naqd pullar' : 'Faqat sizning hisobingiz orqali olingan pullar'}
         icon={Banknote}
       />
 
       <div className="rounded-2xl bg-card border border-border premium-shadow p-4 mb-6 space-y-4">
         <div className="flex flex-wrap gap-2">
           {[
-            ['today', 'Today'],
-            ['yesterday', 'Yesterday'],
-            ['week', 'Last 7 days'],
-            ['all', 'All time'],
+            ['today', 'Bugun'],
+            ['yesterday', 'Kecha'],
+            ['week', 'Oxirgi 7 kun'],
+            ['all', 'Barcha vaqt'],
           ].map(([value, label]) => (
             <Button
               key={value}
@@ -105,7 +105,7 @@ export default function CashOutHistory() {
               size="sm"
               variant={period === value && !selectedDate ? 'default' : 'outline'}
               onClick={() => { setPeriod(value); setSelectedDate(''); }}
-              className={period === value && !selectedDate ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}
+              className={`min-h-11 rounded-xl touch-manipulation ${period === value && !selectedDate ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}`}
             >
               {label}
             </Button>
@@ -114,7 +114,7 @@ export default function CashOutHistory() {
 
         <div className={`grid gap-3 ${ownerView ? 'sm:grid-cols-2' : ''}`}>
           <label className="space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Choose exact day</span>
+            <span className="text-xs font-medium text-muted-foreground">Aniq kunni tanlang</span>
             <Input
               type="date"
               value={selectedDate}
@@ -124,13 +124,13 @@ export default function CashOutHistory() {
           </label>
           {ownerView && (
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Shop</span>
+              <span className="text-xs font-medium text-muted-foreground">Do‘kon</span>
               <select
                 value={selectedShop}
                 onChange={(event) => setSelectedShop(event.target.value)}
                 className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
-                <option value="all">All shops</option>
+                <option value="all">Barcha do‘konlar</option>
                 {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
               </select>
             </label>
@@ -142,7 +142,7 @@ export default function CashOutHistory() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search employee, reason or amount…"
+            placeholder="Xodim, sabab yoki summa bo‘yicha qidirish…"
             className="h-11 rounded-xl pl-10 pr-11 bg-background"
           />
           {search && (
@@ -152,7 +152,7 @@ export default function CashOutHistory() {
               size="icon"
               onClick={() => setSearch('')}
               className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9"
-              aria-label="Clear search"
+              aria-label="Qidiruvni tozalash"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -162,11 +162,11 @@ export default function CashOutHistory() {
 
       <div className="grid sm:grid-cols-2 gap-3 mb-6">
         <div className="rounded-2xl bg-card border border-border premium-shadow p-4">
-          <p className="text-xs text-muted-foreground">Total cash removed</p>
+          <p className="text-xs text-muted-foreground">Jami olingan naqd pul</p>
           <p className="text-2xl font-semibold mt-1">{formatUZS(total)}</p>
         </div>
         <div className="rounded-2xl bg-card border border-border premium-shadow p-4">
-          <p className="text-xs text-muted-foreground">Records</p>
+          <p className="text-xs text-muted-foreground">Yozuvlar</p>
           <p className="text-2xl font-semibold mt-1">{formatNum(filtered.length)}</p>
         </div>
       </div>
@@ -180,16 +180,16 @@ export default function CashOutHistory() {
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl bg-card border border-border py-16 text-center">
           <Banknote className="w-9 h-9 mx-auto text-muted-foreground/50 mb-3" />
-          <p className="font-medium">{search ? 'No matching cash-outs' : 'No cash-outs yet'}</p>
+          <p className="font-medium">{search ? 'Mos yozuv topilmadi' : 'Hali kassadan pul olinmagan'}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {search ? 'Try a different shop, date, employee or reason.' : 'Cash removed from the drawer will appear here.'}
+            {search ? 'Boshqa do‘kon, sana, xodim yoki sababni tanlang.' : 'Kassadan olingan pullar shu yerda ko‘rinadi.'}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((movement) => {
             const date = new Date(movement.created_at || movement.created_date);
-            const employee = movement.employee_name || movement.user_name || 'Unknown user';
+            const employee = movement.employee_name || movement.user_name || 'Noma’lum xodim';
             return (
               <div key={movement.id} className="rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -198,7 +198,7 @@ export default function CashOutHistory() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays className="w-3.5 h-3.5" />
-                        {date.toLocaleString('en-GB', {
+                        {date.toLocaleString('uz-UZ', {
                           day: '2-digit', month: 'short', year: 'numeric',
                           hour: '2-digit', minute: '2-digit',
                         })}
@@ -207,7 +207,7 @@ export default function CashOutHistory() {
                         <UserRound className="w-3.5 h-3.5" />{employee}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
-                        <Store className="w-3.5 h-3.5" />{shopNames[movement.shop_id] || 'Shop'}
+                        <Store className="w-3.5 h-3.5" />{shopNames[movement.shop_id] || 'Do‘kon'}
                       </span>
                     </div>
                   </div>
