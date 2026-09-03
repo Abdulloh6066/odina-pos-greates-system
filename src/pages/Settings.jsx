@@ -59,7 +59,7 @@ export default function Settings() {
     try {
       const saltBytes = crypto.getRandomValues(new Uint8Array(24));
       const salt = Array.from(saltBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-      const iterations = 210000;
+      const iterations = 100000;
       const keyMaterial = await crypto.subtle.importKey(
         'raw',
         new TextEncoder().encode(ownerPin),
