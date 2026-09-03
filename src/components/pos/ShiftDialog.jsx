@@ -81,7 +81,13 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Close Shift</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-3 receipt-print">
+          <div className="text-center font-mono mb-3">
+            <div className="font-bold text-lg">ODINA SHOP</div>
+            <div className="text-sm">SHIFT REPORT</div>
+            <div className="text-xs">{shift?.shop_name} · {shift?.user_name}</div>
+            <div className="text-xs">{new Date().toLocaleString('en-GB')}</div>
+          </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <SummaryRow label="Cash sales" value={formatUZS(shift?.cash_sales)} />
             <SummaryRow label="Uzcard sales" value={formatUZS(shift?.uzcard_sales)} />
@@ -92,6 +98,8 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
             <SummaryRow label="Starting cash" value={formatUZS(shift?.starting_cash)} />
             <SummaryRow label="Expected cash" value={formatUZS(expected)} bold />
             <SummaryRow label="Orders" value={shift?.order_count || 0} />
+            <SummaryRow label="Cash removed" value={formatUZS(shift?.cash_removed)} />
+            <SummaryRow label="Refunds" value={formatUZS(shift?.refunds_total)} />
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Counted actual cash</label>
