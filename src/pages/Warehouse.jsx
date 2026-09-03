@@ -22,6 +22,10 @@ const SOURCE_LABELS = {
   shop_prepared: 'Do‘konning o‘zida tayyorlanadi',
   resale: 'Tayyor holda sotib olinadi',
 };
+const INGREDIENT_CATEGORY_LABELS = {
+  food: 'Oziq-ovqat masallig‘i',
+  packaging: 'Qadoqlash',
+};
 const MOVEMENT_LABELS = {
   opening: 'Boshlang‘ich qoldiq',
   adjustment: 'Qoldiq tuzatishi',
@@ -254,7 +258,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
               <div className="min-w-0">
                 <p className="font-semibold truncate">{item.name}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-                  {kind === 'ingredient' ? item.category : (SOURCE_LABELS[item.source_type] || 'Markaziy ishlab chiqarishda tayyorlanadi')}
+                  {kind === 'ingredient' ? (INGREDIENT_CATEGORY_LABELS[item.category] || item.category) : (SOURCE_LABELS[item.source_type] || 'Markaziy ishlab chiqarishda tayyorlanadi')}
                 </p>
               </div>
               <div className={`rounded-xl px-3 py-1.5 text-right ${quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>
@@ -349,7 +353,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq or packaging</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq yoki qadoq</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">Nomi</Label>
@@ -390,7 +394,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
-          <Button onClick={save} disabled={saving || !name.trim()} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={save} disabled={saving || !name.trim()} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             {saving ? 'Saqlanmoqda…' : 'Yaratish'}
           </Button>
         </DialogFooter>
@@ -480,7 +484,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
-          <Button onClick={save} disabled={saving || !quantity || !reason.trim() || after < 0} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={save} disabled={saving || !quantity || !reason.trim() || after < 0} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             {saving ? 'Saqlanmoqda…' : 'Tarix bilan saqlash'}
           </Button>
         </DialogFooter>
