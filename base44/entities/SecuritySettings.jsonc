@@ -11,6 +11,12 @@
     "pin_salt": {
       "type": "string"
     },
+    "pin_algorithm": {
+      "type": "string"
+    },
+    "pin_iterations": {
+      "type": "number"
+    },
     "pin_updated_at": {
       "type": "string",
       "format": "date-time"
