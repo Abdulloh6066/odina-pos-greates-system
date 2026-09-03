@@ -53,38 +53,38 @@ export default function Dashboard() {
 
   return (
     <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
-      <PageHeader title="Dashboard" subtitle={new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
+      <PageHeader title="Bosh sahifa" subtitle={new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
 
       {loading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard icon={TrendingUp} label="Today's sales" value={formatUZS(todayTotal)} accent />
-            <StatCard icon={Receipt} label="Orders today" value={formatNum(todayOrders)} />
-            <StatCard icon={ShoppingBag} label="Avg. order" value={formatUZS(avgOrder)} />
-            <StatCard icon={Star} label="Products" value={formatNum(products.length)} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <StatCard icon={TrendingUp} label="Bugungi savdo" value={formatUZS(todayTotal)} accent />
+            <StatCard icon={Receipt} label="Bugungi buyurtmalar" value={formatNum(todayOrders)} />
+            <StatCard icon={ShoppingBag} label="O‘rtacha buyurtma" value={formatUZS(avgOrder)} />
+            <StatCard icon={Star} label="Mahsulotlar" value={formatNum(products.length)} />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-5 mt-6">
-            <Panel title="Best sellers today" icon={Star}>
-              {bestSellers.length === 0 ? <Empty text="No sales yet today" /> : (
+            <Panel title="Bugungi eng ko‘p sotilganlar" icon={Star}>
+              {bestSellers.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
                 <div className="space-y-2.5">
                   {bestSellers.map(([name, qty], i) => (
                     <div key={name} className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary-strong flex items-center justify-center text-xs font-bold">{i + 1}</div>
                       <span className="flex-1 text-sm font-medium truncate">{name}</span>
-                      <span className="text-sm font-semibold text-muted-foreground">{qty} sold</span>
+                      <span className="text-sm font-semibold text-muted-foreground">{qty} ta sotildi</span>
                     </div>
                   ))}
                 </div>
               )}
             </Panel>
 
-            <Panel title="Top employees today" icon={UsersIcon}>
-              {topEmployees.length === 0 ? <Empty text="No sales yet today" /> : (
+            <Panel title="Bugungi eng faol xodimlar" icon={UsersIcon}>
+              {topEmployees.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
                 <div className="space-y-2.5">
                   {topEmployees.map(([name, amt], i) => (
                     <div key={name} className="flex items-center gap-3">
@@ -100,7 +100,7 @@ export default function Dashboard() {
 
           {canAccess(role, 'pos') && (
             <button onClick={() => navigate('/pos')} className="mt-6 w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-primary-foreground font-semibold premium-shadow hover:bg-primary-strong transition-colors">
-              Open POS <ArrowRight className="w-4 h-4" />
+              Kassani ochish <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </>
@@ -111,7 +111,7 @@ export default function Dashboard() {
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
-    <div className={`rounded-2xl p-5 border ${accent ? 'bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
+    <div className={`rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-primary-foreground/15' : 'bg-primary/15 text-primary-strong'}`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
