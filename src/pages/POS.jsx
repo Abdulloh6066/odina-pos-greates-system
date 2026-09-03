@@ -10,6 +10,7 @@ import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
+import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
 
 export default function POS() {
   const { user } = useOutletContext();
@@ -38,6 +39,11 @@ export default function POS() {
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
   const [shiftLoading, setShiftLoading] = useState(false);
+  const [discountApprovalOpen, setDiscountApprovalOpen] = useState(false);
+  const [pendingDiscountCode, setPendingDiscountCode] = useState('');
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
+  const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
 
   const loadAll = async () => {
     setLoadingData(true);
@@ -82,22 +88,38 @@ export default function POS() {
   const removeItem = (item) => setCart((p) => p.filter((i) => i.product_id !== item.product_id));
   const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); };
 
-  const applyDiscount = async (code) => {
-    if (!code) return;
+  const validateDiscount = async (code, ownerPin) => {
+    setDiscountLoading(true);
     try {
-      const ownerPin = user?.role === 'cashier' ? window.prompt('Owner PIN required for discount:') : undefined;
-      if (user?.role === 'cashier' && !ownerPin) return;
       const result = await base44.functions.invoke('complete-sale', {
         action: 'validate_discount',
         code,
         owner_pin: ownerPin,
       });
       const dc = result?.data || result;
-      if (!dc?.code) { setDiscountError(dc?.error || 'Invalid or inactive code.'); return; }
+      if (!dc?.code) throw new Error(dc?.error || 'Invalid or inactive code.');
       setDiscountPct(dc.percentage);
       setDiscountCode(dc.code);
       setDiscountError('');
-    } catch (e) { setDiscountError('Could not validate code.'); }
+      setDiscountApprovalOpen(false);
+      setPendingDiscountCode('');
+    } catch (e) {
+      setDiscountError(e?.response?.data?.error || e?.data?.error || e?.message || 'Could not validate code.');
+      setDiscountApprovalOpen(false);
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
+  const applyDiscount = (code) => {
+    const normalized = code?.trim().toUpperCase();
+    if (!normalized) return;
+    if (user?.role === 'cashier') {
+      setPendingDiscountCode(normalized);
+      setDiscountApprovalOpen(true);
+      return;
+    }
+    validateDiscount(normalized);
   };
 
   const removeDiscount = () => { setDiscountCode(''); setDiscountPct(0); setDiscountError(''); };
@@ -180,27 +202,26 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
-  const recordCashWithdrawal = async () => {
-    if (!shift) return alert('Open a shift first.');
-    const amount = Number(window.prompt('Cash amount removed from drawer:'));
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const reason = window.prompt('Reason for removing cash:')?.trim();
-    if (!reason) return;
-    const employeeName = window.prompt('Employee name:')?.trim();
-    if (!employeeName) return;
+  const recordCashWithdrawal = async ({ amount, reason, employee_name }) => {
+    if (!shift) return;
+    setCashWithdrawalLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
         action: 'cash_withdrawal',
         shift_id: shift.id,
         amount,
         reason,
-        employee_name: employeeName,
+        employee_name,
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Could not record withdrawal.');
       setShift(payload.shift);
-      alert('Cash withdrawal recorded.');
-    } catch (e) { alert('Withdrawal failed: ' + (e?.message || e)); }
+      setCashWithdrawalOpen(false);
+    } catch (e) {
+      alert('Withdrawal failed: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+    } finally {
+      setCashWithdrawalLoading(false);
+    }
   };
 
   return (
@@ -224,7 +245,7 @@ export default function POS() {
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
               <Clock className="w-3.5 h-3.5" /> Shift open
             </div>
-            <Button variant="outline" size="sm" onClick={recordCashWithdrawal} className="h-9">
+            <Button variant="outline" size="sm" onClick={() => setCashWithdrawalOpen(true)} className="h-9">
               <Banknote className="w-4 h-4 mr-1.5" /> Cash out
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-9">
@@ -311,6 +332,21 @@ export default function POS() {
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => setReceiptOpen(false)} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
+      <OwnerPinDialog
+        open={discountApprovalOpen}
+        title="Approve discount"
+        description={pendingDiscountCode ? `Owner approval is required to apply ${pendingDiscountCode}.` : ''}
+        onClose={() => { setDiscountApprovalOpen(false); setPendingDiscountCode(''); }}
+        onConfirm={(pin) => validateDiscount(pendingDiscountCode, pin)}
+        loading={discountLoading}
+      />
+      <CashWithdrawalDialog
+        open={cashWithdrawalOpen}
+        shift={shift}
+        onClose={() => setCashWithdrawalOpen(false)}
+        onConfirm={recordCashWithdrawal}
+        loading={cashWithdrawalLoading}
+      />
     </div>
   );
 }
