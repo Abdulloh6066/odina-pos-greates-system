@@ -125,6 +125,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user }) {
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [sourceType, setSourceType] = useState('central_produced');
   const [isFavorite, setIsFavorite] = useState(false);
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,6 +138,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user }) {
       setCategoryId(product?.category_id || (categories[0]?.id || ''));
       setImageUrl(product?.image_url || '');
       setDescription(product?.description || '');
+      setSourceType(product?.source_type || 'central_produced');
       setIsFavorite(product?.is_favorite || false);
       setActive(product?.active !== false);
     }
@@ -164,6 +166,9 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user }) {
       category_name: cat?.name,
       image_url: imageUrl || undefined,
       description: description || undefined,
+      source_type: sourceType,
+      stock_unit: 'piece',
+      track_stock: true,
       is_favorite: isFavorite,
       active,
     };
@@ -217,6 +222,15 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user }) {
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+          </div>
+          <div>
+            <Label className="text-xs mb-1.5 block">How this product is supplied</Label>
+            <select value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+              <option value="central_produced">Produced at Central Production</option>
+              <option value="shop_prepared">Prepared inside each shop</option>
+              <option value="resale">Purchased ready-made for resale</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1.5">This prepares the product for recipes and automatic stock rules in the next phase.</p>
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Description</Label>
