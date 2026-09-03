@@ -309,7 +309,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="hidden lg:flex w-[360px] xl:w-[400px] shrink-0 border-l border-border">
+        <div className="hidden xl:flex w-[380px] 2xl:w-[420px] shrink-0 border-l border-border">
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
@@ -320,17 +320,15 @@ export default function POS() {
         </div>
       </div>
 
-      {/* Mobile cart button */}
-      {cart.length > 0 && (
-        <div className="lg:hidden sticky bottom-0 p-3 bg-card border-t border-border">
-          <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg">
-            Buyurtmani ko‘rish · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)})
-          </Button>
-        </div>
-      )}
+      {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
+      <div className="xl:hidden sticky bottom-0 z-30 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border">
+        <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
+          Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
+        </Button>
+      </div>
 
       <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
-        <SheetContent side="bottom" className="lg:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
+        <SheetContent side="bottom" className="xl:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
