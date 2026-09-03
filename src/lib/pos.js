@@ -11,8 +11,8 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'users', 'settings'],
-  cashier: ['pos', 'sales', 'shifts'],
+  admin: ['dashboard', 'pos', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'users', 'settings'],
+  cashier: ['pos', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
   production: ['products'],
 };
@@ -33,6 +33,7 @@ export const MENU_ITEMS = [
   { key: 'discounts', label: 'Discount Codes', path: '/discounts', icon: 'Ticket' },
   { key: 'sales', label: 'Sales History', path: '/sales', icon: 'ReceiptText' },
   { key: 'shifts', label: 'Shifts', path: '/shifts', icon: 'Clock' },
+  { key: 'cashouts', label: 'Cash-out History', path: '/cash-outs', icon: 'Banknote' },
   { key: 'users', label: 'Users', path: '/users', icon: 'Users' },
   { key: 'settings', label: 'Settings', path: '/settings', icon: 'Settings' },
 ];
