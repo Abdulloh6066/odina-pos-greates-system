@@ -11,10 +11,10 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'users', 'settings'],
-  cashier: ['pos', 'sales', 'shifts', 'cashouts'],
-  accountant: ['dashboard', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
-  production: ['products'],
+  admin: ['dashboard', 'pos', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'users', 'settings'],
+  cashier: ['pos', 'warehouse', 'sales', 'shifts', 'cashouts'],
+  accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
+  production: ['warehouse', 'products'],
 };
 
 export const ROLE_HOME = {
@@ -27,6 +27,7 @@ export const ROLE_HOME = {
 export const MENU_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
   { key: 'pos', label: 'POS', path: '/pos', icon: 'ShoppingCart' },
+  { key: 'warehouse', label: 'Warehouse', path: '/warehouse', icon: 'Warehouse' },
   { key: 'products', label: 'Products', path: '/products', icon: 'Cake' },
   { key: 'categories', label: 'Categories', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Reports', path: '/reports', icon: 'BarChart3' },
