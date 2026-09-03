@@ -97,14 +97,14 @@ export default function POS() {
         owner_pin: ownerPin,
       });
       const dc = result?.data || result;
-      if (!dc?.code) throw new Error(dc?.error || 'Invalid or inactive code.');
+      if (!dc?.code) throw new Error(dc?.error || 'Kod noto‘g‘ri yoki faol emas.');
       setDiscountPct(dc.percentage);
       setDiscountCode(dc.code);
       setDiscountError('');
       setDiscountApprovalOpen(false);
       setPendingDiscountCode('');
     } catch (e) {
-      setDiscountError(e?.response?.data?.error || e?.data?.error || e?.message || 'Could not validate code.');
+      setDiscountError(e?.response?.data?.error || e?.data?.error || e?.message || 'Kodni tekshirib bo‘lmadi.');
       setDiscountApprovalOpen(false);
     } finally {
       setDiscountLoading(false);
@@ -154,7 +154,7 @@ export default function POS() {
       });
       const payload = result?.data || result;
       if (!payload?.sale) {
-        throw new Error(payload?.error || 'The sale could not be completed.');
+        throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
       }
 
       setLastSale(payload.sale);
@@ -163,7 +163,7 @@ export default function POS() {
       setReceiptOpen(true);
       clearCart();
     } catch (e) {
-      alert('Could not complete sale: ' + (e?.message || e));
+      alert('Savdoni yakunlab bo‘lmadi: ' + (e?.message || e));
     } finally {
       setPaying(false);
     }
@@ -178,10 +178,10 @@ export default function POS() {
         starting_cash,
       });
       const payload = result?.data || result;
-      if (!payload?.shift) throw new Error(payload?.error || 'The shift could not be opened.');
+      if (!payload?.shift) throw new Error(payload?.error || 'Smenani ochib bo‘lmadi.');
       setShift(payload.shift);
       setOpenShiftOpen(false);
-    } catch (e) { alert('Could not open shift: ' + (e?.message || e)); }
+    } catch (e) { alert('Smenani ochib bo‘lmadi: ' + (e?.message || e)); }
     finally { setShiftLoading(false); }
   };
 
@@ -194,11 +194,11 @@ export default function POS() {
         actual_cash,
       });
       const payload = result?.data || result;
-      if (!payload?.shift) throw new Error(payload?.error || 'The shift could not be closed.');
+      if (!payload?.shift) throw new Error(payload?.error || 'Smenani yopib bo‘lmadi.');
       window.print();
       setShift(null);
       setCloseShiftOpen(false);
-    } catch (e) { alert('Could not close shift: ' + (e?.message || e)); }
+    } catch (e) { alert('Smenani yopib bo‘lmadi: ' + (e?.message || e)); }
     finally { setShiftLoading(false); }
   };
 
@@ -213,11 +213,11 @@ export default function POS() {
         reason,
       });
       const payload = result?.data || result;
-      if (!payload?.shift) throw new Error(payload?.error || 'Could not record withdrawal.');
+      if (!payload?.shift) throw new Error(payload?.error || 'Pul olishni saqlab bo‘lmadi.');
       setShift(payload.shift);
       setCashWithdrawalOpen(false);
     } catch (e) {
-      alert('Withdrawal failed: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+      alert('Pul olish amalga oshmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
       setCashWithdrawalLoading(false);
     }
@@ -232,9 +232,9 @@ export default function POS() {
             <Building2 className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{shift?.shop_name || 'No active shift'}</div>
+            <div className="text-sm font-semibold truncate">{shift?.shop_name || 'Faol smena yo‘q'}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {shift ? `${formatUZS(shift.total_sales)} · ${shift.order_count} orders` : 'Open a shift to start selling'}
+              {shift ? `${formatUZS(shift.total_sales)} · ${shift.order_count} orders` : 'Savdoni boshlash uchun smenani oching'}
             </div>
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function POS() {
         {shift ? (
           <>
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
-              <Clock className="w-3.5 h-3.5" /> Shift open
+              <Clock className="w-3.5 h-3.5" /> Smena ochiq
             </div>
             <Button variant="outline" size="sm" onClick={() => setCashWithdrawalOpen(true)} className="h-9">
               <Banknote className="w-4 h-4 mr-1.5" /> Cash out
@@ -263,8 +263,8 @@ export default function POS() {
         <div className="flex-1 flex min-w-0">
           {/* Category rail */}
           <div className="hidden md:flex w-44 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
-            <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="All" />
-            <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Favorites" />
+            <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="Barchasi" />
+            <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
             <div className="h-px bg-border my-2 mx-3" />
             {categories.map((c) => (
               <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<span className="text-base">{c.icon || '🍰'}</span>} label={c.name} />
@@ -276,11 +276,11 @@ export default function POS() {
             <div className="px-4 sm:px-5 pt-4 pb-2 space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" className="pl-9 h-11 rounded-xl" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
-                <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>All</Chip>
-                <Chip active={showFav} onClick={() => setShowFav(true)}>★ Favorites</Chip>
+                <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
+                <Chip active={showFav} onClick={() => setShowFav(true)}>★ Sevimlilar</Chip>
                 {categories.map((c) => (
                   <Chip key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }}>{c.name}</Chip>
                 ))}
@@ -295,7 +295,7 @@ export default function POS() {
               ) : filtered.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center py-20">
                   <div className="text-5xl mb-3">🧁</div>
-                  <p className="text-sm font-medium text-muted-foreground">No products found</p>
+                  <p className="text-sm font-medium text-muted-foreground">Mahsulot topilmadi</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -333,8 +333,8 @@ export default function POS() {
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
         open={discountApprovalOpen}
-        title="Approve discount"
-        description={pendingDiscountCode ? `Owner approval is required to apply ${pendingDiscountCode}.` : ''}
+        title="Chegirmani tasdiqlash"
+        description={pendingDiscountCode ? `${pendingDiscountCode} kodini qo‘llash uchun egasi tasdig‘i kerak.` : ''}
         onClose={() => { setDiscountApprovalOpen(false); setPendingDiscountCode(''); }}
         onConfirm={(pin) => validateDiscount(pendingDiscountCode, pin)}
         loading={discountLoading}
