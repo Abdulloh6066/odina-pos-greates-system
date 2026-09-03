@@ -73,6 +73,9 @@ export default async function(req) {
       }
       const shop = shopId ? await service.entities.Shop.get(shopId) : null;
       if (!shop) return Response.json({ error: "Shop not found." }, { status: 404 });
+      if (shop.allows_pos === false || shop.location_type === "production") {
+        return Response.json({ error: "Kassa shifts cannot be opened at a production-only location." }, { status: 403 });
+      }
       const now = new Date().toISOString();
       const newShift = await service.entities.Shift.create({
         user_id: user.id, user_name: user.full_name || user.email,
