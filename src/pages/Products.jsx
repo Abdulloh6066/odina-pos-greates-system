@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Cake, Plus, Search, Pencil, Star, Upload, Loader2 } from 'lucide-react';
+import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
+  const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
 
@@ -32,11 +33,11 @@ export default function Products() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    let list = products;
+    let list = products.filter((p) => showArchived ? p.archived === true : p.archived !== true);
     if (filterCat !== 'all') list = list.filter((p) => p.category_id === filterCat);
     if (search.trim()) list = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
     return list;
-  }, [products, filterCat, search]);
+  }, [products, filterCat, search, showArchived]);
 
   const openNew = () => { setEditing(null); setOpen(true); };
   const openEdit = (p) => { setEditing(p); setOpen(true); };
@@ -114,12 +115,12 @@ export default function Products() {
         </div>
       )}
 
-      <ProductDialog open={open} product={editing} categories={categories} onClose={() => setOpen(false)} onSaved={onSaved} user={user} />
+      <ProductDialog open={open} product={editing} categories={categories} onClose={() => setOpen(false)} onSaved={onSaved} user={user} canArchive={role === 'admin'} />
     </div>
   );
 }
 
-function ProductDialog({ open, product, categories, onClose, onSaved, user }) {
+function ProductDialog({ open, product, categories, onClose, onSaved, user, canArchive }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [categoryId, setCategoryId] = useState('');
