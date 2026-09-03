@@ -11,6 +11,7 @@ import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 export default function POS() {
   const { user } = useOutletContext();
@@ -44,6 +45,7 @@ export default function POS() {
   const [discountLoading, setDiscountLoading] = useState(false);
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   const loadAll = async () => {
     setLoadingData(true);
@@ -234,7 +236,7 @@ export default function POS() {
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">{shift?.shop_name || 'Faol smena yo‘q'}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {shift ? `${formatUZS(shift.total_sales)} · ${shift.order_count} orders` : 'Savdoni boshlash uchun smenani oching'}
+              {shift ? `${formatUZS(shift.total_sales)} · ${shift.order_count} ta buyurtma` : 'Savdoni boshlash uchun smenani oching'}
             </div>
           </div>
         </div>
@@ -245,15 +247,15 @@ export default function POS() {
               <Clock className="w-3.5 h-3.5" /> Smena ochiq
             </div>
             <Button variant="outline" size="sm" onClick={() => setCashWithdrawalOpen(true)} className="h-9">
-              <Banknote className="w-4 h-4 mr-1.5" /> Cash out
+              <Banknote className="w-4 h-4 mr-1.5" /> Pul olish
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-9">
-              Close shift
+              Smenani yopish
             </Button>
           </>
         ) : (
           <Button size="sm" onClick={() => setOpenShiftOpen(true)} className="h-9 bg-primary text-primary-foreground hover:bg-primary-strong">
-            Open shift
+            Smenani ochish
           </Button>
         )}
       </div>
@@ -321,11 +323,24 @@ export default function POS() {
       {/* Mobile cart button */}
       {cart.length > 0 && (
         <div className="lg:hidden sticky bottom-0 p-3 bg-card border-t border-border">
-          <Button onClick={openCheckout} className="w-full h-12 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary-strong">
-            View order · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)})
+          <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg">
+            Buyurtmani ko‘rish · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)})
           </Button>
         </div>
       )}
+
+      <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
+        <SheetContent side="bottom" className="lg:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
+          <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
+          <Cart
+            cart={cart}
+            onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
+            subtotal={subtotal} discount={discount} discountCode={discountCode}
+            onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
+            total={total} onCheckout={() => { setMobileCartOpen(false); openCheckout(); }} disabled={!shift}
+          />
+        </SheetContent>
+      </Sheet>
 
       <PaymentModal open={payOpen} total={total} onClose={() => setPayOpen(false)} onConfirm={completeSale} loading={paying} />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => setReceiptOpen(false)} />
