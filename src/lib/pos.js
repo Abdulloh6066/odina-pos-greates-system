@@ -1,13 +1,13 @@
 import { base44 } from '@/api/base44Client';
 
 export const PAYMENT_METHODS = [
-  { id: 'cash', label: 'Cash', short: 'Cash', group: 'cash' },
+  { id: 'cash', label: 'Naqd pul', short: 'Naqd pul', group: 'cash' },
   { id: 'uzcard', label: 'Uzcard', short: 'Uzcard', group: 'card' },
   { id: 'humo', label: 'Humo', short: 'Humo', group: 'card' },
   { id: 'click', label: 'Click', short: 'Click', group: 'online' },
   { id: 'payme', label: 'Payme', short: 'Payme', group: 'online' },
-  { id: 'bank_transfer', label: 'Bank transfer', short: 'Bank', group: 'bank' },
-  { id: 'other', label: 'Other online', short: 'Other', group: 'online' },
+  { id: 'bank_transfer', label: 'Bank o‘tkazmasi', short: 'Bank', group: 'bank' },
+  { id: 'other', label: 'Boshqa onlayn', short: 'Other', group: 'online' },
 ];
 
 export const ROLE_MENU = {
@@ -25,18 +25,18 @@ export const ROLE_HOME = {
 };
 
 export const MENU_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
-  { key: 'pos', label: 'POS', path: '/pos', icon: 'ShoppingCart' },
-  { key: 'warehouse', label: 'Warehouse', path: '/warehouse', icon: 'Warehouse' },
-  { key: 'products', label: 'Products', path: '/products', icon: 'Cake' },
-  { key: 'categories', label: 'Categories', path: '/categories', icon: 'Tags' },
-  { key: 'reports', label: 'Reports', path: '/reports', icon: 'BarChart3' },
-  { key: 'discounts', label: 'Discount Codes', path: '/discounts', icon: 'Ticket' },
-  { key: 'sales', label: 'Sales History', path: '/sales', icon: 'ReceiptText' },
-  { key: 'shifts', label: 'Shifts', path: '/shifts', icon: 'Clock' },
-  { key: 'cashouts', label: 'Cash-out History', path: '/cash-outs', icon: 'Banknote' },
-  { key: 'users', label: 'Users', path: '/users', icon: 'Users' },
-  { key: 'settings', label: 'Settings', path: '/settings', icon: 'Settings' },
+  { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
+  { key: 'pos', label: 'Kassa', path: '/pos', icon: 'ShoppingCart' },
+  { key: 'warehouse', label: 'Ombor', path: '/warehouse', icon: 'Ombor' },
+  { key: 'products', label: 'Mahsulotlar', path: '/products', icon: 'Cake' },
+  { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
+  { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },
+  { key: 'discounts', label: 'Chegirma kodlari', path: '/discounts', icon: 'Ticket' },
+  { key: 'sales', label: 'Savdolar tarixi', path: '/sales', icon: 'ReceiptText' },
+  { key: 'shifts', label: 'Smenalar', path: '/shifts', icon: 'Clock' },
+  { key: 'cashouts', label: 'Kassadan pul olish tarixi', path: '/cash-outs', icon: 'Banknote' },
+  { key: 'users', label: 'Xodimlar', path: '/users', icon: 'Xodimlar' },
+  { key: 'settings', label: 'Sozlamalar', path: '/settings', icon: 'Sozlamalar' },
 ];
 
 export function formatNum(n) {
