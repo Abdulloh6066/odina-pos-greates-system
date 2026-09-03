@@ -57,13 +57,13 @@ export default function SalesHistory() {
         owner_pin,
       });
       const payload = result?.data || result;
-      if (!payload?.sale) throw new Error(payload?.error || 'Could not refund sale.');
+      if (!payload?.sale) throw new Error(payload?.error || 'Savdoni qaytarib bo‘lmadi.');
       setSelected(payload.sale);
       setRefundOpen(false);
       await load();
     } catch (e) {
       const message = e?.response?.data?.error || e?.data?.error || e?.message || String(e);
-      alert('Refund failed: ' + message);
+      alert('Qaytarishda xato: ' + message);
     } finally {
       setRefundLoading(false);
     }
@@ -71,14 +71,14 @@ export default function SalesHistory() {
 
   return (
     <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
-      <PageHeader title="Sales History" subtitle={`${formatNum(visible.length)} sales · ${formatUZS(totalRev)}`} icon={ReceiptText} />
+      <PageHeader title="Savdolar tarixi" subtitle={`${formatNum(visible.length)} ta savdo · ${formatUZS(totalRev)}`} icon={ReceiptText} />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by cashier or payment…" className="pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Kassir yoki to‘lov usuli bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
         </div>
-        <Input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="sm:w-48" />
+        <Input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="sm:w-48 h-11 rounded-xl" />
       </div>
 
       {loading ? (
@@ -88,7 +88,7 @@ export default function SalesHistory() {
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-5xl mb-3">🧾</div>
-          <p className="text-sm text-muted-foreground">No sales found.</p>
+          <p className="text-sm text-muted-foreground">Savdo topilmadi.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -101,16 +101,16 @@ export default function SalesHistory() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`font-semibold ${s.status === 'refunded' ? 'line-through text-muted-foreground' : ''}`}>{formatUZS(s.total)}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{s.payment_methods_summary}</span>
-                  {s.status === 'refunded' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-destructive">Refunded</span>}
+                  {s.status === 'refunded' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-destructive">Qaytarilgan</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(s.created_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  {new Date(s.created_date).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   {role !== 'cashier' && ` · ${s.user_name || ''}`}
                   {s.shop_name && ` · ${s.shop_name}`}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-xs text-muted-foreground">{s.items?.length || 0} items</div>
+                <div className="text-xs text-muted-foreground">{s.items?.length || 0} ta mahsulot</div>
                 {s.discount_amount > 0 && <div className="text-xs text-primary-strong">−{formatUZS(s.discount_amount)}</div>}
               </div>
             </button>
@@ -134,13 +134,13 @@ function SaleDetailDialog({ sale, onRefund, onClose }) {
   if (!sale) return null;
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Sale details</DialogTitle>
+          <DialogTitle className="font-display text-xl">Savdo tafsilotlari</DialogTitle>
         </DialogHeader>
         <div className="text-xs text-muted-foreground mb-3">
-          {new Date(sale.created_date).toLocaleString('en-GB')}
-          {sale.shop_name && ` · ${sale.shop_name}`} · Cashier: {sale.user_name}
+          {new Date(sale.created_date).toLocaleString('uz-UZ')}
+          {sale.shop_name && ` · ${sale.shop_name}`} · Kassir: {sale.user_name}
         </div>
         <div className="space-y-2 mb-3">
           {sale.items?.map((it, i) => (
@@ -151,26 +151,26 @@ function SaleDetailDialog({ sale, onRefund, onClose }) {
           ))}
         </div>
         <div className="border-t border-dashed border-border pt-3 space-y-1 text-sm">
-          <Row label="Subtotal" value={formatUZS(sale.subtotal)} />
-          {sale.discount_amount > 0 && <Row label={`Discount (${sale.discount_code})`} value={`−${formatUZS(sale.discount_amount)}`} accent />}
-          <Row label="Total" value={formatUZS(sale.total)} bold />
+          <Row label="Oraliq summa" value={formatUZS(sale.subtotal)} />
+          {sale.discount_amount > 0 && <Row label={`Chegirma (${sale.discount_code})`} value={`−${formatUZS(sale.discount_amount)}`} accent />}
+          <Row label="Jami" value={formatUZS(sale.total)} bold />
           <div className="pt-2 mt-2 border-t border-border">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Payments</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">To‘lovlar</div>
             {sale.payments?.map((p, i) => <Row key={i} label={p.method} value={formatUZS(p.amount)} />)}
           </div>
         </div>
         {sale.status === 'refunded' && (
           <div className="rounded-xl bg-red-50 text-destructive p-3 text-sm">
-            Refunded{sale.refund_reason ? `: ${sale.refund_reason}` : ''}
+            Qaytarilgan{sale.refund_reason ? `: ${sale.refund_reason}` : ''}
           </div>
         )}
         <div className="flex gap-2 mt-4">
           {sale.status === 'completed' && (
             <Button variant="destructive" onClick={() => onRefund(sale)} className="flex-1">
-              <RotateCcw className="w-4 h-4 mr-1.5" /> Refund
+              <RotateCcw className="w-4 h-4 mr-1.5" /> Qaytarish
             </Button>
           )}
-          <Button variant="outline" onClick={onClose} className="flex-1">Close</Button>
+          <Button variant="outline" onClick={onClose} className="flex-1 min-h-11 rounded-xl">Yopish</Button>
         </div>
       </DialogContent>
     </Dialog>
