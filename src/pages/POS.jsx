@@ -264,7 +264,7 @@ export default function POS() {
         {/* Center: categories + grid */}
         <div className="flex-1 flex min-w-0">
           {/* Category rail */}
-          <div className="hidden md:flex w-44 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
+          <div className="hidden lg:flex w-44 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
             <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="Barchasi" />
             <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
             <div className="h-px bg-border my-2 mx-3" />
@@ -280,7 +280,7 @@ export default function POS() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
               </div>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 lg:hidden">
                 <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
                 <Chip active={showFav} onClick={() => setShowFav(true)}>★ Sevimlilar</Chip>
                 {categories.map((c) => (
@@ -289,9 +289,9 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-5 pb-28 xl:pb-6">
+            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-5 pb-28 md:pb-6">
               {loadingData ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
                 </div>
               ) : filtered.length === 0 ? (
@@ -300,7 +300,7 @@ export default function POS() {
                   <p className="text-sm font-medium text-muted-foreground">Mahsulot topilmadi</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                   {filtered.map((p) => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
                 </div>
               )}
@@ -309,7 +309,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="hidden xl:flex w-[380px] 2xl:w-[420px] shrink-0 border-l border-border">
+        <div className="hidden md:flex w-[320px] lg:w-[340px] xl:w-[400px] 2xl:w-[420px] shrink-0 border-l border-border">
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
@@ -321,14 +321,14 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className="xl:hidden fixed left-0 lg:left-64 right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border">
+      <div className="md:hidden fixed left-0 right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border">
         <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>
       </div>
 
       <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
-        <SheetContent side="bottom" className="xl:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
+        <SheetContent side="bottom" className="md:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
