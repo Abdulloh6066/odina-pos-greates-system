@@ -13,6 +13,9 @@ export default function CashOutHistory() {
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [period, setPeriod] = useState('today');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedShop, setSelectedShop] = useState('all');
 
   useEffect(() => {
     let active = true;
@@ -46,10 +49,20 @@ export default function CashOutHistory() {
   );
   const filtered = useMemo(() => {
     const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    if (!terms.length) return visible;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - 6);
 
     return visible.filter((movement) => {
       const date = new Date(movement.created_at || movement.created_date);
+      if (selectedShop !== 'all' && movement.shop_id !== selectedShop) return false;
+      if (selectedDate && localDateKey(date) !== selectedDate) return false;
+      if (!selectedDate && period === 'today' && date < todayStart) return false;
+      if (!selectedDate && period === 'yesterday' && (date < yesterdayStart || date >= todayStart)) return false;
+      if (!selectedDate && period === 'week' && date < weekStart) return false;
       const day = String(date.getDate()).padStart(2, '0');
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const year = date.getFullYear();
@@ -65,7 +78,7 @@ export default function CashOutHistory() {
       ].filter(Boolean).join(' ').toLowerCase();
       return terms.every((term) => haystack.includes(term));
     });
-  }, [visible, search, shopNames]);
+  }, [visible, search, shopNames, selectedShop, selectedDate, period]);
 
   const total = filtered.reduce((sum, movement) => sum + Number(movement.amount || 0), 0);
   const ownerView = user?.role === 'admin';
@@ -78,28 +91,74 @@ export default function CashOutHistory() {
         icon={Banknote}
       />
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search shop, date, employee or reason…"
-          className="h-12 rounded-xl pl-10 pr-11 bg-card"
-        />
-        {search && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setSearch('')}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 w-9"
-            aria-label="Clear search"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        )}
+      <div className="rounded-2xl bg-card border border-border premium-shadow p-4 mb-6 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {[
+            ['today', 'Today'],
+            ['yesterday', 'Yesterday'],
+            ['week', 'Last 7 days'],
+            ['all', 'All time'],
+          ].map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={period === value && !selectedDate ? 'default' : 'outline'}
+              onClick={() => { setPeriod(value); setSelectedDate(''); }}
+              className={period === value && !selectedDate ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        <div className={`grid gap-3 ${ownerView ? 'sm:grid-cols-2' : ''}`}>
+          <label className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Choose exact day</span>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              className="h-11 rounded-xl bg-background"
+            />
+          </label>
+          {ownerView && (
+            <label className="space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Shop</span>
+              <select
+                value={selectedShop}
+                onChange={(event) => setSelectedShop(event.target.value)}
+                className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="all">All shops</option>
+                {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search employee, reason or amount…"
+            className="h-11 rounded-xl pl-10 pr-11 bg-background"
+          />
+          {search && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearch('')}
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9"
+              aria-label="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">Example: Odina Central 14.07.2026</p>
 
       <div className="grid sm:grid-cols-2 gap-3 mb-6">
         <div className="rounded-2xl bg-card border border-border premium-shadow p-4">
@@ -161,4 +220,11 @@ export default function CashOutHistory() {
       )}
     </div>
   );
+}
+
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
