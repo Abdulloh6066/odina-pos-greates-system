@@ -122,9 +122,9 @@ export default async function(req) {
       const shiftId = String(body?.shift_id || "");
       const amount = money(body?.amount);
       const reason = String(body?.reason || "").trim();
-      const employeeName = String(body?.employee_name || "").trim();
-      if (!shiftId || amount <= 0 || !reason || !employeeName) {
-        return Response.json({ error: "Amount, reason, and employee name are required." }, { status: 400 });
+      const employeeName = user.full_name || user.email || "Unknown user";
+      if (!shiftId || amount <= 0 || !reason) {
+        return Response.json({ error: "Amount and reason are required." }, { status: 400 });
       }
       const shift = await service.entities.Shift.get(shiftId);
       if (!shift || shift.status !== "open") return Response.json({ error: "The shift is not open." }, { status: 409 });
