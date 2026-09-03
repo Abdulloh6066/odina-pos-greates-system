@@ -16,7 +16,12 @@ const TABS = [
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
-const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'pcs' };
+const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona' };
+const SOURCE_LABELS = {
+  central_produced: 'Markaziy ishlab chiqarishda tayyorlanadi',
+  shop_prepared: 'Do‘konning o‘zida tayyorlanadi',
+  resale: 'Tayyor holda sotib olinadi',
+};
 const MOVEMENT_LABELS = {
   opening: 'Boshlang‘ich qoldiq',
   adjustment: 'Qoldiq tuzatishi',
@@ -126,7 +131,7 @@ export default function Warehouse() {
         )}
       />
 
-      <div className="rounded-2xl bg-card border border-border premium-shadow p-4 mb-5">
+      <div className="rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
         <div className="flex flex-col sm:flex-row gap-3">
           {user?.role === 'admin' ? (
             <label className="sm:w-72 space-y-1.5">
@@ -169,7 +174,7 @@ export default function Warehouse() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
             <Summary label="Masalliqlar" value={ingredients.length} />
             <Summary label="Tayyor mahsulotlar" value={products.length} />
             <Summary label="Omborda mavjud turlar" value={stockedCount} />
@@ -182,7 +187,7 @@ export default function Warehouse() {
                 key={id}
                 variant={tab === id ? 'default' : 'outline'}
                 onClick={() => { setTab(id); setSearch(''); }}
-                className={`shrink-0 ${tab === id ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}`}
+                className={`shrink-0 min-h-11 rounded-xl touch-manipulation ${tab === id ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}`}
               >
                 <Icon className="w-4 h-4 mr-1.5" />{label}
               </Button>
@@ -226,7 +231,7 @@ export default function Warehouse() {
 
 function Summary({ label, value }) {
   return (
-    <div className="rounded-2xl bg-card border border-border p-4">
+    <div className="rounded-2xl bg-card border border-border premium-shadow p-4 transition-all hover:-translate-y-0.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-xl font-semibold mt-1">{formatNum(value)}</p>
     </div>
@@ -249,7 +254,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
               <div className="min-w-0">
                 <p className="font-semibold truncate">{item.name}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-                  {kind === 'ingredient' ? item.category : (item.source_type || 'central produced').replaceAll('_', ' ')}
+                  {kind === 'ingredient' ? item.category : (SOURCE_LABELS[item.source_type] || 'Markaziy ishlab chiqarishda tayyorlanadi')}
                 </p>
               </div>
               <div className={`rounded-xl px-3 py-1.5 text-right ${quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>
@@ -257,7 +262,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
                 <p className="text-[10px] mt-1">{UNIT_LABELS[unit] || unit}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => onAdjust(item)} className="w-full mt-4">
+            <Button variant="outline" size="sm" onClick={() => onAdjust(item)} className="w-full mt-4 min-h-11 rounded-xl touch-manipulation">
               <PackagePlus className="w-4 h-4 mr-1.5" /> Boshlang‘ich qoldiq / tuzatish
             </Button>
           </div>
@@ -454,7 +459,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
             <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>Chiqim qilish</Button>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Quantity ({UNIT_LABELS[unit] || unit})</Label>
+            <Label className="text-xs mb-1.5 block">Miqdor ({UNIT_LABELS[unit] || unit})</Label>
             <Input autoFocus type="number" min="0.001" step={unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
           </div>
           <div>
