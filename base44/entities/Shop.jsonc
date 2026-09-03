@@ -1,19 +1,34 @@
 {
   "name": "Shop",
-  "type": "object",
   "properties": {
-    "name": {
-      "type": "string"
+    "active": {
+      "default": true,
+      "type": "boolean"
     },
     "address": {
       "type": "string"
     },
-    "phone": {
-      "type": "string"
+    "allows_pos": {
+      "default": true,
+      "type": "boolean"
     },
     "is_main": {
-      "type": "boolean",
-      "default": false
+      "default": false,
+      "type": "boolean"
+    },
+    "location_type": {
+      "default": "shop",
+      "enum": [
+        "shop",
+        "production"
+      ],
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
     }
   },
   "required": [
@@ -21,6 +36,11 @@
   ],
   "rls": {
     "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
       "user_condition": {
         "role": "admin"
       }
@@ -33,19 +53,7 @@
           }
         },
         {
-          "user_condition": {
-            "role": "cashier"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "production"
-          }
+          "id": "{{user.data.shop_id}}"
         }
       ]
     },
@@ -53,11 +61,7 @@
       "user_condition": {
         "role": "admin"
       }
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
-  }
+  },
+  "type": "object"
 }
