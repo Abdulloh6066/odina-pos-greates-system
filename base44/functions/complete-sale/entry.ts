@@ -30,7 +30,7 @@ async function verifyOwnerPin(service: any, pinValue: unknown) {
       name: "PBKDF2",
       hash: "SHA-256",
       salt: new TextEncoder().encode(security.pin_salt),
-      iterations: Number(security.pin_iterations || 210000),
+      iterations: Number(security.pin_iterations || 100000),
     }, key, 256);
     return hex(new Uint8Array(derived)) === security.pin_hash;
   }
