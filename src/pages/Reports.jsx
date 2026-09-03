@@ -32,7 +32,7 @@ export default function Reports() {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const daySales = completedSales.filter((s) => isSameDay(s.created_date, d));
-      days.push({ date: d.toLocaleDateString('en-GB', { weekday: 'short' }), total: daySales.reduce((sum, s) => sum + s.total, 0), orders: daySales.length });
+      days.push({ date: d.toLocaleDateString('uz-UZ', { weekday: 'short' }), total: daySales.reduce((sum, s) => sum + s.total, 0), orders: daySales.length });
     }
     return days;
   }, [completedSales]);
@@ -55,15 +55,15 @@ export default function Reports() {
 
   return (
     <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
-      <PageHeader title="Reports" subtitle={`${formatNum(sales.length)} sales · ${formatUZS(totalRev)} total`} icon={BarChart3} />
+      <PageHeader title="Hisobotlar" subtitle={`${formatNum(sales.length)} ta savdo · jami ${formatUZS(totalRev)}`} icon={BarChart3} />
 
       {loading ? (
         <div className="grid lg:grid-cols-2 gap-5">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-64 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : sales.length === 0 ? (
-        <div className="text-center py-20"><div className="text-5xl mb-3">📊</div><p className="text-sm text-muted-foreground">No sales data yet.</p></div>
+        <div className="text-center py-20"><div className="text-5xl mb-3">📊</div><p className="text-sm text-muted-foreground">Hali savdo ma’lumotlari yo‘q.</p></div>
       ) : (
         <div className="grid lg:grid-cols-2 gap-5">
-          <Panel title="Sales — last 7 days">
+          <Panel title="Savdo — oxirgi 7 kun">
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={last7} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                 <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(38 95% 72%)" stopOpacity={0.5} /><stop offset="100%" stopColor="hsl(38 95% 72%)" stopOpacity={0} /></linearGradient></defs>
@@ -76,7 +76,7 @@ export default function Reports() {
             </ResponsiveContainer>
           </Panel>
 
-          <Panel title="Sales by payment method">
+          <Panel title="To‘lov usuli bo‘yicha savdo">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie data={byMethod} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} innerRadius={45}>
@@ -92,7 +92,7 @@ export default function Reports() {
             </div>
           </Panel>
 
-          <Panel title="Sales by shop" className="lg:col-span-2">
+          <Panel title="Do‘konlar bo‘yicha savdo" className="lg:col-span-2">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={byShop} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(36 18% 90%)" />
@@ -111,7 +111,7 @@ export default function Reports() {
 
 function Panel({ title, children, className }) {
   return (
-    <div className={`rounded-2xl bg-card border border-border premium-shadow p-5 ${className || ''}`}>
+    <div className={`rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 ${className || ''}`}>
       <h3 className="font-display text-lg font-bold mb-4">{title}</h3>
       {children}
     </div>
