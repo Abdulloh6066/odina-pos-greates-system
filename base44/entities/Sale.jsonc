@@ -86,7 +86,24 @@
     },
     "status": {
       "type": "string",
+      "enum": [
+        "completed",
+        "refunded"
+      ],
       "default": "completed"
+    },
+    "refunded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "refunded_by": {
+      "type": "string"
+    },
+    "refund_id": {
+      "type": "string"
+    },
+    "refund_reason": {
+      "type": "string"
     }
   },
   "required": [
