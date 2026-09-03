@@ -15,7 +15,7 @@ export default function Receipt({ open, sale, settings, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xs no-print">
+      <DialogContent className="sm:max-w-xs">
         <DialogHeader>
           <DialogTitle className="font-display text-xl text-center">Sale Complete</DialogTitle>
         </DialogHeader>
@@ -25,7 +25,7 @@ export default function Receipt({ open, sale, settings, onClose }) {
             <div className="font-display text-lg font-bold">{settings?.shop_name || 'Odina Shop'}</div>
             <div className="text-[11px] text-muted-foreground">{sale.shop_name || ''}</div>
             <div className="text-[11px] text-muted-foreground">{timeStr}</div>
-            <div className="text-[11px] text-muted-foreground">Receipt #{(sale.id || '').slice(-6).toUpperCase()}</div>
+            <div className="text-[11px] text-muted-foreground">Receipt #{sale.sale_number || (sale.id || '').slice(-6).toUpperCase()}</div>
             <div className="text-[11px] text-muted-foreground">Cashier: {sale.user_name || ''}</div>
           </div>
           <div className="border-t border-dashed border-border my-2" />
@@ -52,6 +52,7 @@ export default function Receipt({ open, sale, settings, onClose }) {
           <div className="text-center text-[12px] py-1">
             {settings?.thank_you_message || 'Rahmat! Sizning tabassumingiz biz uchun juda muhim ❤️'}
           </div>
+          {settings?.receipt_footer && <div className="text-center text-[10px] mt-1">{settings.receipt_footer}</div>
         </div>
 
         <DialogFooter className="gap-2 no-print">
