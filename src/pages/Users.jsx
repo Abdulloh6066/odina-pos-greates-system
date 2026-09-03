@@ -80,8 +80,8 @@ export default function Users() {
                     <option value="production">Production</option>
                   </select>
                   <select value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                    <option value="">No shop</option>
-                    {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    <option value="">No location</option>
+                    {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Production' : ' · Shop'}</option>)}
                   </select>
                 </div>
               ) : (
