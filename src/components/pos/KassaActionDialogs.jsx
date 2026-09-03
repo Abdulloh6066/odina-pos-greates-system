@@ -49,16 +49,16 @@ export function OwnerPinDialog({ open, title = 'Owner approval', description, on
   );
 }
 
-export function CashWithdrawalDialog({ open, shift, onClose, onConfirm, loading }) {
+export function CashWithdrawalDialog({ open, shift, user, onClose, onConfirm, loading }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
-  const [employeeName, setEmployeeName] = useState('');
 
   useEffect(() => {
-    if (open) { setAmount(''); setReason(''); setEmployeeName(''); }
+    if (open) { setAmount(''); setReason(''); }
   }, [open]);
 
-  const valid = Number(amount) > 0 && reason.trim() && employeeName.trim();
+  const valid = Number(amount) > 0 && reason.trim();
+  const employeeName = user?.full_name || user?.email || 'Current Kassa user';
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !loading && onClose()}>
@@ -79,14 +79,14 @@ export function CashWithdrawalDialog({ open, shift, onClose, onConfirm, loading 
             <Label className="text-xs mb-1.5 block">Reason</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is cash being removed?" rows={2} />
           </div>
-          <div>
-            <Label className="text-xs mb-1.5 block">Employee name</Label>
-            <Input value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} placeholder="Who received or removed the cash?" />
+          <div className="rounded-xl bg-muted/60 px-3 py-2.5">
+            <p className="text-xs text-muted-foreground">Recorded automatically as</p>
+            <p className="text-sm font-medium mt-0.5">{employeeName}</p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button onClick={() => valid && onConfirm({ amount: Number(amount), reason: reason.trim(), employee_name: employeeName.trim() })} disabled={loading || !valid} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={() => valid && onConfirm({ amount: Number(amount), reason: reason.trim() })} disabled={loading || !valid} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             {loading ? 'Recording…' : 'Record cash out'}
           </Button>
         </DialogFooter>
