@@ -75,9 +75,15 @@ export default function Products() {
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" className="pl-9" />
         </div>
         <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium sm:w-56">
-          <option value="all">All categories</option>
+          <option value="all">Barcha kategoriyalar</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        {role === 'admin' && (
+          <Button variant="outline" onClick={() => setShowArchived((value) => !value)} className="whitespace-nowrap">
+            {showArchived ? <Cake className="w-4 h-4 mr-1.5" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
+            {showArchived ? 'Faol mahsulotlar' : 'Arxiv' }
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -131,6 +137,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -184,6 +191,23 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
       onSaved();
     } catch (e) { alert('Save failed: ' + (e?.message || e)); }
     finally { setSaving(false); }
+  };
+
+  const setArchived = async (archived) => {
+    const question = archived
+      ? `“${product?.name}” mahsulotini o‘chirishni tasdiqlaysizmi? Eski savdo va hisobotlar saqlanadi.`
+      : `“${product?.name}” mahsulotini qayta tiklaysizmi?`;
+    if (!product || !window.confirm(question)) return;
+    setArchiving(true);
+    try {
+      await base44.entities.Product.update(product.id, { archived, active: archived ? false : product.active });
+      await logAction(user, archived ? 'product_archived' : 'product_restored', product.name);
+      onSaved();
+    } catch (e) {
+      alert((archived ? 'Mahsulotni o‘chirishda xato: ' : 'Mahsulotni tiklashda xato: ') + (e?.message || e));
+    } finally {
+      setArchiving(false);
+    }
   };
 
   return (
@@ -248,11 +272,26 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
             </label>
           </div>
         </div>
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+        <DialogFooter className="mt-4 sm:justify-between">
+          <div>
+            {product && canArchive && (
+              <Button
+                variant="outline"
+                onClick={() => setArchived(product.archived !== true)}
+                disabled={saving || archiving}
+                className={product.archived ? "text-emerald-700" : "text-destructive hover:text-destructive"}
+              >
+                {product.archived ? <ArchiveRestore className="w-4 h-4 mr-1.5" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
+                {archiving ? 'Bajarilmoqda…' : product.archived ? 'Qayta tiklash' : 'Mahsulotni o‘chirish'}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose} disabled={saving || archiving}>Bekor qilish</Button>
           <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             {saving ? 'Saving…' : 'Save'}
           </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
