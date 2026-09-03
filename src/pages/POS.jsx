@@ -289,7 +289,7 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-5 pb-6">
+            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-5 pb-28 xl:pb-6">
               {loadingData ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
@@ -321,7 +321,7 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className="xl:hidden sticky bottom-0 z-30 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border">
+      <div className="xl:hidden fixed left-0 lg:left-64 right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border">
         <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>
