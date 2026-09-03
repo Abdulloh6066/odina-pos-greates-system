@@ -35,7 +35,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
 
   const handleConfirm = () => {
     const valid = payments.filter((p) => Number(p.amount) > 0);
-    if (valid.length === 0) { setError('Enter at least one payment.'); return; }
+    if (valid.length === 0) { setError('Kamida bitta to‘lov kiriting.'); return; }
     const sum = valid.reduce((s, p) => s + Number(p.amount), 0);
     if (Math.abs(sum - total) > 1) {
       setError(`Total is ${formatUZS(total)} but payments sum to ${formatUZS(sum)}. Difference: ${formatUZS(Math.abs(sum - total))}.`);
@@ -48,11 +48,11 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Payment</DialogTitle>
+          <DialogTitle className="font-display text-xl">To‘lov</DialogTitle>
         </DialogHeader>
 
         <div className="rounded-2xl bg-primary/10 px-4 py-3 mb-4 flex items-center justify-between">
-          <span className="text-sm font-medium text-primary-strong">Total to collect</span>
+          <span className="text-sm font-medium text-primary-strong">To‘lanadigan jami</span>
           <span className="font-display text-2xl font-bold text-primary-strong">{formatUZS(total)}</span>
         </div>
 
@@ -102,9 +102,9 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
         {error && <p className="text-sm text-destructive mt-2">{error}</p>}
 
         <DialogFooter className="mt-4 gap-2">
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
           <Button onClick={handleConfirm} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {loading ? 'Processing…' : `Complete · ${formatUZS(total)}`}
+            {loading ? 'Amalga oshirilmoqda…' : `Yakunlash · ${formatUZS(total)}`}
           </Button>
         </DialogFooter>
       </DialogContent>
