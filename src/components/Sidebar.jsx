@@ -28,7 +28,7 @@ export default function Sidebar({ user, mobileOpen, onClose }) {
         </div>
         <div className="min-w-0">
           <div className="font-display text-xl font-bold leading-tight tracking-tight">Odina Shop</div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Patisserie · POS</div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Qandolat · Kassa</div>
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export default function Sidebar({ user, mobileOpen, onClose }) {
           className="mt-1 w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-foreground/70 hover:bg-secondary hover:text-foreground transition-colors"
         >
           <LogOut className="w-[18px] h-[18px]" strokeWidth={2} />
-          <span>Sign out</span>
+          <span>Chiqish</span>
         </button>
       </div>
     </div>
