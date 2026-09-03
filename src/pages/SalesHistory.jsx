@@ -55,7 +55,10 @@ export default function SalesHistory() {
       setSelected(payload.sale);
       await load();
       alert('Sale refunded successfully.');
-    } catch (e) { alert('Refund failed: ' + (e?.message || e)); }
+    } catch (e) {
+      const message = e?.response?.data?.error || e?.data?.error || e?.message || String(e);
+      alert('Refund failed: ' + message);
+    }
   };
 
   return (
