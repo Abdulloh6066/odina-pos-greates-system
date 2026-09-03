@@ -6,7 +6,8 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { formatUZS, formatNum, isSameDay } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 
-const PAY_COLORS = { cash: 'hsl(38 95% 72%)', uzcard: 'hsl(173 58% 39%)', humo: 'hsl(197 37% 40%)', click: 'hsl(27 87% 67%)', payme: 'hsl(43 74% 55%)', other: 'hsl(0 0% 60%)' };
+const PAY_COLORS = { cash: 'hsl(38 95% 72%)', uzcard: 'hsl(173 58% 39%)', humo: 'hsl(197 37% 40%)', click: 'hsl(27 87% 67%)', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
+const PAY_LABELS = { cash: 'Naqd pul', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
 
 export default function Reports() {
   const { user } = useOutletContext();
@@ -20,7 +21,7 @@ export default function Reports() {
       try {
         const s = await base44.entities.Sale.list('-created_date', 1000);
         setSales(s || []);
-      } catch (e) {}
+      } catch {}
       setLoading(false);
     })();
   }, []);
@@ -87,7 +88,7 @@ export default function Reports() {
             </ResponsiveContainer>
             <div className="flex flex-wrap gap-3 justify-center mt-2">
               {byMethod.map((m) => (
-                <div key={m.name} className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full" style={{ background: PAY_COLORS[m.name] || 'hsl(0 0% 60%)' }} /><span className="capitalize">{m.name}</span></div>
+                <div key={m.name} className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full" style={{ background: PAY_COLORS[m.name] || 'hsl(0 0% 60%)' }} /><span>{PAY_LABELS[m.name] || m.name}</span></div>
               ))}
             </div>
           </Panel>
