@@ -55,7 +55,7 @@ export default function POS() {
       base44.entities.Shift.list(),
     ]);
     setCategories((cats || []).filter((c) => c.active));
-    setProducts((prods || []).filter((p) => p.active));
+    setProducts((prods || []).filter((p) => p.active && p.archived !== true));
     setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
     setSettings(settingsList?.[0] || null);
     const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
