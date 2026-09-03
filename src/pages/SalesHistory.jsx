@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { RefundDialog } from '@/components/pos/KassaActionDialogs';
 
 export default function SalesHistory() {
   const { user } = useOutletContext();
@@ -16,6 +17,8 @@ export default function SalesHistory() {
   const [search, setSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [selected, setSelected] = useState(null);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundLoading, setRefundLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -38,26 +41,31 @@ export default function SalesHistory() {
 
   const totalRev = visible.reduce((s, x) => s + (x.status === 'refunded' ? 0 : x.total), 0);
 
-  const refundSale = async (sale) => {
-    const reason = window.prompt('Refund reason:')?.trim();
-    if (!reason) return;
-    const ownerPin = window.prompt('Owner PIN required for refund:');
-    if (!ownerPin) return;
+  const refundSale = (sale) => {
+    setSelected(sale);
+    setRefundOpen(true);
+  };
+
+  const confirmRefund = async ({ reason, owner_pin }) => {
+    if (!selected) return;
+    setRefundLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
         action: 'refund_sale',
-        sale_id: sale.id,
+        sale_id: selected.id,
         reason,
-        owner_pin: ownerPin,
+        owner_pin,
       });
       const payload = result?.data || result;
       if (!payload?.sale) throw new Error(payload?.error || 'Could not refund sale.');
       setSelected(payload.sale);
+      setRefundOpen(false);
       await load();
-      alert('Sale refunded successfully.');
     } catch (e) {
       const message = e?.response?.data?.error || e?.data?.error || e?.message || String(e);
       alert('Refund failed: ' + message);
+    } finally {
+      setRefundLoading(false);
     }
   };
 
@@ -111,6 +119,13 @@ export default function SalesHistory() {
       )}
 
       <SaleDetailDialog sale={selected} onRefund={refundSale} onClose={() => setSelected(null)} />
+      <RefundDialog
+        open={refundOpen}
+        sale={selected}
+        onClose={() => setRefundOpen(false)}
+        onConfirm={confirmRefund}
+        loading={refundLoading}
+      />
     </div>
   );
 }
