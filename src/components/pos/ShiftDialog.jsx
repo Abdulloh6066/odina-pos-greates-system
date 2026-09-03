@@ -29,16 +29,16 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Open Shift</DialogTitle>
+          <DialogTitle className="font-display text-xl">Smenani ochish</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Shop</label>
+            <label className="text-sm font-medium mb-1.5 block">Do‘kon</label>
             {user?.role === 'cashier' ? (
               <div className={`w-full min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${user.shop_id ? 'border-input bg-secondary/60' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
                 {user.shop_id
-                  ? (shops.find((s) => s.id === user.shop_id)?.name || 'Assigned shop not found')
-                  : 'Owner must assign this cashier to a shop.'}
+                  ? (shops.find((s) => s.id === user.shop_id)?.name || 'Biriktirilgan do‘kon topilmadi')
+                  : 'Egasi kassirni do‘konga biriktirishi kerak.'}
               </div>
             ) : (
               <select
@@ -51,7 +51,7 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
             )}
           </div>
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Starting cash amount</label>
+            <label className="text-sm font-medium mb-1.5 block">Boshlang‘ich naqd pul</label>
             <Input
               type="number"
               value={startingCash}
@@ -59,13 +59,13 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
               placeholder="0"
               className="h-10"
             />
-            <p className="text-xs text-muted-foreground mt-1">You can start with 0 UZS.</p>
+            <p className="text-xs text-muted-foreground mt-1">0 UZS bilan boshlash mumkin.</p>
           </div>
         </div>
         <DialogFooter className="mt-2">
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
           <Button onClick={submit} disabled={loading || !shopId} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {loading ? 'Opening…' : 'Open shift'}
+            {loading ? 'Ochilmoqda…' : 'Smenani ochish'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -86,30 +86,30 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Close Shift</DialogTitle>
+          <DialogTitle className="font-display text-xl">Smenani yopish</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 receipt-print">
           <div className="text-center font-mono mb-3">
             <div className="font-bold text-lg">ODINA SHOP</div>
-            <div className="text-sm">SHIFT REPORT</div>
+            <div className="text-sm">SMENA HISOBOTI</div>
             <div className="text-xs">{shift?.shop_name} · {shift?.user_name}</div>
             <div className="text-xs">{new Date().toLocaleString('en-GB')}</div>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <SummaryRow label="Cash sales" value={formatUZS(shift?.cash_sales)} />
-            <SummaryRow label="Uzcard sales" value={formatUZS(shift?.uzcard_sales)} />
-            <SummaryRow label="Humo sales" value={formatUZS(shift?.humo_sales)} />
-            <SummaryRow label="Online sales" value={formatUZS(shift?.online_sales)} />
-            <SummaryRow label="Bank transfers" value={formatUZS(shift?.bank_transfer_sales)} />
-            <SummaryRow label="Total sales" value={formatUZS(shift?.total_sales)} bold />
-            <SummaryRow label="Starting cash" value={formatUZS(shift?.starting_cash)} />
-            <SummaryRow label="Expected cash" value={formatUZS(expected)} bold />
-            <SummaryRow label="Orders" value={shift?.order_count || 0} />
-            <SummaryRow label="Cash removed" value={formatUZS(shift?.cash_removed)} />
-            <SummaryRow label="Refunds" value={formatUZS(shift?.refunds_total)} />
+            <SummaryRow label="Naqd savdo" value={formatUZS(shift?.cash_sales)} />
+            <SummaryRow label="Uzcard savdosi" value={formatUZS(shift?.uzcard_sales)} />
+            <SummaryRow label="Humo savdosi" value={formatUZS(shift?.humo_sales)} />
+            <SummaryRow label="Onlayn savdo" value={formatUZS(shift?.online_sales)} />
+            <SummaryRow label="Bank o‘tkazmalari" value={formatUZS(shift?.bank_transfer_sales)} />
+            <SummaryRow label="Jami savdo" value={formatUZS(shift?.total_sales)} bold />
+            <SummaryRow label="Boshlang‘ich naqd pul" value={formatUZS(shift?.starting_cash)} />
+            <SummaryRow label="Kutilayotgan naqd pul" value={formatUZS(expected)} bold />
+            <SummaryRow label="Buyurtmalar" value={shift?.order_count || 0} />
+            <SummaryRow label="Kassadan olingan pul" value={formatUZS(shift?.cash_removed)} />
+            <SummaryRow label="Qaytarishlar" value={formatUZS(shift?.refunds_total)} />
           </div>
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Counted actual cash</label>
+            <label className="text-sm font-medium mb-1.5 block">Sanab chiqilgan haqiqiy naqd pul</label>
             <Input type="number" value={actualCash} onChange={(e) => setActualCash(e.target.value)} className="h-10" />
           </div>
           <div className={`rounded-xl px-3 py-2.5 text-sm font-medium ${difference === 0 ? 'bg-emerald-50 text-emerald-700' : difference > 0 ? 'bg-primary/10 text-primary-strong' : 'bg-red-50 text-destructive'}`}>
@@ -117,9 +117,9 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
           <Button onClick={submit} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {loading ? 'Closing…' : 'Close shift'}
+            {loading ? 'Yopilmoqda…' : 'Smenani yopish'}
           </Button>
         </DialogFooter>
       </DialogContent>
