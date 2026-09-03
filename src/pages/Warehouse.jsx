@@ -348,7 +348,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq or packaging</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
@@ -448,7 +448,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Ombor qoldig‘ini yangilash</DialogTitle>
           <p className="text-sm text-muted-foreground">{item?.name} · {location?.name}</p>
