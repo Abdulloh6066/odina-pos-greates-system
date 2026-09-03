@@ -10,7 +10,7 @@ export default function Cart({
   total, onCheckout, disabled,
 }) {
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col w-full min-w-0 h-full bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div>
           <h2 className="font-display text-lg font-bold">Joriy buyurtma</h2>
@@ -34,7 +34,7 @@ export default function Cart({
           </div>
         ) : (
           cart.map((item) => (
-            <div key={item.product_id} className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/60 animate-pop-in">
+            <div key={item.product_id} className="flex items-center min-w-0 gap-2.5 p-2.5 rounded-xl bg-secondary/60 animate-pop-in">
               <div className="w-12 h-12 rounded-lg bg-card overflow-hidden shrink-0 border border-border/60">
                 {item.image_url ? (
                   <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
@@ -46,7 +46,7 @@ export default function Cart({
                 <div className="text-sm font-medium truncate">{item.product_name}</div>
                 <div className="text-xs text-muted-foreground">{formatUZS(item.price)}</div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => onDec(item)} className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center hover:bg-primary/10 active:scale-95 transition-all touch-manipulation">
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -55,8 +55,8 @@ export default function Cart({
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="w-20 text-right">
-                <div className="text-sm font-semibold">{formatUZS(item.subtotal)}</div>
+              <div className="w-[4.5rem] min-w-0 shrink-0 text-right">
+                <div className="text-xs sm:text-sm font-semibold leading-tight break-words">{formatUZS(item.subtotal)}</div>
                 <button onClick={() => onRemove(item)} className="text-muted-foreground/60 hover:text-destructive transition-colors mt-0.5">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
