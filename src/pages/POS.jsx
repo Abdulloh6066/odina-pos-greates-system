@@ -226,9 +226,9 @@ export default function POS() {
   };
 
   return (
-    <div className="flex flex-col h-screen lg:h-screen">
+    <div className="flex flex-col h-[calc(100dvh-3.5rem)] lg:h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-border bg-card sticky top-0 z-20">
+      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary-strong flex items-center justify-center shrink-0">
             <Building2 className="w-4.5 h-4.5" />
@@ -246,15 +246,15 @@ export default function POS() {
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
               <Clock className="w-3.5 h-3.5" /> Smena ochiq
             </div>
-            <Button variant="outline" size="sm" onClick={() => setCashWithdrawalOpen(true)} className="h-9">
-              <Banknote className="w-4 h-4 mr-1.5" /> Pul olish
+            <Button variant="outline" size="sm" onClick={() => setCashWithdrawalOpen(true)} className="h-10 px-3 touch-manipulation">
+              <Banknote className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pul olish</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-9">
-              Smenani yopish
+            <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-10 px-3 touch-manipulation">
+              <Clock className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Smenani yopish</span><span className="sm:hidden">Yopish</span>
             </Button>
           </>
         ) : (
-          <Button size="sm" onClick={() => setOpenShiftOpen(true)} className="h-9 bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button size="sm" onClick={() => setOpenShiftOpen(true)} className="h-10 bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             Smenani ochish
           </Button>
         )}
@@ -368,7 +368,7 @@ export default function POS() {
 
 function CatTab({ active, onClick, icon, label }) {
   return (
-    <button onClick={onClick} className={`flex items-center gap-2.5 px-4 py-2.5 mx-2 rounded-xl text-sm font-medium transition-colors text-left ${active ? 'bg-primary text-primary-foreground premium-shadow' : 'text-foreground/70 hover:bg-secondary'}`}>
+    <button onClick={onClick} className={`flex items-center gap-2.5 px-4 py-3 mx-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] touch-manipulation text-left ${active ? 'bg-primary text-primary-foreground premium-shadow' : 'text-foreground/70 hover:bg-secondary'}`}>
       <span className="w-5 flex justify-center">{icon}</span>
       <span className="truncate">{label}</span>
     </button>
@@ -377,7 +377,7 @@ function CatTab({ active, onClick, icon, label }) {
 
 function Chip({ active, onClick, children }) {
   return (
-    <button onClick={onClick} className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
+    <button onClick={onClick} className={`whitespace-nowrap min-h-11 px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-[0.98] touch-manipulation ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
       {children}
     </button>
   );
