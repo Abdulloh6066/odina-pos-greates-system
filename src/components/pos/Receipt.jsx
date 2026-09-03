@@ -52,7 +52,7 @@ export default function Receipt({ open, sale, settings, onClose }) {
           <div className="text-center text-[12px] py-1">
             {settings?.thank_you_message || 'Rahmat! Sizning tabassumingiz biz uchun juda muhim ❤️'}
           </div>
-          {settings?.receipt_footer && <div className="text-center text-[10px] mt-1">{settings.receipt_footer}</div>
+          {settings?.receipt_footer && <div className="text-center text-[10px] mt-1">{settings.receipt_footer}</div>}
         </div>
 
         <DialogFooter className="gap-2 no-print">
