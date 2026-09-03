@@ -18,7 +18,7 @@ export default function Cart({
         </div>
         {cart.length > 0 && (
           <button onClick={onClear} className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1">
-            <Trash2 className="w-3.5 h-3.5" /> Clear
+            <Trash2 className="w-3.5 h-3.5" /> Tozalash
           </button>
         )}
       </div>
@@ -47,11 +47,11 @@ export default function Cart({
                 <div className="text-xs text-muted-foreground">{formatUZS(item.price)}</div>
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => onDec(item)} className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center hover:bg-primary/10 transition-colors">
+                <button onClick={() => onDec(item)} className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center hover:bg-primary/10 active:scale-95 transition-all touch-manipulation">
                   <Minus className="w-3.5 h-3.5" />
                 </button>
                 <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
-                <button onClick={() => onInc(item)} className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center hover:bg-primary/10 transition-colors">
+                <button onClick={() => onInc(item)} className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center hover:bg-primary/10 active:scale-95 transition-all touch-manipulation">
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -80,7 +80,7 @@ export default function Cart({
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-sm text-primary-strong">
-            <span>Discount ({discountCode})</span>
+            <span>Chegirma ({discountCode})</span>
             <span className="font-medium">−{formatUZS(discount)}</span>
           </div>
         )}
@@ -93,7 +93,7 @@ export default function Cart({
           disabled={disabled || cart.length === 0}
           className="w-full h-12 text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong disabled:opacity-40"
         >
-          Charge {formatUZS(total)}
+          To‘lovga o‘tish · {formatUZS(total)}
         </Button>
       </div>
     </div>
@@ -106,7 +106,7 @@ function DiscountRow({ discountCode, discount, onApplyDiscount, onRemoveDiscount
     return (
       <div className="flex items-center justify-between bg-primary/10 rounded-xl px-3 py-2">
         <span className="text-sm font-medium text-primary-strong flex items-center gap-1.5">
-          <Ticket className="w-4 h-4" /> {discountCode} applied
+          <Ticket className="w-4 h-4" /> {discountCode} qo‘llandi
         </span>
         <button onClick={onRemoveDiscount} className="text-muted-foreground hover:text-destructive">
           <X className="w-4 h-4" />
@@ -127,7 +127,7 @@ function DiscountRow({ discountCode, discount, onApplyDiscount, onRemoveDiscount
           />
         </div>
         <Button variant="outline" size="sm" className="h-9" onClick={() => onApplyDiscount(code)}>
-          Apply
+          Qo‘llash
         </Button>
       </div>
       {discountError && <p className="text-xs text-destructive mt-1">{discountError}</p>}
