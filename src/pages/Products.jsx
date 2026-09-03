@@ -51,30 +51,30 @@ export default function Products() {
         active: product.active === false,
       });
       const payload = result?.data || result;
-      if (!payload?.product) throw new Error(payload?.error || 'Could not update availability.');
+      if (!payload?.product) throw new Error(payload?.error || 'Mavjudlik holatini yangilab bo‘lmadi.');
       setProducts((items) => items.map((p) => p.id === product.id ? payload.product : p));
-    } catch (e) { alert('Availability update failed: ' + (e?.message || e)); }
+    } catch (e) { alert('Mavjudlikni yangilashda xato: ' + (e?.message || e)); }
   };
 
   return (
     <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
-        title="Products"
-        subtitle={`${products.length} products`}
+        title="Mahsulotlar"
+        subtitle={`${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
         icon={Cake}
         actions={canManageCatalog && (
           <Button onClick={openNew} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            <Plus className="w-4 h-4 mr-1.5" /> Add product
+            <Plus className="w-4 h-4 mr-1.5" /> Mahsulot qo‘shish
           </Button>
         )}
       />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" className="pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
         </div>
-        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium sm:w-56">
+        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium sm:w-56">
           <option value="all">Barcha kategoriyalar</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -91,28 +91,28 @@ export default function Products() {
           {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-52 rounded-2xl bg-secondary animate-pulse" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20"><div className="text-5xl mb-3">🍰</div><p className="text-sm text-muted-foreground">No products found.</p></div>
+        <div className="text-center py-20"><div className="text-5xl mb-3">🍰</div><p className="text-sm text-muted-foreground">Mahsulot topilmadi.</p></div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {filtered.map((p) => (
-            <div key={p.id} className="group rounded-2xl bg-card border border-border premium-shadow overflow-hidden">
+            <div key={p.id} className="group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg">
               <div className="relative aspect-square bg-secondary overflow-hidden">
                 {p.image_url ? <Image src={p.image_url} alt={p.name} fittingType="fill" className="w-full h-full" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-display text-muted-foreground/40">{p.name.charAt(0)}</div>}
                 {p.is_favorite && <Star className="absolute top-2 left-2 w-4 h-4 fill-primary text-primary" />}
-                {!p.active && <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center text-white text-xs font-semibold">Inactive</div>}
+                {!p.active && <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center text-white text-xs font-semibold">Mavjud emas</div>}
                 {canManageCatalog && (
-                  <button onClick={() => openEdit(p)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-card/90 backdrop-blur flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                  <button onClick={() => openEdit(p)} className="absolute top-2 right-2 w-10 h-10 rounded-full bg-card/95 backdrop-blur flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow touch-manipulation">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
               <div className="p-3">
                 <div className="text-sm font-semibold truncate">{p.name}</div>
-                <div className="text-xs text-muted-foreground">{p.category_name || 'Uncategorized'}</div>
+                <div className="text-xs text-muted-foreground">{p.category_name || 'Kategoriyasiz'}</div>
                 <div className="text-[15px] font-bold text-primary-strong mt-1">{formatUZS(p.price)}</div>
                 {(role === 'production' || canManageCatalog) && (
                   <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => setAvailability(p)}>
-                    Mark {p.active === false ? 'available' : 'unavailable'}
+                    {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan vaqtincha olish'}
                   </Button>
                 )}
               </div>
