@@ -1,0 +1,80 @@
+{
+  "name": "IngredientStock",
+  "properties": {
+    "ingredient_id": {
+      "type": "string"
+    },
+    "ingredient_name": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name": {
+      "type": "string"
+    },
+    "low_stock_level": {
+      "default": 0,
+      "type": "number"
+    },
+    "quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "unit": {
+      "enum": [
+        "g",
+        "ml",
+        "piece"
+      ],
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "updated_by_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "location_id",
+    "ingredient_id",
+    "ingredient_name",
+    "unit",
+    "quantity"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "type": "object"
+}

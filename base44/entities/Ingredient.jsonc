@@ -1,0 +1,111 @@
+{
+  "name": "Ingredient",
+  "properties": {
+    "active": {
+      "default": true,
+      "type": "boolean"
+    },
+    "base_unit": {
+      "enum": [
+        "g",
+        "ml",
+        "piece"
+      ],
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "food",
+        "packaging"
+      ],
+      "type": "string"
+    },
+    "conversion_to_base": {
+      "default": 1,
+      "type": "number"
+    },
+    "name": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "purchase_unit": {
+      "enum": [
+        "kg",
+        "l",
+        "g",
+        "ml",
+        "piece"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "category",
+    "base_unit",
+    "purchase_unit",
+    "conversion_to_base"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "production"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    }
+  },
+  "type": "object"
+}

@@ -1,0 +1,113 @@
+{
+  "name": "StockMovement",
+  "properties": {
+    "balance_after": {
+      "type": "number"
+    },
+    "balance_before": {
+      "type": "number"
+    },
+    "created_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "item_id": {
+      "type": "string"
+    },
+    "item_kind": {
+      "enum": [
+        "ingredient",
+        "product"
+      ],
+      "type": "string"
+    },
+    "item_name": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name": {
+      "type": "string"
+    },
+    "movement_number": {
+      "type": "string"
+    },
+    "movement_type": {
+      "enum": [
+        "opening",
+        "adjustment",
+        "receipt",
+        "production_use",
+        "production_output",
+        "transfer_out",
+        "transfer_in",
+        "sale",
+        "waste",
+        "refund"
+      ],
+      "type": "string"
+    },
+    "quantity_change": {
+      "type": "number"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "reference_id": {
+      "type": "string"
+    },
+    "reference_type": {
+      "type": "string"
+    },
+    "unit": {
+      "enum": [
+        "g",
+        "ml",
+        "piece"
+      ],
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "user_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "movement_number",
+    "location_id",
+    "item_kind",
+    "item_id",
+    "item_name",
+    "unit",
+    "movement_type",
+    "quantity_change",
+    "balance_before",
+    "balance_after",
+    "reason",
+    "user_id",
+    "created_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    }
+  },
+  "type": "object"
+}
