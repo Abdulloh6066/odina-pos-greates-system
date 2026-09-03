@@ -73,6 +73,14 @@
     "order_count": {
       "type": "number",
       "default": 0
+    },
+    "cash_removed": {
+      "type": "number",
+      "default": 0
+    },
+    "refunds_total": {
+      "type": "number",
+      "default": 0
     }
   },
   "required": [
