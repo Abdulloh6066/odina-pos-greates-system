@@ -159,12 +159,12 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setImageUrl(file_url);
-    } catch (err) { alert('Upload failed: ' + (err?.message || err)); }
+    } catch (err) { alert('Rasmni yuklashda xato: ' + (err?.message || err)); }
     finally { setUploading(false); }
   };
 
   const save = async () => {
-    if (!name.trim() || !price) { alert('Name and price are required.'); return; }
+    if (!name.trim() || !price) { alert('Nomi va narxi majburiy.'); return; }
     setSaving(true);
     const cat = categories.find((c) => c.id === categoryId);
     const payload = {
@@ -189,7 +189,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
         await logAction(user, 'product_created', payload.name);
       }
       onSaved();
-    } catch (e) { alert('Save failed: ' + (e?.message || e)); }
+    } catch (e) { alert('Saqlashda xato: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
@@ -214,7 +214,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">{product ? 'Edit product' : 'New product'}</DialogTitle>
+          <DialogTitle className="font-display text-xl">{product ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex gap-4">
@@ -222,53 +222,53 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
               {imageUrl ? <img src={imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40"><Cake className="w-8 h-8" /></div>}
             </div>
             <div className="flex-1 space-y-2">
-              <Label className="text-xs">Product image</Label>
+              <Label className="text-xs">Mahsulot rasmi</Label>
               <label className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-secondary transition-colors">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {uploading ? 'Uploading…' : 'Upload image'}
+                {uploading ? 'Yuklanmoqda…' : 'Rasm yuklash'}
                 <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
               </label>
-              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…or paste image URL" className="h-9 text-xs" />
+              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="…yoki rasm havolasini kiriting" className="h-9 text-xs" />
             </div>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chocolate Truffle Cake" />
+            <Label className="text-xs mb-1.5 block">Nomi</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Shokoladli tort" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs mb-1.5 block">Price (UZS)</Label>
+              <Label className="text-xs mb-1.5 block">Narxi (UZS)</Label>
               <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="45000" />
             </div>
             <div>
-              <Label className="text-xs mb-1.5 block">Category</Label>
+              <Label className="text-xs mb-1.5 block">Kategoriya</Label>
               <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-                <option value="">None</option>
+                <option value="">Tanlanmagan</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">How this product is supplied</Label>
+            <Label className="text-xs mb-1.5 block">Mahsulot qayerdan ta’minlanadi</Label>
             <select value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-              <option value="central_produced">Produced at Central Production</option>
-              <option value="shop_prepared">Prepared inside each shop</option>
-              <option value="resale">Purchased ready-made for resale</option>
+              <option value="central_produced">Markaziy ishlab chiqarishda tayyorlanadi</option>
+              <option value="shop_prepared">Har bir do‘konda tayyorlanadi</option>
+              <option value="resale">Sotish uchun tayyor holda xarid qilinadi</option>
             </select>
-            <p className="text-xs text-muted-foreground mt-1.5">This prepares the product for recipes and automatic stock rules in the next phase.</p>
+            <p className="text-xs text-muted-foreground mt-1.5">Bu tanlov keyingi bosqichdagi retsept va avtomatik ombor qoidalari uchun ishlatiladi.</p>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional" />
+            <Label className="text-xs mb-1.5 block">Tavsif</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ixtiyoriy" />
           </div>
           <div className="flex items-center gap-5">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={isFavorite} onChange={(e) => setIsFavorite(e.target.checked)} className="w-4 h-4 accent-primary" />
-              Favorite
+              Sevimli
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-4 h-4 accent-primary" />
-              Active
+              Faol
             </label>
           </div>
         </div>
