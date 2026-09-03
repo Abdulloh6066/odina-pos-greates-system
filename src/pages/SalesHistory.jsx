@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { ReceiptText, Search, Eye } from 'lucide-react';
+import { ReceiptText, Search, Eye, RotateCcw } from 'lucide-react';
 import { formatUZS, formatNum, isSameDay } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,27 @@ export default function SalesHistory() {
     return list;
   }, [sales, role, user, search, filterDate]);
 
-  const totalRev = visible.reduce((s, x) => s + x.total, 0);
+  const totalRev = visible.reduce((s, x) => s + (x.status === 'refunded' ? 0 : x.total), 0);
+
+  const refundSale = async (sale) => {
+    const reason = window.prompt('Refund reason:')?.trim();
+    if (!reason) return;
+    const ownerPin = window.prompt('Owner PIN required for refund:');
+    if (!ownerPin) return;
+    try {
+      const result = await base44.functions.invoke('complete-sale', {
+        action: 'refund_sale',
+        sale_id: sale.id,
+        reason,
+        owner_pin: ownerPin,
+      });
+      const payload = result?.data || result;
+      if (!payload?.sale) throw new Error(payload?.error || 'Could not refund sale.');
+      setSelected(payload.sale);
+      await load();
+      alert('Sale refunded successfully.');
+    } catch (e) { alert('Refund failed: ' + (e?.message || e)); }
+  };
 
   return (
     <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
@@ -68,8 +88,9 @@ export default function SalesHistory() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold">{formatUZS(s.total)}</span>
+                  <span className={`font-semibold ${s.status === 'refunded' ? 'line-through text-muted-foreground' : ''}`}>{formatUZS(s.total)}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{s.payment_methods_summary}</span>
+                  {s.status === 'refunded' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-destructive">Refunded</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {new Date(s.created_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -86,12 +107,12 @@ export default function SalesHistory() {
         </div>
       )}
 
-      <SaleDetailDialog sale={selected} onClose={() => setSelected(null)} />
+      <SaleDetailDialog sale={selected} onRefund={refundSale} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
-function SaleDetailDialog({ sale, onClose }) {
+function SaleDetailDialog({ sale, onRefund, onClose }) {
   if (!sale) return null;
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onClose()}>
@@ -120,7 +141,19 @@ function SaleDetailDialog({ sale, onClose }) {
             {sale.payments?.map((p, i) => <Row key={i} label={p.method} value={formatUZS(p.amount)} />)}
           </div>
         </div>
-        <Button variant="outline" onClick={onClose} className="mt-4 w-full">Close</Button>
+        {sale.status === 'refunded' && (
+          <div className="rounded-xl bg-red-50 text-destructive p-3 text-sm">
+            Refunded{sale.refund_reason ? `: ${sale.refund_reason}` : ''}
+          </div>
+        )}
+        <div className="flex gap-2 mt-4">
+          {sale.status === 'completed' && (
+            <Button variant="destructive" onClick={() => onRefund(sale)} className="flex-1">
+              <RotateCcw className="w-4 h-4 mr-1.5" /> Refund
+            </Button>
+          )}
+          <Button variant="outline" onClick={onClose} className="flex-1">Close</Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
