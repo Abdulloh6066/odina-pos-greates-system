@@ -41,7 +41,7 @@ async function verifyOwnerPin(service: any, pinValue: unknown) {
   return hex(new Uint8Array(digest)) === security.pin_hash;
 }
 
-Deno.serve(async (req) => {
+export default async function(req) {
   const base44 = createClientFromRequest(req);
   const service = base44.asServiceRole;
   let sale: any = null;
@@ -468,4 +468,4 @@ Deno.serve(async (req) => {
       error: error instanceof Error ? error.message : "Could not complete sale.",
     }, { status: 500 });
   }
-});
+}
