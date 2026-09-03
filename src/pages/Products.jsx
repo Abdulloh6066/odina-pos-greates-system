@@ -200,7 +200,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     if (!product || !window.confirm(question)) return;
     setArchiving(true);
     try {
-      await base44.entities.Product.update(product.id, { archived, active: archived ? false : product.active });
+      await base44.entities.Product.update(product.id, { archived, active: archived ? false : true });
       await logAction(user, archived ? 'product_archived' : 'product_restored', product.name);
       onSaved();
     } catch (e) {
@@ -288,8 +288,8 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
           </div>
           <div className="flex gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving || archiving}>Bekor qilish</Button>
-          <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {saving ? 'Saving…' : 'Save'}
+          <Button onClick={save} disabled={saving || archiving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </Button>
           </div>
         </DialogFooter>
