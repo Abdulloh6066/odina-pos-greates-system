@@ -5,6 +5,10 @@
       "default": true,
       "type": "boolean"
     },
+    "archived": {
+      "default": false,
+      "type": "boolean"
+    },
     "category_id": {
       "type": "string"
     },
