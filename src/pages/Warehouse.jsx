@@ -11,23 +11,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 const TABS = [
-  { id: 'ingredients', label: 'Ingredients & packaging', icon: Archive },
-  { id: 'products', label: 'Finished products', icon: Boxes },
-  { id: 'history', label: 'Stock history', icon: History },
+  { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
+  { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes },
+  { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
 const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'pcs' };
 const MOVEMENT_LABELS = {
-  opening: 'Opening stock',
-  adjustment: 'Stock adjustment',
-  receipt: 'Supplier receipt',
-  production_use: 'Production use',
-  production_output: 'Production output',
-  transfer_out: 'Transfer sent',
-  transfer_in: 'Transfer received',
-  sale: 'POS sale',
-  waste: 'Waste',
-  refund: 'Refund',
+  opening: 'Boshlang‘ich qoldiq',
+  adjustment: 'Qoldiq tuzatishi',
+  receipt: 'Yetkazib beruvchidan qabul',
+  production_use: 'Ishlab chiqarishda sarf',
+  production_output: 'Ishlab chiqarilgan mahsulot',
+  transfer_out: 'Jo‘natilgan transfer',
+  transfer_in: 'Qabul qilingan transfer',
+  sale: 'Kassa savdosi',
+  waste: 'Chiqit',
+  refund: 'Qaytarish',
 };
 
 export default function Warehouse() {
@@ -67,7 +67,7 @@ export default function Warehouse() {
         setSelectedLocation(preferred);
       }
     } catch (error) {
-      alert('Could not load warehouse: ' + (error?.message || error));
+      alert('Omborni yuklab bo‘lmadi: ' + (error?.message || error));
     } finally {
       setLoading(false);
     }
@@ -116,12 +116,12 @@ export default function Warehouse() {
   return (
     <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
-        title="Warehouse"
-        subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Choose a location'}
+        title="Ombor"
+        subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
         actions={canCreateIngredients && (
           <Button onClick={() => setIngredientOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            <Plus className="w-4 h-4 mr-1.5" /> New ingredient
+            <Plus className="w-4 h-4 mr-1.5" /> Yangi masalliq
           </Button>
         )}
       />
@@ -130,7 +130,7 @@ export default function Warehouse() {
         <div className="flex flex-col sm:flex-row gap-3">
           {user?.role === 'admin' ? (
             <label className="sm:w-72 space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Warehouse location</span>
+              <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
               <select
                 value={selectedLocation}
                 onChange={(event) => setSelectedLocation(event.target.value)}
@@ -138,24 +138,24 @@ export default function Warehouse() {
               >
                 {locations.map((location) => (
                   <option key={location.id} value={location.id}>
-                    {location.name}{location.location_type === 'production' ? ' · Production' : ' · Shop'}
+                    {location.name}{location.location_type === 'production' ? ' · Ishlab chiqarish' : ' · Do‘kon'}
                   </option>
                 ))}
               </select>
             </label>
           ) : (
             <div className="sm:w-72">
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">Your warehouse</p>
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">Sizning omboringiz</p>
               <div className="h-11 rounded-xl bg-secondary/70 px-3 flex items-center text-sm font-medium">
-                {selectedLocationRecord?.name || user?.shop_name || 'No location assigned'}
+                {selectedLocationRecord?.name || user?.shop_name || 'Joylashuv biriktirilmagan'}
               </div>
             </div>
           )}
           <label className="flex-1 space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Search</span>
+            <span className="text-xs font-medium text-muted-foreground">Qidiruv</span>
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search stock or history…" className="h-11 pl-10 rounded-xl bg-background" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Qoldiq yoki tarixni qidirish…" className="h-11 pl-10 rounded-xl bg-background" />
             </div>
           </label>
         </div>
@@ -164,16 +164,16 @@ export default function Warehouse() {
       {!selectedLocation ? (
         <div className="rounded-2xl border border-border bg-card py-16 text-center">
           <WarehouseIcon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="font-medium">No warehouse location assigned</p>
-          <p className="text-sm text-muted-foreground mt-1">The owner must assign this user to a location.</p>
+          <p className="font-medium">Ombor joylashuvi biriktirilmagan</p>
+          <p className="text-sm text-muted-foreground mt-1">Egasi ushbu xodimni joylashuvga biriktirishi kerak.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <Summary label="Ingredients" value={ingredients.length} />
-            <Summary label="Finished products" value={products.length} />
-            <Summary label="Items in stock" value={stockedCount} />
-            <Summary label="Stock movements" value={movements.filter((m) => m.location_id === selectedLocation).length} />
+            <Summary label="Masalliqlar" value={ingredients.length} />
+            <Summary label="Tayyor mahsulotlar" value={products.length} />
+            <Summary label="Omborda mavjud turlar" value={stockedCount} />
+            <Summary label="Ombor harakatlari" value={movements.filter((m) => m.location_id === selectedLocation).length} />
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
@@ -235,7 +235,7 @@ function Summary({ label, value }) {
 
 function StockGrid({ items, stockMap, kind, onAdjust }) {
   if (!items.length) {
-    return <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">No matching items.</div>;
+    return <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Mos mahsulot topilmadi.</div>;
   }
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -258,7 +258,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={() => onAdjust(item)} className="w-full mt-4">
-              <PackagePlus className="w-4 h-4 mr-1.5" /> Set opening / adjust
+              <PackagePlus className="w-4 h-4 mr-1.5" /> Boshlang‘ich qoldiq / tuzatish
             </Button>
           </div>
         );
@@ -269,7 +269,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
 
 function HistoryList({ movements }) {
   if (!movements.length) {
-    return <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">No stock movements for this location.</div>;
+    return <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Bu joylashuvda ombor harakati yo‘q.</div>;
   }
   return (
     <div className="space-y-3">
@@ -320,7 +320,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
       || (baseUnit === 'ml' && ['ml', 'l'].includes(purchaseUnit))
       || (baseUnit === 'piece' && purchaseUnit === 'piece');
     if (!validPair) {
-      alert('Purchase unit must match the base unit.');
+      alert('Xarid birligi asosiy birlikka mos bo‘lishi kerak.');
       return;
     }
     setSaving(true);
@@ -335,7 +335,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
       });
       onSaved();
     } catch (error) {
-      alert('Could not create ingredient: ' + (error?.message || error));
+      alert('Masalliqni yaratib bo‘lmadi: ' + (error?.message || error));
     } finally {
       setSaving(false);
     }
@@ -344,49 +344,49 @@ function IngredientDialog({ open, onClose, onSaved }) {
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle className="font-display text-xl">New ingredient or packaging</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq or packaging</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label className="text-xs mb-1.5 block">Name</Label>
-            <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Flour, Milk, Cake box" />
+            <Label className="text-xs mb-1.5 block">Nomi</Label>
+            <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Masalan: un, sut, tort qutisi" />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Type</Label>
+            <Label className="text-xs mb-1.5 block">Turi</Label>
             <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-              <option value="food">Food ingredient</option>
-              <option value="packaging">Packaging</option>
+              <option value="food">Oziq-ovqat masallig‘i</option>
+              <option value="packaging">Qadoqlash</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs mb-1.5 block">Recipe / stock unit</Label>
+              <Label className="text-xs mb-1.5 block">Retsept / ombor birligi</Label>
               <select value={baseUnit} onChange={(event) => {
                 const value = event.target.value;
                 setBaseUnit(value);
                 setPurchaseUnit(value === 'g' ? 'kg' : value === 'ml' ? 'l' : 'piece');
               }} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-                <option value="g">Grams (g)</option>
-                <option value="ml">Millilitres (ml)</option>
-                <option value="piece">Pieces</option>
+                <option value="g">Gramm (g)</option>
+                <option value="ml">Millilitr (ml)</option>
+                <option value="piece">Dona</option>
               </select>
             </div>
             <div>
-              <Label className="text-xs mb-1.5 block">Usually purchased in</Label>
+              <Label className="text-xs mb-1.5 block">Odatda qaysi birlikda olinadi</Label>
               <select value={purchaseUnit} onChange={(event) => setPurchaseUnit(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-                {baseUnit === 'g' && <><option value="kg">Kilograms (kg)</option><option value="g">Grams (g)</option></>}
-                {baseUnit === 'ml' && <><option value="l">Litres (L)</option><option value="ml">Millilitres (ml)</option></>}
-                {baseUnit === 'piece' && <option value="piece">Pieces</option>}
+                {baseUnit === 'g' && <><option value="kg">Kilogramm (kg)</option><option value="g">Gramm (g)</option></>}
+                {baseUnit === 'ml' && <><option value="l">Litr (L)</option><option value="ml">Millilitr (ml)</option></>}
+                {baseUnit === 'piece' && <option value="piece">Dona</option>}
               </select>
             </div>
           </div>
           <p className="text-xs text-muted-foreground rounded-xl bg-secondary/60 p-3">
-            Kilograms and litres are automatically converted to 1,000 grams or millilitres.
+            Kilogramm va litr avtomatik ravishda 1 000 gramm yoki millilitrga aylantiriladi.
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
           <Button onClick={save} disabled={saving || !name.trim()} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {saving ? 'Saving…' : 'Create item'}
+            {saving ? 'Saqlanmoqda…' : 'Yaratish'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -417,7 +417,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
   const save = async () => {
     if (!item || !location || !Number.isFinite(change) || change === 0 || !reason.trim()) return;
     if (after < 0) {
-      alert('Stock cannot become negative.');
+      alert('Ombor qoldig‘i manfiy bo‘lishi mumkin emas.');
       return;
     }
     setSaving(true);
@@ -432,10 +432,10 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
         reason: reason.trim(),
       });
       const payload = result?.data || result;
-      if (!payload?.stock) throw new Error(payload?.error || 'Stock could not be updated.');
+      if (!payload?.stock) throw new Error(payload?.error || 'Ombor qoldig‘ini yangilab bo‘lmadi.');
       onSaved();
     } catch (error) {
-      alert('Stock update failed: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
+      alert('Ombor yangilanishi amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
     } finally {
       setSaving(false);
     }
@@ -445,38 +445,38 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Update stock</DialogTitle>
+          <DialogTitle className="font-display text-xl">Ombor qoldig‘ini yangilash</DialogTitle>
           <p className="text-sm text-muted-foreground">{item?.name} · {location?.name}</p>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant={mode === 'add' ? 'default' : 'outline'} onClick={() => setMode('add')} className={mode === 'add' ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}>Add stock</Button>
-            <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>Remove stock</Button>
+            <Button type="button" variant={mode === 'add' ? 'default' : 'outline'} onClick={() => setMode('add')} className={mode === 'add' ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}>Kirim qilish</Button>
+            <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>Chiqim qilish</Button>
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Quantity ({UNIT_LABELS[unit] || unit})</Label>
             <Input autoFocus type="number" min="0.001" step={unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Reason</Label>
-            <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required for permanent stock history" rows={2} />
+            <Label className="text-xs mb-1.5 block">Sabab</Label>
+            <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Doimiy ombor tarixi uchun majburiy" rows={2} />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Record type</Label>
+            <Label className="text-xs mb-1.5 block">Yozuv turi</Label>
             <select value={movementType} onChange={(event) => setMovementType(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-              <option value="opening">Opening stock</option>
-              <option value="adjustment">Manual correction</option>
+              <option value="opening">Boshlang‘ich qoldiq</option>
+              <option value="adjustment">Qo‘lda tuzatish</option>
             </select>
           </div>
           <div className="rounded-xl bg-secondary/60 p-3 text-sm flex items-center justify-between">
-            <span className="text-muted-foreground">Balance after change</span>
+            <span className="text-muted-foreground">O‘zgarishdan keyingi qoldiq</span>
             <span className={`font-semibold ${after < 0 ? 'text-destructive' : ''}`}>{formatNum(after)} {UNIT_LABELS[unit] || unit}</span>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
           <Button onClick={save} disabled={saving || !quantity || !reason.trim() || after < 0} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {saving ? 'Saving…' : 'Save with history'}
+            {saving ? 'Saqlanmoqda…' : 'Tarix bilan saqlash'}
           </Button>
         </DialogFooter>
       </DialogContent>
