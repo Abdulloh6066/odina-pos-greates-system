@@ -226,7 +226,7 @@ export default function POS() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-3.5rem)] lg:h-screen bg-background">
+    <div className="flex flex-col w-full max-w-full h-[calc(100dvh-3.5rem)] lg:h-screen bg-background overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -309,7 +309,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="hidden xl:flex w-[380px] 2xl:w-[420px] shrink-0 border-l border-border">
+        <div className="hidden xl:flex w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
