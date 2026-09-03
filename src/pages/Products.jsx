@@ -63,7 +63,7 @@ export default function Products() {
         subtitle={`${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
         icon={Cake}
         actions={canManageCatalog && (
-          <Button onClick={openNew} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={openNew} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             <Plus className="w-4 h-4 mr-1.5" /> Mahsulot qo‘shish
           </Button>
         )}
@@ -79,7 +79,7 @@ export default function Products() {
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         {role === 'admin' && (
-          <Button variant="outline" onClick={() => setShowArchived((value) => !value)} className="whitespace-nowrap">
+          <Button variant="outline" onClick={() => setShowArchived((value) => !value)} className="whitespace-nowrap min-h-11 rounded-xl touch-manipulation">
             {showArchived ? <Cake className="w-4 h-4 mr-1.5" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
             {showArchived ? 'Faol mahsulotlar' : 'Arxiv' }
           </Button>
@@ -111,7 +111,7 @@ export default function Products() {
                 <div className="text-xs text-muted-foreground">{p.category_name || 'Kategoriyasiz'}</div>
                 <div className="text-[15px] font-bold text-primary-strong mt-1">{formatUZS(p.price)}</div>
                 {(role === 'production' || canManageCatalog) && (
-                  <Button variant="outline" size="sm" className="w-full mt-2 h-8 text-xs" onClick={() => setAvailability(p)}>
+                  <Button variant="outline" size="sm" className="w-full mt-2 min-h-10 rounded-xl text-xs touch-manipulation" onClick={() => setAvailability(p)}>
                     {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan vaqtincha olish'}
                   </Button>
                 )}
@@ -212,7 +212,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{product ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}</DialogTitle>
         </DialogHeader>
@@ -288,7 +288,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
           </div>
           <div className="flex gap-2">
           <Button variant="outline" onClick={onClose} disabled={saving || archiving}>Bekor qilish</Button>
-          <Button onClick={save} disabled={saving || archiving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={save} disabled={saving || archiving} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </Button>
           </div>
