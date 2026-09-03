@@ -12,6 +12,35 @@ const PAYMENT_METHODS = new Set([
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
 
+const hex = (bytes: Uint8Array) =>
+  Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+
+async function verifyOwnerPin(service: any, pinValue: unknown) {
+  const pin = String(pinValue || "");
+  if (!/^\d{4,8}$/.test(pin)) return false;
+  const records = await service.entities.SecuritySettings.filter({ key: "owner_approval_pin" });
+  const security = records?.[0];
+  if (!security?.pin_hash || !security?.pin_salt) return false;
+
+  if (security.pin_algorithm === "PBKDF2-SHA256") {
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"],
+    );
+    const derived = await crypto.subtle.deriveBits({
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode(security.pin_salt),
+      iterations: Number(security.pin_iterations || 210000),
+    }, key, 256);
+    return hex(new Uint8Array(derived)) === security.pin_hash;
+  }
+
+  const digest = await crypto.subtle.digest(
+    "SHA-256", new TextEncoder().encode(`${security.pin_salt}:${pin}`),
+  );
+  return hex(new Uint8Array(digest)) === security.pin_hash;
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const service = base44.asServiceRole;
@@ -30,6 +59,120 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
+    const action = String(body?.action || "complete_sale");
+
+    if (action === "validate_discount") {
+      if (user.role === "cashier" && !(await verifyOwnerPin(service, body?.owner_pin))) {
+        return Response.json({ error: "Owner PIN is incorrect." }, { status: 403 });
+      }
+      const code = String(body?.code || "").trim().toUpperCase();
+      const matches = code ? await service.entities.DiscountCode.filter({ code, active: true }) : [];
+      const discount = matches?.[0];
+      if (!discount || (discount.single_use !== false && Number(discount.usage_count || 0) >= 1)) {
+        return Response.json({ error: "Invalid, inactive, or already-used discount code." }, { status: 404 });
+      }
+      return Response.json({ code: discount.code, percentage: Number(discount.percentage) });
+    }
+
+    if (action === "cash_withdrawal") {
+      const shiftId = String(body?.shift_id || "");
+      const amount = money(body?.amount);
+      const reason = String(body?.reason || "").trim();
+      const employeeName = String(body?.employee_name || "").trim();
+      if (!shiftId || amount <= 0 || !reason || !employeeName) {
+        return Response.json({ error: "Amount, reason, and employee name are required." }, { status: 400 });
+      }
+      const shift = await service.entities.Shift.get(shiftId);
+      if (!shift || shift.status !== "open") return Response.json({ error: "The shift is not open." }, { status: 409 });
+      if (shift.user_id !== user.id) return Response.json({ error: "This shift belongs to another user." }, { status: 403 });
+      if (amount > Number(shift.expected_cash || 0)) {
+        return Response.json({ error: "Withdrawal is greater than expected drawer cash." }, { status: 400 });
+      }
+      const movement = await service.entities.CashMovement.create({
+        shift_id: shift.id, shop_id: shift.shop_id, user_id: user.id,
+        user_name: user.full_name || user.email, employee_name: employeeName,
+        type: "withdrawal", amount, reason, created_at: new Date().toISOString(),
+      });
+      await service.entities.Shift.update(shift.id, {
+        expected_cash: Number(shift.expected_cash || 0) - amount,
+        cash_removed: Number(shift.cash_removed || 0) + amount,
+      });
+      await service.entities.ActionHistory.create({
+        user_id: user.id, user_name: user.full_name || user.email,
+        action: "cash_withdrawal", details: `${amount} UZS. ${reason}. Employee: ${employeeName}`,
+      });
+      return Response.json({
+        movement,
+        shift: {
+          ...shift,
+          expected_cash: Number(shift.expected_cash || 0) - amount,
+          cash_removed: Number(shift.cash_removed || 0) + amount,
+        },
+      });
+    }
+
+    if (action === "refund_sale") {
+      if (!(await verifyOwnerPin(service, body?.owner_pin))) {
+        return Response.json({ error: "Owner PIN is incorrect." }, { status: 403 });
+      }
+      const saleId = String(body?.sale_id || "");
+      const reason = String(body?.reason || "").trim();
+      if (!saleId || !reason) return Response.json({ error: "Sale and refund reason are required." }, { status: 400 });
+      const original = await service.entities.Sale.get(saleId);
+      if (!original) return Response.json({ error: "Sale not found." }, { status: 404 });
+      if (original.status !== "completed") return Response.json({ error: "This sale is already refunded." }, { status: 409 });
+
+      const openShifts = await service.entities.Shift.filter({ user_id: user.id, status: "open", shop_id: original.shop_id });
+      const refundShift = openShifts?.[0];
+      if (!refundShift) {
+        return Response.json({ error: "Open a shift at the sale's shop before refunding." }, { status: 409 });
+      }
+
+      const refundPayments = Array.isArray(original.payments) ? original.payments : [];
+      const byMethod = (method: string) => refundPayments
+        .filter((payment: any) => payment.method === method)
+        .reduce((sum: number, payment: any) => sum + money(payment.amount), 0);
+      const cash = byMethod("cash");
+      const uzcard = byMethod("uzcard");
+      const humo = byMethod("humo");
+      const online = byMethod("click") + byMethod("payme") + byMethod("other");
+      const bank = byMethod("bank_transfer");
+      if (cash > Number(refundShift.expected_cash || 0)) {
+        return Response.json({ error: "Not enough expected drawer cash for this refund." }, { status: 409 });
+      }
+
+      const now = new Date().toISOString();
+      const refundNumber = `RF-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+      const refund = await service.entities.Refund.create({
+        refund_number: refundNumber, sale_id: original.id, sale_number: original.sale_number,
+        shop_id: original.shop_id, shift_id: refundShift.id, cashier_id: user.id,
+        cashier_name: user.full_name || user.email, amount: money(original.total), reason,
+        payments: refundPayments, payment_summary: original.payment_methods_summary, created_at: now,
+      });
+      await service.entities.Sale.update(original.id, {
+        status: "refunded", refunded_at: now, refunded_by: user.id,
+        refund_id: refund.id, refund_reason: reason,
+      });
+      await service.entities.Shift.update(refundShift.id, {
+        cash_sales: Number(refundShift.cash_sales || 0) - cash,
+        uzcard_sales: Number(refundShift.uzcard_sales || 0) - uzcard,
+        humo_sales: Number(refundShift.humo_sales || 0) - humo,
+        online_sales: Number(refundShift.online_sales || 0) - online,
+        bank_transfer_sales: Number(refundShift.bank_transfer_sales || 0) - bank,
+        total_sales: Number(refundShift.total_sales || 0) - money(original.total),
+        expected_cash: Number(refundShift.expected_cash || 0) - cash,
+        refunds_total: Number(refundShift.refunds_total || 0) + money(original.total),
+      });
+      await service.entities.ActionHistory.create({
+        user_id: user.id, user_name: user.full_name || user.email,
+        action: "sale_refunded", details: `${original.sale_number || original.id}. ${money(original.total)} UZS. ${reason}`,
+      });
+      return Response.json({ refund, sale: { ...original, status: "refunded", refunded_at: now, refund_id: refund.id, refund_reason: reason } });
+    }
+
+    if (action !== "complete_sale") {
+      return Response.json({ error: "Unknown Kassa action." }, { status: 400 });
+    }
     const shiftId = String(body?.shift_id || "");
     const requestedItems = Array.isArray(body?.items) ? body.items : [];
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
