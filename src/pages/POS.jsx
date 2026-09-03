@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Search, Star, Clock, Building2, BanknoteArrowDown } from 'lucide-react';
+import { Search, Star, Clock, Building2, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -225,7 +225,7 @@ export default function POS() {
               <Clock className="w-3.5 h-3.5" /> Shift open
             </div>
             <Button variant="outline" size="sm" onClick={recordCashWithdrawal} className="h-9">
-              <BanknoteArrowDown className="w-4 h-4 mr-1.5" /> Cash out
+              <Banknote className="w-4 h-4 mr-1.5" /> Cash out
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-9">
               Close shift

@@ -9,8 +9,13 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
   const [startingCash, setStartingCash] = useState(0);
 
   useEffect(() => {
-    if (open && shops.length) {
-      setShopId(user?.role === 'cashier' ? (user.shop_id || '') : shops[0].id);
+    if (open) {
+      if (user?.role === 'cashier') {
+        setShopId(user.shop_id || '');
+      } else {
+        const main = shops.find((s) => s.is_main);
+        setShopId(main?.id || shops[0]?.id || '');
+      }
       setStartingCash(0);
     }
   }, [open, shops, user]);
@@ -30,8 +35,10 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
           <div>
             <label className="text-sm font-medium mb-1.5 block">Shop</label>
             {user?.role === 'cashier' ? (
-              <div className="w-full min-h-10 rounded-lg border border-input bg-secondary/60 px-3 py-2 text-sm font-medium">
-                {shops.find((s) => s.id === user.shop_id)?.name || 'No shop assigned — ask Owner/Admin'}
+              <div className={`w-full min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${user.shop_id ? 'border-input bg-secondary/60' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
+                {user.shop_id
+                  ? (shops.find((s) => s.id === user.shop_id)?.name || 'Assigned shop not found')
+                  : 'Owner must assign this cashier to a shop.'}
               </div>
             ) : (
               <select
