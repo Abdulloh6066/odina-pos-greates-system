@@ -1,11 +1,30 @@
 {
   "name": "CashMovement",
-  "type": "object",
   "properties": {
+    "amount": {
+      "type": "number"
+    },
+    "created_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "employee_name": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
     "shift_id": {
       "type": "string"
     },
     "shop_id": {
+      "type": "string"
+    },
+    "type": {
+      "default": "withdrawal",
+      "enum": [
+        "withdrawal"
+      ],
       "type": "string"
     },
     "user_id": {
@@ -13,26 +32,6 @@
     },
     "user_name": {
       "type": "string"
-    },
-    "employee_name": {
-      "type": "string"
-    },
-    "type": {
-      "type": "string",
-      "enum": [
-        "withdrawal"
-      ],
-      "default": "withdrawal"
-    },
-    "amount": {
-      "type": "number"
-    },
-    "reason": {
-      "type": "string"
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time"
     }
   },
   "required": [
@@ -50,16 +49,16 @@
         "role": "admin"
       }
     },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "read": {
       "$or": [
         {
           "user_condition": {
             "role": "admin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
           }
         },
         {
@@ -71,11 +70,7 @@
       "user_condition": {
         "role": "admin"
       }
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
-  }
+  },
+  "type": "object"
 }
