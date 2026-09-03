@@ -2,14 +2,14 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Cake, LayoutDashboard, ShoppingCart, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Users, Settings, LogOut, Circle,
+  ReceiptText, Clock, Banknote, Users, Settings, LogOut, Circle,
 } from 'lucide-react';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Users, Settings,
+  ReceiptText, Clock, Banknote, Users, Settings,
 };
 
 export default function Sidebar({ user, mobileOpen, onClose }) {
