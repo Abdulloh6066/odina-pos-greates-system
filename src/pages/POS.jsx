@@ -202,7 +202,7 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
-  const recordCashWithdrawal = async ({ amount, reason, employee_name }) => {
+  const recordCashWithdrawal = async ({ amount, reason }) => {
     if (!shift) return;
     setCashWithdrawalLoading(true);
     try {
@@ -211,7 +211,6 @@ export default function POS() {
         shift_id: shift.id,
         amount,
         reason,
-        employee_name,
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Could not record withdrawal.');
@@ -343,6 +342,7 @@ export default function POS() {
       <CashWithdrawalDialog
         open={cashWithdrawalOpen}
         shift={shift}
+        user={user}
         onClose={() => setCashWithdrawalOpen(false)}
         onConfirm={recordCashWithdrawal}
         loading={cashWithdrawalLoading}
