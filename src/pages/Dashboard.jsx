@@ -30,7 +30,7 @@ export default function Dashboard() {
     return () => { active = false; };
   }, [role]);
 
-  const today = useMemo(() => sales.filter((s) => isSameDay(s.created_date, Date.now())), [sales]);
+  const today = useMemo(() => sales.filter((s) => s.status !== 'refunded' && isSameDay(s.created_date, Date.now())), [sales]);
   const todayTotal = today.reduce((sum, s) => sum + s.total, 0);
   const todayOrders = today.length;
   const avgOrder = todayOrders ? todayTotal / todayOrders : 0;
