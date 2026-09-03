@@ -58,7 +58,7 @@ export default function Warehouse() {
       ]);
       setLocations((locationList || []).filter((location) => location.active !== false));
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
-      setProducts((productList || []).filter((item) => item.active !== false && item.track_stock !== false));
+      setProducts((productList || []).filter((item) => item.active !== false && item.archived !== true && item.track_stock !== false));
       setIngredientStock(ingredientBalances || []);
       setProductStock(productBalances || []);
       setMovements(movementList || []);
