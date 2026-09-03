@@ -65,7 +65,7 @@ export default function Dashboard() {
             <StatCard icon={TrendingUp} label="Bugungi savdo" value={formatUZS(todayTotal)} accent />
             <StatCard icon={Receipt} label="Bugungi buyurtmalar" value={formatNum(todayOrders)} />
             <StatCard icon={ShoppingBag} label="O‘rtacha buyurtma" value={formatUZS(avgOrder)} />
-            <StatCard icon={Star} label="Mahsulotlar" value={formatNum(products.length)} />
+            <StatCard icon={Star} label="Mahsulotlar" value={formatNum(products.filter((product) => product.archived !== true).length)} />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-5 mt-6">
@@ -99,7 +99,7 @@ export default function Dashboard() {
           </div>
 
           {canAccess(role, 'pos') && (
-            <button onClick={() => navigate('/pos')} className="mt-6 w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-primary-foreground font-semibold premium-shadow hover:bg-primary-strong transition-colors">
+            <button onClick={() => navigate('/pos')} className="mt-6 w-full min-h-14 flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-primary-foreground font-semibold premium-shadow hover:bg-primary-strong active:scale-[0.99] transition-all touch-manipulation">
               Kassani ochish <ArrowRight className="w-4 h-4" />
             </button>
           )}
