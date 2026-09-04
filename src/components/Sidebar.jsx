@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Cake, LayoutDashboard, ShoppingCart, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Warehouse, Users, Settings, LogOut, Circle,
-  ChevronDown, PanelLeftClose, PanelLeftOpen,
+  Archive, ArrowRightLeft, BarChart3, Banknote, Boxes, Cake, ChevronDown,
+  Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
+  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Users, Warehouse,
 } from 'lucide-react';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
@@ -15,6 +15,12 @@ const ICONS = {
 };
 
 const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts'];
+const WAREHOUSE_CHILDREN = [
+  { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
+  { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products' },
+  { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers' },
+  { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
+];
 
 export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle }) {
   const role = user?.role || 'cashier';
@@ -25,19 +31,21 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
   const topItems = items.filter((item) => !hasKassa || !KASSA_CHILD_KEYS.includes(item.key));
   const kassaPaths = ['/pos', ...kassaChildren.map((item) => item.path)];
   const kassaActive = kassaPaths.includes(location.pathname);
+  const warehouseActive = location.pathname === '/warehouse';
+  const warehouseTab = new URLSearchParams(location.search).get('tab') || 'ingredients';
   const [kassaOpen, setKassaOpen] = useState(kassaActive);
+  const [warehouseOpen, setWarehouseOpen] = useState(warehouseActive);
 
   useEffect(() => {
     if (kassaActive) setKassaOpen(true);
   }, [kassaActive]);
 
+  useEffect(() => {
+    if (warehouseActive) setWarehouseOpen(true);
+  }, [warehouseActive]);
+
   const handleLogout = async () => {
     await base44.auth.logout();
-  };
-
-  const handleKassaClick = () => {
-    if (collapsed) onToggle();
-    setKassaOpen((current) => collapsed ? true : !current);
   };
 
   const renderRegularItem = (item) => {
@@ -63,6 +71,53 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
     );
   };
 
+  const renderGroup = ({ item, children, active, open, setOpen, ParentIcon }) => (
+    <div key={item.key}>
+      <NavLink
+        to={item.path}
+        onClick={() => {
+          if (collapsed) onToggle();
+          setOpen((current) => collapsed ? true : !current);
+        }}
+        title={collapsed ? item.label : undefined}
+        className={`group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
+          active
+            ? 'bg-primary text-primary-foreground premium-shadow'
+            : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
+        }`}
+      >
+        <ParentIcon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+        <span className={`flex-1 truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''} ${collapsed ? 'lg:hidden' : ''}`} />
+      </NavLink>
+
+      <div className={`grid transition-[grid-template-rows,opacity] duration-200 ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'} ${collapsed ? 'lg:hidden' : ''}`}>
+        <div className="overflow-hidden">
+          <div className="ml-5 mt-1 mb-2 pl-3 border-l border-primary/35 space-y-1">
+            {children.map((child) => {
+              const ChildIcon = child.icon || ICONS[child.iconName] || Circle;
+              return (
+                <NavLink
+                  key={child.key}
+                  to={child.path}
+                  onClick={onClose}
+                  className={`flex items-center gap-2.5 min-h-10 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                    child.active
+                      ? 'bg-primary/15 text-primary-strong'
+                      : 'text-foreground/65 hover:bg-secondary hover:text-foreground'
+                  }`}
+                >
+                  <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
+                  <span className="truncate">{child.label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const content = (
     <div className="flex flex-col h-full">
       <div className={`py-6 flex items-center gap-3 ${collapsed ? 'px-5 lg:px-3 lg:justify-center' : 'px-5'}`}>
@@ -77,57 +132,36 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
 
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin">
         {topItems.map((item) => {
-          if (item.key !== 'pos') return renderRegularItem(item);
+          if (item.key === 'pos') {
+            return renderGroup({
+              item,
+              active: kassaActive,
+              open: kassaOpen,
+              setOpen: setKassaOpen,
+              ParentIcon: ShoppingCart,
+              children: kassaChildren.map((child) => ({
+                ...child,
+                iconName: child.icon,
+                active: location.pathname === child.path,
+              })),
+            });
+          }
 
-          return (
-            <div key={item.key}>
-              <NavLink
-                to={item.path}
-                onClick={handleKassaClick}
-                title={collapsed ? item.label : undefined}
-                className={`group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
-                  kassaActive
-                    ? 'bg-primary text-primary-foreground premium-shadow'
-                    : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
-                }`}
-              >
-                <ShoppingCart className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
-                <span className={`flex-1 truncate ${collapsed ? 'lg:hidden' : ''}`}>Kassa</span>
-                {kassaChildren.length > 0 && (
-                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${kassaOpen ? 'rotate-180' : ''} ${collapsed ? 'lg:hidden' : ''}`} />
-                )}
-              </NavLink>
+          if (item.key === 'warehouse') {
+            return renderGroup({
+              item: { ...item, path: '/warehouse?tab=ingredients' },
+              active: warehouseActive,
+              open: warehouseOpen,
+              setOpen: setWarehouseOpen,
+              ParentIcon: Warehouse,
+              children: WAREHOUSE_CHILDREN.map((child) => ({
+                ...child,
+                active: warehouseActive && warehouseTab === child.tab,
+              })),
+            });
+          }
 
-              {kassaChildren.length > 0 && (
-                <div className={`grid transition-[grid-template-rows,opacity] duration-200 ${kassaOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'} ${collapsed ? 'lg:hidden' : ''}`}>
-                  <div className="overflow-hidden">
-                    <div className="ml-5 mt-1 mb-2 pl-3 border-l border-primary/35 space-y-1">
-                      {kassaChildren.map((child) => {
-                        const ChildIcon = ICONS[child.icon] || Circle;
-                        return (
-                          <NavLink
-                            key={child.key}
-                            to={child.path}
-                            onClick={onClose}
-                            className={({ isActive }) =>
-                              `flex items-center gap-2.5 min-h-10 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-                                isActive
-                                  ? 'bg-primary/15 text-primary-strong'
-                                  : 'text-foreground/65 hover:bg-secondary hover:text-foreground'
-                              }`
-                            }
-                          >
-                            <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
-                            <span className="truncate">{child.label}</span>
-                          </NavLink>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
+          return renderRegularItem(item);
         })}
       </nav>
 
