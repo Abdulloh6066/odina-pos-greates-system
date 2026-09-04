@@ -19,7 +19,7 @@ export default function TransfersPanel({
 }) {
   const [sendOpen, setSendOpen] = useState(false);
   const [receivingId, setReceivingId] = useState('');
-  const canSend = ['admin', 'production'].includes(user?.role) && location?.location_type === 'production';
+  const canSend = user?.role === 'admin' && location?.location_type === 'production';
   const normalizedSearch = search.toLowerCase().trim();
 
   const visibleTransfers = useMemo(() => transfers.filter((transfer) => {
