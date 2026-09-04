@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 
 export default function Settings() {
   const { user } = useOutletContext();
@@ -20,6 +21,7 @@ export default function Settings() {
   const [thankYou, setThankYou] = useState('Rahmat! Sizning tabassumingiz biz uchun juda muhim ❤️');
   const [receiptFooter, setReceiptFooter] = useState('');
   const [currency, setCurrency] = useState('UZS');
+  const [allowNegativeStock, setAllowNegativeStock] = useState(true);
   const [ownerPin, setOwnerPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [savingPin, setSavingPin] = useState(false);
@@ -35,6 +37,7 @@ export default function Settings() {
       setThankYou(existing.thank_you_message || '');
       setReceiptFooter(existing.receipt_footer || '');
       setCurrency(existing.currency || 'UZS');
+      setAllowNegativeStock(existing.allow_negative_stock !== false);
     }
     setLoading(false);
   };
@@ -43,7 +46,13 @@ export default function Settings() {
   const save = async () => {
     setSaving(true);
     try {
-      const payload = { shop_name: shopName, thank_you_message: thankYou, receipt_footer: receiptFooter, currency };
+      const payload = {
+        shop_name: shopName,
+        thank_you_message: thankYou,
+        receipt_footer: receiptFooter,
+        currency,
+        allow_negative_stock: allowNegativeStock,
+      };
       if (settings) await base44.entities.Settings.update(settings.id, payload);
       else { const created = await base44.entities.Settings.create(payload); setSettings(created); }
       await logAction(user, 'settings_updated', 'Updated shop settings');
@@ -128,6 +137,27 @@ export default function Settings() {
             <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
               <Save className="w-4 h-4 mr-1.5" /> {saving ? 'Saving…' : 'Save settings'}
             </Button>
+          </div>
+
+          <div className="rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-display text-lg font-bold">Qoldiqsiz sotuv</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Yoqilganida qoldiq yetmasa kassir ogohlantiriladi, ammo tasdiqlab sotishi mumkin.
+                  O‘chirilganda qoldiqsiz sotuv bloklanadi.
+                </p>
+              </div>
+              <Switch
+                checked={allowNegativeStock}
+                onCheckedChange={setAllowNegativeStock}
+                aria-label="Qoldiqsiz sotishga ruxsat"
+                className="mt-1"
+              />
+            </div>
+            <p className={`mt-3 text-xs font-medium ${allowNegativeStock ? 'text-amber-700' : 'text-emerald-700'}`}>
+              {allowNegativeStock ? 'Hozir: ogohlantirib sotishga ruxsat berilgan' : 'Hozir: qoldiq yetmasa sotuv bloklanadi'}
+            </p>
           </div>
 
           <div className="rounded-2xl bg-card border border-border premium-shadow p-5 mt-5 space-y-4">
