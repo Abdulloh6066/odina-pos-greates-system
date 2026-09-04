@@ -15,6 +15,7 @@ export const ROLE_MENU = {
   cashier: ['pos', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
   production: ['warehouse', 'products'],
+  warehouse: ['warehouse'],
 };
 
 export const ROLE_HOME = {
@@ -22,6 +23,7 @@ export const ROLE_HOME = {
   cashier: '/pos',
   accountant: '/',
   production: '/products',
+  warehouse: '/warehouse',
 };
 
 export const MENU_ITEMS = [
