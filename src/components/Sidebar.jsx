@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Archive, ArrowRightLeft, BarChart3, Banknote, Boxes, Building2, Cake, ChevronDown,
+  Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, Warehouse,
 } from 'lucide-react';
@@ -19,6 +19,8 @@ const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-suppliers', label: 'Kirim va qarzlar', path: '/warehouse?tab=suppliers', icon: Truck, tab: 'suppliers', roles: ['admin', 'warehouse', 'accountant'] },
+  { key: 'warehouse-recipes', label: 'Retseptlar', path: '/warehouse?tab=recipes', icon: BookOpen, tab: 'recipes', roles: ['admin', 'accountant', 'production'] },
+  { key: 'warehouse-production', label: 'Ishlab chiqarish', path: '/warehouse?tab=production', icon: ChefHat, tab: 'production', roles: ['admin', 'accountant', 'production'] },
   { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers', roles: ['admin', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];
