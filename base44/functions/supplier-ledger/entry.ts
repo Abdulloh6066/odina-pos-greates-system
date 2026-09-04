@@ -50,6 +50,20 @@ export default async function(req) {
     const body = await req.json();
     const action = String(body?.action || "");
 
+    if (action === "get_debts") {
+      if (!["admin", "cashier", "warehouse", "accountant"].includes(user.role)) {
+        return Response.json({ error: "Qarzlarni ko‘rishga ruxsat yo‘q." }, { status: 403 });
+      }
+      const openReceipts = (await service.entities.SupplierReceipt.filter(
+        { remaining_debt: { $gt: 0 } }, "received_at", 500,
+      )) || [];
+      const totals: Record<string, number> = {};
+      for (const receipt of openReceipts) {
+        totals[receipt.supplier_id] = money(totals[receipt.supplier_id] || 0) + money(receipt.remaining_debt);
+      }
+      return Response.json({ debts: totals });
+    }
+
     if (action === "create_receipt") {
       if (!["admin", "warehouse"].includes(user.role)) {
         return Response.json({ error: "Faqat owner yoki Omborchi kirim qila oladi." }, { status: 403 });
