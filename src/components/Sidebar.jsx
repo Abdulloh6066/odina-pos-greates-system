@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, Boxes, Building2, Cake, ChevronDown,
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
-  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Users, Warehouse,
+  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, Warehouse,
 } from 'lucide-react';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
@@ -18,6 +18,7 @@ const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipi
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products' },
+  { key: 'warehouse-suppliers', label: 'Kirim va qarzlar', path: '/warehouse?tab=suppliers', icon: Truck, tab: 'suppliers', roles: ['admin', 'warehouse', 'accountant'] },
   { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers' },
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];
@@ -154,7 +155,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
               open: warehouseOpen,
               setOpen: setWarehouseOpen,
               ParentIcon: Warehouse,
-              children: WAREHOUSE_CHILDREN.map((child) => ({
+              children: WAREHOUSE_CHILDREN.filter((child) => !child.roles || child.roles.includes(role)).map((child) => ({
                 ...child,
                 active: warehouseActive && warehouseTab === child.tab,
               })),
