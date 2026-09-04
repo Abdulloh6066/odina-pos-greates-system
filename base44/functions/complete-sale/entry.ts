@@ -304,19 +304,27 @@ export default async function(req) {
 
     if (action === "refund_sale") {
       if (!(await verifyOwnerPin(service, body?.owner_pin))) {
-        return Response.json({ error: "Owner PIN is incorrect." }, { status: 403 });
+        return Response.json({ error: "Egasi PIN kodi noto‘g‘ri." }, { status: 403 });
       }
       const saleId = String(body?.sale_id || "");
       const reason = String(body?.reason || "").trim();
-      if (!saleId || !reason) return Response.json({ error: "Sale and refund reason are required." }, { status: 400 });
+      if (!saleId || !reason) {
+        return Response.json({ error: "Savdo va qaytarish sababi majburiy." }, { status: 400 });
+      }
       const original = await service.entities.Sale.get(saleId);
-      if (!original) return Response.json({ error: "Sale not found." }, { status: 404 });
-      if (original.status !== "completed") return Response.json({ error: "This sale is already refunded." }, { status: 409 });
+      if (!original) return Response.json({ error: "Savdo topilmadi." }, { status: 404 });
+      if (original.status !== "completed") {
+        return Response.json({ error: "Bu savdo allaqachon qaytarilgan." }, { status: 409 });
+      }
 
-      const openShifts = await service.entities.Shift.filter({ user_id: user.id, status: "open", shop_id: original.shop_id });
+      const openShifts = await service.entities.Shift.filter({
+        user_id: user.id,
+        status: "open",
+        shop_id: original.shop_id,
+      });
       const refundShift = openShifts?.[0];
       if (!refundShift) {
-        return Response.json({ error: "Open a shift at the sale's shop before refunding." }, { status: 409 });
+        return Response.json({ error: "Qaytarish uchun savdo qilingan do‘konda smenani oching." }, { status: 409 });
       }
 
       const refundPayments = Array.isArray(original.payments) ? original.payments : [];
@@ -329,36 +337,214 @@ export default async function(req) {
       const online = byMethod("click") + byMethod("payme") + byMethod("other");
       const bank = byMethod("bank_transfer");
       if (cash > Number(refundShift.expected_cash || 0)) {
-        return Response.json({ error: "Not enough expected drawer cash for this refund." }, { status: 409 });
+        return Response.json({ error: "Qaytarish uchun kassada kutilayotgan naqd pul yetarli emas." }, { status: 409 });
       }
 
       const now = new Date().toISOString();
-      const refundNumber = `RF-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-      const refund = await service.entities.Refund.create({
-        refund_number: refundNumber, sale_id: original.id, sale_number: original.sale_number,
-        shop_id: original.shop_id, shift_id: refundShift.id, cashier_id: user.id,
-        cashier_name: user.full_name || user.email, amount: money(original.total), reason,
-        payments: refundPayments, payment_summary: original.payment_methods_summary, created_at: now,
-      });
-      await service.entities.Sale.update(original.id, {
-        status: "refunded", refunded_at: now, refunded_by: user.id,
-        refund_id: refund.id, refund_reason: reason,
-      });
-      await service.entities.Shift.update(refundShift.id, {
-        cash_sales: Number(refundShift.cash_sales || 0) - cash,
-        uzcard_sales: Number(refundShift.uzcard_sales || 0) - uzcard,
-        humo_sales: Number(refundShift.humo_sales || 0) - humo,
-        online_sales: Number(refundShift.online_sales || 0) - online,
-        bank_transfer_sales: Number(refundShift.bank_transfer_sales || 0) - bank,
-        total_sales: Number(refundShift.total_sales || 0) - money(original.total),
-        expected_cash: Number(refundShift.expected_cash || 0) - cash,
-        refunds_total: Number(refundShift.refunds_total || 0) + money(original.total),
-      });
-      await service.entities.ActionHistory.create({
-        user_id: user.id, user_name: user.full_name || user.email,
-        action: "sale_refunded", details: `${original.sale_number || original.id}. ${money(original.total)} UZS. ${reason}`,
-      });
-      return Response.json({ refund, sale: { ...original, status: "refunded", refunded_at: now, refund_id: refund.id, refund_reason: reason } });
+      const day = now.slice(0, 10).replaceAll("-", "");
+      const refundNumber = `RF-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+      const saleItemRows = await service.entities.SaleItem.filter({ sale_id: original.id });
+      const restockItems = (saleItemRows || []).filter(
+        (item: any) => item.stock_tracked_snapshot === true && Number(item.quantity || 0) > 0,
+      );
+
+      let refund: any = null;
+      let saleClaimed = false;
+      let shiftAdjusted = false;
+      const restocks: any[] = [];
+      const refundMovements: any[] = [];
+
+      try {
+        refund = await service.entities.Refund.create({
+          refund_number: refundNumber,
+          sale_id: original.id,
+          sale_number: original.sale_number,
+          shop_id: original.shop_id,
+          shift_id: refundShift.id,
+          cashier_id: user.id,
+          cashier_name: user.full_name || user.email,
+          amount: money(original.total),
+          reason,
+          payments: refundPayments,
+          payment_summary: original.payment_methods_summary,
+          created_at: now,
+        });
+
+        const saleClaim = await service.entities.Sale.updateMany(
+          { id: original.id, status: "completed" },
+          { $set: {
+            status: "refunded",
+            refunded_at: now,
+            refunded_by: user.id,
+            refund_id: refund.id,
+            refund_reason: reason,
+          } },
+        );
+        if (!saleClaim?.success || Number(saleClaim.updated || 0) !== 1) {
+          throw httpError("Savdo boshqa qurilmada o‘zgargan. Yangilang va qayta urinib ko‘ring.", 409);
+        }
+        saleClaimed = true;
+
+        const shiftUpdate = await service.entities.Shift.updateMany(
+          { id: refundShift.id, status: "open" },
+          { $inc: {
+            cash_sales: -cash,
+            uzcard_sales: -uzcard,
+            humo_sales: -humo,
+            online_sales: -online,
+            bank_transfer_sales: -bank,
+            total_sales: -money(original.total),
+            expected_cash: -cash,
+            refunds_total: money(original.total),
+          } },
+        );
+        if (!shiftUpdate?.success || Number(shiftUpdate.updated || 0) !== 1) {
+          throw httpError("Smena boshqa qurilmada o‘zgargan. Yangilang va qayta urinib ko‘ring.", 409);
+        }
+        shiftAdjusted = true;
+
+        for (const item of restockItems) {
+          const locationId = item.stock_location_id || original.shop_id;
+          const rows = await service.entities.ProductStock.filter({
+            location_id: locationId,
+            product_id: item.product_id,
+          });
+          if ((rows || []).length > 1) {
+            throw httpError(`${item.product_name_snapshot} uchun takroriy ombor qoldig‘i topildi.`, 409);
+          }
+          const existing = rows?.[0] || null;
+          const before = stockNumber(existing?.quantity || 0);
+          const quantity = stockNumber(item.quantity);
+          const after = stockNumber(before + quantity);
+          let stockRecord = existing;
+
+          if (existing) {
+            const update = await service.entities.ProductStock.updateMany(
+              { id: existing.id, quantity: before },
+              { $set: {
+                quantity: after,
+                product_name: item.product_name_snapshot,
+                location_name: original.shop_name,
+                unit: "piece",
+                updated_at: now,
+                updated_by: user.id,
+                updated_by_name: user.full_name || user.email,
+              } },
+            );
+            if (!update?.success || Number(update.updated || 0) !== 1) {
+              throw httpError(`${item.product_name_snapshot} qoldig‘i boshqa qurilmada o‘zgardi.`, 409);
+            }
+          } else {
+            stockRecord = await service.entities.ProductStock.create({
+              location_id: locationId,
+              location_name: original.shop_name,
+              product_id: item.product_id,
+              product_name: item.product_name_snapshot,
+              unit: "piece",
+              quantity: after,
+              low_stock_level: 0,
+              updated_at: now,
+              updated_by: user.id,
+              updated_by_name: user.full_name || user.email,
+            });
+          }
+          restocks.push({ stockRecord, quantity, product_id: item.product_id, after });
+
+          const movement = await service.entities.StockMovement.create({
+            movement_number: `ST-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+            location_id: locationId,
+            location_name: original.shop_name,
+            item_kind: "product",
+            item_id: item.product_id,
+            item_name: item.product_name_snapshot,
+            unit: "piece",
+            movement_type: "refund",
+            quantity_change: quantity,
+            balance_before: before,
+            balance_after: after,
+            reason: `Savdo qaytarildi: ${original.sale_number || original.id}`,
+            reference_id: refund.id,
+            reference_type: "refund",
+            user_id: user.id,
+            user_name: user.full_name || user.email,
+            created_at: now,
+          });
+          refundMovements.push(movement);
+        }
+
+        try {
+          await service.entities.ActionHistory.create({
+            user_id: user.id,
+            user_name: user.full_name || user.email,
+            action: "sale_refunded",
+            details: `${original.sale_number || original.id}. ${money(original.total)} UZS. ${reason}`,
+          });
+        } catch {}
+
+        return Response.json({
+          refund,
+          sale: {
+            ...original,
+            status: "refunded",
+            refunded_at: now,
+            refund_id: refund.id,
+            refund_reason: reason,
+          },
+          stock_updates: restocks.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.after,
+          })),
+        });
+      } catch (error) {
+        for (const movement of refundMovements) {
+          try { await service.entities.StockMovement.delete(movement.id); } catch {}
+        }
+        for (const restock of restocks) {
+          try {
+            await service.entities.ProductStock.updateMany(
+              { id: restock.stockRecord.id },
+              { $inc: { quantity: -restock.quantity } },
+            );
+          } catch {}
+        }
+        if (shiftAdjusted) {
+          try {
+            await service.entities.Shift.updateMany(
+              { id: refundShift.id },
+              { $inc: {
+                cash_sales: cash,
+                uzcard_sales: uzcard,
+                humo_sales: humo,
+                online_sales: online,
+                bank_transfer_sales: bank,
+                total_sales: money(original.total),
+                expected_cash: cash,
+                refunds_total: -money(original.total),
+              } },
+            );
+          } catch {}
+        }
+        if (saleClaimed) {
+          try {
+            await service.entities.Sale.updateMany(
+              { id: original.id },
+              {
+                $set: { status: "completed" },
+                $unset: {
+                  refunded_at: "",
+                  refunded_by: "",
+                  refund_id: "",
+                  refund_reason: "",
+                },
+              },
+            );
+          } catch {}
+        }
+        if (refund?.id) {
+          try { await service.entities.Refund.delete(refund.id); } catch {}
+        }
+        throw error;
+      }
     }
 
     if (action !== "complete_sale") {
