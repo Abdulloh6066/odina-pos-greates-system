@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { Archive, ArrowRightLeft, Boxes, History, PackagePlus, Plus, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
@@ -43,6 +43,7 @@ const MOVEMENT_LABELS = {
 
 export default function Warehouse() {
   const { user } = useOutletContext();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [locations, setLocations] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [products, setProducts] = useState([]);
@@ -51,7 +52,8 @@ export default function Warehouse() {
   const [movements, setMovements] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(user?.role === 'admin' ? '' : (user?.shop_id || ''));
-  const [tab, setTab] = useState('ingredients');
+  const requestedTab = searchParams.get('tab');
+  const [tab, setTab] = useState(TABS.some((item) => item.id === requestedTab) ? requestedTab : 'ingredients');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [ingredientOpen, setIngredientOpen] = useState(false);
@@ -88,6 +90,19 @@ export default function Warehouse() {
   };
 
   useEffect(() => { if (user) load(); }, [user]);
+
+  useEffect(() => {
+    if (requestedTab && TABS.some((item) => item.id === requestedTab) && requestedTab !== tab) {
+      setTab(requestedTab);
+      setSearch('');
+    }
+  }, [requestedTab, tab]);
+
+  const changeTab = (nextTab) => {
+    setTab(nextTab);
+    setSearch('');
+    setSearchParams({ tab: nextTab });
+  };
 
   const selectedLocationRecord = locations.find((location) => location.id === selectedLocation);
   const canCreateIngredients = ['admin', 'accountant'].includes(user?.role);
@@ -190,12 +205,12 @@ export default function Warehouse() {
             <Summary label="Ombor harakatlari" value={movements.filter((m) => m.location_id === selectedLocation).length} />
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+          <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3">
             {TABS.map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
                 variant={tab === id ? 'default' : 'outline'}
-                onClick={() => { setTab(id); setSearch(''); }}
+                onClick={() => changeTab(id)}
                 className={`shrink-0 min-h-11 rounded-xl touch-manipulation ${tab === id ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}`}
               >
                 <Icon className="w-4 h-4 mr-1.5" />{label}
