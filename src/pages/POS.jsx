@@ -14,7 +14,7 @@ import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActi
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 export default function POS() {
-  const { user } = useOutletContext();
+  const { user, sidebarCollapsed } = useOutletContext();
 
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -320,7 +320,7 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className="xl:hidden fixed left-0 lg:left-64 right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border">
+      <div className={`xl:hidden fixed left-0 ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
         <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>
