@@ -86,9 +86,16 @@
           }
         },
         {
-          "user_condition": {
-            "role": "warehouse"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "warehouse"
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
         },
         {
           "user_condition": {
