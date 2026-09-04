@@ -23,7 +23,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
 
   const content = (
     <div className="flex flex-col h-full">
-      <div className={`py-6 flex items-center gap-3 ${collapsed ? 'lg:px-3 lg:justify-center' : 'px-5'}`}>
+      <div className={`py-6 flex items-center gap-3 ${collapsed ? 'px-5 lg:px-3 lg:justify-center' : 'px-5'}`}>
         <div className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center premium-shadow shrink-0">
           <Cake className="w-6 h-6 text-primary-foreground" strokeWidth={2.2} />
         </div>
@@ -44,7 +44,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
               onClick={onClose}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'lg:justify-center lg:px-2' : 'px-3.5'} ${
+                `group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
                   isActive
                     ? 'bg-primary text-primary-foreground premium-shadow'
                     : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
@@ -59,7 +59,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
       </nav>
 
       <div className="p-3 border-t border-border">
-        <div className={`flex items-center gap-3 py-2 rounded-xl ${collapsed ? 'lg:justify-center lg:px-0' : 'px-2'}`}> 
+        <div className={`flex items-center gap-3 py-2 rounded-xl ${collapsed ? 'px-2 lg:justify-center lg:px-0' : 'px-2'}`}> 
           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
             {(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}
           </div>
@@ -71,7 +71,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         <button
           onClick={handleLogout}
           title={collapsed ? 'Chiqish' : undefined}
-          className={`mt-1 w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-foreground/70 hover:bg-secondary hover:text-foreground transition-colors ${collapsed ? 'lg:justify-center lg:px-2' : 'px-3.5'}`}
+          className={`mt-1 w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium text-foreground/70 hover:bg-secondary hover:text-foreground transition-colors ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'}`}
         >
           <LogOut className="w-[18px] h-[18px]" strokeWidth={2} />
           <span className={collapsed ? 'lg:hidden' : ''}>Chiqish</span>
