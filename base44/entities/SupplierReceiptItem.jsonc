@@ -75,11 +75,6 @@
           "user_condition": {
             "role": "accountant"
           }
-        },
-        {
-          "user_condition": {
-            "role": "cashier"
-          }
         }
       ]
     },
