@@ -11,6 +11,22 @@
     "employee_name": {
       "type": "string"
     },
+    "expense_category": {
+      "default": "other_expense",
+      "enum": [
+        "shop_expense",
+        "goods_payment",
+        "owner_withdrawal",
+        "other_expense"
+      ],
+      "type": "string"
+    },
+    "recipient_id": {
+      "type": "string"
+    },
+    "recipient_name_snapshot": {
+      "type": "string"
+    },
     "reason": {
       "type": "string"
     },
