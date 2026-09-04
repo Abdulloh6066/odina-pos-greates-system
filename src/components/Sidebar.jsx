@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Archive, ArrowRightLeft, BarChart3, Banknote, Boxes, Cake, ChevronDown,
+  Archive, ArrowRightLeft, BarChart3, Banknote, Boxes, Building2, Cake, ChevronDown,
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, ShoppingCart, Tags, Ticket, Users, Warehouse,
 } from 'lucide-react';
@@ -10,11 +10,11 @@ import { base44 } from '@/api/base44Client';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Warehouse, Users, Settings,
+  ReceiptText, Clock, Banknote, Building2, Warehouse, Users, Settings,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
-const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts'];
+const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products' },
