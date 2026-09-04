@@ -57,7 +57,8 @@ export default function Warehouse() {
   const [selectedLocation, setSelectedLocation] = useState(user?.role === 'admin' ? '' : (user?.shop_id || ''));
   const requestedTab = searchParams.get('tab');
   const canViewSupplierLedger = ['admin', 'warehouse', 'accountant'].includes(user?.role);
-  const tabAllowed = (value) => TABS.some((item) => item.id === value) && (value !== 'suppliers' || canViewSupplierLedger);
+  const visibleTabs = TABS.filter((item) => user?.role !== 'warehouse' || ['ingredients', 'suppliers', 'history'].includes(item.id));
+  const tabAllowed = (value) => visibleTabs.some((item) => item.id === value) && (value !== 'suppliers' || canViewSupplierLedger);
   const [tab, setTab] = useState(tabAllowed(requestedTab) ? requestedTab : 'ingredients');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -70,11 +71,11 @@ export default function Warehouse() {
       const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferList, recipientList] = await Promise.all([
         base44.entities.Shop.list(),
         base44.entities.Ingredient.list('name', 500),
-        base44.entities.Product.list('name', 500),
+        user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.Product.list('name', 500),
         base44.entities.IngredientStock.list('-updated_at', 500),
-        base44.entities.ProductStock.list('-updated_at', 500),
+        user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.ProductStock.list('-updated_at', 500),
         base44.entities.StockMovement.list('-created_at', 500),
-        base44.entities.StockTransfer.list('-sent_at', 500),
+        user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.StockTransfer.list('-sent_at', 500),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
       setLocations((locationList || []).filter((location) => location.active !== false));
@@ -213,7 +214,7 @@ export default function Warehouse() {
           </div>
 
           <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3">
-            {TABS.filter((item) => item.id !== 'suppliers' || canViewSupplierLedger).map(({ id, label, icon: Icon }) => (
+            {visibleTabs.filter((item) => item.id !== 'suppliers' || canViewSupplierLedger).map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
                 variant={tab === id ? 'default' : 'outline'}
