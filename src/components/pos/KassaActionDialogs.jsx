@@ -49,20 +49,49 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
   );
 }
 
-export function CashWithdrawalDialog({ open, shift, user, onClose, onConfirm, loading }) {
+export function CashWithdrawalDialog({ open, shift, user, recipients = [], onClose, onConfirm, loading }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState('shop_expense');
+  const [recipientId, setRecipientId] = useState('');
+  const [ownerChoice, setOwnerChoice] = useState('Abdulloh');
+  const [otherOwner, setOtherOwner] = useState('');
 
   useEffect(() => {
-    if (open) { setAmount(''); setReason(''); }
+    if (open) {
+      setAmount('');
+      setReason('');
+      setExpenseCategory('shop_expense');
+      setRecipientId('');
+      setOwnerChoice('Abdulloh');
+      setOtherOwner('');
+    }
   }, [open]);
 
-  const valid = Number(amount) > 0 && reason.trim();
+  const recipientRequired = expenseCategory === 'goods_payment';
+  const ownerName = ownerChoice === 'other' ? otherOwner.trim() : 'Abdulloh';
+  const ownerRequired = expenseCategory === 'owner_withdrawal';
+  const valid = Number(amount) > 0
+    && Number(amount) <= Number(shift?.expected_cash || 0)
+    && reason.trim()
+    && (!recipientRequired || recipientId)
+    && (!ownerRequired || ownerName);
   const employeeName = user?.full_name || user?.email || 'Joriy Kassa xodimi';
+
+  const submit = () => {
+    if (!valid) return;
+    onConfirm({
+      amount: Number(amount),
+      reason: reason.trim(),
+      expense_category: expenseCategory,
+      recipient_id: recipientRequired ? recipientId : undefined,
+      recipient_name: ownerRequired ? ownerName : undefined,
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !loading && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mb-2">
             <Banknote className="w-5 h-5" />
@@ -72,21 +101,62 @@ export function CashWithdrawalDialog({ open, shift, user, onClose, onConfirm, lo
         </DialogHeader>
         <div className="space-y-4">
           <div>
+            <Label className="text-xs mb-1.5 block">Chiqim turi</Label>
+            <select
+              value={expenseCategory}
+              onChange={(event) => {
+                setExpenseCategory(event.target.value);
+                setRecipientId('');
+              }}
+              className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
+            >
+              <option value="shop_expense">Do‘kon xarajati</option>
+              <option value="goods_payment">Tovarlarga pul</option>
+              <option value="owner_withdrawal">Egasi olgan pul</option>
+              <option value="other_expense">Boshqa chiqim</option>
+            </select>
+          </div>
+
+          {recipientRequired && (
+            <div>
+              <Label className="text-xs mb-1.5 block">Kompaniya / yetkazib beruvchi</Label>
+              <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+                <option value="">Ro‘yxatdan tanlang</option>
+                {recipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name}</option>)}
+              </select>
+              {recipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Owner avval “Qabul qiluvchilar” bo‘limida kompaniya yaratishi kerak.</p>}
+            </div>
+          )}
+
+          {ownerRequired && (
+            <div className="space-y-2">
+              <Label className="text-xs block">Pulni olgan shaxs</Label>
+              <select value={ownerChoice} onChange={(event) => setOwnerChoice(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+                <option value="Abdulloh">Abdulloh</option>
+                <option value="other">Boshqa shaxs</option>
+              </select>
+              {ownerChoice === 'other' && (
+                <Input value={otherOwner} onChange={(event) => setOtherOwner(event.target.value)} placeholder="Shaxs ismini yozing" className="h-11 rounded-xl" />
+              )}
+            </div>
+          )}
+
+          <div>
             <Label className="text-xs mb-1.5 block">Miqdor</Label>
-            <Input autoFocus type="number" min="1" max={shift?.expected_cash || undefined} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
+            <Input autoFocus type="number" min="1" max={shift?.expected_cash || undefined} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Sabab</Label>
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Pul nima sababdan olinmoqda?" rows={2} />
+            <Label className="text-xs mb-1.5 block">Izoh / sabab</Label>
+            <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Pul nima uchun berildi?" rows={2} />
           </div>
           <div className="rounded-xl bg-muted/60 px-3 py-2.5">
-            <p className="text-xs text-muted-foreground">Avtomatik ravishda xodim nomiga yoziladi</p>
+            <p className="text-xs text-muted-foreground">Operatsiyani bajarayotgan xodim</p>
             <p className="text-sm font-medium mt-0.5">{employeeName}</p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
-          <Button onClick={() => valid && onConfirm({ amount: Number(amount), reason: reason.trim() })} disabled={loading || !valid} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={submit} disabled={loading || !valid} className="min-h-11 bg-primary text-primary-foreground hover:bg-primary-strong">
             {loading ? 'Saqlanmoqda…' : 'Pul olishni saqlash'}
           </Button>
         </DialogFooter>
