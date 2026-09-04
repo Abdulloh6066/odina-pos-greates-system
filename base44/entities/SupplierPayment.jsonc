@@ -1,0 +1,99 @@
+{
+  "name": "SupplierPayment",
+  "type": "object",
+  "properties": {
+    "payment_number": {
+      "type": "string"
+    },
+    "receipt_id": {
+      "type": "string"
+    },
+    "receipt_number_snapshot": {
+      "type": "string"
+    },
+    "supplier_id": {
+      "type": "string"
+    },
+    "supplier_name_snapshot": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name_snapshot": {
+      "type": "string"
+    },
+    "shift_id": {
+      "type": "string"
+    },
+    "cash_movement_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "user_name": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "paid_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "payment_number",
+    "receipt_id",
+    "supplier_id",
+    "supplier_name_snapshot",
+    "amount",
+    "shop_id",
+    "shift_id",
+    "user_id",
+    "paid_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.user_id": "{{user.id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
