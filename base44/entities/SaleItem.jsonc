@@ -20,6 +20,20 @@
     "product_id": {
       "type": "string"
     },
+    "source_type_snapshot": {
+      "type": "string"
+    },
+    "stock_tracked_snapshot": {
+      "type": "boolean",
+      "default": false
+    },
+    "stock_location_id": {
+      "type": "string"
+    },
+    "stock_quantity_change": {
+      "type": "number",
+      "default": 0
+    },
     "product_name_snapshot": {
       "type": "string"
     },
