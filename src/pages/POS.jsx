@@ -18,6 +18,7 @@ export default function POS() {
 
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
+  const [productStock, setProductStock] = useState([]);
   const [activeCat, setActiveCat] = useState('all');
   const [search, setSearch] = useState('');
   const [showFav, setShowFav] = useState(false);
@@ -28,6 +29,7 @@ export default function POS() {
   const [cashRecipients, setCashRecipients] = useState([]);
   const [supplierDebts, setSupplierDebts] = useState({});
   const [loadingData, setLoadingData] = useState(true);
+  const [stockChecking, setStockChecking] = useState(false);
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountPct, setDiscountPct] = useState(0);
@@ -50,7 +52,7 @@ export default function POS() {
 
   const loadAll = async () => {
     setLoadingData(true);
-    const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts] = await Promise.all([
+    const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts, stockList] = await Promise.all([
       base44.entities.Category.list(),
       base44.entities.Product.list(),
       base44.entities.Shop.list(),
@@ -58,9 +60,11 @@ export default function POS() {
       base44.entities.Shift.list(),
       base44.entities.CashRecipient.list('name', 500),
       base44.functions.invoke('supplier-ledger', { action: 'get_debts' }).catch(() => ({ data: { debts: {} } })),
+      base44.entities.ProductStock.list('-updated_at', 500),
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
+    setProductStock(stockList || []);
     setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
     setSettings(settingsList?.[0] || null);
     setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
@@ -143,9 +147,53 @@ export default function POS() {
     return list;
   }, [products, activeCat, showFav, search]);
 
-  const openCheckout = () => {
+  const stockByProduct = useMemo(() => {
+    const locationId = shift?.shop_id || user?.shop_id;
+    if (!locationId) return {};
+    return Object.fromEntries(
+      productStock
+        .filter((stock) => stock.location_id === locationId)
+        .map((stock) => [stock.product_id, Number(stock.quantity || 0)]),
+    );
+  }, [productStock, shift?.shop_id, user?.shop_id]);
+
+  const openCheckout = async () => {
     if (!shift) { setOpenShiftOpen(true); return; }
-    setPayOpen(true);
+    if (!cart.length || stockChecking) return;
+    setStockChecking(true);
+    try {
+      const result = await base44.functions.invoke('complete-sale', {
+        action: 'check_stock',
+        shift_id: shift.id,
+        items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+      });
+      const payload = result?.data || result;
+      const shortages = payload?.shortages || [];
+      if (shortages.length) {
+        const details = shortages
+          .map((item) => `${item.product_name}: ${item.requested} ta kerak, ${item.available} ta mavjud`)
+          .join('\n');
+        if (payload.allow_negative_stock === false) {
+          alert('Omborda mahsulot yetarli emas:\n\n' + details);
+          return;
+        }
+        const accepted = window.confirm(
+          'DIQQAT: ayrim mahsulotlar qoldig‘i yetarli emas. Savdodan keyin qoldiq minus bo‘ladi.\n\n'
+          + details
+          + '\n\nBaribir sotuvni davom ettirasizmi?',
+        );
+        if (!accepted) return;
+      }
+      setPayOpen(true);
+    } catch (error) {
+      const payload = error?.response?.data || error?.data || {};
+      const details = (payload.shortages || [])
+        .map((item) => `${item.product_name}: ${item.available} ta mavjud`)
+        .join('\n');
+      alert((payload.error || error?.message || 'Qoldiqni tekshirib bo‘lmadi.') + (details ? '\n\n' + details : ''));
+    } finally {
+      setStockChecking(false);
+    }
   };
 
   const completeSale = async (payments) => {
@@ -167,11 +215,29 @@ export default function POS() {
 
       setLastSale(payload.sale);
       if (payload.shift) setShift(payload.shift);
+      if (payload.stock_updates?.length) {
+        const updatedByProduct = Object.fromEntries(payload.stock_updates.map((item) => [item.product_id, item.quantity]));
+        setProductStock((current) => {
+          const existingIds = new Set(current.map((stock) => `${stock.location_id}:${stock.product_id}`));
+          const changed = current.map((stock) => (
+            stock.location_id === shift.shop_id && Object.prototype.hasOwnProperty.call(updatedByProduct, stock.product_id)
+              ? { ...stock, quantity: updatedByProduct[stock.product_id] }
+              : stock
+          ));
+          for (const item of payload.stock_updates) {
+            const key = `${shift.shop_id}:${item.product_id}`;
+            if (!existingIds.has(key)) {
+              changed.push({ location_id: shift.shop_id, product_id: item.product_id, quantity: item.quantity });
+            }
+          }
+          return changed;
+        });
+      }
       setPayOpen(false);
       setReceiptOpen(true);
       clearCart();
     } catch (e) {
-      alert('Savdoni yakunlab bo‘lmadi: ' + (e?.message || e));
+      alert('Savdoni yakunlab bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
       setPaying(false);
     }
@@ -324,7 +390,14 @@ export default function POS() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {filtered.map((p) => <ProductCard key={p.id} product={p} onAdd={addToCart} />)}
+                  {filtered.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      stockQuantity={p.track_stock === false || !shift ? null : Number(stockByProduct[p.id] || 0)}
+                      onAdd={addToCart}
+                    />
+                  ))}
                 </div>
               )}
             </div>
