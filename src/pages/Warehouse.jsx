@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Archive, Boxes, History, PackagePlus, Plus, Search, Warehouse as WarehouseIcon } from 'lucide-react';
+import { Archive, ArrowRightLeft, Boxes, History, PackagePlus, Plus, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import TransfersPanel from '@/components/warehouse/TransfersPanel';
 
 const TABS = [
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
   { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes },
+  { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
@@ -47,6 +49,7 @@ export default function Warehouse() {
   const [ingredientStock, setIngredientStock] = useState([]);
   const [productStock, setProductStock] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(user?.role === 'admin' ? '' : (user?.shop_id || ''));
   const [tab, setTab] = useState('ingredients');
   const [search, setSearch] = useState('');
@@ -57,13 +60,14 @@ export default function Warehouse() {
   const load = async () => {
     setLoading(true);
     try {
-      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList] = await Promise.all([
+      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferList] = await Promise.all([
         base44.entities.Shop.list(),
         base44.entities.Ingredient.list('name', 500),
         base44.entities.Product.list('name', 500),
         base44.entities.IngredientStock.list('-updated_at', 500),
         base44.entities.ProductStock.list('-updated_at', 500),
         base44.entities.StockMovement.list('-created_at', 500),
+        base44.entities.StockTransfer.list('-sent_at', 500),
       ]);
       setLocations((locationList || []).filter((location) => location.active !== false));
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
@@ -71,6 +75,7 @@ export default function Warehouse() {
       setIngredientStock(ingredientBalances || []);
       setProductStock(productBalances || []);
       setMovements(movementList || []);
+      setTransfers(transferList || []);
       if (!selectedLocation) {
         const preferred = user?.shop_id || locationList?.[0]?.id || '';
         setSelectedLocation(preferred);
@@ -204,6 +209,17 @@ export default function Warehouse() {
             </div>
           ) : tab === 'history' ? (
             <HistoryList movements={visibleMovements} />
+          ) : tab === 'transfers' ? (
+            <TransfersPanel
+              user={user}
+              location={selectedLocationRecord}
+              locations={locations}
+              products={products}
+              productStock={productStock}
+              transfers={transfers}
+              search={search}
+              onReload={load}
+            />
           ) : (
             <StockGrid
               items={items}
@@ -298,7 +314,7 @@ function HistoryList({ movements }) {
               </p>
             </div>
             <div className="text-xs text-muted-foreground mt-2">
-              {formatNum(movement.balance_before)} → {formatNum(movement.balance_after)} · {movement.user_name} · {new Date(movement.created_at || movement.created_date).toLocaleString('en-GB')}
+              {formatNum(movement.balance_before)} → {formatNum(movement.balance_after)} · {movement.user_name} · {new Date(movement.created_at || movement.created_date).toLocaleString('uz-UZ')}
             </div>
           </div>
         </div>
