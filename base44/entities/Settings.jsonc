@@ -15,6 +15,11 @@
     "currency": {
       "type": "string",
       "default": "UZS"
+    },
+    "allow_negative_stock": {
+      "type": "boolean",
+      "default": true,
+      "description": "Qoldiq yetishmasa ogohlantirib sotishga ruxsat"
     }
   },
   "required": [
