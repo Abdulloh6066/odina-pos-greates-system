@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRightLeft, Boxes, History, PackagePlus, Plus, Search, Warehouse as WarehouseIcon } from 'lucide-react';
+import { Archive, ArrowRightLeft, Boxes, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
+import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 
 const TABS = [
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
   { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes },
+  { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck },
   { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
@@ -51,9 +53,12 @@ export default function Warehouse() {
   const [productStock, setProductStock] = useState([]);
   const [movements, setMovements] = useState([]);
   const [transfers, setTransfers] = useState([]);
+  const [recipients, setRecipients] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(user?.role === 'admin' ? '' : (user?.shop_id || ''));
   const requestedTab = searchParams.get('tab');
-  const [tab, setTab] = useState(TABS.some((item) => item.id === requestedTab) ? requestedTab : 'ingredients');
+  const canViewSupplierLedger = ['admin', 'warehouse', 'accountant'].includes(user?.role);
+  const tabAllowed = (value) => TABS.some((item) => item.id === value) && (value !== 'suppliers' || canViewSupplierLedger);
+  const [tab, setTab] = useState(tabAllowed(requestedTab) ? requestedTab : 'ingredients');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [ingredientOpen, setIngredientOpen] = useState(false);
@@ -62,7 +67,7 @@ export default function Warehouse() {
   const load = async () => {
     setLoading(true);
     try {
-      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferList] = await Promise.all([
+      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferList, recipientList] = await Promise.all([
         base44.entities.Shop.list(),
         base44.entities.Ingredient.list('name', 500),
         base44.entities.Product.list('name', 500),
@@ -70,6 +75,7 @@ export default function Warehouse() {
         base44.entities.ProductStock.list('-updated_at', 500),
         base44.entities.StockMovement.list('-created_at', 500),
         base44.entities.StockTransfer.list('-sent_at', 500),
+        base44.entities.CashRecipient.list('name', 500),
       ]);
       setLocations((locationList || []).filter((location) => location.active !== false));
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
@@ -78,6 +84,7 @@ export default function Warehouse() {
       setProductStock(productBalances || []);
       setMovements(movementList || []);
       setTransfers(transferList || []);
+      setRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
       if (!selectedLocation) {
         const preferred = user?.shop_id || locationList?.[0]?.id || '';
         setSelectedLocation(preferred);
@@ -92,11 +99,11 @@ export default function Warehouse() {
   useEffect(() => { if (user) load(); }, [user]);
 
   useEffect(() => {
-    if (requestedTab && TABS.some((item) => item.id === requestedTab) && requestedTab !== tab) {
+    if (requestedTab && tabAllowed(requestedTab) && requestedTab !== tab) {
       setTab(requestedTab);
       setSearch('');
     }
-  }, [requestedTab, tab]);
+  }, [requestedTab, tab, canViewSupplierLedger]);
 
   const changeTab = (nextTab) => {
     setTab(nextTab);
@@ -206,7 +213,7 @@ export default function Warehouse() {
           </div>
 
           <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3">
-            {TABS.map(({ id, label, icon: Icon }) => (
+            {TABS.filter((item) => item.id !== 'suppliers' || canViewSupplierLedger).map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
                 variant={tab === id ? 'default' : 'outline'}
@@ -224,6 +231,14 @@ export default function Warehouse() {
             </div>
           ) : tab === 'history' ? (
             <HistoryList movements={visibleMovements} />
+          ) : tab === 'suppliers' && canViewSupplierLedger ? (
+            <SupplierLedgerPanel
+              user={user}
+              location={selectedLocationRecord}
+              ingredients={ingredients}
+              recipients={recipients}
+              search={search}
+            />
           ) : tab === 'transfers' ? (
             <TransfersPanel
               user={user}
@@ -240,7 +255,7 @@ export default function Warehouse() {
               items={items}
               stockMap={stockMap}
               kind={tab === 'products' ? 'product' : 'ingredient'}
-              onAdjust={(item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
+              onAdjust={user?.role === 'warehouse' ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
             />
           )}
         </>
@@ -297,9 +312,11 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
                 <p className="text-[10px] mt-1">{UNIT_LABELS[unit] || unit}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => onAdjust(item)} className="w-full mt-4 min-h-11 rounded-xl touch-manipulation">
-              <PackagePlus className="w-4 h-4 mr-1.5" /> Boshlang‘ich qoldiq / tuzatish
-            </Button>
+            {onAdjust && (
+              <Button variant="outline" size="sm" onClick={() => onAdjust(item)} className="w-full mt-4 min-h-11 rounded-xl touch-manipulation">
+                <PackagePlus className="w-4 h-4 mr-1.5" /> Boshlang‘ich qoldiq / tuzatish
+              </Button>
+            )}
           </div>
         );
       })}
