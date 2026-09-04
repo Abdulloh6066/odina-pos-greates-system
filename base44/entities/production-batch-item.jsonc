@@ -1,0 +1,90 @@
+{
+  "name": "ProductionBatchItem",
+  "type": "object",
+  "properties": {
+    "production_batch_id": {
+      "type": "string"
+    },
+    "batch_number": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "ingredient_id": {
+      "type": "string"
+    },
+    "ingredient_name_snapshot": {
+      "type": "string"
+    },
+    "quantity_used": {
+      "type": "number"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "g",
+        "ml",
+        "piece"
+      ]
+    },
+    "balance_before": {
+      "type": "number"
+    },
+    "balance_after": {
+      "type": "number"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "production_batch_id",
+    "batch_number",
+    "location_id",
+    "product_id",
+    "ingredient_id",
+    "ingredient_name_snapshot",
+    "quantity_used",
+    "unit",
+    "created_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
