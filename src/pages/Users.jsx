@@ -14,6 +14,7 @@ const ROLE_COLORS = {
   cashier: 'bg-blue-50 text-blue-700',
   accountant: 'bg-violet-50 text-violet-700',
   production: 'bg-amber-50 text-amber-700',
+  warehouse: 'bg-emerald-50 text-emerald-700',
 };
 
 export default function Users() {
@@ -77,7 +78,8 @@ export default function Users() {
                     <option value="admin">Admin</option>
                     <option value="cashier">Cashier</option>
                     <option value="accountant">Accountant</option>
-                    <option value="production">Production</option>
+                    <option value="production">Ishlab chiqarish</option>
+                    <option value="warehouse">Omborchi</option>
                   </select>
                   <select value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="">No location</option>
@@ -129,7 +131,8 @@ function InviteDialog({ open, shops, onClose, onDone, user }) {
             <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium">
               <option value="cashier">Cashier</option>
               <option value="accountant">Accountant</option>
-              <option value="production">Production</option>
+              <option value="production">Ishlab chiqarish</option>
+              <option value="warehouse">Omborchi</option>
               <option value="admin">Owner / Admin</option>
             </select>
           </div>
