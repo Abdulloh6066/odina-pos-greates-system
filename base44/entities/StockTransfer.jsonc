@@ -1,0 +1,116 @@
+{
+  "name": "StockTransfer",
+  "properties": {
+    "transfer_number": {
+      "type": "string"
+    },
+    "source_location_id": {
+      "type": "string"
+    },
+    "source_location_name": {
+      "type": "string"
+    },
+    "destination_location_id": {
+      "type": "string"
+    },
+    "destination_location_name": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "piece"
+      ],
+      "default": "piece"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "receiving",
+        "received"
+      ],
+      "default": "pending"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "received_by": {
+      "type": "string"
+    },
+    "received_by_name": {
+      "type": "string"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "transfer_number",
+    "source_location_id",
+    "source_location_name",
+    "destination_location_id",
+    "destination_location_name",
+    "product_id",
+    "product_name_snapshot",
+    "quantity",
+    "unit",
+    "status",
+    "created_by",
+    "created_by_name",
+    "sent_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.source_location_id": "{{user.data.shop_id}}"
+        },
+        {
+          "data.destination_location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "type": "object"
+}
