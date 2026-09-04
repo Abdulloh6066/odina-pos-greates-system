@@ -52,10 +52,10 @@ export default function Users() {
   return (
     <div className="p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
       <PageHeader
-        title="Users"
-        subtitle={`${users.length} users`}
+        title="Xodimlar"
+        subtitle={`${users.length} ta xodim`}
         icon={UsersIcon}
-        actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Invite</Button>}
+        actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
@@ -93,7 +93,7 @@ export default function Users() {
               )}
             </div>
           ))}
-          {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">No users found.</p>}
+          {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">Xodimlar topilmadi.</p>}
         </div>
       )}
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} />
@@ -110,36 +110,38 @@ function InviteDialog({ open, onClose, onDone, user }) {
     if (!email.trim()) return;
     setSaving(true);
     try {
-      await base44.users.inviteUser(email.trim(), role);
+      await base44.auth.inviteUser(email.trim(), role);
       await logAction(user, 'user_invited', `${email} as ${role}`);
+      alert('Taklif yuborildi. Xodim emaildagi linkni ochib, o‘z parolini yaratadi.');
       onDone();
-    } catch (e) { alert('Invite failed: ' + (e?.message || e)); }
+    } catch (e) { alert('Taklif yuborilmadi: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-sm">
-        <DialogHeader><DialogTitle className="font-display text-xl">Invite user</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-xl">Xodimni taklif qilish</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">Email</Label>
             <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cashier@odina.uz" type="email" />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Role</Label>
+            <Label className="text-xs mb-1.5 block">Lavozim</Label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium">
-              <option value="cashier">Cashier</option>
-              <option value="accountant">Accountant</option>
-              <option value="production">Ishlab chiqarish</option>
+              <option value="cashier">Kassir</option>
+              <option value="accountant">Hisobchi</option>
+              <option value="production">Ishlab chiqarish xodimi</option>
               <option value="warehouse">Omborchi</option>
-              <option value="admin">Owner / Admin</option>
+              <option value="admin">Egasi / Admin</option>
             </select>
+            <p className="mt-2 text-xs text-muted-foreground">Xodim emaildagi taklif havolasini ochib, o‘z parolini yaratadi. Umumiy parol berilmaydi.</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">{saving ? 'Inviting…' : 'Send invite'}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+          <Button onClick={submit} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">{saving ? 'Yuborilmoqda…' : 'Taklif yuborish'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
