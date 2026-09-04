@@ -49,13 +49,14 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
   );
 }
 
-export function CashWithdrawalDialog({ open, shift, user, recipients = [], onClose, onConfirm, loading }) {
+export function CashWithdrawalDialog({ open, shift, user, recipients = [], supplierDebts = {}, onClose, onConfirm, loading }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('shop_expense');
   const [recipientId, setRecipientId] = useState('');
   const [ownerChoice, setOwnerChoice] = useState('Abdulloh');
   const [otherOwner, setOtherOwner] = useState('');
+  const [ownerPin, setOwnerPin] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -65,16 +66,21 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], onClo
       setRecipientId('');
       setOwnerChoice('Abdulloh');
       setOtherOwner('');
+      setOwnerPin('');
     }
   }, [open]);
 
   const recipientRequired = expenseCategory === 'goods_payment';
+  const debtRecipients = recipients.filter((recipient) => Number(supplierDebts[recipient.id] || 0) > 0);
+  const selectedDebt = Number(supplierDebts[recipientId] || 0);
+  const ownerPinRequired = recipientRequired && user?.role === 'cashier';
   const ownerName = ownerChoice === 'other' ? otherOwner.trim() : 'Abdulloh';
   const ownerRequired = expenseCategory === 'owner_withdrawal';
   const valid = Number(amount) > 0
     && Number(amount) <= Number(shift?.expected_cash || 0)
     && reason.trim()
-    && (!recipientRequired || recipientId)
+    && (!recipientRequired || (recipientId && Number(amount) <= selectedDebt))
+    && (!ownerPinRequired || /^\d{4,8}$/.test(ownerPin))
     && (!ownerRequired || ownerName);
   const employeeName = user?.full_name || user?.email || 'Joriy Kassa xodimi';
 
@@ -86,6 +92,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], onClo
       expense_category: expenseCategory,
       recipient_id: recipientRequired ? recipientId : undefined,
       recipient_name: ownerRequired ? ownerName : undefined,
+      owner_pin: ownerPinRequired ? ownerPin : undefined,
     });
   };
 
@@ -122,9 +129,26 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], onClo
               <Label className="text-xs mb-1.5 block">Kompaniya / yetkazib beruvchi</Label>
               <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="">Ro‘yxatdan tanlang</option>
-                {recipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name}</option>)}
+                {debtRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name} · qarz {formatUZS(supplierDebts[recipient.id])}</option>)}
               </select>
-              {recipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Owner avval “Qabul qiluvchilar” bo‘limida kompaniya yaratishi kerak.</p>}
+              {debtRecipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Hozir to‘lanadigan yetkazib beruvchi qarzi yo‘q.</p>}
+              {recipientId && <p className="text-xs text-muted-foreground mt-1.5">Qolgan umumiy qarz: <span className="font-semibold text-foreground">{formatUZS(selectedDebt)}</span></p>}
+            </div>
+          )}
+
+          {ownerPinRequired && (
+            <div>
+              <Label className="text-xs mb-1.5 block">Egasi PIN-kodi</Label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                value={ownerPin}
+                onChange={(event) => setOwnerPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="••••"
+                className="h-11 rounded-xl text-center text-lg tracking-[0.4em]"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">Yetkazib beruvchi qarzini kassadan to‘lash owner tasdig‘i bilan amalga oshadi.</p>
             </div>
           )}
 
@@ -143,7 +167,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], onClo
 
           <div>
             <Label className="text-xs mb-1.5 block">Miqdor</Label>
-            <Input autoFocus type="number" min="1" max={shift?.expected_cash || undefined} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
+            <Input autoFocus type="number" min="1" max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Izoh / sabab</Label>
