@@ -89,6 +89,11 @@
           "user_condition": {
             "role": "production"
           }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
         }
       ]
     },
