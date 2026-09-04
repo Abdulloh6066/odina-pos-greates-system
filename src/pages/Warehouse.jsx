@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRightLeft, Boxes, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
+import { Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -11,12 +11,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
 import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
+import ProductionPanel from '@/components/warehouse/ProductionPanel';
 
 const TABS = [
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
-  { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes },
-  { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck },
-  { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft },
+  { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes, roles: ['admin', 'cashier', 'accountant', 'production'] },
+  { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck, roles: ['admin', 'warehouse', 'accountant'] },
+  { id: 'recipes', label: 'Retseptlar', icon: BookOpen, roles: ['admin', 'accountant', 'production'] },
+  { id: 'production', label: 'Ishlab chiqarish', icon: ChefHat, roles: ['admin', 'accountant', 'production'] },
+  { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft, roles: ['admin', 'cashier', 'accountant', 'production'] },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
@@ -57,8 +60,8 @@ export default function Warehouse() {
   const [selectedLocation, setSelectedLocation] = useState(user?.role === 'admin' ? '' : (user?.shop_id || ''));
   const requestedTab = searchParams.get('tab');
   const canViewSupplierLedger = ['admin', 'warehouse', 'accountant'].includes(user?.role);
-  const visibleTabs = TABS.filter((item) => user?.role !== 'warehouse' || ['ingredients', 'suppliers', 'history'].includes(item.id));
-  const tabAllowed = (value) => visibleTabs.some((item) => item.id === value) && (value !== 'suppliers' || canViewSupplierLedger);
+  const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
+  const tabAllowed = (value) => visibleTabs.some((item) => item.id === value);
   const [tab, setTab] = useState(tabAllowed(requestedTab) ? requestedTab : 'ingredients');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -239,6 +242,17 @@ export default function Warehouse() {
               ingredients={ingredients}
               recipients={recipients}
               search={search}
+            />
+          ) : ['recipes', 'production'].includes(tab) ? (
+            <ProductionPanel
+              mode={tab}
+              user={user}
+              location={selectedLocationRecord}
+              products={products}
+              ingredients={ingredients}
+              ingredientStock={ingredientStock}
+              search={search}
+              onReload={load}
             />
           ) : tab === 'transfers' ? (
             <TransfersPanel
