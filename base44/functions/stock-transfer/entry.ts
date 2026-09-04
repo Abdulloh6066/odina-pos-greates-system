@@ -97,8 +97,8 @@ export default async function(req) {
     const action = String(body?.action || "");
 
     if (action === "create_transfer") {
-      if (!["admin", "production"].includes(user.role)) {
-        return Response.json({ error: "Transferni faqat egasi yoki ishlab chiqarish xodimi jo‘nata oladi." }, { status: 403 });
+      if (user.role !== "admin") {
+        return Response.json({ error: "Transferni faqat egasi jo‘nata oladi." }, { status: 403 });
       }
 
       const sourceId = String(body?.source_location_id || "");
@@ -113,10 +113,6 @@ export default async function(req) {
       if (!Number.isInteger(quantity) || quantity <= 0) {
         return Response.json({ error: "Transfer miqdori musbat butun dona bo‘lishi kerak." }, { status: 400 });
       }
-      if (user.role !== "admin" && user.shop_id !== sourceId) {
-        return Response.json({ error: "Faqat o‘zingiz biriktirilgan markaziy ombordan jo‘nata olasiz." }, { status: 403 });
-      }
-
       const [source, destination, product] = await Promise.all([
         service.entities.Shop.get(sourceId),
         service.entities.Shop.get(destinationId),
