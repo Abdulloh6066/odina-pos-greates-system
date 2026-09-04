@@ -11,6 +11,84 @@ const PAYMENT_METHODS = new Set([
 ]);
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
+const stockNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed * 1000) / 1000 : 0;
+};
+
+const httpError = (message: string, status: number) => {
+  const error: any = new Error(message);
+  error.status = status;
+  return error;
+};
+
+async function normalizeSaleItems(service: any, requestedItems: any[]) {
+  const quantities = new Map<string, number>();
+  for (const requested of requestedItems) {
+    const quantity = Math.floor(Number(requested?.quantity));
+    const productId = String(requested?.product_id || "");
+    if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
+      throw httpError("Har bir mahsulotda to‘g‘ri dona soni bo‘lishi kerak.", 400);
+    }
+    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+  }
+
+  const normalizedItems = [];
+  for (const [productId, quantity] of quantities.entries()) {
+    const product = await service.entities.Product.get(productId);
+    if (!product || product.active === false || product.archived === true) {
+      throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
+    }
+    const unitPrice = money(product.price);
+    normalizedItems.push({
+      product_id: product.id,
+      product_name: product.name,
+      image_url: product.image_url || "",
+      price: unitPrice,
+      quantity,
+      subtotal: unitPrice * quantity,
+      source_type: product.source_type || "central_produced",
+      stock_tracked: product.track_stock !== false,
+      stock_location_id: "",
+      stock_quantity_change: product.track_stock === false ? 0 : -quantity,
+    });
+  }
+  return normalizedItems;
+}
+
+async function stockPolicy(service: any) {
+  const settings = await service.entities.Settings.list();
+  return settings?.[0]?.allow_negative_stock !== false;
+}
+
+async function planSaleStock(service: any, shopId: string, items: any[]) {
+  const plans = [];
+  const shortages = [];
+  for (const item of items.filter((row) => row.stock_tracked)) {
+    const rows = await service.entities.ProductStock.filter({
+      location_id: shopId,
+      product_id: item.product_id,
+    });
+    if ((rows || []).length > 1) {
+      throw httpError(`${item.product_name} uchun takroriy ombor qoldig‘i topildi.`, 409);
+    }
+    const stock = rows?.[0] || null;
+    const before = stockNumber(stock?.quantity || 0);
+    const after = stockNumber(before - item.quantity);
+    item.stock_location_id = shopId;
+    if (after < 0) {
+      shortages.push({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        requested: item.quantity,
+        available: before,
+        missing: stockNumber(-after),
+      });
+    }
+    plans.push({ item, stock, before, after });
+  }
+  return { plans, shortages };
+}
 
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -48,6 +126,8 @@ export default async function(req) {
   let saleItems: any[] = [];
   let paymentRecords: any[] = [];
   let claimedDiscount: any = null;
+  let stockChanges: any[] = [];
+  let stockMovementRecords: any[] = [];
 
   try {
     const user = await base44.auth.me();
@@ -193,6 +273,35 @@ export default async function(req) {
       });
     }
 
+    if (action === "check_stock") {
+      const shiftId = String(body?.shift_id || "");
+      const requestedItems = Array.isArray(body?.items) ? body.items : [];
+      if (!shiftId || !requestedItems.length) {
+        return Response.json({ error: "Smena va mahsulotlar kerak." }, { status: 400 });
+      }
+      const shift = await service.entities.Shift.get(shiftId);
+      if (!shift || shift.status !== "open") {
+        return Response.json({ error: "Smena ochiq emas." }, { status: 409 });
+      }
+      if (shift.user_id !== user.id) {
+        return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
+      }
+      if (user.role === "cashier" && user.shop_id !== shift.shop_id) {
+        return Response.json({ error: "Kassir boshqa do‘konga biriktirilgan." }, { status: 403 });
+      }
+      const normalizedItems = await normalizeSaleItems(service, requestedItems);
+      const allowNegativeStock = await stockPolicy(service);
+      const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
+      if (shortages.length && !allowNegativeStock) {
+        return Response.json({
+          error: "Omborda mahsulot yetarli emas. Qoldiqsiz sotuv bloklangan.",
+          shortages,
+          allow_negative_stock: false,
+        }, { status: 409 });
+      }
+      return Response.json({ shortages, allow_negative_stock: allowNegativeStock });
+    }
+
     if (action === "refund_sale") {
       if (!(await verifyOwnerPin(service, body?.owner_pin))) {
         return Response.json({ error: "Owner PIN is incorrect." }, { status: 403 });
@@ -278,25 +387,16 @@ export default async function(req) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
-    const normalizedItems = [];
-    for (const requested of requestedItems) {
-      const quantity = Math.floor(Number(requested?.quantity));
-      if (!requested?.product_id || !Number.isFinite(quantity) || quantity <= 0) {
-        return Response.json({ error: "Every item needs a valid product and quantity." }, { status: 400 });
-      }
-      const product = await service.entities.Product.get(String(requested.product_id));
-      if (!product || product.active === false) {
-        return Response.json({ error: "A selected product is unavailable." }, { status: 409 });
-      }
-      const unitPrice = money(product.price);
-      normalizedItems.push({
-        product_id: product.id,
-        product_name: product.name,
-        image_url: product.image_url || "",
-        price: unitPrice,
-        quantity,
-        subtotal: unitPrice * quantity,
-      });
+    const normalizedItems = await normalizeSaleItems(service, requestedItems);
+    const allowNegativeStock = await stockPolicy(service);
+    const { plans: stockPlans, shortages: stockWarnings } =
+      await planSaleStock(service, shift.shop_id, normalizedItems);
+    if (stockWarnings.length && !allowNegativeStock) {
+      return Response.json({
+        error: "Omborda mahsulot yetarli emas. Qoldiqsiz sotuv bloklangan.",
+        shortages: stockWarnings,
+        allow_negative_stock: false,
+      }, { status: 409 });
     }
 
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -348,6 +448,41 @@ export default async function(req) {
     const saleNumber = `OD-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const paymentSummary = normalizedPayments.map((payment) => payment.method).join(" + ");
 
+    for (const plan of stockPlans) {
+      let stockRecord = plan.stock;
+      if (stockRecord) {
+        const update = await service.entities.ProductStock.updateMany(
+          { id: stockRecord.id, quantity: plan.before },
+          { $set: {
+            quantity: plan.after,
+            location_name: shift.shop_name,
+            product_name: plan.item.product_name,
+            unit: "piece",
+            updated_at: now,
+            updated_by: user.id,
+            updated_by_name: user.full_name || user.email,
+          } },
+        );
+        if (!update?.success || Number(update.updated || 0) !== 1) {
+          throw httpError(`${plan.item.product_name} qoldig‘i boshqa qurilmada o‘zgardi. Yangilang va qayta urinib ko‘ring.`, 409);
+        }
+      } else {
+        stockRecord = await service.entities.ProductStock.create({
+          location_id: shift.shop_id,
+          location_name: shift.shop_name,
+          product_id: plan.item.product_id,
+          product_name: plan.item.product_name,
+          unit: "piece",
+          quantity: plan.after,
+          low_stock_level: 0,
+          updated_at: now,
+          updated_by: user.id,
+          updated_by_name: user.full_name || user.email,
+        });
+      }
+      stockChanges.push({ ...plan, stockRecord });
+    }
+
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
       financial_records_version: 2,
@@ -380,6 +515,10 @@ export default async function(req) {
         shift_id: shift.id,
         cashier_id: user.id,
         product_id: item.product_id,
+        source_type_snapshot: item.source_type,
+        stock_tracked_snapshot: item.stock_tracked,
+        stock_location_id: item.stock_location_id || undefined,
+        stock_quantity_change: item.stock_quantity_change,
         product_name_snapshot: item.product_name,
         image_url_snapshot: item.image_url,
         quantity: item.quantity,
@@ -404,6 +543,29 @@ export default async function(req) {
         created_at: now,
       })),
     );
+
+    for (const change of stockChanges) {
+      const movement = await service.entities.StockMovement.create({
+        movement_number: `ST-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+        location_id: shift.shop_id,
+        location_name: shift.shop_name,
+        item_kind: "product",
+        item_id: change.item.product_id,
+        item_name: change.item.product_name,
+        unit: "piece",
+        movement_type: "sale",
+        quantity_change: -change.item.quantity,
+        balance_before: change.before,
+        balance_after: change.after,
+        reason: `Kassa savdosi ${saleNumber}`,
+        reference_id: sale.id,
+        reference_type: "sale",
+        user_id: user.id,
+        user_name: user.full_name || user.email,
+        created_at: now,
+      });
+      stockMovementRecords.push(movement);
+    }
 
     if (claimedDiscount) {
       await service.entities.DiscountCode.update(claimedDiscount.id, {
@@ -478,8 +640,25 @@ export default async function(req) {
       sale_items: saleItems,
       payments: paymentRecords,
       shift: updatedShift,
+      stock_warnings: stockWarnings,
+      allow_negative_stock: allowNegativeStock,
+      stock_updates: stockChanges.map((change) => ({
+        product_id: change.item.product_id,
+        quantity: change.after,
+      })),
     });
   } catch (error) {
+    for (const movement of stockMovementRecords) {
+      try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch {}
+    }
+    for (const change of stockChanges) {
+      try {
+        await base44.asServiceRole.entities.ProductStock.updateMany(
+          { id: change.stockRecord.id },
+          { $inc: { quantity: change.item.quantity } },
+        );
+      } catch {}
+    }
     if (claimedDiscount && sale) {
       try {
         await base44.asServiceRole.entities.DiscountCode.update(claimedDiscount.id, {
@@ -503,7 +682,7 @@ export default async function(req) {
     }
 
     return Response.json({
-      error: error instanceof Error ? error.message : "Could not complete sale.",
-    }, { status: 500 });
+      error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",
+    }, { status: Number((error as any)?.status || 500) });
   }
 }
