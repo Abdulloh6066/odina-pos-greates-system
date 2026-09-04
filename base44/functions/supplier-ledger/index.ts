@@ -195,6 +195,7 @@ export default async function(req) {
 
           const receiptItem = await service.entities.SupplierReceiptItem.create({
             receipt_id: receipt.id,
+            location_id: location.id,
             ingredient_id: item.ingredient.id,
             ingredient_name_snapshot: item.ingredient.name,
             purchase_quantity: item.purchaseQuantity,
