@@ -1,0 +1,116 @@
+{
+  "name": "SupplierReceipt",
+  "type": "object",
+  "properties": {
+    "receipt_number": {
+      "type": "string"
+    },
+    "supplier_id": {
+      "type": "string"
+    },
+    "supplier_name_snapshot": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name_snapshot": {
+      "type": "string"
+    },
+    "total_amount": {
+      "type": "number"
+    },
+    "paid_at_receipt": {
+      "type": "number",
+      "default": 0
+    },
+    "debt_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "remaining_debt": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "paid",
+        "partial",
+        "unpaid"
+      ],
+      "default": "unpaid"
+    },
+    "invoice_reference": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "receipt_number",
+    "supplier_id",
+    "supplier_name_snapshot",
+    "location_id",
+    "location_name_snapshot",
+    "total_amount",
+    "paid_at_receipt",
+    "debt_amount",
+    "remaining_debt",
+    "status",
+    "received_at",
+    "created_by"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
