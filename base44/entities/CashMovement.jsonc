@@ -30,6 +30,12 @@
     "reason": {
       "type": "string"
     },
+    "reference_id": {
+      "type": "string"
+    },
+    "reference_type": {
+      "type": "string"
+    },
     "shift_id": {
       "type": "string"
     },
