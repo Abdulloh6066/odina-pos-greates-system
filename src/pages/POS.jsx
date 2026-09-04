@@ -57,7 +57,7 @@ export default function POS() {
       base44.entities.Settings.list(),
       base44.entities.Shift.list(),
       base44.entities.CashRecipient.list('name', 500),
-      base44.functions.invoke('supplier-ledger', { action: 'get_debts' }),
+      base44.functions.invoke('supplier-ledger', { action: 'get_debts' }).catch(() => ({ data: { debts: {} } })),
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
