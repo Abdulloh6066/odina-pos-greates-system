@@ -75,7 +75,7 @@ export default function Warehouse() {
         base44.entities.ProductStock.list('-updated_at', 500),
         base44.entities.StockMovement.list('-created_at', 500),
         base44.entities.StockTransfer.list('-sent_at', 500),
-        base44.entities.CashRecipient.list('name', 500),
+        canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
       setLocations((locationList || []).filter((location) => location.active !== false));
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
