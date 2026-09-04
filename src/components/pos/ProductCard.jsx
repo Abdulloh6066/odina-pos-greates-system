@@ -1,9 +1,9 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
-import { Plus } from 'lucide-react';
+import { AlertTriangle, Plus } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 
-export default function ProductCard({ product, onAdd }) {
+export default function ProductCard({ product, stockQuantity = null, onAdd }) {
   return (
     <button
       onClick={() => onAdd(product)}
@@ -25,6 +25,11 @@ export default function ProductCard({ product, onAdd }) {
         <div className="absolute top-2 right-2 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow-lg">
           <Plus className="w-5 h-5" strokeWidth={2.5} />
         </div>
+        {stockQuantity !== null && stockQuantity <= 0 && (
+          <div className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-full bg-red-600/95 text-white px-2 py-1 text-[10px] font-semibold shadow">
+            <AlertTriangle className="w-3 h-3" /> Qoldiq {stockQuantity}
+          </div>
+        )}
       </div>
       <div className="p-3">
         <div className="text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</div>
