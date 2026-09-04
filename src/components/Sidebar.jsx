@@ -95,7 +95,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         <div className="overflow-hidden">
           <div className="ml-5 mt-1 mb-2 pl-3 border-l border-primary/35 space-y-1">
             {children.map((child) => {
-              const ChildIcon = child.icon || ICONS[child.iconName] || Circle;
+              const ChildIcon = child.icon || Circle;
               return (
                 <NavLink
                   key={child.key}
@@ -141,7 +141,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
               ParentIcon: ShoppingCart,
               children: kassaChildren.map((child) => ({
                 ...child,
-                iconName: child.icon,
+                icon: ICONS[child.icon] || Circle,
                 active: location.pathname === child.path,
               })),
             });
