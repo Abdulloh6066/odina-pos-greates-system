@@ -36,6 +36,18 @@
           "product_id": {
             "type": "string"
           },
+          "source_type": {
+            "type": "string"
+          },
+          "stock_tracked": {
+            "type": "boolean"
+          },
+          "stock_location_id": {
+            "type": "string"
+          },
+          "stock_quantity_change": {
+            "type": "number"
+          },
           "product_name": {
             "type": "string"
           },
