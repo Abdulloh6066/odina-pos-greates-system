@@ -7,6 +7,7 @@ export default function Layout() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('odina-sidebar-collapsed') === 'true');
   const location = useLocation();
 
   useEffect(() => {
@@ -20,6 +21,14 @@ export default function Layout() {
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      localStorage.setItem('odina-sidebar-collapsed', String(next));
+      return next;
+    });
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -30,7 +39,13 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <Sidebar user={user} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <Sidebar
+        user={user}
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
+      />
       <div className="flex-1 flex flex-col min-w-0">
         <div className="lg:hidden flex items-center justify-between px-4 h-14 border-b border-border bg-card sticky top-0 z-30">
           <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 text-foreground">
@@ -40,7 +55,7 @@ export default function Layout() {
           <div className="w-9" />
         </div>
         <main className="flex-1 min-w-0">
-          <Outlet context={{ user, reloadUser: async () => { const u = await base44.auth.me(); setUser(u); } }} />
+          <Outlet context={{ user, sidebarCollapsed, reloadUser: async () => { const u = await base44.auth.me(); setUser(u); } }} />
         </main>
       </div>
     </div>
