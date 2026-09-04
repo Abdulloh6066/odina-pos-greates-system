@@ -57,18 +57,15 @@ export default function POS() {
       base44.entities.Settings.list(),
       base44.entities.Shift.list(),
       base44.entities.CashRecipient.list('name', 500),
-      base44.entities.SupplierReceipt.list('-received_at', 500),
+      base44.functions.invoke('supplier-ledger', { action: 'get_debts' }),
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
     setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
     setSettings(settingsList?.[0] || null);
     setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
-    setSupplierDebts((supplierReceipts || []).reduce((totals, receipt) => {
-      const remaining = Number(receipt.remaining_debt || 0);
-      if (remaining > 0) totals[receipt.supplier_id] = Number(totals[receipt.supplier_id] || 0) + remaining;
-      return totals;
-    }, {}));
+    const debtPayload = supplierReceipts?.data || supplierReceipts;
+    setSupplierDebts(debtPayload?.debts || {});
     const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
     setShift(myOpen || null);
     setLoadingData(false);
