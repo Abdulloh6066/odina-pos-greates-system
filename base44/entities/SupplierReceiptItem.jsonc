@@ -1,0 +1,97 @@
+{
+  "name": "SupplierReceiptItem",
+  "type": "object",
+  "properties": {
+    "receipt_id": {
+      "type": "string"
+    },
+    "ingredient_id": {
+      "type": "string"
+    },
+    "ingredient_name_snapshot": {
+      "type": "string"
+    },
+    "purchase_quantity": {
+      "type": "number"
+    },
+    "purchase_unit": {
+      "type": "string",
+      "enum": [
+        "kg",
+        "l",
+        "g",
+        "ml",
+        "piece"
+      ]
+    },
+    "base_quantity": {
+      "type": "number"
+    },
+    "base_unit": {
+      "type": "string",
+      "enum": [
+        "g",
+        "ml",
+        "piece"
+      ]
+    },
+    "unit_price": {
+      "type": "number"
+    },
+    "line_total": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "receipt_id",
+    "ingredient_id",
+    "ingredient_name_snapshot",
+    "purchase_quantity",
+    "purchase_unit",
+    "base_quantity",
+    "base_unit",
+    "unit_price",
+    "line_total"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
