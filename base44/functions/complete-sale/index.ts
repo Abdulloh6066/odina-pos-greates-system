@@ -125,28 +125,63 @@ export default async function(req) {
       const shiftId = String(body?.shift_id || "");
       const amount = money(body?.amount);
       const reason = String(body?.reason || "").trim();
-      const employeeName = user.full_name || user.email || "Unknown user";
-      if (!shiftId || amount <= 0 || !reason) {
-        return Response.json({ error: "Amount and reason are required." }, { status: 400 });
+      const expenseCategory = String(body?.expense_category || "");
+      const recipientId = String(body?.recipient_id || "");
+      const requestedRecipientName = String(body?.recipient_name || "").trim();
+      const allowedCategories = new Set(["shop_expense", "goods_payment", "owner_withdrawal", "other_expense"]);
+      const employeeName = user.full_name || user.email || "Noma’lum xodim";
+
+      if (!shiftId || amount <= 0 || !reason || !allowedCategories.has(expenseCategory)) {
+        return Response.json({ error: "Miqdor, chiqim turi va izoh majburiy." }, { status: 400 });
       }
+
+      let recipientName = "";
+      let verifiedRecipientId = "";
+      if (expenseCategory === "goods_payment") {
+        if (!recipientId) {
+          return Response.json({ error: "Kompaniya yoki yetkazib beruvchini tanlang." }, { status: 400 });
+        }
+        const recipient = await service.entities.CashRecipient.get(recipientId);
+        if (!recipient || recipient.active === false) {
+          return Response.json({ error: "Tanlangan qabul qiluvchi faol emas yoki topilmadi." }, { status: 404 });
+        }
+        verifiedRecipientId = recipient.id;
+        recipientName = recipient.name;
+      } else if (expenseCategory === "owner_withdrawal") {
+        recipientName = requestedRecipientName || "Abdulloh";
+      }
+
       const shift = await service.entities.Shift.get(shiftId);
-      if (!shift || shift.status !== "open") return Response.json({ error: "The shift is not open." }, { status: 409 });
-      if (shift.user_id !== user.id) return Response.json({ error: "This shift belongs to another user." }, { status: 403 });
+      if (!shift || shift.status !== "open") return Response.json({ error: "Smena ochiq emas." }, { status: 409 });
+      if (shift.user_id !== user.id) return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
       if (amount > Number(shift.expected_cash || 0)) {
-        return Response.json({ error: "Withdrawal is greater than expected drawer cash." }, { status: 400 });
+        return Response.json({ error: "Kassada kutilayotgan naqd pul yetarli emas." }, { status: 400 });
       }
+
       const movement = await service.entities.CashMovement.create({
-        shift_id: shift.id, shop_id: shift.shop_id, user_id: user.id,
-        user_name: user.full_name || user.email, employee_name: employeeName,
-        type: "withdrawal", amount, reason, created_at: new Date().toISOString(),
+        shift_id: shift.id,
+        shop_id: shift.shop_id,
+        user_id: user.id,
+        user_name: user.full_name || user.email,
+        employee_name: employeeName,
+        type: "withdrawal",
+        expense_category: expenseCategory,
+        recipient_id: verifiedRecipientId || undefined,
+        recipient_name_snapshot: recipientName || undefined,
+        amount,
+        reason,
+        created_at: new Date().toISOString(),
       });
+
       await service.entities.Shift.update(shift.id, {
         expected_cash: Number(shift.expected_cash || 0) - amount,
         cash_removed: Number(shift.cash_removed || 0) + amount,
       });
       await service.entities.ActionHistory.create({
-        user_id: user.id, user_name: user.full_name || user.email,
-        action: "cash_withdrawal", details: `${amount} UZS. ${reason}. Employee: ${employeeName}`,
+        user_id: user.id,
+        user_name: user.full_name || user.email,
+        action: "cash_withdrawal",
+        details: `${amount} UZS. ${expenseCategory}. ${recipientName || "Qabul qiluvchi yo‘q"}. ${reason}. Xodim: ${employeeName}`,
       });
       return Response.json({
         movement,
