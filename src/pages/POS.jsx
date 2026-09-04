@@ -25,6 +25,7 @@ export default function POS() {
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [cashRecipients, setCashRecipients] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const [discountCode, setDiscountCode] = useState('');
@@ -48,17 +49,19 @@ export default function POS() {
 
   const loadAll = async () => {
     setLoadingData(true);
-    const [cats, prods, shopList, settingsList, shifts] = await Promise.all([
+    const [cats, prods, shopList, settingsList, shifts, recipientList] = await Promise.all([
       base44.entities.Category.list(),
       base44.entities.Product.list(),
       base44.entities.Shop.list(),
       base44.entities.Settings.list(),
       base44.entities.Shift.list(),
+      base44.entities.CashRecipient.list('name', 500),
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
     setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
     setSettings(settingsList?.[0] || null);
+    setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
     const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
     setShift(myOpen || null);
     setLoadingData(false);
@@ -203,7 +206,7 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
-  const recordCashWithdrawal = async ({ amount, reason }) => {
+  const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name }) => {
     if (!shift) return;
     setCashWithdrawalLoading(true);
     try {
@@ -212,6 +215,9 @@ export default function POS() {
         shift_id: shift.id,
         amount,
         reason,
+        expense_category,
+        recipient_id,
+        recipient_name,
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Pul olishni saqlab bo‘lmadi.');
@@ -355,6 +361,7 @@ export default function POS() {
         open={cashWithdrawalOpen}
         shift={shift}
         user={user}
+        recipients={cashRecipients}
         onClose={() => setCashWithdrawalOpen(false)}
         onConfirm={recordCashWithdrawal}
         loading={cashWithdrawalLoading}
