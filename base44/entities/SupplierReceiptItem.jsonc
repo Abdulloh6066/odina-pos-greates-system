@@ -5,6 +5,9 @@
     "receipt_id": {
       "type": "string"
     },
+    "location_id": {
+      "type": "string"
+    },
     "ingredient_id": {
       "type": "string"
     },
@@ -44,6 +47,7 @@
   },
   "required": [
     "receipt_id",
+    "location_id",
     "ingredient_id",
     "ingredient_name_snapshot",
     "purchase_quantity",
@@ -67,9 +71,16 @@
           }
         },
         {
-          "user_condition": {
-            "role": "warehouse"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "warehouse"
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
         },
         {
           "user_condition": {
