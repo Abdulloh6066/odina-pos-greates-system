@@ -30,7 +30,7 @@ export default function Users() {
       const [u, sh] = await Promise.all([base44.entities.User.list(), base44.entities.Shop.list()]);
       setUsers(u || []);
       setShops(sh || []);
-    } catch (e) {}
+    } catch {}
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -96,12 +96,12 @@ export default function Users() {
           {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">No users found.</p>}
         </div>
       )}
-      <InviteDialog open={inviteOpen} shops={shops} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} />
+      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} />
     </div>
   );
 }
 
-function InviteDialog({ open, shops, onClose, onDone, user }) {
+function InviteDialog({ open, onClose, onDone, user }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('cashier');
   const [saving, setSaving] = useState(false);
