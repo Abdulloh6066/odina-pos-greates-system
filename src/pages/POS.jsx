@@ -26,6 +26,7 @@ export default function POS() {
   const [shift, setShift] = useState(null);
   const [settings, setSettings] = useState(null);
   const [cashRecipients, setCashRecipients] = useState([]);
+  const [supplierDebts, setSupplierDebts] = useState({});
   const [loadingData, setLoadingData] = useState(true);
 
   const [discountCode, setDiscountCode] = useState('');
@@ -49,19 +50,25 @@ export default function POS() {
 
   const loadAll = async () => {
     setLoadingData(true);
-    const [cats, prods, shopList, settingsList, shifts, recipientList] = await Promise.all([
+    const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts] = await Promise.all([
       base44.entities.Category.list(),
       base44.entities.Product.list(),
       base44.entities.Shop.list(),
       base44.entities.Settings.list(),
       base44.entities.Shift.list(),
       base44.entities.CashRecipient.list('name', 500),
+      base44.entities.SupplierReceipt.list('-received_at', 500),
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
     setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
     setSettings(settingsList?.[0] || null);
     setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
+    setSupplierDebts((supplierReceipts || []).reduce((totals, receipt) => {
+      const remaining = Number(receipt.remaining_debt || 0);
+      if (remaining > 0) totals[receipt.supplier_id] = Number(totals[receipt.supplier_id] || 0) + remaining;
+      return totals;
+    }, {}));
     const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
     setShift(myOpen || null);
     setLoadingData(false);
@@ -206,11 +213,19 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
-  const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name }) => {
+  const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name, owner_pin }) => {
     if (!shift) return;
     setCashWithdrawalLoading(true);
     try {
-      const result = await base44.functions.invoke('complete-sale', {
+      const isDebtPayment = expense_category === 'goods_payment';
+      const result = await base44.functions.invoke(isDebtPayment ? 'supplier-ledger' : 'complete-sale', isDebtPayment ? {
+        action: 'pay_debt',
+        shift_id: shift.id,
+        supplier_id: recipient_id,
+        amount,
+        notes: reason,
+        owner_pin,
+      } : {
         action: 'cash_withdrawal',
         shift_id: shift.id,
         amount,
@@ -222,6 +237,12 @@ export default function POS() {
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Pul olishni saqlab bo‘lmadi.');
       setShift(payload.shift);
+      if (expense_category === 'goods_payment') {
+        setSupplierDebts((current) => ({
+          ...current,
+          [recipient_id]: Math.max(0, Number(current[recipient_id] || 0) - Number(amount || 0)),
+        }));
+      }
       setCashWithdrawalOpen(false);
     } catch (e) {
       alert('Pul olish amalga oshmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
@@ -362,6 +383,7 @@ export default function POS() {
         shift={shift}
         user={user}
         recipients={cashRecipients}
+        supplierDebts={supplierDebts}
         onClose={() => setCashWithdrawalOpen(false)}
         onConfirm={recordCashWithdrawal}
         loading={cashWithdrawalLoading}
