@@ -1,9 +1,9 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Cake, LayoutDashboard, ShoppingCart, Tags, BarChart3, Ticket,
   ReceiptText, Clock, Banknote, Warehouse, Users, Settings, LogOut, Circle,
-  PanelLeftClose, PanelLeftOpen,
+  ChevronDown, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
@@ -11,14 +11,56 @@ import { base44 } from '@/api/base44Client';
 const ICONS = {
   LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
   ReceiptText, Clock, Banknote, Warehouse, Users, Settings,
+  Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
+
+const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts'];
 
 export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle }) {
   const role = user?.role || 'cashier';
-  const items = MENU_ITEMS.filter((i) => canAccess(role, i.key));
+  const location = useLocation();
+  const items = MENU_ITEMS.filter((item) => canAccess(role, item.key));
+  const hasKassa = items.some((item) => item.key === 'pos');
+  const kassaChildren = hasKassa ? items.filter((item) => KASSA_CHILD_KEYS.includes(item.key)) : [];
+  const topItems = items.filter((item) => !hasKassa || !KASSA_CHILD_KEYS.includes(item.key));
+  const kassaPaths = ['/pos', ...kassaChildren.map((item) => item.path)];
+  const kassaActive = kassaPaths.includes(location.pathname);
+  const [kassaOpen, setKassaOpen] = useState(kassaActive);
+
+  useEffect(() => {
+    if (kassaActive) setKassaOpen(true);
+  }, [kassaActive]);
 
   const handleLogout = async () => {
     await base44.auth.logout();
+  };
+
+  const handleKassaClick = () => {
+    if (collapsed) onToggle();
+    setKassaOpen((current) => collapsed ? true : !current);
+  };
+
+  const renderRegularItem = (item) => {
+    const Icon = ICONS[item.icon] || Circle;
+    return (
+      <NavLink
+        key={item.key}
+        to={item.path}
+        end={item.path === '/'}
+        onClick={onClose}
+        title={collapsed ? item.label : undefined}
+        className={({ isActive }) =>
+          `group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
+            isActive
+              ? 'bg-primary text-primary-foreground premium-shadow'
+              : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
+          }`
+        }
+      >
+        <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+        <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+      </NavLink>
+    );
   };
 
   const content = (
@@ -34,36 +76,67 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
       </div>
 
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {items.map((item) => {
-          const Icon = ICONS[item.icon] || Circle;
+        {topItems.map((item) => {
+          if (item.key !== 'pos') return renderRegularItem(item);
+
           return (
-            <NavLink
-              key={item.key}
-              to={item.path}
-              end={item.path === '/'}
-              onClick={onClose}
-              title={collapsed ? item.label : undefined}
-              className={({ isActive }) =>
-                `group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
-                  isActive
+            <div key={item.key}>
+              <NavLink
+                to={item.path}
+                onClick={handleKassaClick}
+                title={collapsed ? item.label : undefined}
+                className={`group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
+                  kassaActive
                     ? 'bg-primary text-primary-foreground premium-shadow'
                     : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
-                }`
-              }
-            >
-              <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
-              <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
-            </NavLink>
+                }`}
+              >
+                <ShoppingCart className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+                <span className={`flex-1 truncate ${collapsed ? 'lg:hidden' : ''}`}>Kassa</span>
+                {kassaChildren.length > 0 && (
+                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${kassaOpen ? 'rotate-180' : ''} ${collapsed ? 'lg:hidden' : ''}`} />
+                )}
+              </NavLink>
+
+              {kassaChildren.length > 0 && (
+                <div className={`grid transition-[grid-template-rows,opacity] duration-200 ${kassaOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'} ${collapsed ? 'lg:hidden' : ''}`}>
+                  <div className="overflow-hidden">
+                    <div className="ml-5 mt-1 mb-2 pl-3 border-l border-primary/35 space-y-1">
+                      {kassaChildren.map((child) => {
+                        const ChildIcon = ICONS[child.icon] || Circle;
+                        return (
+                          <NavLink
+                            key={child.key}
+                            to={child.path}
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                              `flex items-center gap-2.5 min-h-10 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                                isActive
+                                  ? 'bg-primary/15 text-primary-strong'
+                                  : 'text-foreground/65 hover:bg-secondary hover:text-foreground'
+                              }`
+                            }
+                          >
+                            <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
+                            <span className="truncate">{child.label}</span>
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
 
       <div className="p-3 border-t border-border">
-        <div className={`flex items-center gap-3 py-2 rounded-xl ${collapsed ? 'px-2 lg:justify-center lg:px-0' : 'px-2'}`}> 
+        <div className={`flex items-center gap-3 py-2 rounded-xl ${collapsed ? 'px-2 lg:justify-center lg:px-0' : 'px-2'}`}>
           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
             {(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0 flex-1">
+          <div className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>
             <div className="text-sm font-medium truncate">{user?.full_name || user?.email}</div>
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{role}</div>
           </div>
