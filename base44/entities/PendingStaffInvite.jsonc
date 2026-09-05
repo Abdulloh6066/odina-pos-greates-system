@@ -1,0 +1,84 @@
+{
+  "name": "PendingStaffInvite",
+  "properties": {
+    "applied_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "applied_user_id": {
+      "type": "string"
+    },
+    "desired_role": {
+      "enum": [
+        "admin",
+        "cashier",
+        "accountant",
+        "production",
+        "warehouse"
+      ],
+      "type": "string"
+    },
+    "email": {
+      "format": "email",
+      "type": "string"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "invited_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "invited_by_id": {
+      "type": "string"
+    },
+    "invited_by_name": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "status": {
+      "default": "pending",
+      "enum": [
+        "pending",
+        "applied",
+        "failed",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "email",
+    "desired_role",
+    "status",
+    "invited_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "type": "object"
+}
