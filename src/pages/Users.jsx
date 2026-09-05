@@ -17,6 +17,14 @@ const ROLE_COLORS = {
   warehouse: 'bg-emerald-50 text-emerald-700',
 };
 
+const ROLE_LABELS = {
+  admin: 'Egasi / Admin',
+  cashier: 'Kassir',
+  accountant: 'Hisobchi',
+  production: 'Ishlab chiqarish xodimi',
+  warehouse: 'Omborchi',
+};
+
 export default function Users() {
   const { user } = useOutletContext();
   const [users, setUsers] = useState([]);
@@ -68,27 +76,27 @@ export default function Users() {
                   {(u.full_name || u.email || '?').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{u.full_name || 'Unnamed'}</div>
+                  <div className="font-medium truncate">{u.full_name || 'Nomsiz xodim'}</div>
                   <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                 </div>
               </div>
               {u.id !== user.id ? (
                 <div className="flex items-center gap-2">
                   <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                    <option value="admin">Admin</option>
-                    <option value="cashier">Cashier</option>
-                    <option value="accountant">Accountant</option>
-                    <option value="production">Ishlab chiqarish</option>
+                    <option value="admin">Egasi / Admin</option>
+                    <option value="cashier">Kassir</option>
+                    <option value="accountant">Hisobchi</option>
+                    <option value="production">Ishlab chiqarish xodimi</option>
                     <option value="warehouse">Omborchi</option>
                   </select>
                   <select value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                    <option value="">No location</option>
-                    {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Production' : ' · Shop'}</option>)}
+                    <option value="">Joy biriktirilmagan</option>
+                    {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
                   </select>
                 </div>
               ) : (
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-secondary'} flex items-center gap-1 w-fit`}>
-                  <Shield className="w-3 h-3" /> {u.role} (you)
+                  <Shield className="w-3 h-3" /> {ROLE_LABELS[u.role] || u.role} (siz)
                 </span>
               )}
             </div>
@@ -96,52 +104,110 @@ export default function Users() {
           {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">Xodimlar topilmadi.</p>}
         </div>
       )}
-      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} />
+      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} />
     </div>
   );
 }
 
-function InviteDialog({ open, onClose, onDone, user }) {
+function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('cashier');
+  const [shopId, setShopId] = useState('');
   const [saving, setSaving] = useState(false);
+  const needsShop = role !== 'admin';
+  const activeShops = shops.filter((shop) => shop.active !== false);
 
   const submit = async () => {
-    if (!email.trim()) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      alert('Xodimning email manzilini kiriting.');
+      return;
+    }
+    if (needsShop && !shopId) {
+      alert('Xodim ishlaydigan joyni tanlang.');
+      return;
+    }
+
     setSaving(true);
     try {
-      await base44.auth.inviteUser(email.trim(), role);
-      await logAction(user, 'user_invited', `${email} as ${role}`);
-      alert('Taklif yuborildi. Xodim emaildagi linkni ochib, o‘z parolini yaratadi.');
+      const result = await base44.functions.invoke('staff-invite', {
+        action: 'invite',
+        email: normalizedEmail,
+        role,
+        shop_id: needsShop ? shopId : '',
+      });
+      const data = result?.data || result;
+      if (!data?.invited) throw new Error(data?.error || 'Taklif yuborilmadi.');
+
+      await logAction(user, 'staff_invite_requested', `${normalizedEmail} · ${role}`);
+      const locationText = data.shop_name ? `\nIsh joyi: ${data.shop_name}` : '';
+      alert(`Taklif yuborildi.\nLavozim: ${ROLE_LABELS[role]}${locationText}\n\nXodim emaildagi havolani ochib, o‘z parolini yaratadi.`);
+      setEmail('');
+      setRole('cashier');
+      setShopId('');
       onDone();
-    } catch (e) { alert('Taklif yuborilmadi: ' + (e?.message || e)); }
-    finally { setSaving(false); }
+    } catch (e) {
+      const message = e?.response?.data?.error || e?.message || String(e);
+      alert(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle className="font-display text-xl">Xodimni taklif qilish</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">Email</Label>
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cashier@odina.uz" type="email" />
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="xodim@odina.uz" type="email" disabled={saving} />
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Lavozim</Label>
-            <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium">
+            <select
+              value={role}
+              onChange={(e) => {
+                setRole(e.target.value);
+                if (e.target.value === 'admin') setShopId('');
+              }}
+              disabled={saving}
+              className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
+            >
               <option value="cashier">Kassir</option>
               <option value="accountant">Hisobchi</option>
               <option value="production">Ishlab chiqarish xodimi</option>
               <option value="warehouse">Omborchi</option>
               <option value="admin">Egasi / Admin</option>
             </select>
-            <p className="mt-2 text-xs text-muted-foreground">Xodim emaildagi taklif havolasini ochib, o‘z parolini yaratadi. Umumiy parol berilmaydi.</p>
+          </div>
+          {needsShop && (
+            <div>
+              <Label className="text-xs mb-1.5 block">Ish joyi</Label>
+              <select
+                value={shopId}
+                onChange={(e) => setShopId(e.target.value)}
+                disabled={saving}
+                className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
+              >
+                <option value="">Joyni tanlang</option>
+                {activeShops.map((shop) => (
+                  <option key={shop.id} value={shop.id}>
+                    {shop.name} · {shop.location_type === 'production' ? 'Ishlab chiqarish markazi' : 'Do‘kon'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="rounded-xl bg-secondary/70 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
+            Xodim emaildagi taklif havolasini ochib, o‘z parolini yaratadi. Birinchi kirishda tanlangan lavozim va ish joyi avtomatik biriktiriladi.
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
-          <Button onClick={submit} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">{saving ? 'Yuborilmoqda…' : 'Taklif yuborish'}</Button>
+          <Button onClick={submit} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+            {saving ? 'Yuborilmoqda…' : 'Taklif yuborish'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
