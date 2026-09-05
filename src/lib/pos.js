@@ -11,7 +11,7 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users', 'settings'],
+  admin: ['dashboard', 'pos', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings'],
   cashier: ['pos', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
   production: ['warehouse', 'products'],
@@ -38,6 +38,7 @@ export const MENU_ITEMS = [
   { key: 'shifts', label: 'Smenalar', path: '/shifts', icon: 'Clock' },
   { key: 'cashouts', label: 'Kassadan pul olish tarixi', path: '/cash-outs', icon: 'Banknote' },
   { key: 'recipients', label: 'Qabul qiluvchilar', path: '/cash-recipients', icon: 'Building2' },
+  { key: 'budget', label: 'Budget', path: '/budget', icon: 'WalletCards' },
   { key: 'users', label: 'Xodimlar', path: '/users', icon: 'Xodimlar' },
   { key: 'settings', label: 'Sozlamalar', path: '/settings', icon: 'Sozlamalar' },
 ];
