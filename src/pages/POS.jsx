@@ -259,13 +259,15 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
-  const closeShift = async ({ actual_cash }) => {
+  const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift }) => {
     setShiftLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
         action: 'close_shift',
         shift_id: shift.id,
         actual_cash,
+        budget_cash_submitted,
+        cash_left_for_next_shift,
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani yopib bo‘lmadi.');
