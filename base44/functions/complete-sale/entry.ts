@@ -22,6 +22,70 @@ const httpError = (message: string, status: number) => {
   return error;
 };
 
+const BUDGET_ACCOUNT_LABELS: Record<string, string> = {
+  cash: "Naqd pul",
+  uzcard: "Uzcard",
+  humo: "Humo",
+  online: "Onlayn",
+  bank: "Bank",
+};
+
+async function creditBudgetBalance(service: any, account: string, amount: number, user: any, now: string) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const rows = await service.entities.BudgetBalance.filter({ account });
+    if ((rows || []).length > 1) {
+      throw httpError(`${BUDGET_ACCOUNT_LABELS[account]} uchun takroriy Budget balansi topildi.`, 409);
+    }
+
+    const current = rows?.[0];
+    if (!current) {
+      try {
+        const created = await service.entities.BudgetBalance.create({
+          account,
+          label: BUDGET_ACCOUNT_LABELS[account],
+          balance: amount,
+          updated_at: now,
+          updated_by_id: user.id,
+          updated_by_name: user.full_name || user.email,
+        });
+        return { record: created, before: 0, after: amount };
+      } catch (_) {
+        continue;
+      }
+    }
+
+    const before = money(current.balance);
+    const after = before + amount;
+    const update = await service.entities.BudgetBalance.updateMany(
+      { id: current.id, balance: Number(current.balance || 0) },
+      { $set: {
+        balance: after,
+        updated_at: now,
+        updated_by_id: user.id,
+        updated_by_name: user.full_name || user.email,
+      } },
+    );
+    if (update?.success && Number(update.updated || 0) === 1) {
+      return { record: { ...current, balance: after }, before, after };
+    }
+  }
+
+  throw httpError("Budget balansi bir vaqtda o‘zgardi. Yangilab qayta urinib ko‘ring.", 409);
+}
+
+async function rollbackBudgetBalance(service: any, change: any, user: any) {
+  if (!change?.record?.id) return;
+  await service.entities.BudgetBalance.updateMany(
+    { id: change.record.id, balance: change.after },
+    { $set: {
+      balance: change.before,
+      updated_at: new Date().toISOString(),
+      updated_by_id: user.id,
+      updated_by_name: user.full_name || user.email,
+    } },
+  ).catch(() => {});
+}
+
 async function normalizeSaleItems(service: any, requestedItems: any[]) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
@@ -171,21 +235,138 @@ export default async function(req) {
 
     if (action === "close_shift") {
       const shiftId = String(body?.shift_id || "");
-      const actualCash = money(body?.actual_cash);
-      if (!shiftId || actualCash < 0) return Response.json({ error: "Valid shift and counted cash are required." }, { status: 400 });
+      const actualCashRaw = Number(body?.actual_cash);
+      if (!shiftId || !Number.isFinite(actualCashRaw) || actualCashRaw < 0) {
+        return Response.json({ error: "Smena va sanalgan naqd pul to‘g‘ri kiritilishi kerak." }, { status: 400 });
+      }
+      const actualCash = Math.round(actualCashRaw);
+      const hasCashSplit = body?.budget_cash_submitted !== undefined
+        || body?.cash_left_for_next_shift !== undefined;
+      const submittedRaw = hasCashSplit ? Number(body?.budget_cash_submitted) : actualCash;
+      const leftRaw = hasCashSplit ? Number(body?.cash_left_for_next_shift) : 0;
+      if (
+        !Number.isFinite(submittedRaw)
+        || !Number.isFinite(leftRaw)
+        || submittedRaw < 0
+        || leftRaw < 0
+      ) {
+        return Response.json({ error: "Budgetga topshirilgan va qoldirilgan naqd pul manfiy bo‘lishi mumkin emas." }, { status: 400 });
+      }
+      const budgetCashSubmitted = Math.round(submittedRaw);
+      const cashLeftForNextShift = Math.round(leftRaw);
+      if (budgetCashSubmitted + cashLeftForNextShift !== actualCash) {
+        return Response.json({
+          error: "Budgetga topshirilgan pul bilan keyingi smenaga qoldirilgan pul yig‘indisi sanalgan naqd pulga teng bo‘lishi kerak.",
+        }, { status: 400 });
+      }
+
       const closingShift = await service.entities.Shift.get(shiftId);
-      if (!closingShift || closingShift.status !== "open") return Response.json({ error: "The shift is not open." }, { status: 409 });
-      if (closingShift.user_id !== user.id) return Response.json({ error: "This shift belongs to another user." }, { status: 403 });
+      if (!closingShift || closingShift.status !== "open") {
+        return Response.json({ error: "Smena ochiq emas yoki allaqachon yopilgan." }, { status: 409 });
+      }
+      if (closingShift.user_id !== user.id) {
+        return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
+      }
+
+      const claim = await service.entities.Shift.updateMany(
+        { id: closingShift.id, user_id: user.id, status: "open" },
+        { $set: { status: "closing" } },
+      );
+      if (!claim?.success || Number(claim.updated || 0) !== 1) {
+        return Response.json({ error: "Smena bir vaqtda o‘zgardi yoki allaqachon yopilmoqda." }, { status: 409 });
+      }
+
       const expected = money(closingShift.expected_cash);
-      const updated = await service.entities.Shift.update(closingShift.id, {
-        status: "closed", closed_at: new Date().toISOString(),
-        actual_cash: actualCash, difference: actualCash - expected,
-      });
-      await service.entities.ActionHistory.create({
-        user_id: user.id, user_name: user.full_name || user.email,
-        action: "shift_closed", details: `${closingShift.shop_name}. Difference ${actualCash - expected} UZS`,
-      });
-      return Response.json({ shift: updated, print_report_required: true });
+      const closedAt = new Date().toISOString();
+      const userName = user.full_name || user.email || "Noma’lum xodim";
+      const settlementReference = `SM-${closedAt.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+      const deposits = [
+        { account: "cash", amount: budgetCashSubmitted },
+        { account: "uzcard", amount: Math.max(0, money(closingShift.uzcard_sales)) },
+        { account: "humo", amount: Math.max(0, money(closingShift.humo_sales)) },
+        { account: "online", amount: Math.max(0, money(closingShift.online_sales)) },
+        { account: "bank", amount: Math.max(0, money(closingShift.bank_transfer_sales)) },
+      ].filter((deposit) => deposit.amount > 0);
+      const balanceChanges: any[] = [];
+      const budgetTransactions: any[] = [];
+
+      try {
+        for (const deposit of deposits) {
+          const balanceChange = await creditBudgetBalance(
+            service,
+            deposit.account,
+            deposit.amount,
+            user,
+            closedAt,
+          );
+          balanceChanges.push(balanceChange);
+          const transaction = await service.entities.BudgetTransaction.create({
+            transaction_number: `${settlementReference}-${deposit.account.toUpperCase()}`,
+            type: "shift_deposit",
+            direction: "in",
+            account: deposit.account,
+            amount: deposit.amount,
+            balance_before: balanceChange.before,
+            balance_after: balanceChange.after,
+            shift_id: closingShift.id,
+            shop_id: closingShift.shop_id,
+            shop_name: closingShift.shop_name,
+            reference_id: settlementReference,
+            reference_type: "shift_settlement",
+            description: `${closingShift.shop_name} smenasi · ${BUDGET_ACCOUNT_LABELS[deposit.account]}`,
+            performed_by_id: user.id,
+            performed_by_name: userName,
+            created_at: closedAt,
+            status: "completed",
+          });
+          budgetTransactions.push(transaction);
+        }
+
+        const finalized = await service.entities.Shift.updateMany(
+          { id: closingShift.id, status: "closing" },
+          { $set: {
+            status: "closed",
+            closed_at: closedAt,
+            actual_cash: actualCash,
+            difference: actualCash - expected,
+            budget_settled: true,
+            budget_settlement_reference: settlementReference,
+            budget_cash_submitted: budgetCashSubmitted,
+            cash_left_for_next_shift: cashLeftForNextShift,
+            budget_settled_at: closedAt,
+            budget_settled_by_id: user.id,
+            budget_settled_by_name: userName,
+          } },
+        );
+        if (!finalized?.success || Number(finalized.updated || 0) !== 1) {
+          throw httpError("Smenani yakuniy yopib bo‘lmadi.", 409);
+        }
+
+        const updated = await service.entities.Shift.get(closingShift.id);
+        await service.entities.ActionHistory.create({
+          user_id: user.id,
+          user_name: userName,
+          action: "shift_closed",
+          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · farq ${actualCash - expected} UZS`,
+        }).catch(() => {});
+        return Response.json({
+          shift: updated,
+          budget_transactions: budgetTransactions,
+          print_report_required: true,
+        });
+      } catch (error) {
+        for (const transaction of [...budgetTransactions].reverse()) {
+          await service.entities.BudgetTransaction.delete(transaction.id).catch(() => {});
+        }
+        for (const balanceChange of [...balanceChanges].reverse()) {
+          await rollbackBudgetBalance(service, balanceChange, user);
+        }
+        await service.entities.Shift.updateMany(
+          { id: closingShift.id, status: "closing" },
+          { $set: { status: "open" } },
+        ).catch(() => {});
+        throw error;
+      }
     }
 
     if (action === "validate_discount") {
