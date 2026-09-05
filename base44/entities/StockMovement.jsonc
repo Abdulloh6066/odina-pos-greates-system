@@ -105,6 +105,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
           "data.location_id": "{{user.data.shop_id}}"
         }
       ]
