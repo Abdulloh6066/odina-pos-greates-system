@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 
 const ROLE_COLORS = {
   admin: 'bg-red-50 text-red-700',
+  manager: 'bg-cyan-50 text-cyan-700',
   cashier: 'bg-blue-50 text-blue-700',
   accountant: 'bg-violet-50 text-violet-700',
   production: 'bg-amber-50 text-amber-700',
@@ -19,6 +20,7 @@ const ROLE_COLORS = {
 
 const ROLE_LABELS = {
   admin: 'Egasi / Admin',
+  manager: 'Boshqaruvchi',
   cashier: 'Kassir',
   accountant: 'Hisobchi',
   production: 'Ishlab chiqarish xodimi',
@@ -84,6 +86,7 @@ export default function Users() {
                 <div className="flex items-center gap-2">
                   <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="admin">Egasi / Admin</option>
+                    <option value="manager">Boshqaruvchi</option>
                     <option value="cashier">Kassir</option>
                     <option value="accountant">Hisobchi</option>
                     <option value="production">Ishlab chiqarish xodimi</option>
@@ -174,6 +177,7 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
               disabled={saving}
               className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
             >
+              <option value="manager">Boshqaruvchi</option>
               <option value="cashier">Kassir</option>
               <option value="accountant">Hisobchi</option>
               <option value="production">Ishlab chiqarish xodimi</option>
