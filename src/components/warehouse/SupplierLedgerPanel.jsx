@@ -11,8 +11,6 @@ import {
   ReceiptText,
   Scale,
   Trash2,
-  Truck,
-  WalletCards,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatNum, formatUZS } from "@/lib/pos";
