@@ -85,7 +85,7 @@ export default function Users() {
               {u.id !== user.id ? (
                 <div className="flex items-center gap-2">
                   <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                    <option value="admin">Egasi / Admin</option>
+                    <option value="admin" disabled>Egasi / Admin</option>
                     <option value="manager">Boshqaruvchi</option>
                     <option value="cashier">Kassir</option>
                     <option value="accountant">Hisobchi</option>
@@ -170,10 +170,7 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
             <Label className="text-xs mb-1.5 block">Lavozim</Label>
             <select
               value={role}
-              onChange={(e) => {
-                setRole(e.target.value);
-                if (e.target.value === 'admin') setShopId('');
-              }}
+              onChange={(e) => setRole(e.target.value)}
               disabled={saving}
               className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
             >
@@ -182,7 +179,6 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
               <option value="accountant">Hisobchi</option>
               <option value="production">Ishlab chiqarish xodimi</option>
               <option value="warehouse">Omborchi</option>
-              <option value="admin">Egasi / Admin</option>
             </select>
           </div>
           {needsShop && (
