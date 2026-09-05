@@ -37,7 +37,9 @@
       "enum": [
         "paid",
         "partial",
-        "unpaid"
+        "unpaid",
+        "cancelling",
+        "cancelled"
       ],
       "default": "unpaid"
     },
@@ -55,6 +57,19 @@
       "type": "string"
     },
     "created_by_name": {
+      "type": "string"
+    },
+    "cancelled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelled_by": {
+      "type": "string"
+    },
+    "cancelled_by_name": {
+      "type": "string"
+    },
+    "cancellation_reason": {
       "type": "string"
     }
   },
