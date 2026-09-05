@@ -84,6 +84,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
           "data.user_id": "{{user.id}}"
         }
       ]
