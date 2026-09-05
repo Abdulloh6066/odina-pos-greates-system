@@ -39,7 +39,8 @@ export default function TransfersPanel({
   const pending = visibleTransfers.filter((transfer) => transfer.status !== 'received');
   const completed = visibleTransfers.filter((transfer) => transfer.status === 'received');
 
-  const canReceive = (transfer) => transfer.status === 'pending'
+  const canReceive = (transfer) => user?.role !== 'manager'
+    && transfer.status === 'pending'
     && transfer.destination_location_id === location?.id
     && (user?.role === 'admin' || user?.shop_id === transfer.destination_location_id);
 
