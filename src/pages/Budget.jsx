@@ -5,7 +5,7 @@ import {
   Banknote,
   CreditCard,
   Landmark,
-  PlusMinus,
+  ArrowUpDown,
   Search,
   ShieldCheck,
   Smartphone,
@@ -104,7 +104,7 @@ export default function Budget() {
             onClick={() => setAdjustOpen(true)}
             className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation"
           >
-            <PlusMinus className="w-4 h-4 mr-1.5" /> Mablag‘ kiritish / chiqarish
+            <ArrowUpDown className="w-4 h-4 mr-1.5" /> Mablag‘ kiritish / chiqarish
           </Button>
         )}
       />
