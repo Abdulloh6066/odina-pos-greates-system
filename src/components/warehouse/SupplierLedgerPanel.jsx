@@ -711,6 +711,157 @@ function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, 
   );
 }
 
+function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
+  const [balances, setBalances] = useState({});
+  const [account, setAccount] = useState("cash");
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [ownerPin, setOwnerPin] = useState("");
+  const [loadingBalances, setLoadingBalances] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const debt = supplier
+    ? supplier.receipts
+      .filter((receipt) => !isCancelled(receipt))
+      .reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0)
+    : 0;
+  const value = Math.round(Number(amount) || 0);
+  const available = Number(balances[account] || 0);
+  const invalidAmount = value <= 0 || value > debt || value > available;
+
+  useEffect(() => {
+    if (!supplier) return undefined;
+    let active = true;
+    setAccount("cash");
+    setAmount(String(debt));
+    setNotes("");
+    setOwnerPin("");
+    setLoadingBalances(true);
+    base44.functions.invoke("budget-ledger", { action: "summary" })
+      .then((result) => {
+        if (!active) return;
+        const payload = result?.data || result;
+        if (!payload?.balances) throw new Error(payload?.error || "Budget balansi yuklanmadi.");
+        setBalances(Object.fromEntries(
+          payload.balances.map((row) => [row.account, Number(row.balance || 0)]),
+        ));
+      })
+      .catch((error) => {
+        if (active) alert("Budget balansi yuklanmadi: " + errorText(error));
+      })
+      .finally(() => {
+        if (active) setLoadingBalances(false);
+      });
+    return () => { active = false; };
+  }, [supplier, debt]);
+
+  const submit = async () => {
+    if (!supplier || invalidAmount || !/^\d{4,8}$/.test(ownerPin)) return;
+    setSaving(true);
+    try {
+      const result = await base44.functions.invoke("budget-ledger", {
+        action: "pay_supplier",
+        supplier_id: supplier.id,
+        account,
+        amount: value,
+        notes: notes.trim(),
+        owner_pin: ownerPin,
+      });
+      const payload = result?.data || result;
+      if (!payload?.paid) throw new Error(payload?.error || "Qarz to‘lovi bajarilmadi.");
+      onPaid();
+    } catch (error) {
+      alert("Qarz to‘lanmadi: " + errorText(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!supplier} onOpenChange={(open) => !open && !saving && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl">Budgetdan qarzni to‘lash</DialogTitle>
+          <p className="text-sm text-muted-foreground">{supplier?.name} · Qarz {formatUZS(debt)}</p>
+        </DialogHeader>
+
+        <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+          To‘lov eng eski kirim qarzidan boshlab avtomatik taqsimlanadi. Amal qilgan admin va pul hisobi tarixda saqlanadi.
+        </div>
+
+        <div>
+          <Label className="text-xs mb-1.5 block">Qaysi Budget hisobidan</Label>
+          <select
+            value={account}
+            onChange={(event) => setAccount(event.target.value)}
+            disabled={saving || loadingBalances}
+            className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
+          >
+            <option value="cash">Naqd pul · {formatUZS(balances.cash || 0)}</option>
+            <option value="uzcard">Uzcard · {formatUZS(balances.uzcard || 0)}</option>
+            <option value="humo">Humo · {formatUZS(balances.humo || 0)}</option>
+            <option value="online">Onlayn · {formatUZS(balances.online || 0)}</option>
+            <option value="bank">Bank · {formatUZS(balances.bank || 0)}</option>
+          </select>
+        </div>
+
+        <div>
+          <Label className="text-xs mb-1.5 block">To‘lov summasi</Label>
+          <Input
+            type="number"
+            min="1"
+            max={Math.min(debt, available)}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="0"
+            disabled={saving || loadingBalances}
+            className="h-11 rounded-xl"
+          />
+          {value > debt && <p className="text-xs text-destructive mt-1">To‘lov qolgan qarzdan oshmasligi kerak.</p>}
+          {value > available && <p className="text-xs text-destructive mt-1">Tanlangan Budget hisobida pul yetarli emas.</p>}
+        </div>
+
+        <div>
+          <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
+          <Textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Masalan: sentabr kirimlari uchun"
+            rows={2}
+            disabled={saving}
+          />
+        </div>
+
+        <div>
+          <Label className="text-xs mb-1.5 block">Owner PIN</Label>
+          <Input
+            type="password"
+            inputMode="numeric"
+            maxLength={8}
+            value={ownerPin}
+            onChange={(event) => setOwnerPin(event.target.value.replace(/\D/g, "").slice(0, 8))}
+            placeholder="4–8 xonali PIN"
+            disabled={saving}
+            className="h-11 rounded-xl"
+          />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+          <Button
+            type="button"
+            onClick={submit}
+            disabled={saving || loadingBalances || invalidAmount || !/^\d{4,8}$/.test(ownerPin)}
+            className="bg-primary text-primary-foreground hover:bg-primary-strong"
+          >
+            {saving ? "To‘lanmoqda…" : "Owner PIN bilan to‘lash"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CancelReceiptDialog({ receipt, onClose, onCancelled }) {
   const [reason, setReason] = useState("");
   const [ownerPin, setOwnerPin] = useState("");
