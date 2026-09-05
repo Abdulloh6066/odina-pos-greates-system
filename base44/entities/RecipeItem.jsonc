@@ -66,6 +66,11 @@
         },
         {
           "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
             "role": "accountant"
           }
         },
