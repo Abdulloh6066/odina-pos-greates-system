@@ -32,6 +32,33 @@
     "cash_movement_id": {
       "type": "string"
     },
+    "payment_source": {
+      "type": "string",
+      "enum": [
+        "shift_cash",
+        "budget"
+      ],
+      "default": "shift_cash"
+    },
+    "budget_account": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "uzcard",
+        "humo",
+        "online",
+        "bank"
+      ]
+    },
+    "budget_transaction_id": {
+      "type": "string"
+    },
+    "authorized_by_id": {
+      "type": "string"
+    },
+    "authorized_by_name": {
+      "type": "string"
+    },
     "user_id": {
       "type": "string"
     },
