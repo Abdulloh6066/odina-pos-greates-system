@@ -350,6 +350,12 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
                 {shift.status === "closed" && (
                   <>
                     <CashRow label="Sanalgan naqd pul" value={formatUZS(shift.actual_cash)} />
+                    {shift.budget_settled && (
+                      <>
+                        <CashRow label="Budgetga topshirilgan naqd" value={formatUZS(shift.budget_cash_submitted)} />
+                        <CashRow label="Keyingi smenaga qoldirilgan" value={formatUZS(shift.cash_left_for_next_shift)} />
+                      </>
+                    )}
                     <CashRow
                       label="Farq"
                       value={(diff > 0 ? "+" : "") + formatUZS(diff)}
