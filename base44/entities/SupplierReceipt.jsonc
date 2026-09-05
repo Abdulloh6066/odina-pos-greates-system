@@ -101,6 +101,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
           "$and": [
             {
               "user_condition": {
