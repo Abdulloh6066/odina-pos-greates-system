@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 
 export default function CashRecipients() {
   const { user } = useOutletContext();
+  const canManage = user?.role === 'admin';
   const [recipients, setRecipients] = useState([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
@@ -33,7 +34,7 @@ export default function CashRecipients() {
     return recipients.filter((item) => [item.name, item.notes].filter(Boolean).join(' ').toLowerCase().includes(query));
   }, [recipients, search]);
 
-  if (user?.role !== 'admin') return <Navigate to="/pos" replace />;
+  if (!['admin', 'manager'].includes(user?.role)) return <Navigate to="/" replace />;
 
   return (
     <div className="p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
@@ -41,7 +42,7 @@ export default function CashRecipients() {
         title="Qabul qiluvchilar"
         subtitle="Tovarlarga pul beriladigan kompaniya va yetkazib beruvchilar"
         icon={Building2}
-        actions={(
+        actions={canManage && (
           <Button onClick={() => setEditing({})} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong">
             <Plus className="w-4 h-4 mr-1.5" /> Yangi qabul qiluvchi
           </Button>
@@ -74,7 +75,9 @@ export default function CashRecipients() {
                   <p className="text-xs text-muted-foreground mt-0.5">{item.recipient_type === 'company' ? 'Kompaniya' : 'Yetkazib beruvchi'} · {item.active === false ? 'Faol emas' : 'Faol'}</p>
                   {item.notes && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{item.notes}</p>}
                 </div>
-                <Button variant="outline" size="icon" onClick={() => setEditing(item)} className="h-10 w-10 rounded-xl shrink-0"><Pencil className="w-4 h-4" /></Button>
+                {canManage && (
+                  <Button variant="outline" size="icon" onClick={() => setEditing(item)} className="h-10 w-10 rounded-xl shrink-0"><Pencil className="w-4 h-4" /></Button>
+                )}
               </div>
             </article>
           ))}
