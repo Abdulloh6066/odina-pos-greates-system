@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Tags, Plus, Pencil, Trash2 } from 'lucide-react';
-import { canAccess, logAction } from '@/lib/pos';
+import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ const ICONS = ['🍰', '🧁', '🍪', '🥐', '🍩', '🎂', '🥧', '🍫', '
 
 export default function Categories() {
   const { user } = useOutletContext();
+  const canManage = ['admin', 'accountant'].includes(user?.role);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -39,7 +40,7 @@ export default function Categories() {
         title="Categories"
         subtitle={`${categories.length} categories`}
         icon={Tags}
-        actions={canAccess(user?.role, 'categories') && (
+        actions={canManage && (
           <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             <Plus className="w-4 h-4 mr-1.5" /> Add
           </Button>
@@ -58,7 +59,7 @@ export default function Categories() {
                 <div className="font-semibold truncate">{c.name}</div>
                 <div className="text-xs text-muted-foreground">{c.active ? 'Active' : 'Inactive'}</div>
               </div>
-              {canAccess(user?.role, 'categories') && (
+              {canManage && (
                 <div className="flex gap-1">
                   <button onClick={() => { setEditing(c); setOpen(true); }} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary"><Pencil className="w-4 h-4" /></button>
                   <button onClick={() => remove(c)} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
