@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
-const STAFF_ROLES = ["admin", "cashier", "accountant", "production", "warehouse"];
+const STAFF_ROLES = ["admin", "manager", "cashier", "accountant", "production", "warehouse"];
 
 const errorMessage = (error: unknown) => {
   if (error && typeof error === "object") {
