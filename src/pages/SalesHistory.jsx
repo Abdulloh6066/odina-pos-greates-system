@@ -118,7 +118,7 @@ export default function SalesHistory() {
         </div>
       )}
 
-      <SaleDetailDialog sale={selected} onRefund={refundSale} onClose={() => setSelected(null)} />
+      <SaleDetailDialog sale={selected} canRefund={role !== 'manager'} onRefund={refundSale} onClose={() => setSelected(null)} />
       <RefundDialog
         open={refundOpen}
         sale={selected}
@@ -130,7 +130,7 @@ export default function SalesHistory() {
   );
 }
 
-function SaleDetailDialog({ sale, onRefund, onClose }) {
+function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
   if (!sale) return null;
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onClose()}>
@@ -165,7 +165,7 @@ function SaleDetailDialog({ sale, onRefund, onClose }) {
           </div>
         )}
         <div className="flex gap-2 mt-4">
-          {sale.status === 'completed' && (
+          {canRefund && sale.status === 'completed' && (
             <Button variant="destructive" onClick={() => onRefund(sale)} className="flex-1">
               <RotateCcw className="w-4 h-4 mr-1.5" /> Qaytarish
             </Button>
