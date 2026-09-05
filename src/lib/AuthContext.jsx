@@ -88,7 +88,21 @@ export const AuthProvider = ({ children }) => {
     try {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
+      let currentUser = await base44.auth.me();
+
+      // Taklif qilingan xodim birinchi kirganda Odina ichidagi lavozimi
+      // va ish joyini xavfsiz backend orqali avtomatik oladi.
+      try {
+        const assignmentResponse = await base44.functions.invoke('staff-invite', { action: 'claim' });
+        const assignment = assignmentResponse?.data || assignmentResponse;
+        if (assignment?.applied) {
+          currentUser = await base44.auth.me();
+        }
+      } catch (assignmentError) {
+        // Taklif yozuvi bo‘lmagan eski foydalanuvchilar odatdagidek kiraveradi.
+        console.warn('Staff assignment check failed:', assignmentError);
+      }
+
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
