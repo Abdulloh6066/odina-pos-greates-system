@@ -44,6 +44,7 @@ const MOVEMENT_LABELS = {
   sale: 'Kassa savdosi',
   waste: 'Chiqit',
   refund: 'Qaytarish',
+  receipt_cancel: 'Kirim bekor qilindi',
 };
 
 export default function Warehouse() {
