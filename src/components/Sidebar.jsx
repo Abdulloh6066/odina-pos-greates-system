@@ -3,14 +3,14 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
-  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, Warehouse,
+  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, WalletCards, Warehouse,
 } from 'lucide-react';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Building2, Warehouse, Users, Settings,
+  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
