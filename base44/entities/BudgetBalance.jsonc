@@ -1,0 +1,59 @@
+{
+  "name": "BudgetBalance",
+  "type": "object",
+  "properties": {
+    "account": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "uzcard",
+        "humo",
+        "online",
+        "bank"
+      ]
+    },
+    "label": {
+      "type": "string"
+    },
+    "balance": {
+      "type": "number",
+      "default": 0
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_by_id": {
+      "type": "string"
+    },
+    "updated_by_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "account",
+    "balance"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
