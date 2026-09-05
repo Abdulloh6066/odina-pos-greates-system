@@ -44,7 +44,8 @@
         "transfer_in",
         "sale",
         "waste",
-        "refund"
+        "refund",
+        "receipt_cancel"
       ],
       "type": "string"
     },
