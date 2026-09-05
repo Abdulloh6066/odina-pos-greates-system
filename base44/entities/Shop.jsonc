@@ -53,6 +53,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
           "id": "{{user.data.shop_id}}"
         }
       ]
