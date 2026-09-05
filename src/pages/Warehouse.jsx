@@ -15,11 +15,11 @@ import ProductionPanel from '@/components/warehouse/ProductionPanel';
 
 const TABS = [
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
-  { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes, roles: ['admin', 'cashier', 'accountant', 'production'] },
-  { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck, roles: ['admin', 'warehouse', 'accountant'] },
-  { id: 'recipes', label: 'Retseptlar', icon: BookOpen, roles: ['admin', 'accountant', 'production'] },
-  { id: 'production', label: 'Ishlab chiqarish', icon: ChefHat, roles: ['admin', 'accountant', 'production'] },
-  { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft, roles: ['admin', 'cashier', 'accountant', 'production'] },
+  { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck, roles: ['admin', 'manager', 'warehouse', 'accountant'] },
+  { id: 'recipes', label: 'Retseptlar', icon: BookOpen, roles: ['admin', 'manager', 'accountant', 'production'] },
+  { id: 'production', label: 'Ishlab chiqarish', icon: ChefHat, roles: ['admin', 'manager', 'accountant', 'production'] },
+  { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
@@ -58,9 +58,9 @@ export default function Warehouse() {
   const [movements, setMovements] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [recipients, setRecipients] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState(user?.role === 'admin' ? '' : (user?.shop_id || ''));
+  const [selectedLocation, setSelectedLocation] = useState(['admin', 'manager'].includes(user?.role) ? '' : (user?.shop_id || ''));
   const requestedTab = searchParams.get('tab');
-  const canViewSupplierLedger = ['admin', 'warehouse', 'accountant'].includes(user?.role);
+  const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
   const tabAllowed = (value) => visibleTabs.some((item) => item.id === value);
   const [tab, setTab] = useState(tabAllowed(requestedTab) ? requestedTab : 'ingredients');
@@ -169,7 +169,7 @@ export default function Warehouse() {
 
       <div className="rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
         <div className="flex flex-col sm:flex-row gap-3">
-          {user?.role === 'admin' ? (
+          {['admin', 'manager'].includes(user?.role) ? (
             <label className="sm:w-72 space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
               <select
@@ -271,7 +271,7 @@ export default function Warehouse() {
               items={items}
               stockMap={stockMap}
               kind={tab === 'products' ? 'product' : 'ingredient'}
-              onAdjust={user?.role === 'warehouse' ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
+              onAdjust={['warehouse', 'manager'].includes(user?.role) ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
             />
           )}
         </>
