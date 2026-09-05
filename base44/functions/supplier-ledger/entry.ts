@@ -259,6 +259,203 @@ export default async function(req) {
       }
     }
 
+    if (action === "cancel_receipt") {
+      if (!["admin", "warehouse"].includes(user.role)) {
+        return Response.json({ error: "Faqat owner yoki Omborchi kirimni bekor qila oladi." }, { status: 403 });
+      }
+      if (!(await verifyOwnerPin(service, body?.owner_pin))) {
+        return Response.json({ error: "Owner PIN-kodi noto‘g‘ri." }, { status: 403 });
+      }
+
+      const receiptId = String(body?.receipt_id || "");
+      const reason = String(body?.reason || "").trim();
+      if (!receiptId || reason.length < 3) {
+        return Response.json({ error: "Kirim va bekor qilish sababi majburiy." }, { status: 400 });
+      }
+
+      const receipt = await service.entities.SupplierReceipt.get(receiptId);
+      if (!receipt) return Response.json({ error: "Kirim topilmadi." }, { status: 404 });
+      if (receipt.status === "cancelled") {
+        return Response.json({ error: "Bu kirim avval bekor qilingan." }, { status: 409 });
+      }
+      if (receipt.status === "cancelling") {
+        return Response.json({ error: "Bu kirim bekor qilinish jarayonida. Owner tekshirishi kerak." }, { status: 409 });
+      }
+      if (user.role === "warehouse" && (!user.shop_id || user.shop_id !== receipt.location_id)) {
+        return Response.json({ error: "Siz faqat biriktirilgan ombordagi kirimni bekor qila olasiz." }, { status: 403 });
+      }
+
+      const [items, payments] = await Promise.all([
+        service.entities.SupplierReceiptItem.filter({ receipt_id: receipt.id }, "created_date", 500),
+        service.entities.SupplierPayment.filter({ receipt_id: receipt.id }, "paid_at", 1),
+      ]);
+      if (!items?.length) {
+        return Response.json({ error: "Kirim tarkibi topilmadi. Avtomatik bekor qilib bo‘lmaydi." }, { status: 409 });
+      }
+      if (
+        payments?.length ||
+        money(receipt.paid_at_receipt) > 0 ||
+        money(receipt.remaining_debt) !== money(receipt.debt_amount)
+      ) {
+        return Response.json({
+          error: "Bu kirim bo‘yicha pul to‘langan. Kassa va qarz tarixi buzilmasligi uchun uni avtomatik bekor qilib bo‘lmaydi.",
+        }, { status: 409 });
+      }
+
+      const stockPlans: any[] = [];
+      for (const item of items) {
+        const matches = await service.entities.IngredientStock.filter({
+          location_id: receipt.location_id,
+          ingredient_id: item.ingredient_id,
+        });
+        if ((matches || []).length !== 1) {
+          return Response.json({
+            error: item.ingredient_name_snapshot + " uchun ombor qoldig‘i topilmadi yoki takroriy yozuv bor.",
+          }, { status: 409 });
+        }
+        const stock = matches[0];
+        const before = quantity(stock.quantity);
+        const receivedQuantity = quantity(item.base_quantity);
+        const after = quantity(before - receivedQuantity);
+        if (!Number.isFinite(receivedQuantity) || receivedQuantity <= 0) {
+          return Response.json({ error: "Kirim miqdori noto‘g‘ri saqlangan." }, { status: 409 });
+        }
+        if (after < 0) {
+          return Response.json({
+            error: item.ingredient_name_snapshot + " qoldig‘i yetarli emas. Kirimdan keyin masalliq ishlatilgan, shuning uchun bekor qilish bloklandi.",
+          }, { status: 409 });
+        }
+        stockPlans.push({ item, stock, before, after, receivedQuantity });
+      }
+
+      const originalStatus = receipt.status;
+      const originalRemaining = money(receipt.remaining_debt);
+      const now = new Date().toISOString();
+      const userName = user.full_name || user.email || "Noma’lum xodim";
+      let claimed = false;
+      const changedStocks: any[] = [];
+      const reverseMovements: any[] = [];
+
+      try {
+        const claim = await service.entities.SupplierReceipt.updateMany(
+          { id: receipt.id, status: originalStatus, remaining_debt: originalRemaining },
+          { $set: { status: "cancelling" } },
+        );
+        if (!claim?.success || Number(claim.updated || 0) !== 1) {
+          return Response.json({
+            error: "Kirim boshqa qurilmada o‘zgargan. Yangilang va qayta urinib ko‘ring.",
+          }, { status: 409 });
+        }
+        claimed = true;
+
+        for (const plan of stockPlans) {
+          const stockUpdate = await service.entities.IngredientStock.updateMany(
+            { id: plan.stock.id, quantity: plan.before },
+            { $set: {
+              quantity: plan.after,
+              updated_at: now,
+              updated_by: user.id,
+              updated_by_name: userName,
+            } },
+          );
+          if (!stockUpdate?.success || Number(stockUpdate.updated || 0) !== 1) {
+            throw new Error(plan.item.ingredient_name_snapshot + " qoldig‘i bir vaqtda o‘zgardi. Yangilang va qayta urinib ko‘ring.");
+          }
+          changedStocks.push(plan);
+
+          const movement = await service.entities.StockMovement.create({
+            movement_number: "ST-" + now.slice(0, 10).replaceAll("-", "") + "-" + crypto.randomUUID().slice(0, 8).toUpperCase(),
+            location_id: receipt.location_id,
+            location_name: receipt.location_name_snapshot,
+            item_kind: "ingredient",
+            item_id: plan.item.ingredient_id,
+            item_name: plan.item.ingredient_name_snapshot,
+            unit: plan.item.base_unit,
+            movement_type: "receipt_cancel",
+            quantity_change: -plan.receivedQuantity,
+            balance_before: plan.before,
+            balance_after: plan.after,
+            reason: "Kirim bekor qilindi · " + receipt.receipt_number + " · " + reason,
+            reference_id: receipt.id,
+            reference_type: "supplier_receipt_cancel",
+            user_id: user.id,
+            user_name: userName,
+            created_at: now,
+          });
+          reverseMovements.push(movement);
+        }
+
+        const finalized = await service.entities.SupplierReceipt.updateMany(
+          { id: receipt.id, status: "cancelling" },
+          { $set: {
+            status: "cancelled",
+            remaining_debt: 0,
+            cancelled_at: now,
+            cancelled_by: user.id,
+            cancelled_by_name: userName,
+            cancellation_reason: reason,
+          } },
+        );
+        if (!finalized?.success || Number(finalized.updated || 0) !== 1) {
+          throw new Error("Kirimni yakuniy bekor qilishda yozuv o‘zgardi.");
+        }
+
+        await service.entities.ActionHistory.create({
+          user_id: user.id,
+          user_name: userName,
+          action: "supplier_receipt_cancelled",
+          details: receipt.receipt_number + ". " + receipt.supplier_name_snapshot + ". " + receipt.total_amount + " UZS. " + reason,
+        });
+
+        return Response.json({
+          receipt: {
+            ...receipt,
+            status: "cancelled",
+            remaining_debt: 0,
+            cancelled_at: now,
+            cancelled_by: user.id,
+            cancelled_by_name: userName,
+            cancellation_reason: reason,
+          },
+          reversed_items: stockPlans.length,
+        });
+      } catch (error) {
+        for (const movement of reverseMovements.reverse()) {
+          try { await service.entities.StockMovement.delete(movement.id); } catch {}
+        }
+        for (const plan of changedStocks.reverse()) {
+          try {
+            await service.entities.IngredientStock.updateMany(
+              { id: plan.stock.id, quantity: plan.after },
+              { $set: {
+                quantity: plan.before,
+                updated_at: new Date().toISOString(),
+                updated_by: user.id,
+                updated_by_name: userName,
+              } },
+            );
+          } catch {}
+        }
+        if (claimed) {
+          try {
+            await service.entities.SupplierReceipt.updateMany(
+              { id: receipt.id, status: "cancelling" },
+              {
+                $set: { status: originalStatus, remaining_debt: originalRemaining },
+                $unset: {
+                  cancelled_at: "",
+                  cancelled_by: "",
+                  cancelled_by_name: "",
+                  cancellation_reason: "",
+                },
+              },
+            );
+          } catch {}
+        }
+        throw error;
+      }
+    }
+
     if (action === "pay_debt") {
       if (!["admin", "cashier"].includes(user.role)) {
         return Response.json({ error: "Faqat owner yoki kassir qarzni to‘lay oladi." }, { status: 403 });
