@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
-const STAFF_ROLES = ["admin", "manager", "cashier", "accountant", "production", "warehouse"];
+const STAFF_ROLES = ["manager", "cashier", "accountant", "production", "warehouse"];
 
 const errorMessage = (error: unknown) => {
   if (error && typeof error === "object") {
@@ -146,8 +146,7 @@ Deno.serve(async (req) => {
         : await base44.asServiceRole.entities.PendingStaffInvite.create(inviteData);
 
       try {
-        const platformRole = desiredRole === "admin" ? "admin" : "user";
-        await base44.users.inviteUser(email, platformRole);
+        await base44.users.inviteUser(email, "user");
       } catch (error) {
         const message = errorMessage(error);
         await base44.asServiceRole.entities.PendingStaffInvite.update(pending.id, {
