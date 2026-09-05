@@ -1,0 +1,119 @@
+{
+  "name": "BudgetTransaction",
+  "type": "object",
+  "properties": {
+    "transaction_number": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "shift_deposit",
+        "supplier_payment",
+        "manual_deposit",
+        "manual_withdrawal"
+      ]
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "in",
+        "out"
+      ]
+    },
+    "account": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "uzcard",
+        "humo",
+        "online",
+        "bank"
+      ]
+    },
+    "amount": {
+      "type": "number"
+    },
+    "balance_before": {
+      "type": "number"
+    },
+    "balance_after": {
+      "type": "number"
+    },
+    "shift_id": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "supplier_id": {
+      "type": "string"
+    },
+    "supplier_name": {
+      "type": "string"
+    },
+    "reference_id": {
+      "type": "string"
+    },
+    "reference_type": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "performed_by_id": {
+      "type": "string"
+    },
+    "performed_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "reversed"
+      ],
+      "default": "completed"
+    }
+  },
+  "required": [
+    "transaction_number",
+    "type",
+    "direction",
+    "account",
+    "amount",
+    "balance_before",
+    "balance_after",
+    "performed_by_id",
+    "created_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
