@@ -17,11 +17,11 @@ const ICONS = {
 const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
-  { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'cashier', 'accountant', 'production'] },
-  { key: 'warehouse-suppliers', label: 'Kirim va qarzlar', path: '/warehouse?tab=suppliers', icon: Truck, tab: 'suppliers', roles: ['admin', 'warehouse', 'accountant'] },
-  { key: 'warehouse-recipes', label: 'Retseptlar', path: '/warehouse?tab=recipes', icon: BookOpen, tab: 'recipes', roles: ['admin', 'accountant', 'production'] },
-  { key: 'warehouse-production', label: 'Ishlab chiqarish', path: '/warehouse?tab=production', icon: ChefHat, tab: 'production', roles: ['admin', 'accountant', 'production'] },
-  { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers', roles: ['admin', 'cashier', 'accountant', 'production'] },
+  { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { key: 'warehouse-suppliers', label: 'Kirim va qarzlar', path: '/warehouse?tab=suppliers', icon: Truck, tab: 'suppliers', roles: ['admin', 'manager', 'warehouse', 'accountant'] },
+  { key: 'warehouse-recipes', label: 'Retseptlar', path: '/warehouse?tab=recipes', icon: BookOpen, tab: 'recipes', roles: ['admin', 'manager', 'accountant', 'production'] },
+  { key: 'warehouse-production', label: 'Ishlab chiqarish', path: '/warehouse?tab=production', icon: ChefHat, tab: 'production', roles: ['admin', 'manager', 'accountant', 'production'] },
+  { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];
 
