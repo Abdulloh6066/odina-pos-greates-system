@@ -51,7 +51,7 @@ export default function CashOutHistory() {
   }, []);
 
   const visible = useMemo(() => {
-    if (user?.role === 'admin') return movements;
+    if (['admin', 'manager'].includes(user?.role)) return movements;
     return movements.filter((movement) => movement.user_id === user?.id);
   }, [movements, user]);
 
@@ -111,7 +111,7 @@ export default function CashOutHistory() {
       .filter((movement) => categoryOf(movement) === key)
       .reduce((sum, movement) => sum + Number(movement.amount || 0), 0),
   })), [filtered]);
-  const ownerView = user?.role === 'admin';
+  const ownerView = ['admin', 'manager'].includes(user?.role);
 
   return (
     <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
