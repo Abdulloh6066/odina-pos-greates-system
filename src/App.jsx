@@ -27,6 +27,7 @@ import Shifts from '@/pages/Shifts';
 import CashOutHistory from '@/pages/CashOutHistory';
 import CashRecipients from '@/pages/CashRecipients';
 import Warehouse from '@/pages/Warehouse';
+import Budget from '@/pages/Budget';
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -77,6 +78,7 @@ function App() {
                 <Route path="/cash-outs" element={<RoleRoute pageKey="cashouts"><CashOutHistory /></RoleRoute>} />
                 <Route path="/cash-recipients" element={<RoleRoute pageKey="recipients"><CashRecipients /></RoleRoute>} />
                 <Route path="/warehouse" element={<RoleRoute pageKey="warehouse"><Warehouse /></RoleRoute>} />
+                <Route path="/budget" element={<RoleRoute pageKey="budget"><Budget /></RoleRoute>} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />
