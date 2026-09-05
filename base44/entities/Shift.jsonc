@@ -18,6 +18,7 @@
       "type": "string",
       "enum": [
         "open",
+        "closing",
         "closed"
       ],
       "default": "open"
@@ -81,6 +82,31 @@
     "refunds_total": {
       "type": "number",
       "default": 0
+    },
+    "budget_settled": {
+      "type": "boolean",
+      "default": false
+    },
+    "budget_settlement_reference": {
+      "type": "string"
+    },
+    "budget_cash_submitted": {
+      "type": "number",
+      "default": 0
+    },
+    "cash_left_for_next_shift": {
+      "type": "number",
+      "default": 0
+    },
+    "budget_settled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "budget_settled_by_id": {
+      "type": "string"
+    },
+    "budget_settled_by_name": {
+      "type": "string"
     }
   },
   "required": [
