@@ -11,6 +11,7 @@ import {
   ReceiptText,
   Scale,
   Trash2,
+  WalletCards,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { formatNum, formatUZS } from "@/lib/pos";
@@ -84,6 +85,7 @@ export default function SupplierLedgerPanel({
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [budgetPaymentTarget, setBudgetPaymentTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -423,8 +425,16 @@ export default function SupplierLedgerPanel({
 
       <SupplierDetailDialog
         supplier={selectedSupplier}
+        canPayBudget={user?.role === "admin"}
+        onPayBudget={(supplier) => { setSelectedSupplierId(""); setBudgetPaymentTarget(supplier); }}
         onReceipt={(receipt) => { setSelectedSupplierId(""); setSelectedReceipt(receipt); }}
         onClose={() => setSelectedSupplierId("")}
+      />
+
+      <BudgetSupplierPaymentDialog
+        supplier={budgetPaymentTarget}
+        onClose={() => setBudgetPaymentTarget(null)}
+        onPaid={() => { setBudgetPaymentTarget(null); load(); }}
       />
 
       <CancelReceiptDialog
@@ -622,7 +632,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
   );
 }
 
-function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
+function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, onClose }) {
   if (!supplier) return null;
   const active = supplier.receipts.filter((receipt) => !isCancelled(receipt));
   const purchases = active.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
@@ -643,6 +653,16 @@ function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
           <MiniSummary label="Qolgan qarz" value={formatUZS(debt)} warning={debt > 0} />
           <MiniSummary label="Kirimlar" value={formatNum(supplier.receipts.length)} />
         </div>
+
+        {canPayBudget && debt > 0 && (
+          <Button
+            type="button"
+            onClick={() => onPayBudget(supplier)}
+            className="w-full min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong"
+          >
+            <WalletCards className="w-4 h-4 mr-1.5" /> Budgetdan qarzni to‘lash
+          </Button>
+        )}
 
         <div>
           <h4 className="font-semibold mb-2">Barcha kirimlar</h4>
