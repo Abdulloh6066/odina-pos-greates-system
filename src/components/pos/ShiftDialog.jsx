@@ -75,12 +75,29 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
 
 export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
   const [actualCash, setActualCash] = useState(0);
+  const [cashLeft, setCashLeft] = useState(0);
   const expected = shift?.expected_cash || 0;
-  const difference = (Number(actualCash) || 0) - expected;
+  const countedCash = Number(actualCash) || 0;
+  const leftForNextShift = Number(cashLeft) || 0;
+  const budgetCashSubmitted = countedCash - leftForNextShift;
+  const difference = countedCash - expected;
+  const splitInvalid = countedCash < 0 || leftForNextShift < 0 || leftForNextShift > countedCash;
 
-  useEffect(() => { if (open) setActualCash(expected); }, [open, expected]);
+  useEffect(() => {
+    if (open) {
+      setActualCash(expected);
+      setCashLeft(0);
+    }
+  }, [open, expected]);
 
-  const submit = () => onConfirm({ actual_cash: Number(actualCash) || 0 });
+  const submit = () => {
+    if (splitInvalid) return;
+    onConfirm({
+      actual_cash: countedCash,
+      budget_cash_submitted: budgetCashSubmitted,
+      cash_left_for_next_shift: leftForNextShift,
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -110,15 +127,47 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Sanab chiqilgan haqiqiy naqd pul</label>
-            <Input type="number" value={actualCash} onChange={(e) => setActualCash(e.target.value)} className="h-10" />
+            <Input
+              type="number"
+              min="0"
+              value={actualCash}
+              onChange={(e) => setActualCash(e.target.value)}
+              className="h-10"
+            />
           </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Keyingi smenaga kassada qoldiriladi</label>
+            <Input
+              type="number"
+              min="0"
+              max={countedCash}
+              value={cashLeft}
+              onChange={(e) => setCashLeft(e.target.value)}
+              className="h-10"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Qolgan naqd pul Budget hisobiga topshirilgan deb yoziladi.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <SummaryRow label="Budgetga naqd topshiriladi" value={formatUZS(Math.max(0, budgetCashSubmitted))} bold />
+            <SummaryRow label="Kassada qoladi" value={formatUZS(leftForNextShift)} />
+          </div>
+          {splitInvalid && (
+            <div className="rounded-xl px-3 py-2.5 text-sm font-medium bg-red-50 text-destructive">
+              Keyingi smenaga qoldiriladigan pul sanalgan naqd puldan oshmasligi kerak.
+            </div>
+          )}
           <div className={`rounded-xl px-3 py-2.5 text-sm font-medium ${difference === 0 ? 'bg-emerald-50 text-emerald-700' : difference > 0 ? 'bg-primary/10 text-primary-strong' : 'bg-red-50 text-destructive'}`}>
-            Difference: {difference > 0 ? '+' : ''}{formatUZS(difference)}
+            Farq: {difference > 0 ? '+' : ''}{formatUZS(difference)}
+          </div>
+          <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-xs text-muted-foreground">
+            Uzcard, Humo, onlayn va bank tushumlari smena yopilganda Budgetdagi o‘z hisoblariga avtomatik qo‘shiladi.
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
-          <Button onClick={submit} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button onClick={submit} disabled={loading || splitInvalid} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             {loading ? 'Yopilmoqda…' : 'Smenani yopish'}
           </Button>
         </DialogFooter>
