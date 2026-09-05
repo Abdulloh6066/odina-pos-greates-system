@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Ticket, Plus, Pencil, Trash2 } from 'lucide-react';
-import { formatNum, canAccess, logAction } from '@/lib/pos';
+import { formatNum, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 
 export default function DiscountCodes() {
   const { user } = useOutletContext();
+  const canManage = ['admin', 'accountant'].includes(user?.role);
   const [codes, setCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -37,7 +38,7 @@ export default function DiscountCodes() {
         title="Discount Codes"
         subtitle={`${codes.length} codes`}
         icon={Ticket}
-        actions={canAccess(user?.role, 'discounts') && (
+        actions={canManage && (
           <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             <Plus className="w-4 h-4 mr-1.5" /> Add code
           </Button>
@@ -56,7 +57,7 @@ export default function DiscountCodes() {
                 <div className="font-semibold font-mono truncate">{c.code}</div>
                 <div className="text-xs text-muted-foreground">{c.percentage}% off · used {formatNum(c.usage_count || 0)}× · {c.active ? 'Active' : 'Inactive'}</div>
               </div>
-              {canAccess(user?.role, 'discounts') && (
+              {canManage && (
                 <div className="flex gap-1">
                   <button onClick={() => { setEditing(c); setOpen(true); }} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary"><Pencil className="w-4 h-4" /></button>
                   <button onClick={() => remove(c)} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
