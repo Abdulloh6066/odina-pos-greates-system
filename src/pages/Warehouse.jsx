@@ -81,7 +81,14 @@ export default function Warehouse() {
         base44.entities.StockMovement.list('-created_at', 500),
         user?.role === 'warehouse'
           ? Promise.resolve({ data: { transfers: [] } })
-          : base44.functions.invoke('stock-transfer', { action: 'list_transfers' }),
+          : base44.functions.invoke('stock-transfer', { action: 'list_transfers' }).catch(async (error) => {
+            console.warn('Transferlarni yuklash vaqtincha ishlamadi.', error);
+            if (user?.role === 'admin') {
+              const fallbackTransfers = await base44.entities.StockTransfer.list('-sent_at', 500).catch(() => []);
+              return { data: { transfers: fallbackTransfers, fallback: true } };
+            }
+            return { data: { transfers: [], fallback: true } };
+          }),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
       const activeLocations = (locationList || []).filter((location) => location.active !== false);
@@ -112,7 +119,7 @@ export default function Warehouse() {
         setSelectedLocation(preferred);
       }
     } catch (error) {
-      alert('Omborni yuklab bo‘lmadi: ' + (error?.message || error));
+      alert('Omborni yuklab bo‘lmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
     } finally {
       setLoading(false);
     }
