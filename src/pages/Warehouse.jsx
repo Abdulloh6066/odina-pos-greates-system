@@ -104,6 +104,29 @@ export default function Warehouse() {
   useEffect(() => { if (user) load(); }, [user]);
 
   useEffect(() => {
+    if (!user || user.role === 'warehouse') return undefined;
+
+    const unsubscribe = base44.entities.StockTransfer.subscribe((event) => {
+      const recordId = event?.data?.id || event?.id;
+      if (!recordId) return;
+
+      setTransfers((current) => {
+        if (event.type === 'delete') {
+          return current.filter((transfer) => transfer.id !== recordId);
+        }
+
+        const existing = current.find((transfer) => transfer.id === recordId);
+        const nextRecord = { ...(existing || {}), ...(event.data || {}), id: recordId };
+        return existing
+          ? current.map((transfer) => transfer.id === recordId ? nextRecord : transfer)
+          : [nextRecord, ...current];
+      });
+    });
+
+    return () => unsubscribe?.();
+  }, [user?.id, user?.role]);
+
+  useEffect(() => {
     if (requestedTab && tabAllowed(requestedTab) && requestedTab !== tab) {
       setTab(requestedTab);
       setSearch('');
