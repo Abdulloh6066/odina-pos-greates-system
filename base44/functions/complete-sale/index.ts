@@ -15,30 +15,38 @@ const money = (value: unknown) => Math.round(Number(value) || 0);
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
+const constantTimeEqual = (left: string, right: string) => {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+};
+
 async function verifyOwnerPin(service: any, pinValue: unknown) {
   const pin = String(pinValue || "");
   if (!/^\d{4,8}$/.test(pin)) return false;
   const records = await service.entities.SecuritySettings.filter({ key: "owner_approval_pin" });
   const security = records?.[0];
-  if (!security?.pin_hash || !security?.pin_salt) return false;
+  if (
+    !security?.pin_hash ||
+    !security?.pin_salt ||
+    security.pin_algorithm !== "PBKDF2-SHA256"
+  ) return false;
 
-  if (security.pin_algorithm === "PBKDF2-SHA256") {
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"],
-    );
-    const derived = await crypto.subtle.deriveBits({
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: new TextEncoder().encode(security.pin_salt),
-      iterations: Number(security.pin_iterations || 100000),
-    }, key, 256);
-    return hex(new Uint8Array(derived)) === security.pin_hash;
-  }
-
-  const digest = await crypto.subtle.digest(
-    "SHA-256", new TextEncoder().encode(`${security.pin_salt}:${pin}`),
+  const configuredIterations = Number(security.pin_iterations || 100000);
+  const iterations = Math.min(Math.max(configuredIterations, 100000), 600000);
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"],
   );
-  return hex(new Uint8Array(digest)) === security.pin_hash;
+  const derived = await crypto.subtle.deriveBits({
+    name: "PBKDF2",
+    hash: "SHA-256",
+    salt: new TextEncoder().encode(security.pin_salt),
+    iterations,
+  }, key, 256);
+  return constantTimeEqual(hex(new Uint8Array(derived)), String(security.pin_hash));
 }
 
 export default async function(req) {
