@@ -1,6 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
-const ALLOWED_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
+const TRANSFER_VIEW_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
+const TRANSFER_ACTION_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
 
 const cleanNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -89,12 +90,36 @@ export default async function(req) {
   try {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
-    if (!ALLOWED_ROLES.has(user.role)) {
-      return Response.json({ error: "Sizda transfer bilan ishlash huquqi yo‘q." }, { status: 403 });
-    }
 
     const body = await req.json();
     const action = String(body?.action || "");
+    const allowedRoles = action === "list_transfers" ? TRANSFER_VIEW_ROLES : TRANSFER_ACTION_ROLES;
+    if (!allowedRoles.has(user.role)) {
+      return Response.json({ error: "Sizda transfer bilan ishlash huquqi yo‘q." }, { status: 403 });
+    }
+
+    if (action === "list_transfers") {
+      const canViewAllLocations = user.role === "admin" || user.role === "manager";
+      const effectiveLocationId = canViewAllLocations ? "" : String(user.shop_id || "");
+
+      if (!canViewAllLocations && !effectiveLocationId) {
+        return Response.json({ error: "Xodimga do‘kon biriktirilmagan." }, { status: 400 });
+      }
+
+      const allTransfers = await service.entities.StockTransfer.list("-sent_at", 500);
+      const transfers = effectiveLocationId
+        ? (allTransfers || []).filter((transfer: any) =>
+          transfer.source_location_id === effectiveLocationId
+          || transfer.destination_location_id === effectiveLocationId
+        )
+        : (allTransfers || []);
+
+      return Response.json({
+        transfers,
+        effective_location_id: effectiveLocationId || null,
+        effective_location_name: canViewAllLocations ? null : (user.shop_name || null),
+      });
+    }
 
     if (action === "create_transfer") {
       if (user.role !== "admin") {
