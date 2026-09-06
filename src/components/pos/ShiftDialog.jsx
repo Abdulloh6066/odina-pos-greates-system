@@ -101,7 +101,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Smenani yopish</DialogTitle>
         </DialogHeader>
