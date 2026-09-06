@@ -216,6 +216,8 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
     return categoryMatches && searchMatches;
   });
   const available = Number(stockByProduct[productId] || 0);
+  const transferAmount = Number(quantity);
+  const quantityValid = Number.isInteger(transferAmount) && transferAmount > 0 && transferAmount <= available;
 
   const resetAndClose = () => {
     if (saving) return;
@@ -229,8 +231,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
   };
 
   const send = async () => {
-    const amount = Number(quantity);
-    if (!destinationId || !productId || !Number.isInteger(amount) || amount <= 0 || amount > available) return;
+    if (!destinationId || !productId || !quantityValid) return;
     setSaving(true);
     try {
       const result = await base44.functions.invoke('stock-transfer', {
@@ -238,12 +239,14 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
         source_location_id: source.id,
         destination_location_id: destinationId,
         product_id: productId,
-        quantity: amount,
+        quantity: transferAmount,
         notes: notes.trim(),
       });
       const payload = result?.data || result;
       if (!payload?.transfer) throw new Error(payload?.error || 'Transferni yaratib bo‘lmadi.');
       setDestinationId('');
+      setCategoryId('all');
+      setProductSearch('');
       setProductId('');
       setQuantity('');
       setNotes('');
@@ -337,12 +340,17 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
                 Markazda mavjud: {formatNum(available)} dona. Transfer yaratish uchun 1–{formatNum(available)} oralig‘idagi butun sonni kiriting.
               </p>
             )}
+            {quantity && !quantityValid && (
+              <p className="text-xs text-destructive mt-1.5">
+                Miqdor 1 dan {formatNum(available)} gacha bo‘lgan butun son bo‘lishi kerak.
+              </p>
+            )}
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Masalan: ertalabki yetkazib berish" rows={2} />
           </div>
-          {productId && quantity && (
+          {productId && quantityValid && (
             <div className="rounded-xl bg-secondary/60 p-3 text-sm flex items-center justify-between">
               <span className="text-muted-foreground">Jo‘natilgandan keyin markazda</span>
               <span className={`font-semibold ${Number(quantity) > available ? 'text-destructive' : ''}`}>
@@ -354,7 +362,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
 
         <DialogFooter>
           <Button variant="outline" onClick={resetAndClose} disabled={saving}>Bekor qilish</Button>
-          <Button onClick={send} disabled={saving || !destinationId || !productId || !quantity || Number(quantity) > available} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+          <Button onClick={send} disabled={saving || !destinationId || !productId || !quantityValid} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             <Send className="w-4 h-4 mr-1.5" />
             {saving ? 'Jo‘natilmoqda…' : 'Transferni jo‘natish'}
           </Button>
