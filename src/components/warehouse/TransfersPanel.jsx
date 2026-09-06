@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, PackageCheck, Send, Truck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, PackageCheck, RefreshCw, Search, Send, Truck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
@@ -74,11 +74,16 @@ export default function TransfersPanel({
             Markaz jo‘natadi, do‘kon qabul qilgandan keyin uning qoldig‘iga qo‘shiladi.
           </p>
         </div>
-        {canSend && (
-          <Button onClick={() => setSendOpen(true)} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
-            <Send className="w-4 h-4 mr-1.5" /> Yangi transfer
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button type="button" variant="outline" onClick={onReload} className="min-h-11 rounded-xl touch-manipulation">
+            <RefreshCw className="w-4 h-4 mr-1.5" /> Yangilash
           </Button>
-        )}
+          {canSend && (
+            <Button onClick={() => setSendOpen(true)} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+              <Send className="w-4 h-4 mr-1.5" /> Yangi transfer
+            </Button>
+          )}
+        </div>
       </div>
 
       <section>
@@ -178,6 +183,8 @@ function TransferCard({ transfer, canReceive, receiving, onReceive }) {
 
 function SendTransferDialog({ open, onClose, source, locations, products, productStock, onSaved }) {
   const [destinationId, setDestinationId] = useState('');
+  const [categoryId, setCategoryId] = useState('all');
+  const [productSearch, setProductSearch] = useState('');
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
@@ -190,11 +197,31 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
       .map((stock) => [stock.product_id, Number(stock.quantity || 0)]),
   );
   const availableProducts = products.filter((product) => Number(stockByProduct[product.id] || 0) > 0);
+  const categories = Array.from(new Map(
+    availableProducts
+      .filter((product) => product.category_id || product.category_name)
+      .map((product) => [
+        product.category_id || product.category_name,
+        product.category_name || 'Kategoriyasiz',
+      ]),
+  ).entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'uz'));
+  const normalizedProductSearch = productSearch.toLowerCase().trim();
+  const filteredProducts = availableProducts.filter((product) => {
+    const productCategoryId = product.category_id || product.category_name;
+    const categoryMatches = categoryId === 'all' || productCategoryId === categoryId;
+    const searchMatches = !normalizedProductSearch
+      || [product.name, product.category_name].filter(Boolean).join(' ').toLowerCase().includes(normalizedProductSearch);
+    return categoryMatches && searchMatches;
+  });
   const available = Number(stockByProduct[productId] || 0);
 
   const resetAndClose = () => {
     if (saving) return;
     setDestinationId('');
+    setCategoryId('all');
+    setProductSearch('');
     setProductId('');
     setQuantity('');
     setNotes('');
@@ -244,19 +271,72 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
               {destinations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs mb-1.5 block">Kategoriya</Label>
+              <select
+                value={categoryId}
+                onChange={(event) => {
+                  setCategoryId(event.target.value);
+                  setProductId('');
+                  setQuantity('');
+                }}
+                className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
+              >
+                <option value="all">Barcha kategoriyalar</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={productSearch}
+                  onChange={(event) => {
+                    setProductSearch(event.target.value);
+                    setProductId('');
+                    setQuantity('');
+                  }}
+                  placeholder="Masalan: Almond"
+                  className="h-11 pl-9"
+                />
+              </div>
+            </div>
+          </div>
           <div>
             <Label className="text-xs mb-1.5 block">Mahsulot</Label>
             <select value={productId} onChange={(event) => { setProductId(event.target.value); setQuantity(''); }} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
               <option value="">Mahsulotni tanlang</option>
-              {availableProducts.map((product) => (
+              {filteredProducts.map((product) => (
                 <option key={product.id} value={product.id}>{product.name} · {formatNum(stockByProduct[product.id])} dona mavjud</option>
               ))}
             </select>
+            {filteredProducts.length === 0 && (
+              <p className="text-xs text-destructive mt-1.5">Bu kategoriya yoki qidiruv bo‘yicha qoldiqli mahsulot topilmadi.</p>
+            )}
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Jo‘natiladigan miqdor (dona)</Label>
-            <Input type="number" min="1" step="1" max={available || undefined} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
-            {productId && <p className="text-xs text-muted-foreground mt-1.5">Markazda mavjud: {formatNum(available)} dona</p>}
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max={available || undefined}
+              step="1"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              placeholder={productId ? `1 dan ${formatNum(available)} gacha` : 'Avval mahsulotni tanlang'}
+              disabled={!productId}
+              className="h-11 rounded-xl"
+            />
+            {productId && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Markazda mavjud: {formatNum(available)} dona. Transfer yaratish uchun 1–{formatNum(available)} oralig‘idagi butun sonni kiriting.
+              </p>
+            )}
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
