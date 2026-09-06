@@ -77,6 +77,29 @@ export default function POS() {
 
   useEffect(() => { if (user) loadAll(); }, [user]);
 
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const unsubscribe = base44.entities.ProductStock.subscribe((event) => {
+      const recordId = event?.data?.id || event?.id;
+      if (!recordId) return;
+
+      setProductStock((current) => {
+        if (event.type === 'delete') {
+          return current.filter((stock) => stock.id !== recordId);
+        }
+
+        const existing = current.find((stock) => stock.id === recordId);
+        const nextRecord = { ...(existing || {}), ...(event.data || {}), id: recordId };
+        return existing
+          ? current.map((stock) => stock.id === recordId ? nextRecord : stock)
+          : [nextRecord, ...current];
+      });
+    });
+
+    return () => unsubscribe?.();
+  }, [user?.id]);
+
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.subtotal, 0), [cart]);
   const discount = useMemo(() => Math.round(subtotal * discountPct / 100), [subtotal, discountPct]);
   const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
