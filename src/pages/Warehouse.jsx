@@ -72,26 +72,43 @@ export default function Warehouse() {
   const load = async () => {
     setLoading(true);
     try {
-      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferList, recipientList] = await Promise.all([
+      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferResponse, recipientList] = await Promise.all([
         base44.entities.Shop.list(),
         base44.entities.Ingredient.list('name', 500),
         user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.Product.list('name', 500),
         base44.entities.IngredientStock.list('-updated_at', 500),
         user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.ProductStock.list('-updated_at', 500),
         base44.entities.StockMovement.list('-created_at', 500),
-        user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.StockTransfer.list('-sent_at', 500),
+        user?.role === 'warehouse'
+          ? Promise.resolve({ data: { transfers: [] } })
+          : base44.functions.invoke('stock-transfer', { action: 'list_transfers' }),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
-      setLocations((locationList || []).filter((location) => location.active !== false));
+      const activeLocations = (locationList || []).filter((location) => location.active !== false);
+      const transferPayload = transferResponse?.data || transferResponse;
+      const transferList = transferPayload?.transfers || [];
+
+      setLocations(activeLocations);
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
       setProducts((productList || []).filter((item) => item.active !== false && item.archived !== true && item.track_stock !== false));
       setIngredientStock(ingredientBalances || []);
       setProductStock(productBalances || []);
       setMovements(movementList || []);
-      setTransfers(transferList || []);
+      setTransfers(transferList);
       setRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
-      if (!selectedLocation) {
-        const preferred = user?.shop_id || locationList?.[0]?.id || '';
+
+      const canChooseLocation = ['admin', 'manager'].includes(user?.role);
+      if (!canChooseLocation) {
+        const effectiveLocation = transferPayload?.effective_location_id
+          || activeLocations.find((location) => location.id === user?.shop_id)?.id
+          || activeLocations[0]?.id
+          || user?.shop_id
+          || '';
+        if (effectiveLocation && effectiveLocation !== selectedLocation) {
+          setSelectedLocation(effectiveLocation);
+        }
+      } else if (!selectedLocation || !activeLocations.some((location) => location.id === selectedLocation)) {
+        const preferred = user?.shop_id || activeLocations[0]?.id || '';
         setSelectedLocation(preferred);
       }
     } catch (error) {
