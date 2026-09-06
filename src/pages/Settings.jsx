@@ -66,39 +66,16 @@ export default function Settings() {
     if (ownerPin !== confirmPin) return alert('PIN kodlar bir xil emas.');
     setSavingPin(true);
     try {
-      const saltBytes = crypto.getRandomValues(new Uint8Array(24));
-      const salt = Array.from(saltBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-      const iterations = 100000;
-      const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        new TextEncoder().encode(ownerPin),
-        'PBKDF2',
-        false,
-        ['deriveBits'],
-      );
-      const derived = await crypto.subtle.deriveBits(
-        { name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations },
-        keyMaterial,
-        256,
-      );
-      const pinHash = Array.from(new Uint8Array(derived), (byte) => byte.toString(16).padStart(2, '0')).join('');
-      const payload = {
-        key: 'owner_approval_pin',
-        pin_hash: pinHash,
-        pin_salt: salt,
-        pin_algorithm: 'PBKDF2-SHA256',
-        pin_iterations: iterations,
-        pin_updated_at: new Date().toISOString(),
-        pin_updated_by: user.id,
-      };
-      const existing = await base44.entities.SecuritySettings.filter({ key: 'owner_approval_pin' });
-      if (existing?.[0]) await base44.entities.SecuritySettings.update(existing[0].id, payload);
-      else await base44.entities.SecuritySettings.create(payload);
+      await base44.functions.invoke('set-owner-pin', { pin: ownerPin });
       setOwnerPin('');
       setConfirmPin('');
       alert('Egasi tasdiqlash PIN kodi xavfsiz saqlandi.');
-    } catch (e) { alert('PIN kodni saqlashda xato: ' + (e?.message || e)); }
-    finally { setSavingPin(false); }
+    } catch (e) {
+      const message = e?.response?.data?.error || e?.message || e;
+      alert('PIN kodni saqlashda xato: ' + message);
+    } finally {
+      setSavingPin(false);
+    }
   };
 
   const addShop = async () => {
