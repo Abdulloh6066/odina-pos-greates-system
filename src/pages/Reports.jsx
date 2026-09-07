@@ -6,7 +6,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { formatUZS, formatNum, isSameDay } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 
-const PAY_COLORS = { cash: 'hsl(38 95% 72%)', uzcard: 'hsl(173 58% 39%)', humo: 'hsl(197 37% 40%)', click: 'hsl(27 87% 67%)', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
+const PAY_COLORS = { cash: 'hsl(var(--primary))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
 const PAY_LABELS = { cash: 'Naqd pul', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
 
 export default function Reports() {
@@ -67,12 +67,12 @@ export default function Reports() {
           <Panel title="Savdo — oxirgi 7 kun">
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={last7} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(38 95% 72%)" stopOpacity={0.5} /><stop offset="100%" stopColor="hsl(38 95% 72%)" stopOpacity={0} /></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(36 18% 90%)" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(30 8% 42%)" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(30 8% 42%)" tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(36 18% 88%)' }} />
-                <Area type="monotone" dataKey="total" stroke="hsl(36 85% 58%)" strokeWidth={2} fill="url(#g)" />
+                <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.5} /><stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))' }} />
+                <Area type="monotone" dataKey="total" stroke="hsl(var(--brand-ink))" strokeWidth={2} fill="url(#g)" />
               </AreaChart>
             </ResponsiveContainer>
           </Panel>
@@ -83,7 +83,7 @@ export default function Reports() {
                 <Pie data={byMethod} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} innerRadius={45}>
                   {byMethod.map((m) => <Cell key={m.name} fill={PAY_COLORS[m.name] || 'hsl(0 0% 60%)'} />)}
                 </Pie>
-                <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(36 18% 88%)' }} />
+                <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))' }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-wrap gap-3 justify-center mt-2">
@@ -96,11 +96,11 @@ export default function Reports() {
           <Panel title="Do‘konlar bo‘yicha savdo" className="lg:col-span-2">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={byShop} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(36 18% 90%)" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(30 8% 42%)" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(30 8% 42%)" tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-                <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(36 18% 88%)' }} />
-                <Bar dataKey="total" fill="hsl(38 95% 72%)" radius={[8, 8, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))' }} />
+                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Panel>
