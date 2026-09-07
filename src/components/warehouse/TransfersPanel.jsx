@@ -21,10 +21,12 @@ export default function TransfersPanel({
   const [receivingId, setReceivingId] = useState('');
   const canSend = user?.role === 'admin' && location?.location_type === 'production';
   const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
+  const effectiveLocationId = location?.id || assignedShopId;
   const normalizedSearch = search.toLowerCase().trim();
 
   const visibleTransfers = useMemo(() => transfers.filter((transfer) => {
-    const belongs = transfer.source_location_id === location?.id || transfer.destination_location_id === location?.id;
+    const belongs = transfer.source_location_id === effectiveLocationId
+      || transfer.destination_location_id === effectiveLocationId;
     if (!belongs) return false;
     if (!normalizedSearch) return true;
     return [
@@ -35,14 +37,14 @@ export default function TransfersPanel({
       transfer.created_by_name,
       transfer.received_by_name,
     ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch);
-  }), [transfers, location?.id, normalizedSearch]);
+  }), [transfers, effectiveLocationId, normalizedSearch]);
 
   const pending = visibleTransfers.filter((transfer) => transfer.status !== 'received');
   const completed = visibleTransfers.filter((transfer) => transfer.status === 'received');
 
   const canReceive = (transfer) => user?.role !== 'manager'
     && transfer.status === 'pending'
-    && transfer.destination_location_id === location?.id
+    && transfer.destination_location_id === effectiveLocationId
     && (user?.role === 'admin' || assignedShopId === transfer.destination_location_id);
 
   const receive = async (transfer) => {
