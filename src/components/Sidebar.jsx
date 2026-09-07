@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
@@ -109,7 +109,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
           {children.map((child) => {
             const ChildIcon = child.icon || Circle;
             return (
-              <NavLink
+              <Link
                 key={child.key}
                 to={child.path}
                 onClick={onClose}
@@ -118,7 +118,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
               >
                 <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
                 <span className="min-w-0 break-words">{child.label}</span>
-              </NavLink>
+              </Link>
             );
           })}
         </div>
