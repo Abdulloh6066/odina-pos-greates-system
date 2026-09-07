@@ -47,6 +47,13 @@ const MOVEMENT_LABELS = {
   receipt_cancel: 'Kirim bekor qilindi',
 };
 
+export function resolveWarehouseTab(requestedTab, role) {
+  const allowedTabs = TABS.filter((item) => !item.roles || item.roles.includes(role));
+  return allowedTabs.some((item) => item.id === requestedTab)
+    ? requestedTab
+    : (allowedTabs[0]?.id || 'ingredients');
+}
+
 export default function Warehouse() {
   const { user } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,8 +69,7 @@ export default function Warehouse() {
   const requestedTab = searchParams.get('tab');
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
-  const tabAllowed = (value) => visibleTabs.some((item) => item.id === value);
-  const tab = tabAllowed(requestedTab) ? requestedTab : (visibleTabs[0]?.id || 'ingredients');
+  const tab = resolveWarehouseTab(requestedTab, user?.role);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadWarning, setLoadWarning] = useState('');
