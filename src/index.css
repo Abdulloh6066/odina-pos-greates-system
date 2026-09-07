@@ -6,55 +6,60 @@
 
 @layer base {
   :root {
-    --background: 36 33% 98%;
-    --foreground: 20 14% 12%;
+    --background: 46.66667 39.13043% 95.49020%;
+    --foreground: 40 18.98734% 15.49020%;
     --card: 0 0% 100%;
-    --card-foreground: 20 14% 12%;
+    --card-foreground: 40 18.98734% 15.49020%;
     --popover: 0 0% 100%;
-    --popover-foreground: 20 14% 12%;
-    --primary: 38 95% 72%;
-    --primary-foreground: 20 20% 16%;
-    --primary-strong: 36 85% 58%;
-    --secondary: 36 30% 94%;
+    --popover-foreground: 40 18.98734% 15.49020%;
+    --primary: 37.38462 98.48485% 74.11765%;
+    --primary-foreground: 40 18.98734% 15.49020%;
+    /* Logo palette: #FECD7C honey, #ACA95D olive, #D0B17F sand. */
+    --primary-strong: 37.03704 46.28571% 65.68627%;
+    --brand-olive: 57.72152 32.24490% 51.96078%;
+    --brand-sand: 37.03704 46.28571% 65.68627%;
+    --brand-ink: 39.64286 37.83784% 29.01961%;
+    --secondary: 48 34.88372% 91.56863%;
     --secondary-foreground: 20 14% 12%;
     --muted: 36 20% 95%;
-    --muted-foreground: 30 8% 42%;
-    --accent: 38 95% 72%;
+    --muted-foreground: 41.05263 9.64467% 38.62745%;
+    --accent: 48 34.88372% 91.56863%;
     --accent-foreground: 20 20% 16%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 36 18% 88%;
-    --input: 36 18% 88%;
-    --ring: 38 95% 72%;
-    --chart-1: 38 95% 72%;
+    --border: 42.85714 28% 85.29412%;
+    --input: 40 14% 60%;
+    --ring: 39.64286 37.83784% 29.01961%;
+    --chart-1: var(--primary);
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 40%;
-    --chart-4: 43 74% 60%;
-    --chart-5: 27 87% 60%;
+    --chart-4: var(--brand-olive);
+    --chart-5: var(--brand-sand);
     --radius: 0.75rem;
     --font-heading: 'Playfair Display', ui-serif, Georgia, serif;
     --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-display: 'Playfair Display', ui-serif, Georgia, serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    --sidebar-background: 30 22% 99%;
+    --sidebar-background: 40 42.85714% 98.62745%;
     --sidebar-foreground: 20 14% 12%;
-    --sidebar-primary: 38 95% 72%;
-    --sidebar-primary-foreground: 20 20% 16%;
-    --sidebar-accent: 36 30% 94%;
+    --sidebar-primary: var(--brand-olive);
+    --sidebar-primary-foreground: 40 18.98734% 15.49020%;
+    --sidebar-accent: 48 34.88372% 91.56863%;
     --sidebar-accent-foreground: 20 14% 12%;
     --sidebar-border: 36 18% 90%;
-    --sidebar-ring: 38 95% 72%;
+    --sidebar-ring: var(--ring);
   }
 
   .dark {
+    --brand-ink: 37.03704 46.28571% 65.68627%;
     --background: 20 14% 9%;
     --foreground: 36 30% 96%;
     --card: 20 14% 12%;
     --card-foreground: 36 30% 96%;
     --popover: 20 14% 12%;
     --popover-foreground: 36 30% 96%;
-    --primary: 38 95% 72%;
-    --primary-foreground: 20 20% 16%;
+    --primary: 37.38462 98.48485% 74.11765%;
+    --primary-foreground: 40 18.98734% 15.49020%;
     --secondary: 20 10% 18%;
     --secondary-foreground: 36 30% 96%;
     --muted: 20 10% 18%;
@@ -65,15 +70,15 @@
     --destructive-foreground: 0 0% 98%;
     --border: 20 10% 20%;
     --input: 20 10% 20%;
-    --ring: 38 95% 72%;
+    --ring: 57.72152 32.24490% 51.96078%;
     --sidebar-background: 20 14% 11%;
     --sidebar-foreground: 36 30% 96%;
-    --sidebar-primary: 38 95% 72%;
-    --sidebar-primary-foreground: 20 20% 16%;
+    --sidebar-primary: var(--brand-olive);
+    --sidebar-primary-foreground: 40 18.98734% 15.49020%;
     --sidebar-accent: 20 10% 18%;
     --sidebar-accent-foreground: 36 30% 96%;
     --sidebar-border: 20 10% 20%;
-    --sidebar-ring: 38 95% 72%;
+    --sidebar-ring: var(--ring);
   }
 }
 
@@ -85,13 +90,15 @@
   body {
     @apply bg-background text-foreground font-body antialiased;
     min-width: 320px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
   }
 
-  button, [role='button'], input, select {
+  button, [role='button'], a, input, select, textarea {
     -webkit-tap-highlight-color: transparent;
   }
 
-  button:focus-visible, [role='button']:focus-visible, input:focus-visible, select:focus-visible {
+  button:focus-visible, [role='button']:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
   }
@@ -103,6 +110,15 @@
 }
 
 @layer utilities {
+  .brand-mark {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--brand-sand)));
+  }
+  .brand-surface {
+    background: linear-gradient(135deg, hsl(var(--brand-olive) / 0.10), hsl(var(--brand-sand) / 0.12));
+  }
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
@@ -130,6 +146,24 @@
   }
   .premium-shadow-lg {
     box-shadow: 0 4px 12px -4px rgba(60, 40, 20, 0.08), 0 24px 48px -16px rgba(60, 40, 20, 0.18);
+  }
+}
+
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
