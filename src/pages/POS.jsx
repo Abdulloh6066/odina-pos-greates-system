@@ -340,11 +340,11 @@ export default function POS() {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-full h-[calc(100dvh-3.5rem)] lg:h-dvh bg-background overflow-x-hidden">
+    <div className="odina-pos flex flex-col w-full max-w-full h-[calc(100dvh-3.5rem)] lg:h-dvh bg-background overflow-x-hidden">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
+      <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
+          <div className="odina-store-icon w-9 h-9 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
             <Building2 className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
@@ -378,7 +378,8 @@ export default function POS() {
         {/* Center: categories + grid */}
         <div className="flex-1 flex min-w-0">
           {/* Category rail */}
-          <div className="hidden md:flex w-44 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
+          <div className="odina-category-rail hidden md:flex w-44 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
+            <p className="odina-category-title">KATEGORIYALAR</p>
             <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="Barchasi" />
             <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
             <div className="h-px bg-border my-2 mx-3" />
@@ -389,7 +390,11 @@ export default function POS() {
 
           <div className="flex-1 flex flex-col min-w-0">
             {/* Search + mobile categories */}
-            <div className="px-4 sm:px-5 pt-4 pb-2 space-y-3">
+            <div className="odina-pos-search px-4 sm:px-5 pt-4 pb-2 space-y-3">
+              <div className="odina-catalog-heading">
+                <h1>Mahsulotlar</h1>
+                {!loadingData && <span>{filtered.length} ta mahsulot</span>}
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input aria-label="Mahsulotlarni qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
@@ -430,7 +435,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="hidden xl:flex w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
+        <div className="odina-cart-wrap hidden xl:flex w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
@@ -449,7 +454,7 @@ export default function POS() {
       </div>
 
       <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
-        <SheetContent side="bottom" className="xl:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
+        <SheetContent side="bottom" className="odina-cart-sheet xl:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
@@ -489,7 +494,7 @@ export default function POS() {
 
 function CatTab({ active, onClick, icon, label }) {
   return (
-    <button type="button" aria-pressed={active} onClick={onClick} className={`flex items-center gap-2.5 px-3 py-3 mx-2 min-h-11 border rounded-xl text-sm font-medium transition-all active:scale-[0.98] touch-manipulation text-left ${active ? 'bg-primary/35 text-brand-ink border-brand-sand' : 'text-muted-foreground hover:bg-secondary border-transparent'}`}>
+    <button type="button" aria-pressed={active} onClick={onClick} className={`odina-category-tab flex items-center gap-2.5 px-3 py-3 mx-2 min-h-11 border rounded-xl text-sm font-medium transition-all active:scale-[0.98] touch-manipulation text-left ${active ? 'bg-primary/35 text-brand-ink border-brand-sand' : 'text-muted-foreground hover:bg-secondary border-transparent'}`}>
       <span className="w-5 flex justify-center">{icon}</span>
       <span className="min-w-0 break-words leading-snug">{label}</span>
     </button>
