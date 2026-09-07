@@ -26,7 +26,7 @@
 .odina-sidebar-content .odina-nav-child[aria-current="page"] { background:#fff2d8; color:#654b25; }
 .odina-sidebar-content .odina-sidebar-account { margin:8px 12px 12px; border:1px solid #e1e1d1; border-radius:18px; background:#ffffffa6; padding:10px; }
 .odina-sidebar-content .odina-user-avatar { background:#e9ead8; color:#4d5231; border:1px solid #d7d9be; }
-.odina-sidebar-toggle { box-shadow:0 2px 8px #4b4b2910; width:32px; height:32px; right:-16px; top:35px; border-color:#e1e1d1; }
+.odina-sidebar-toggle { box-shadow:0 2px 8px #4b4b2910; width:44px; height:44px; right:-22px; top:29px; border-color:#e1e1d1; }
 .odina-mobile-header { background:#f6f5ed; border-color:#e4e2d6; }
 .odina-pos { background:#f8f7f2; color:#302e28; }
 .odina-pos-header { min-height:78px; background:#fffefa; border-color:#e9e5d9; }
@@ -52,7 +52,7 @@
 .odina-product-name { font-size:13px; font-weight:600; min-height:2.5rem; line-height:1.4; }
 .odina-product-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; margin-top:6px; flex-wrap:wrap; }
 .odina-product-price { font-size:15px; font-weight:700; letter-spacing:-0.035em; color:#454831; }
-.odina-product-stock { color:#6b7050; background:#f0f2e7; border-radius:6px; padding:3px 5px; font-size:9px; font-weight:600; }
+.odina-product-stock { color:#6b7050; background:#f0f2e7; border-radius:6px; padding:3px 5px; font-size:11px; font-weight:600; }
 .odina-cart-wrap { padding:16px 16px 16px 4px; border:0; }
 .odina-cart { background:#fffefa; border:1px solid #e5dfd0; border-radius:22px; box-shadow:0 5px 24px -14px #67512638; }
 .odina-cart-header { background:#f3f2e7; border-bottom:1px solid #e5e2d3; padding-top:20px; padding-bottom:18px; }
@@ -96,6 +96,9 @@
 .dark .odina-sidebar-content .odina-nav-link[aria-current="page"],
 .dark .odina-sidebar-content .odina-nav-group[data-active="true"] { color:#292b1b; background:#aca95d; }
 .dark .odina-category-tab[aria-pressed="true"], .dark .odina-sidebar-content .odina-nav-child[aria-current="page"] { color:#fecd7c; background:#54482d; }
+@media (pointer: coarse) {
+  .odina-pos input, .odina-cart input { font-size:16px; min-height:44px; }
+}
 @media print {
   .odina-cart { border:0; box-shadow:none; }
 }
