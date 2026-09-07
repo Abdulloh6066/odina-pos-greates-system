@@ -5,6 +5,25 @@ import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
 
+const APP_ROLES = new Set(['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse']);
+
+const normalizeAppUser = (value) => {
+  if (!value) return value;
+  const nested = value?.data || {};
+  const rootRole = String(value?.role || '');
+  const nestedRole = String(nested?.role || '');
+  const role = APP_ROLES.has(rootRole)
+    ? rootRole
+    : (APP_ROLES.has(nestedRole) ? nestedRole : (rootRole || nestedRole));
+
+  return {
+    ...value,
+    role,
+    shop_id: value?.shop_id || nested?.shop_id || '',
+    shop_name: value?.shop_name || nested?.shop_name || '',
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -103,7 +122,7 @@ export const AuthProvider = ({ children }) => {
         console.warn('Staff assignment check failed:', assignmentError);
       }
 
-      setUser(currentUser);
+      setUser(normalizeAppUser(currentUser));
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);
