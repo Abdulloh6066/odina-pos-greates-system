@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
+import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -229,6 +229,16 @@ export default function Warehouse() {
           </Button>
         )}
       />
+
+      {loadWarning && (
+        <div role="status" className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 flex flex-col sm:flex-row sm:items-center gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />
+          <p className="text-sm flex-1">{loadWarning}</p>
+          <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading} className="shrink-0 bg-card">
+            {loading ? 'Yuklanmoqda…' : 'Qayta yuklash'}
+          </Button>
+        </div>
+      )}
 
       <div className="rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
         <div className="flex flex-col sm:flex-row gap-3">
