@@ -177,20 +177,33 @@ export default async function(req) {
 
       const sourceId = String(body?.source_location_id || "");
       const destinationId = String(body?.destination_location_id || "");
-      const productId = String(body?.product_id || "");
-      const quantity = cleanNumber(body?.quantity);
-      const notes = String(body?.notes || "").trim();
+      const notes = String(body?.notes || "").trim().slice(0, 2000);
+      const rawItems = Array.isArray(body?.items) && body.items.length > 0
+        ? body.items
+        : [{ product_id: body?.product_id, quantity: body?.quantity }];
+      const items = rawItems.map((item: any) => ({
+        product_id: String(item?.product_id || ""),
+        quantity: cleanNumber(item?.quantity),
+      }));
 
-      if (!sourceId || !destinationId || sourceId === destinationId || !productId) {
-        return Response.json({ error: "Markaz, do‘kon va mahsulotni to‘g‘ri tanlang." }, { status: 400 });
+      if (!sourceId || !destinationId || sourceId === destinationId) {
+        return Response.json({ error: "Markaz va qabul qiluvchi do‘konni to‘g‘ri tanlang." }, { status: 400 });
       }
-      if (!Number.isInteger(quantity) || quantity <= 0) {
-        return Response.json({ error: "Transfer miqdori musbat butun dona bo‘lishi kerak." }, { status: 400 });
+      if (items.length < 1 || items.length > 50) {
+        return Response.json({ error: "Bitta transferda 1 tadan 50 tagacha mahsulot turi bo‘lishi mumkin." }, { status: 400 });
       }
-      const [source, destination, product] = await Promise.all([
+      if (items.some((item: any) =>
+        !item.product_id || !Number.isInteger(item.quantity) || item.quantity <= 0
+      )) {
+        return Response.json({ error: "Har bir mahsulot miqdori musbat butun dona bo‘lishi kerak." }, { status: 400 });
+      }
+      if (new Set(items.map((item: any) => item.product_id)).size !== items.length) {
+        return Response.json({ error: "Bir mahsulotni transferga ikki marta qo‘shib bo‘lmaydi." }, { status: 400 });
+      }
+
+      const [source, destination] = await Promise.all([
         service.entities.Shop.get(sourceId),
         service.entities.Shop.get(destinationId),
-        service.entities.Product.get(productId),
       ]);
       if (!source || source.active === false || source.location_type !== "production") {
         return Response.json({ error: "Jo‘natuvchi joy markaziy ishlab chiqarish ombori bo‘lishi kerak." }, { status: 400 });
@@ -198,143 +211,353 @@ export default async function(req) {
       if (!destination || destination.active === false || destination.location_type !== "shop") {
         return Response.json({ error: "Qabul qiluvchi faol do‘kon bo‘lishi kerak." }, { status: 400 });
       }
-      if (!product || product.active === false || product.archived === true || product.track_stock === false) {
-        return Response.json({ error: "Transfer uchun faol ombor mahsuloti topilmadi." }, { status: 404 });
-      }
 
-      const sourceStock = await findStock(service, sourceId, productId);
-      const before = cleanNumber(sourceStock?.quantity || 0);
-      const after = cleanNumber(before - quantity);
-      if (!sourceStock || after < 0) {
-        return Response.json({ error: `Markaziy omborda yetarli qoldiq yo‘q. Mavjud: ${before} dona.` }, { status: 409 });
+      const products = await Promise.all(
+        items.map((item: any) => service.entities.Product.get(item.product_id)),
+      );
+      const sourceStocks = await Promise.all(
+        items.map((item: any) => findStock(service, sourceId, item.product_id)),
+      );
+      const prepared: any[] = [];
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const product = products[index];
+        const sourceStock = sourceStocks[index];
+        if (!product || product.active === false || product.archived === true || product.track_stock === false) {
+          return Response.json({ error: "Transfer ro‘yxatidagi faol ombor mahsulotlaridan biri topilmadi." }, { status: 404 });
+        }
+        const before = cleanNumber(sourceStock?.quantity || 0);
+        const after = cleanNumber(before - item.quantity);
+        if (!sourceStock || after < 0) {
+          return Response.json({
+            error: `${product.name} uchun markaziy omborda qoldiq yetarli emas. Mavjud: ${before} dona.`,
+          }, { status: 409 });
+        }
+        prepared.push({ item, product, sourceStock, before, after });
       }
 
       const now = new Date().toISOString();
-      await changeExistingStock(service, sourceStock, before, after, source, product, user, now);
-      let transfer: any = null;
+      const batchId = crypto.randomUUID();
+      const batchNumber = `TR-${now.slice(0, 10).replaceAll("-", "")}-${batchId.slice(0, 6).toUpperCase()}`;
+      const changedStocks: any[] = [];
+      const createdTransfers: any[] = [];
+      const createdMovements: any[] = [];
+
       try {
-        transfer = await service.entities.StockTransfer.create({
-          transfer_number: `TR-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-          source_location_id: source.id,
-          source_location_name: source.name,
-          destination_location_id: destination.id,
-          destination_location_name: destination.name,
-          product_id: product.id,
-          product_name_snapshot: product.name,
-          quantity,
-          unit: "piece",
-          status: "pending",
-          notes,
-          created_by: user.id,
-          created_by_name: userLabel(user),
-          sent_at: now,
-        });
-        await createMovement(service, {
-          location: source, product, type: "transfer_out", change: -quantity,
-          before, after, transfer, user, now,
-        });
+        for (const row of prepared) {
+          await changeExistingStock(
+            service, row.sourceStock, row.before, row.after, source, row.product, user, now,
+          );
+          changedStocks.push(row);
+        }
+
+        for (let index = 0; index < prepared.length; index += 1) {
+          const row = prepared[index];
+          const transfer = await service.entities.StockTransfer.create({
+            transfer_number: `${batchNumber}-${String(index + 1).padStart(2, "0")}`,
+            batch_id: batchId,
+            batch_number: batchNumber,
+            line_number: index + 1,
+            batch_item_count: prepared.length,
+            source_location_id: source.id,
+            source_location_name: source.name,
+            destination_location_id: destination.id,
+            destination_location_name: destination.name,
+            product_id: row.product.id,
+            product_name_snapshot: row.product.name,
+            quantity: row.item.quantity,
+            unit: "piece",
+            status: "pending",
+            notes,
+            created_by: user.id,
+            created_by_name: userLabel(user),
+            sent_at: now,
+          });
+          createdTransfers.push(transfer);
+          const movement = await createMovement(service, {
+            location: source,
+            product: row.product,
+            type: "transfer_out",
+            change: -row.item.quantity,
+            before: row.before,
+            after: row.after,
+            transfer,
+            user,
+            now,
+          });
+          createdMovements.push(movement);
+        }
       } catch (error) {
-        try {
-          await service.entities.ProductStock.update(sourceStock.id, { quantity: before });
-          if (transfer?.id) await service.entities.StockTransfer.delete(transfer.id);
-        } catch {}
+        for (const movement of [...createdMovements].reverse()) {
+          try {
+            if (movement?.id) await service.entities.StockMovement.delete(movement.id);
+          } catch {}
+        }
+        for (const transfer of [...createdTransfers].reverse()) {
+          try {
+            if (transfer?.id) await service.entities.StockTransfer.delete(transfer.id);
+          } catch {}
+        }
+        for (const row of [...changedStocks].reverse()) {
+          try {
+            await service.entities.ProductStock.updateMany(
+              { id: row.sourceStock.id, quantity: row.after },
+              { $set: { quantity: row.before } },
+            );
+          } catch {}
+        }
         throw error;
       }
 
       try {
+        const totalQuantity = prepared.reduce((sum, row) => sum + row.item.quantity, 0);
+        const productSummary = prepared
+          .slice(0, 5)
+          .map((row) => `${row.product.name}: ${row.item.quantity}`)
+          .join(", ");
+        const more = prepared.length > 5 ? ` va yana ${prepared.length - 5} tur` : "";
         await service.entities.ActionHistory.create({
           user_id: user.id,
           user_name: userLabel(user),
           action: "stock_transfer_sent",
-          details: `${source.name} → ${destination.name}. ${product.name}: ${quantity} dona.`,
+          details: `${source.name} → ${destination.name}. ${prepared.length} tur, ${totalQuantity} dona: ${productSummary}${more}.`,
         });
       } catch {}
 
-      return Response.json({ transfer });
+      return Response.json({
+        transfer: createdTransfers[0],
+        transfers: createdTransfers,
+        batch_id: batchId,
+        batch_number: batchNumber,
+      });
     }
 
-    if (action === "receive_transfer") {
+    if (action === "receive_transfer" || action === "receive_transfer_batch") {
       const transferId = String(body?.transfer_id || "");
-      if (!transferId) return Response.json({ error: "Transfer tanlanmagan." }, { status: 400 });
+      const requestedBatchId = String(body?.batch_id || "");
+      let transferRows: any[] = [];
 
-      const transfer = await service.entities.StockTransfer.get(transferId);
-      if (!transfer) return Response.json({ error: "Transfer topilmadi." }, { status: 404 });
-      if (transfer.status !== "pending") {
-        return Response.json({ error: "Bu transfer allaqachon qabul qilingan yoki qayta ishlanmoqda." }, { status: 409 });
-      }
-      if (role !== "admin" && userShopId(user) !== transfer.destination_location_id) {
-        return Response.json({ error: "Faqat qabul qiluvchi do‘kon xodimi tasdiqlashi mumkin." }, { status: 403 });
+      if (action === "receive_transfer_batch") {
+        if (!requestedBatchId) {
+          return Response.json({ error: "Transfer guruhi tanlanmagan." }, { status: 400 });
+        }
+        transferRows = await service.entities.StockTransfer.filter(
+          { batch_id: requestedBatchId },
+          "line_number",
+          50,
+        );
+      } else {
+        if (!transferId) {
+          return Response.json({ error: "Transfer tanlanmagan." }, { status: 400 });
+        }
+        const selected = await service.entities.StockTransfer.get(transferId);
+        if (selected?.batch_id) {
+          transferRows = await service.entities.StockTransfer.filter(
+            { batch_id: selected.batch_id },
+            "line_number",
+            50,
+          );
+        } else if (selected) {
+          transferRows = [selected];
+        }
       }
 
+      transferRows = (transferRows || []).sort(
+        (a: any, b: any) => cleanNumber(a.line_number || 0) - cleanNumber(b.line_number || 0),
+      );
+      if (transferRows.length === 0) {
+        return Response.json({ error: "Transfer topilmadi." }, { status: 404 });
+      }
+      if (transferRows.length > 50) {
+        return Response.json({ error: "Transferda ruxsat etilgandan ko‘p mahsulot bor." }, { status: 409 });
+      }
+
+      const first = transferRows[0];
+      const batchId = String(first.batch_id || "");
+      const declaredCount = cleanNumber(first.batch_item_count || transferRows.length);
+      if (batchId && declaredCount !== transferRows.length) {
+        return Response.json({
+          error: "Transfer hujjati to‘liq yuklanmadi. Yangilang va qayta urinib ko‘ring.",
+        }, { status: 409 });
+      }
+      if (transferRows.some((transfer: any) =>
+        transfer.source_location_id !== first.source_location_id
+        || transfer.destination_location_id !== first.destination_location_id
+        || String(transfer.batch_id || "") !== batchId
+      )) {
+        return Response.json({ error: "Transfer guruhi ma’lumotlari bir-biriga mos emas." }, { status: 409 });
+      }
+      if (new Set(transferRows.map((transfer: any) => transfer.product_id)).size !== transferRows.length) {
+        return Response.json({ error: "Transfer guruhida takroriy mahsulot topildi." }, { status: 409 });
+      }
+      if (transferRows.some((transfer: any) => transfer.status !== "pending")) {
+        return Response.json({
+          error: "Bu transfer allaqachon qabul qilingan yoki qayta ishlanmoqda.",
+        }, { status: 409 });
+      }
+      if (role !== "admin" && userShopId(user) !== first.destination_location_id) {
+        return Response.json({
+          error: "Faqat qabul qiluvchi do‘kon xodimi tasdiqlashi mumkin.",
+        }, { status: 403 });
+      }
+
+      const [destination, products] = await Promise.all([
+        service.entities.Shop.get(first.destination_location_id),
+        Promise.all(
+          transferRows.map((transfer: any) => service.entities.Product.get(transfer.product_id)),
+        ),
+      ]);
+      if (!destination || destination.active === false || products.some((product: any) => !product)) {
+        return Response.json({ error: "Do‘kon yoki mahsulotlardan biri topilmadi." }, { status: 404 });
+      }
+
+      const destinationStocks = await Promise.all(
+        transferRows.map((transfer: any) =>
+          findStock(service, destination.id, transfer.product_id)
+        ),
+      );
+      const prepared = transferRows.map((transfer: any, index: number) => {
+        const existing = destinationStocks[index];
+        const before = cleanNumber(existing?.quantity || 0);
+        return {
+          transfer,
+          product: products[index],
+          existing,
+          before,
+          after: cleanNumber(before + cleanNumber(transfer.quantity)),
+        };
+      });
+
+      const claimFilter = batchId
+        ? { batch_id: batchId, status: "pending" }
+        : { id: first.id, status: "pending" };
       const claim = await service.entities.StockTransfer.updateMany(
-        { id: transfer.id, status: "pending" },
+        claimFilter,
         { $set: { status: "receiving" } },
       );
-      if (!claim?.success || Number(claim.updated || 0) !== 1) {
-        return Response.json({ error: "Transfer boshqa qurilmada qayta ishlanmoqda." }, { status: 409 });
+      const claimedCount = Number(claim?.updated || 0);
+      if (!claim?.success || claimedCount !== transferRows.length) {
+        if (claimedCount > 0) {
+          try {
+            await service.entities.StockTransfer.updateMany(
+              batchId ? { batch_id: batchId, status: "receiving" } : { id: first.id, status: "receiving" },
+              { $set: { status: "pending" } },
+            );
+          } catch {}
+        }
+        return Response.json({
+          error: "Transfer boshqa qurilmada qayta ishlanmoqda.",
+        }, { status: 409 });
       }
 
       const now = new Date().toISOString();
-      const [destination, product] = await Promise.all([
-        service.entities.Shop.get(transfer.destination_location_id),
-        service.entities.Product.get(transfer.product_id),
-      ]);
-      if (!destination || destination.active === false || !product) {
-        await service.entities.StockTransfer.update(transfer.id, { status: "pending" });
-        return Response.json({ error: "Do‘kon yoki mahsulot topilmadi." }, { status: 404 });
-      }
-
-      const existing = await findStock(service, destination.id, product.id);
-      const before = cleanNumber(existing?.quantity || 0);
-      const after = cleanNumber(before + cleanNumber(transfer.quantity));
-      let createdStock: any = null;
+      const changedStocks: any[] = [];
+      const createdStocks: any[] = [];
+      const createdMovements: any[] = [];
 
       try {
-        if (existing) {
-          await changeExistingStock(service, existing, before, after, destination, product, user, now);
-        } else {
-          createdStock = await service.entities.ProductStock.create({
-            location_id: destination.id,
-            location_name: destination.name,
-            product_id: product.id,
-            product_name: transfer.product_name_snapshot || product.name,
-            unit: "piece",
-            quantity: after,
-            low_stock_level: 0,
-            updated_at: now,
-            updated_by: user.id,
-            updated_by_name: userLabel(user),
+        for (const row of prepared) {
+          if (row.existing) {
+            await changeExistingStock(
+              service, row.existing, row.before, row.after, destination, row.product, user, now,
+            );
+            changedStocks.push(row);
+          } else {
+            const createdStock = await service.entities.ProductStock.create({
+              location_id: destination.id,
+              location_name: destination.name,
+              product_id: row.product.id,
+              product_name: row.transfer.product_name_snapshot || row.product.name,
+              unit: "piece",
+              quantity: row.after,
+              low_stock_level: 0,
+              updated_at: now,
+              updated_by: user.id,
+              updated_by_name: userLabel(user),
+            });
+            createdStocks.push({ ...row, createdStock });
+          }
+
+          const movement = await createMovement(service, {
+            location: destination,
+            product: row.product,
+            type: "transfer_in",
+            change: cleanNumber(row.transfer.quantity),
+            before: row.before,
+            after: row.after,
+            transfer: row.transfer,
+            user,
+            now,
           });
+          createdMovements.push(movement);
         }
 
-        await createMovement(service, {
-          location: destination, product, type: "transfer_in",
-          change: cleanNumber(transfer.quantity), before, after, transfer, user, now,
-        });
-
-        const completed = await service.entities.StockTransfer.update(transfer.id, {
-          status: "received",
-          received_by: user.id,
-          received_by_name: userLabel(user),
-          received_at: now,
-        });
+        const completionFilter = batchId
+          ? { batch_id: batchId, status: "receiving" }
+          : { id: first.id, status: "receiving" };
+        const completion = await service.entities.StockTransfer.updateMany(
+          completionFilter,
+          { $set: {
+            status: "received",
+            received_by: user.id,
+            received_by_name: userLabel(user),
+            received_at: now,
+          } },
+        );
+        if (!completion?.success || Number(completion.updated || 0) !== transferRows.length) {
+          throw new Error("Transfer holatini yakunlab bo‘lmadi.");
+        }
 
         try {
+          const totalQuantity = prepared.reduce(
+            (sum: number, row: any) => sum + cleanNumber(row.transfer.quantity),
+            0,
+          );
           await service.entities.ActionHistory.create({
             user_id: user.id,
             user_name: userLabel(user),
             action: "stock_transfer_received",
-            details: `${destination.name}. ${transfer.product_name_snapshot}: ${transfer.quantity} dona qabul qilindi.`,
+            details: `${destination.name}. ${prepared.length} tur, ${totalQuantity} dona qabul qilindi (${first.batch_number || first.transfer_number}).`,
           });
         } catch {}
 
-        return Response.json({ transfer: completed });
+        const completedTransfers = transferRows.map((transfer: any) => ({
+          ...transfer,
+          status: "received",
+          received_by: user.id,
+          received_by_name: userLabel(user),
+          received_at: now,
+        }));
+        return Response.json({
+          transfer: completedTransfers[0],
+          transfers: completedTransfers,
+          batch_id: batchId || null,
+        });
       } catch (error) {
-        try {
-          if (existing) await service.entities.ProductStock.update(existing.id, { quantity: before });
-          else if (createdStock?.id) await service.entities.ProductStock.delete(createdStock.id);
-          await service.entities.StockTransfer.update(transfer.id, { status: "pending" });
-        } catch {}
+        for (const movement of [...createdMovements].reverse()) {
+          try {
+            if (movement?.id) await service.entities.StockMovement.delete(movement.id);
+          } catch {}
+        }
+        for (const row of [...changedStocks].reverse()) {
+          try {
+            await service.entities.ProductStock.updateMany(
+              { id: row.existing.id, quantity: row.after },
+              { $set: { quantity: row.before } },
+            );
+          } catch {}
+        }
+        for (const row of [...createdStocks].reverse()) {
+          try {
+            if (row.createdStock?.id) await service.entities.ProductStock.delete(row.createdStock.id);
+          } catch {}
+        }
+        for (const transfer of transferRows) {
+          try {
+            await service.entities.StockTransfer.update(transfer.id, { status: "pending" });
+          } catch {}
+        }
         throw error;
       }
     }
