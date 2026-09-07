@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Minus, Plus, Trash2, Ticket, X, Search } from 'lucide-react';
+import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,14 @@ export default function Cart({
   total, onCheckout, disabled,
 }) {
   return (
-    <div className="flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
-      <div className="px-4 py-4 pr-16 xl:pr-4 shrink-0 border-b border-brand-sand/40 brand-surface flex items-center justify-between gap-2">
-        <div>
-          <h2 className="font-display text-lg font-bold">Joriy buyurtma</h2>
-          <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + i.quantity, 0)} ta mahsulot</p>
+    <div className="odina-cart flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
+      <div className="odina-cart-header px-4 py-4 pr-16 xl:pr-4 shrink-0 border-b border-brand-sand/40 brand-surface flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="odina-cart-header-icon" aria-hidden="true"><ReceiptText className="w-4 h-4" /></span>
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-bold">Joriy buyurtma</h2>
+            <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + i.quantity, 0)} ta mahsulot</p>
+          </div>
         </div>
         {cart.length > 0 && (
           <button onClick={onClear} type="button" className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
@@ -26,15 +29,15 @@ export default function Cart({
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-3 space-y-3">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-16">
-            <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
-              <Search className="w-7 h-7 text-muted-foreground/50" />
+            <div className="odina-cart-empty-icon w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
+              <ShoppingBag className="w-7 h-7 text-muted-foreground/50" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground">Hali mahsulot yo‘q</p>
+            <p className="text-sm font-medium text-muted-foreground">Yangi buyurtma kutmoqda</p>
             <p className="text-xs text-muted-foreground mt-1">Buyurtmaga qo‘shish uchun mahsulotni bosing.</p>
           </div>
         ) : (
           cart.map((item) => (
-            <div key={item.product_id} className="min-w-0 rounded-2xl border border-border bg-background/70 p-3 animate-pop-in">
+            <div key={item.product_id} className="odina-cart-line min-w-0 rounded-2xl border border-border bg-background/70 p-3 animate-pop-in">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-card overflow-hidden shrink-0 border border-border/60">
                   {item.image_url ? (
@@ -68,7 +71,7 @@ export default function Cart({
         )}
       </div>
 
-      <div className="border-t border-brand-sand/50 p-4 safe-bottom shrink-0 space-y-3 bg-card">
+      <div className="odina-cart-summary border-t border-brand-sand/50 p-4 safe-bottom shrink-0 space-y-3 bg-card">
         <DiscountRow
           discountCode={discountCode}
           discount={discount}
@@ -86,16 +89,17 @@ export default function Cart({
             <span className="font-medium">−{formatUZS(discount)}</span>
           </div>
         )}
-        <div className="flex items-center justify-between pt-2 border-t border-border">
+        <div className="odina-cart-total flex items-center justify-between pt-2 border-t border-border">
           <span className="font-display text-lg font-bold">Jami</span>
           <span className="text-2xl font-bold tracking-tight text-brand-ink text-right break-words">{formatUZS(total)}</span>
         </div>
         <Button
           onClick={onCheckout}
           disabled={disabled || cart.length === 0}
-          className="w-full min-h-12 h-auto py-3 whitespace-normal text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong disabled:opacity-40"
+          className="odina-checkout w-full min-h-12 h-auto py-3 whitespace-normal text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong disabled:opacity-40"
         >
-          To‘lovga o‘tish · {formatUZS(total)}
+          <span>To‘lovga o‘tish</span>
+          <span className="flex items-center gap-2">{formatUZS(total)} <ArrowUpRight className="w-4 h-4 shrink-0" aria-hidden="true" /></span>
         </Button>
       </div>
     </div>
