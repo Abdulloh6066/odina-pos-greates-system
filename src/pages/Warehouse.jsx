@@ -347,7 +347,7 @@ export default function Warehouse() {
             />
           ) : (
             <>
-              {tab === 'products' && selectedLocationRecord?.location_type === 'production' && (
+              {tab === 'products' && selectedLocationRecord?.location_type === 'production' && visibleTabs.some((item) => item.id === 'production') && (
                 <div className="rounded-2xl border border-primary/35 bg-primary/10 p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   <ChefHat className="w-5 h-5 text-brand-ink shrink-0" />
                   <div className="flex-1">
