@@ -121,7 +121,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
             <SummaryRow label="Jami savdo" value={formatUZS(shift?.total_sales)} bold />
             <SummaryRow label="Boshlang‘ich naqd pul" value={formatUZS(shift?.starting_cash)} />
             <SummaryRow label="Kutilayotgan naqd pul" value={formatUZS(expected)} bold />
-            <SummaryRow label="Buyurtmalar" value={shift?.order_count || 0} />
+            <SummaryRow label="Buyurtmalar" value={`${shift?.order_count || 0} ta`} />
             <SummaryRow label="Kassadan olingan pul" value={formatUZS(shift?.cash_removed)} />
             <SummaryRow label="Qaytarishlar" value={formatUZS(shift?.refunds_total)} />
           </div>
@@ -178,9 +178,9 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
 
 function SummaryRow({ label, value, bold }) {
   return (
-    <div className={`flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2 ${bold ? 'font-semibold' : ''}`}>
+    <div className={`flex flex-col items-start gap-1 rounded-xl bg-secondary/60 px-3 py-2.5 ${bold ? 'font-semibold' : ''}`}>
       <span className="text-muted-foreground text-xs">{label}</span>
-      <span>{typeof value === 'number' ? formatUZS(value) : value}</span>
+      <span className="font-semibold break-words">{typeof value === 'number' ? formatUZS(value) : value}</span>
     </div>
   );
 }
