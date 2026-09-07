@@ -340,9 +340,9 @@ export default function POS() {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-full h-[calc(100dvh-3.5rem)] lg:h-screen bg-background overflow-x-hidden">
+    <div className="flex flex-col w-full max-w-full h-[calc(100dvh-3.5rem)] lg:h-dvh bg-background overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
             <Building2 className="w-4.5 h-4.5" />
@@ -360,10 +360,10 @@ export default function POS() {
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
               <Clock className="w-3.5 h-3.5" /> Smena ochiq
             </div>
-            <Button variant="outline" size="sm" onClick={() => setCashWithdrawalOpen(true)} className="h-10 px-3 touch-manipulation">
+            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" onClick={() => setCashWithdrawalOpen(true)} className="h-10 px-3 touch-manipulation">
               <Banknote className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pul olish</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCloseShiftOpen(true)} className="h-10 px-3 touch-manipulation">
+            <Button variant="outline" size="sm" aria-label="Smenani yopish" onClick={() => setCloseShiftOpen(true)} className="h-10 px-3 touch-manipulation">
               <Clock className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Smenani yopish</span><span className="sm:hidden">Yopish</span>
             </Button>
           </>
@@ -392,7 +392,7 @@ export default function POS() {
             <div className="px-4 sm:px-5 pt-4 pb-2 space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
+                <Input aria-label="Mahsulotlarni qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
                 <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
@@ -403,9 +403,9 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-5 pb-28 xl:pb-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-28 xl:pb-6">
               {loadingData ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
                 </div>
               ) : filtered.length === 0 ? (
@@ -414,7 +414,7 @@ export default function POS() {
                   <p className="text-sm font-medium text-muted-foreground">Mahsulot topilmadi</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
                   {filtered.map((p) => (
                     <ProductCard
                       key={p.id}
@@ -443,7 +443,7 @@ export default function POS() {
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
       <div className={`xl:hidden fixed left-0 ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
-        <Button onClick={() => setMobileCartOpen(true)} className="w-full h-14 text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
+        <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-14 h-auto py-4 whitespace-normal text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>
       </div>
@@ -489,16 +489,16 @@ export default function POS() {
 
 function CatTab({ active, onClick, icon, label }) {
   return (
-    <button onClick={onClick} className={`flex items-center gap-2.5 px-4 py-3 mx-2 rounded-xl text-sm font-medium transition-all active:scale-[0.98] touch-manipulation text-left ${active ? 'bg-primary text-primary-foreground premium-shadow' : 'text-foreground/70 hover:bg-secondary'}`}>
+    <button type="button" aria-pressed={active} onClick={onClick} className={`flex items-center gap-2.5 px-3 py-3 mx-2 min-h-11 border rounded-xl text-sm font-medium transition-all active:scale-[0.98] touch-manipulation text-left ${active ? 'bg-primary/35 text-brand-ink border-brand-sand' : 'text-muted-foreground hover:bg-secondary border-transparent'}`}>
       <span className="w-5 flex justify-center">{icon}</span>
-      <span className="truncate">{label}</span>
+      <span className="min-w-0 break-words leading-snug">{label}</span>
     </button>
   );
 }
 
 function Chip({ active, onClick, children }) {
   return (
-    <button onClick={onClick} className={`whitespace-nowrap min-h-11 px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-[0.98] touch-manipulation ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
+    <button type="button" aria-pressed={active} onClick={onClick} className={`whitespace-nowrap min-h-11 px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-[0.98] touch-manipulation ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
       {children}
     </button>
   );
