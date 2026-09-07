@@ -97,7 +97,7 @@ export default function Warehouse() {
               const fallbackTransfers = await base44.entities.StockTransfer.list('-sent_at', 500).catch(() => []);
               return { data: { transfers: fallbackTransfers, fallback: true } };
             }
-            return { data: { transfers: [], fallback: true } };
+            return { data: { transfers: [], fallback: true, load_failed: true } };
           }),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
@@ -122,6 +122,9 @@ export default function Warehouse() {
       const activeLocations = (locationList || []).filter((location) => location.active !== false);
       const transferPayload = transferResponse?.data || transferResponse;
       const transferList = transferPayload?.transfers || [];
+      if (transferPayload?.load_failed && !failedSections.includes('Transferlar')) {
+        failedSections.push('Transferlar');
+      }
 
       setLocations(activeLocations);
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
