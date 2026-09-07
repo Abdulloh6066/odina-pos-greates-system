@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
@@ -61,10 +62,10 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         onClick={onClose}
         title={collapsed ? item.label : undefined}
         className={({ isActive }) =>
-          `group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
+          `group flex min-h-11 items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
             isActive
-              ? 'bg-primary text-primary-foreground premium-shadow'
-              : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
+              ? 'bg-brand-olive/20 text-foreground shadow-[inset_3px_0_0_hsl(var(--brand-olive))]'
+              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           }`
         }
       >
@@ -76,55 +77,59 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
 
   const renderGroup = ({ item, children, active, open, setOpen, ParentIcon }) => (
     <div key={item.key}>
-      <NavLink
-        to={item.path}
-        onClick={() => {
-          if (collapsed) onToggle();
-          setOpen((current) => collapsed ? true : !current);
-        }}
-        title={collapsed ? item.label : undefined}
-        className={`group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
-          active
-            ? 'bg-primary text-primary-foreground premium-shadow'
-            : 'text-foreground/70 hover:bg-secondary hover:text-foreground'
-        }`}
-      >
-        <ParentIcon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
-        <span className={`flex-1 truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
-        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''} ${collapsed ? 'lg:hidden' : ''}`} />
-      </NavLink>
-
-      <div className={`grid transition-[grid-template-rows,opacity] duration-200 ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'} ${collapsed ? 'lg:hidden' : ''}`}>
-        <div className="overflow-hidden">
-          <div className="ml-5 mt-1 mb-2 pl-3 border-l border-primary/35 space-y-1">
-            {children.map((child) => {
-              const ChildIcon = child.icon || Circle;
-              return (
-                <NavLink
-                  key={child.key}
-                  to={child.path}
-                  onClick={onClose}
-                  className={`flex items-center gap-2.5 min-h-10 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-                    child.active
-                      ? 'bg-primary/15 text-primary-strong'
-                      : 'text-foreground/65 hover:bg-secondary hover:text-foreground'
-                  }`}
-                >
-                  <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
-                  <span className="truncate">{child.label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
+      <div className={`flex items-center rounded-xl border transition-colors ${active ? 'bg-brand-olive/20 border-brand-olive/35 text-foreground' : 'border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
+        <NavLink
+          to={item.path}
+          onClick={() => {
+            if (collapsed) onToggle();
+            setOpen(true);
+            onClose();
+          }}
+          title={collapsed ? item.label : undefined}
+          aria-label={item.label}
+          className={`flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}
+        >
+          <ParentIcon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+          <span className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+        </NavLink>
+        {children.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOpen((current) => !current)}
+            aria-label={`${item.label} bo‘limlarini ${open ? 'yopish' : 'ochish'}`}
+            aria-expanded={open}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brand-olive/15 ${collapsed ? 'lg:hidden' : ''}`}
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
+      {open && children.length > 0 && (
+        <div className={`ml-5 mt-1 mb-2 pl-2 border-l-2 border-brand-sand/60 space-y-1 ${collapsed ? 'lg:hidden' : ''}`}>
+          {children.map((child) => {
+            const ChildIcon = child.icon || Circle;
+            return (
+              <NavLink
+                key={child.key}
+                to={child.path}
+                onClick={onClose}
+                aria-current={child.active ? 'page' : undefined}
+                className={`flex items-center gap-2.5 min-h-11 px-3 py-2 rounded-xl text-[13px] leading-snug font-medium transition-colors ${child.active ? 'bg-primary/25 text-brand-ink' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+              >
+                <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
+                <span className="min-w-0 break-words">{child.label}</span>
+              </NavLink>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       <div className={`py-6 flex items-center gap-3 ${collapsed ? 'px-5 lg:px-3 lg:justify-center' : 'px-5'}`}>
-        <div className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center premium-shadow shrink-0">
+        <div className="w-11 h-11 rounded-2xl brand-mark flex items-center justify-center premium-shadow shrink-0">
           <Cake className="w-6 h-6 text-primary-foreground" strokeWidth={2.2} />
         </div>
         <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
@@ -133,7 +138,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         </div>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin">
+      <nav aria-label="Asosiy menyu" className="flex-1 min-h-0 px-3 pb-3 space-y-1 overflow-y-auto overscroll-contain scrollbar-thin">
         {topItems.map((item) => {
           if (item.key === 'pos') {
             return renderGroup({
@@ -168,14 +173,14 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         })}
       </nav>
 
-      <div className="p-3 border-t border-border">
+      <div className="p-3 safe-bottom border-t border-border bg-brand-sand/10">
         <div className={`flex items-center gap-3 py-2 rounded-xl ${collapsed ? 'px-2 lg:justify-center lg:px-0' : 'px-2'}`}>
           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
             {(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}
           </div>
           <div className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>
             <div className="text-sm font-medium truncate">{user?.full_name || user?.email}</div>
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{role}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{{ admin: 'Egasi', manager: 'Boshqaruvchi', cashier: 'Kassir', accountant: 'Hisobchi', production: 'Ishlab chiqarish', warehouse: 'Omborchi' }[role] || role}</div>
           </div>
         </div>
         <button
@@ -192,26 +197,25 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
 
   return (
     <>
-      <aside className={`relative hidden lg:flex shrink-0 flex-col bg-sidebar border-r border-sidebar-border h-screen sticky top-0 transition-[width] duration-200 ${collapsed ? 'w-20' : 'w-64'}`}>
+      <aside className={`relative hidden lg:flex shrink-0 flex-col bg-sidebar border-r border-sidebar-border h-dvh sticky top-0 transition-[width] duration-200 ${collapsed ? 'w-20' : 'w-64'}`}>
         <button
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? 'Menyuni ochish' : 'Menyuni yopish'}
           title={collapsed ? 'Menyuni ochish' : 'Menyuni yopish'}
-          className="absolute -right-3 top-7 z-20 w-7 h-7 rounded-full border border-sidebar-border bg-card text-foreground/70 shadow-md flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation"
+          className="absolute -right-5 top-6 z-20 w-11 h-11 rounded-full border border-sidebar-border bg-card text-foreground/70 shadow-md flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation"
         >
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
         {content}
       </aside>
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
-          <aside className="absolute left-0 top-0 h-full w-72 bg-sidebar border-r border-sidebar-border shadow-2xl animate-fade-in">
-            {content}
-          </aside>
-        </div>
-      )}
+      <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose()}>
+        <SheetContent side="left" className="w-72 max-w-[calc(100%-2rem)] p-0 bg-sidebar">
+          <SheetTitle className="sr-only">Odina Shop menyusi</SheetTitle>
+          <SheetDescription className="sr-only">Kerakli bo‘limni tanlang.</SheetDescription>
+          {content}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
