@@ -24,6 +24,25 @@ const normalizeAppUser = (value) => {
   };
 };
 
+const hydrateAppUser = async (value) => {
+  const sessionUser = normalizeAppUser(value);
+  if (!sessionUser?.id) return sessionUser;
+
+  try {
+    const storedUser = normalizeAppUser(await base44.entities.User.get(sessionUser.id));
+    return {
+      ...sessionUser,
+      role: APP_ROLES.has(storedUser?.role) ? storedUser.role : sessionUser.role,
+      shop_id: storedUser?.shop_id || sessionUser.shop_id || '',
+      shop_name: storedUser?.shop_name || sessionUser.shop_name || '',
+      active: storedUser?.active ?? sessionUser.active,
+    };
+  } catch (error) {
+    console.warn('Stored user profile could not be refreshed; session profile will be used.', error);
+    return sessionUser;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -122,7 +141,7 @@ export const AuthProvider = ({ children }) => {
         console.warn('Staff assignment check failed:', assignmentError);
       }
 
-      setUser(normalizeAppUser(currentUser));
+      setUser(await hydrateAppUser(currentUser));
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);
