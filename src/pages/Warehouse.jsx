@@ -72,8 +72,9 @@ export default function Warehouse() {
 
   const load = async () => {
     setLoading(true);
+    setLoadWarning('');
     try {
-      const [locationList, ingredientList, productList, ingredientBalances, productBalances, movementList, transferResponse, recipientList] = await Promise.all([
+      const results = await Promise.allSettled([
         base44.entities.Shop.list(),
         base44.entities.Ingredient.list('name', 500),
         user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.Product.list('name', 500),
@@ -92,6 +93,24 @@ export default function Warehouse() {
           }),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
+
+      const failedSections = [];
+      const resultValue = (result, label, fallback) => {
+        if (result.status === 'fulfilled') return result.value;
+        failedSections.push(label);
+        console.warn(`${label} ma’lumotlarini yuklab bo‘lmadi.`, result.reason);
+        return fallback;
+      };
+
+      const locationList = resultValue(results[0], 'Joylashuvlar', locations);
+      const ingredientList = resultValue(results[1], 'Masalliqlar', ingredients);
+      const productList = resultValue(results[2], 'Mahsulotlar', products);
+      const ingredientBalances = resultValue(results[3], 'Masalliq qoldiqlari', ingredientStock);
+      const productBalances = resultValue(results[4], 'Mahsulot qoldiqlari', productStock);
+      const movementList = resultValue(results[5], 'Ombor tarixi', movements);
+      const transferResponse = resultValue(results[6], 'Transferlar', { data: { transfers } });
+      const recipientList = resultValue(results[7], 'Yetkazib beruvchilar', recipients);
+
       const activeLocations = (locationList || []).filter((location) => location.active !== false);
       const transferPayload = transferResponse?.data || transferResponse;
       const transferList = transferPayload?.transfers || [];
@@ -104,6 +123,9 @@ export default function Warehouse() {
       setMovements(movementList || []);
       setTransfers(transferList);
       setRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
+      setLoadWarning(failedSections.length
+        ? `Vaqtincha yuklanmagan bo‘limlar: ${failedSections.join(', ')}. Qayta yuklashni bosing.`
+        : '');
 
       const canChooseLocation = ['admin', 'manager'].includes(user?.role);
       if (!canChooseLocation) {
@@ -120,7 +142,8 @@ export default function Warehouse() {
         setSelectedLocation(preferred);
       }
     } catch (error) {
-      alert('Omborni yuklab bo‘lmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
+      const message = error?.response?.data?.error || error?.data?.error || error?.message || String(error);
+      setLoadWarning('Omborni yuklashda xato yuz berdi: ' + message);
     } finally {
       setLoading(false);
     }
