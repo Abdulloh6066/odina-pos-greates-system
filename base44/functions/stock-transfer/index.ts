@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
+const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
 const TRANSFER_VIEW_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const TRANSFER_ACTION_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
 
@@ -9,6 +10,13 @@ const cleanNumber = (value: unknown) => {
 };
 
 const userLabel = (user: any) => user.full_name || user.email || "Noma’lum xodim";
+const userRole = (user: any) => {
+  const rootRole = String(user?.role || "");
+  const nestedRole = String(user?.data?.role || "");
+  if (APP_ROLES.has(rootRole)) return rootRole;
+  if (APP_ROLES.has(nestedRole)) return nestedRole;
+  return rootRole || nestedRole;
+};
 const userShopId = (user: any) => String(user?.shop_id || user?.data?.shop_id || "");
 const userShopName = (user: any) => String(user?.shop_name || user?.data?.shop_name || "");
 
@@ -95,13 +103,14 @@ export default async function(req) {
 
     const body = await req.json();
     const action = String(body?.action || "");
+    const role = userRole(user);
     const allowedRoles = action === "list_transfers" ? TRANSFER_VIEW_ROLES : TRANSFER_ACTION_ROLES;
-    if (!allowedRoles.has(user.role)) {
+    if (!allowedRoles.has(role)) {
       return Response.json({ error: "Sizda transfer bilan ishlash huquqi yo‘q." }, { status: 403 });
     }
 
     if (action === "list_transfers") {
-      const canViewAllLocations = user.role === "admin" || user.role === "manager";
+      const canViewAllLocations = role === "admin" || role === "manager";
       const effectiveLocationId = canViewAllLocations ? "" : userShopId(user);
 
       if (!canViewAllLocations && !effectiveLocationId) {
@@ -124,7 +133,7 @@ export default async function(req) {
     }
 
     if (action === "create_transfer") {
-      if (user.role !== "admin") {
+      if (role !== "admin") {
         return Response.json({ error: "Transferni faqat egasi jo‘nata oladi." }, { status: 403 });
       }
 
@@ -215,7 +224,7 @@ export default async function(req) {
       if (transfer.status !== "pending") {
         return Response.json({ error: "Bu transfer allaqachon qabul qilingan yoki qayta ishlanmoqda." }, { status: 409 });
       }
-      if (user.role !== "admin" && userShopId(user) !== transfer.destination_location_id) {
+      if (role !== "admin" && userShopId(user) !== transfer.destination_location_id) {
         return Response.json({ error: "Faqat qabul qiluvchi do‘kon xodimi tasdiqlashi mumkin." }, { status: 403 });
       }
 
