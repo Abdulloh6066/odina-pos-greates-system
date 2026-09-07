@@ -329,8 +329,15 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
   };
 
   const addProduct = (product) => {
-    const current = Number(selectedQuantities[product.id] || 0);
-    changeQuantity(product.id, current + 1);
+    const available = Math.floor(Number(stockByProduct[product.id] || 0));
+    setSelectedQuantities((current) => {
+      const currentQuantity = Number(current[product.id] || 0);
+      const selectedTypeCount = Object.values(current).filter((value) => Number(value) > 0).length;
+      if (currentQuantity >= available || (!current[product.id] && selectedTypeCount >= 50)) {
+        return current;
+      }
+      return { ...current, [product.id]: currentQuantity + 1 };
+    });
   };
 
   const removeProduct = (productId) => {
