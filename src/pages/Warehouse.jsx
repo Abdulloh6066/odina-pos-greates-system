@@ -78,6 +78,79 @@ export default function Warehouse() {
   const [ingredientOpen, setIngredientOpen] = useState(false);
   const [adjusting, setAdjusting] = useState(null);
 
+  const loadAssignedTransfers = async () => {
+    if (!assignedShopId) return [];
+
+    const [incoming, outgoing] = await Promise.all([
+      base44.entities.StockTransfer.filter(
+        { destination_location_id: assignedShopId },
+        '-sent_at',
+        500,
+      ),
+      base44.entities.StockTransfer.filter(
+        { source_location_id: assignedShopId },
+        '-sent_at',
+        500,
+      ),
+    ]);
+
+    const exactTransfers = [...(incoming || []), ...(outgoing || [])].filter(
+      (transfer) => transfer.destination_location_id === assignedShopId
+        || transfer.source_location_id === assignedShopId,
+    );
+    return Array.from(
+      new Map(exactTransfers.map((transfer) => [transfer.id, transfer])).values(),
+    ).sort((left, right) => new Date(right.sent_at || right.created_date || 0)
+      - new Date(left.sent_at || left.created_date || 0));
+  };
+
+  const loadTransferData = async () => {
+    try {
+      const response = await base44.functions.invoke('stock-transfer', { action: 'list_transfers' });
+      const payload = response?.data || response;
+      const returnedTransfers = payload?.transfers || [];
+
+      if (!['admin', 'manager'].includes(user?.role) && assignedShopId && returnedTransfers.length === 0) {
+        const exactTransfers = await loadAssignedTransfers().catch(() => []);
+        if (exactTransfers.length > 0) {
+          return {
+            data: {
+              ...payload,
+              transfers: exactTransfers,
+              effective_location_id: assignedShopId,
+              effective_location_name: assignedShopName || null,
+              fallback: true,
+            },
+          };
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.warn('Transferlarni backend orqali yuklash vaqtincha ishlamadi.', error);
+
+      if (user?.role === 'admin') {
+        const fallbackTransfers = await base44.entities.StockTransfer.list('-sent_at', 500).catch(() => []);
+        return { data: { transfers: fallbackTransfers, fallback: true } };
+      }
+
+      try {
+        const exactTransfers = await loadAssignedTransfers();
+        return {
+          data: {
+            transfers: exactTransfers,
+            effective_location_id: assignedShopId || null,
+            effective_location_name: assignedShopName || null,
+            fallback: true,
+          },
+        };
+      } catch (fallbackError) {
+        console.warn('Biriktirilgan do‘kon transferlarini ham yuklab bo‘lmadi.', fallbackError);
+        return { data: { transfers: [], fallback: true, load_failed: true } };
+      }
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     setLoadWarning('');
@@ -91,14 +164,7 @@ export default function Warehouse() {
         base44.entities.StockMovement.list('-created_at', 500),
         user?.role === 'warehouse'
           ? Promise.resolve({ data: { transfers: [] } })
-          : base44.functions.invoke('stock-transfer', { action: 'list_transfers' }).catch(async (error) => {
-            console.warn('Transferlarni yuklash vaqtincha ishlamadi.', error);
-            if (user?.role === 'admin') {
-              const fallbackTransfers = await base44.entities.StockTransfer.list('-sent_at', 500).catch(() => []);
-              return { data: { transfers: fallbackTransfers, fallback: true } };
-            }
-            return { data: { transfers: [], fallback: true, load_failed: true } };
-          }),
+          : loadTransferData(),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
       ]);
 
