@@ -178,6 +178,8 @@ export default async function(req) {
       const sourceId = String(body?.source_location_id || "");
       const destinationId = String(body?.destination_location_id || "");
       const notes = String(body?.notes || "").trim().slice(0, 2000);
+      // Multi-product UI sends items: [{ product_id, quantity }].
+      // Legacy single-product callers send top-level product_id + quantity.
       const rawItems = Array.isArray(body?.items) && body.items.length > 0
         ? body.items
         : [{ product_id: body?.product_id, quantity: body?.quantity }];
@@ -212,6 +214,7 @@ export default async function(req) {
         return Response.json({ error: "Qabul qiluvchi faol do‘kon bo‘lishi kerak." }, { status: 400 });
       }
 
+      // Pre-flight: validate every product and source stock BEFORE any write.
       const products = await Promise.all(
         items.map((item: any) => service.entities.Product.get(item.product_id)),
       );
@@ -245,6 +248,7 @@ export default async function(req) {
       const createdMovements: any[] = [];
 
       try {
+        // 1) Decrease every product from the central warehouse first.
         for (const row of prepared) {
           await changeExistingStock(
             service, row.sourceStock, row.before, row.after, source, row.product, user, now,
@@ -252,6 +256,7 @@ export default async function(req) {
           changedStocks.push(row);
         }
 
+        // 2) Create one StockTransfer line + out-movement per item, sharing batch_id/batch_number.
         for (let index = 0; index < prepared.length; index += 1) {
           const row = prepared[index];
           const transfer = await service.entities.StockTransfer.create({
@@ -289,6 +294,7 @@ export default async function(req) {
           createdMovements.push(movement);
         }
       } catch (error) {
+        // Roll back the entire batch: movements, transfer lines, and stock changes.
         for (const movement of [...createdMovements].reverse()) {
           try {
             if (movement?.id) await service.entities.StockMovement.delete(movement.id);
@@ -333,6 +339,8 @@ export default async function(req) {
       });
     }
 
+    // receive_transfer (legacy single line) and receive_transfer_batch (whole batch)
+    // both resolve every line that shares the batch and receive them together.
     if (action === "receive_transfer" || action === "receive_transfer_batch") {
       const transferId = String(body?.transfer_id || "");
       const requestedBatchId = String(body?.batch_id || "");
@@ -429,6 +437,7 @@ export default async function(req) {
         };
       });
 
+      // Atomically claim every line as "receiving" so concurrent devices can't double-receive.
       const claimFilter = batchId
         ? { batch_id: batchId, status: "pending" }
         : { id: first.id, status: "pending" };
