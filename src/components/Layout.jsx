@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import OdinaBrand from './brand/OdinaBrand';
 import { base44 } from '@/api/base44Client';
 
 export default function Layout() {
@@ -54,11 +55,11 @@ export default function Layout() {
         onToggle={toggleSidebar}
       />
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="lg:hidden flex items-center justify-between px-4 h-14 shrink-0 border-b border-brand-sand/50 bg-card sticky top-0 z-30">
+        <div className="odina-mobile-header lg:hidden flex items-center justify-between px-4 h-14 shrink-0 border-b border-brand-sand/50 bg-card sticky top-0 z-30">
           <button type="button" aria-label="Menyuni ochish" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)} className="h-11 w-11 -ml-2 rounded-xl flex items-center justify-center text-brand-ink hover:bg-secondary">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
           </button>
-          <span className="font-display text-lg font-semibold tracking-tight">Odina Shop</span>
+          <OdinaBrand compact />
           <div className="w-9" />
         </div>
         <main className="flex-1 min-w-0">
