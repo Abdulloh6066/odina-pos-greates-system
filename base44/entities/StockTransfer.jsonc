@@ -4,6 +4,18 @@
     "transfer_number": {
       "type": "string"
     },
+    "batch_id": {
+      "type": "string"
+    },
+    "batch_number": {
+      "type": "string"
+    },
+    "line_number": {
+      "type": "integer"
+    },
+    "batch_item_count": {
+      "type": "integer"
+    },
     "source_location_id": {
       "type": "string"
     },
