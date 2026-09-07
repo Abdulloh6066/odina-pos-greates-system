@@ -346,12 +346,28 @@ export default function Warehouse() {
               onReload={load}
             />
           ) : (
-            <StockGrid
-              items={items}
-              stockMap={stockMap}
-              kind={tab === 'products' ? 'product' : 'ingredient'}
-              onAdjust={['warehouse', 'manager'].includes(user?.role) ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
-            />
+            <>
+              {tab === 'products' && selectedLocationRecord?.location_type === 'production' && (
+                <div className="rounded-2xl border border-primary/35 bg-primary/10 p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <ChefHat className="w-5 h-5 text-brand-ink shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold">Retsept bo‘yicha mahsulot kiritish</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Un, shakar va boshqa masalliqlar “Ishlab chiqarish” bo‘limida tayyor mahsulot kiritilganda avtomatik kamayadi. Qo‘lda qoldiq tuzatish masalliqlarni o‘zgartirmaydi.
+                    </p>
+                  </div>
+                  <Button type="button" onClick={() => changeTab('production')} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary-strong">
+                    <ChefHat className="w-4 h-4 mr-1.5" /> Ishlab chiqarishga o‘tish
+                  </Button>
+                </div>
+              )}
+              <StockGrid
+                items={items}
+                stockMap={stockMap}
+                kind={tab === 'products' ? 'product' : 'ingredient'}
+                onAdjust={['warehouse', 'manager'].includes(user?.role) ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
+              />
+            </>
           )}
         </>
       )}
@@ -409,7 +425,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
             </div>
             {onAdjust && (
               <Button variant="outline" size="sm" onClick={() => onAdjust(item)} className="w-full mt-4 min-h-11 rounded-xl touch-manipulation">
-                <PackagePlus className="w-4 h-4 mr-1.5" /> Boshlang‘ich qoldiq / tuzatish
+                <PackagePlus className="w-4 h-4 mr-1.5" /> {kind === 'product' ? 'Faqat qoldiqni tuzatish' : 'Boshlang‘ich qoldiq / tuzatish'}
               </Button>
             )}
           </div>
@@ -597,13 +613,18 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Ombor qoldig‘ini yangilash</DialogTitle>
+          <DialogTitle className="font-display text-xl">{kind === 'product' ? 'Tayyor mahsulot qoldig‘ini tuzatish' : 'Ombor qoldig‘ini yangilash'}</DialogTitle>
           <p className="text-sm text-muted-foreground">{item?.name} · {location?.name}</p>
         </DialogHeader>
         <div className="space-y-4">
+          {kind === 'product' && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Bu qo‘lda qoldiq tuzatish oynasi. Retsept ishlamaydi va un, shakar hamda boshqa masalliqlar kamaymaydi. Ishlab chiqarilgan mahsulotni “Ishlab chiqarish” bo‘limidan kiriting.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant={mode === 'add' ? 'default' : 'outline'} onClick={() => setMode('add')} className={mode === 'add' ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}>Kirim qilish</Button>
-            <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>Chiqim qilish</Button>
+            <Button type="button" variant={mode === 'add' ? 'default' : 'outline'} onClick={() => setMode('add')} className={mode === 'add' ? 'bg-primary text-primary-foreground hover:bg-primary-strong' : ''}>{kind === 'product' ? 'Qoldiqni oshirish' : 'Kirim qilish'}</Button>
+            <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>{kind === 'product' ? 'Qoldiqni kamaytirish' : 'Chiqim qilish'}</Button>
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Miqdor ({UNIT_LABELS[unit] || unit})</Label>
@@ -628,7 +649,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
           <Button onClick={save} disabled={saving || !quantity || !reason.trim() || after < 0} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
-            {saving ? 'Saqlanmoqda…' : 'Tarix bilan saqlash'}
+            {saving ? 'Saqlanmoqda…' : (kind === 'product' ? 'Faqat qoldiqni saqlash' : 'Tarix bilan saqlash')}
           </Button>
         </DialogFooter>
       </DialogContent>
