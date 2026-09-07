@@ -20,6 +20,34 @@ const userRole = (user: any) => {
 const userShopId = (user: any) => String(user?.shop_id || user?.data?.shop_id || "");
 const userShopName = (user: any) => String(user?.shop_name || user?.data?.shop_name || "");
 
+const resolveAppUser = async (service: any, authenticatedUser: any) => {
+  let storedUser: any = null;
+  const authenticatedId = String(authenticatedUser?.id || "");
+  const email = String(authenticatedUser?.email || "").trim().toLowerCase();
+
+  if (authenticatedId) {
+    storedUser = await service.entities.User.get(authenticatedId).catch(() => null);
+  }
+  if (!storedUser && email) {
+    const matches = await service.entities.User.filter({ email }, "-updated_date", 5);
+    storedUser = (matches || []).find(
+      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === email,
+    ) || null;
+  }
+
+  const storedRole = userRole(storedUser);
+  return {
+    ...authenticatedUser,
+    id: authenticatedUser?.id || storedUser?.id,
+    email: authenticatedUser?.email || storedUser?.email,
+    full_name: authenticatedUser?.full_name || storedUser?.full_name,
+    role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
+    shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
+    shop_name: userShopName(storedUser) || userShopName(authenticatedUser),
+    active: storedUser?.active ?? authenticatedUser?.active,
+  };
+};
+
 const findStock = async (service: any, locationId: string, productId: string) => {
   const rows = await service.entities.ProductStock.filter({
     location_id: locationId,
@@ -98,8 +126,13 @@ export default async function(req) {
   const service = base44.asServiceRole;
 
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+    const authenticatedUser = await base44.auth.me();
+    if (!authenticatedUser) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+
+    const user = await resolveAppUser(service, authenticatedUser);
+    if (user.active === false) {
+      return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
+    }
 
     const body = await req.json();
     const action = String(body?.action || "");
@@ -129,6 +162,11 @@ export default async function(req) {
         transfers,
         effective_location_id: effectiveLocationId || null,
         effective_location_name: canViewAllLocations ? null : (userShopName(user) || null),
+        viewer: {
+          role,
+          shop_id: userShopId(user) || null,
+          shop_name: userShopName(user) || null,
+        },
       });
     }
 
