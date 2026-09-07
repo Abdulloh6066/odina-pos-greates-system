@@ -56,6 +56,8 @@ export function resolveWarehouseTab(requestedTab, role) {
 
 export default function Warehouse() {
   const { user } = useOutletContext();
+  const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
+  const assignedShopName = user?.shop_name || user?.data?.shop_name || '';
   const [searchParams, setSearchParams] = useSearchParams();
   const [locations, setLocations] = useState([]);
   const [ingredients, setIngredients] = useState([]);
@@ -65,7 +67,7 @@ export default function Warehouse() {
   const [movements, setMovements] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [recipients, setRecipients] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState(['admin', 'manager'].includes(user?.role) ? '' : (user?.shop_id || ''));
+  const [selectedLocation, setSelectedLocation] = useState(['admin', 'manager'].includes(user?.role) ? '' : assignedShopId);
   const requestedTab = searchParams.get('tab');
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
@@ -136,15 +138,15 @@ export default function Warehouse() {
       const canChooseLocation = ['admin', 'manager'].includes(user?.role);
       if (!canChooseLocation) {
         const effectiveLocation = transferPayload?.effective_location_id
-          || activeLocations.find((location) => location.id === user?.shop_id)?.id
+          || activeLocations.find((location) => location.id === assignedShopId)?.id
           || activeLocations[0]?.id
-          || user?.shop_id
+          || assignedShopId
           || '';
         if (effectiveLocation && effectiveLocation !== selectedLocation) {
           setSelectedLocation(effectiveLocation);
         }
       } else if (!selectedLocation || !activeLocations.some((location) => location.id === selectedLocation)) {
-        const preferred = user?.shop_id || activeLocations[0]?.id || '';
+        const preferred = assignedShopId || activeLocations[0]?.id || '';
         setSelectedLocation(preferred);
       }
     } catch (error) {
@@ -267,7 +269,7 @@ export default function Warehouse() {
             <div className="sm:w-72">
               <p className="text-xs font-medium text-muted-foreground mb-1.5">Sizning omboringiz</p>
               <div className="h-11 rounded-xl bg-secondary/70 px-3 flex items-center text-sm font-medium">
-                {selectedLocationRecord?.name || user?.shop_name || 'Joylashuv biriktirilmagan'}
+                {selectedLocationRecord?.name || assignedShopName || 'Joylashuv biriktirilmagan'}
               </div>
             </div>
           )}
