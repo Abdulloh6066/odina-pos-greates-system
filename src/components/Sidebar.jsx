@@ -5,6 +5,8 @@ import {
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, WalletCards, Warehouse,
 } from 'lucide-react';
+import OdinaBrand from '@/components/brand/OdinaBrand';
+import '@/styles/odina-retail.css';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -62,7 +64,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         onClick={onClose}
         title={collapsed ? item.label : undefined}
         className={({ isActive }) =>
-          `group flex min-h-11 items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
+          `odina-nav-link group flex min-h-11 items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
             isActive
               ? 'bg-brand-olive/20 text-foreground shadow-[inset_3px_0_0_hsl(var(--brand-olive))]'
               : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -77,7 +79,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
 
   const renderGroup = ({ item, children, active, open, setOpen, ParentIcon }) => (
     <div key={item.key}>
-      <div className={`flex items-center rounded-xl border transition-colors ${active ? 'bg-brand-olive/20 border-brand-olive/35 text-foreground' : 'border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
+      <div data-active={active} className={`odina-nav-group flex items-center rounded-xl border transition-colors ${active ? 'bg-brand-olive/20 border-brand-olive/35 text-foreground' : 'border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
         <NavLink
           to={item.path}
           onClick={() => {
@@ -105,7 +107,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         )}
       </div>
       {open && children.length > 0 && (
-        <div className={`ml-5 mt-1 mb-2 pl-2 border-l-2 border-brand-sand/60 space-y-1 ${collapsed ? 'lg:hidden' : ''}`}>
+        <div className={`odina-nav-children ml-5 mt-1 mb-2 pl-2 border-l-2 border-brand-sand/60 space-y-1 ${collapsed ? 'lg:hidden' : ''}`}>
           {children.map((child) => {
             const ChildIcon = child.icon || Circle;
             return (
@@ -114,7 +116,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
                 to={child.path}
                 onClick={onClose}
                 aria-current={child.active ? 'page' : undefined}
-                className={`flex items-center gap-2.5 min-h-11 px-3 py-2 rounded-xl text-[13px] leading-snug font-medium transition-colors ${child.active ? 'bg-primary/25 text-brand-ink' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+                className={`odina-nav-child flex items-center gap-2.5 min-h-11 px-3 py-2 rounded-xl text-[13px] leading-snug font-medium transition-colors ${child.active ? 'bg-primary/25 text-brand-ink' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
               >
                 <ChildIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
                 <span className="min-w-0 break-words">{child.label}</span>
@@ -127,18 +129,13 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
   );
 
   const content = (
-    <div className="flex flex-col h-full min-h-0">
-      <div className={`py-6 flex items-center gap-3 ${collapsed ? 'px-5 lg:px-3 lg:justify-center' : 'px-5'}`}>
-        <div className="w-11 h-11 rounded-2xl brand-mark flex items-center justify-center premium-shadow shrink-0">
-          <Cake className="w-6 h-6 text-primary-foreground" strokeWidth={2.2} />
-        </div>
-        <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
-          <div className="font-display text-xl font-bold leading-tight tracking-tight">Odina Shop</div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Qandolat · Kassa</div>
-        </div>
+    <div className="odina-sidebar-content flex flex-col h-full min-h-0">
+      <div className={`odina-sidebar-brand py-6 flex items-center gap-3 ${collapsed ? 'px-5 lg:px-3 lg:justify-center' : 'px-5'}`}>
+        <OdinaBrand collapsed={collapsed} />
       </div>
 
       <nav aria-label="Asosiy menyu" className="flex-1 min-h-0 px-3 pb-3 space-y-1 overflow-y-auto overscroll-contain scrollbar-thin">
+        <p className={`odina-nav-label ${collapsed ? 'lg:hidden' : ''}`}>ISH MAYDONI</p>
         {topItems.map((item) => {
           if (item.key === 'pos') {
             return renderGroup({
@@ -173,9 +170,9 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         })}
       </nav>
 
-      <div className="p-3 safe-bottom border-t border-border bg-brand-sand/10">
+      <div className="odina-sidebar-account p-3 safe-bottom border-t border-border bg-brand-sand/10">
         <div className={`flex items-center gap-3 py-2 rounded-xl ${collapsed ? 'px-2 lg:justify-center lg:px-0' : 'px-2'}`}>
-          <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
+          <div className="odina-user-avatar w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
             {(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}
           </div>
           <div className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>
@@ -197,20 +194,20 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
 
   return (
     <>
-      <aside className={`relative hidden lg:flex shrink-0 flex-col bg-sidebar border-r border-sidebar-border h-dvh sticky top-0 transition-[width] duration-200 ${collapsed ? 'w-20' : 'w-64'}`}>
+      <aside className={`odina-sidebar relative hidden lg:flex shrink-0 flex-col bg-sidebar border-r border-sidebar-border h-dvh sticky top-0 transition-[width] duration-200 ${collapsed ? 'w-20' : 'w-64'}`}>
         <button
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? 'Menyuni ochish' : 'Menyuni yopish'}
           title={collapsed ? 'Menyuni ochish' : 'Menyuni yopish'}
-          className="absolute -right-5 top-6 z-20 w-11 h-11 rounded-full border border-sidebar-border bg-card text-foreground/70 shadow-md flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation"
+          className="odina-sidebar-toggle absolute -right-5 top-6 z-20 w-11 h-11 rounded-full border border-sidebar-border bg-card text-foreground/70 shadow-md flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors touch-manipulation"
         >
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
         </button>
         {content}
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose()}>
-        <SheetContent side="left" className="w-72 max-w-[calc(100%-2rem)] p-0 bg-sidebar">
+        <SheetContent side="left" className="odina-sidebar-sheet w-72 max-w-[calc(100%-2rem)] p-0 bg-sidebar">
           <SheetTitle className="sr-only">Odina Shop menyusi</SheetTitle>
           <SheetDescription className="sr-only">Kerakli bo‘limni tanlang.</SheetDescription>
           {content}
