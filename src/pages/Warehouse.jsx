@@ -63,9 +63,10 @@ export default function Warehouse() {
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
   const tabAllowed = (value) => visibleTabs.some((item) => item.id === value);
-  const [tab, setTab] = useState(tabAllowed(requestedTab) ? requestedTab : 'ingredients');
+  const tab = tabAllowed(requestedTab) ? requestedTab : (visibleTabs[0]?.id || 'ingredients');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadWarning, setLoadWarning] = useState('');
   const [ingredientOpen, setIngredientOpen] = useState(false);
   const [adjusting, setAdjusting] = useState(null);
 
@@ -150,15 +151,7 @@ export default function Warehouse() {
     return () => unsubscribe?.();
   }, [user?.id, user?.role]);
 
-  useEffect(() => {
-    if (requestedTab && tabAllowed(requestedTab) && requestedTab !== tab) {
-      setTab(requestedTab);
-      setSearch('');
-    }
-  }, [requestedTab, tab, canViewSupplierLedger]);
-
   const changeTab = (nextTab) => {
-    setTab(nextTab);
     setSearch('');
     setSearchParams({ tab: nextTab });
   };
