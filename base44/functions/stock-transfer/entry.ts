@@ -9,6 +9,8 @@ const cleanNumber = (value: unknown) => {
 };
 
 const userLabel = (user: any) => user.full_name || user.email || "Noma’lum xodim";
+const userShopId = (user: any) => String(user?.shop_id || user?.data?.shop_id || "");
+const userShopName = (user: any) => String(user?.shop_name || user?.data?.shop_name || "");
 
 const findStock = async (service: any, locationId: string, productId: string) => {
   const rows = await service.entities.ProductStock.filter({
@@ -100,7 +102,7 @@ export default async function(req) {
 
     if (action === "list_transfers") {
       const canViewAllLocations = user.role === "admin" || user.role === "manager";
-      const effectiveLocationId = canViewAllLocations ? "" : String(user.shop_id || "");
+      const effectiveLocationId = canViewAllLocations ? "" : userShopId(user);
 
       if (!canViewAllLocations && !effectiveLocationId) {
         return Response.json({ error: "Xodimga do‘kon biriktirilmagan." }, { status: 400 });
@@ -117,7 +119,7 @@ export default async function(req) {
       return Response.json({
         transfers,
         effective_location_id: effectiveLocationId || null,
-        effective_location_name: canViewAllLocations ? null : (user.shop_name || null),
+        effective_location_name: canViewAllLocations ? null : (userShopName(user) || null),
       });
     }
 
@@ -213,7 +215,7 @@ export default async function(req) {
       if (transfer.status !== "pending") {
         return Response.json({ error: "Bu transfer allaqachon qabul qilingan yoki qayta ishlanmoqda." }, { status: 409 });
       }
-      if (user.role !== "admin" && user.shop_id !== transfer.destination_location_id) {
+      if (user.role !== "admin" && userShopId(user) !== transfer.destination_location_id) {
         return Response.json({ error: "Faqat qabul qiluvchi do‘kon xodimi tasdiqlashi mumkin." }, { status: 403 });
       }
 
