@@ -74,7 +74,7 @@ export default function Dashboard() {
                 <div className="space-y-2.5">
                   {bestSellers.map(([name, qty], i) => (
                     <div key={name} className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary-strong flex items-center justify-center text-xs font-bold">{i + 1}</div>
+                      <div className="w-7 h-7 rounded-lg bg-primary/15 text-brand-ink flex items-center justify-center text-xs font-bold">{i + 1}</div>
                       <span className="flex-1 text-sm font-medium truncate">{name}</span>
                       <span className="text-sm font-semibold text-muted-foreground">{qty} ta sotildi</span>
                     </div>
@@ -88,7 +88,7 @@ export default function Dashboard() {
                 <div className="space-y-2.5">
                   {topEmployees.map(([name, amt], i) => (
                     <div key={name} className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-primary/15 text-primary-strong flex items-center justify-center text-xs font-bold">{i + 1}</div>
+                      <div className="w-7 h-7 rounded-lg bg-primary/15 text-brand-ink flex items-center justify-center text-xs font-bold">{i + 1}</div>
                       <span className="flex-1 text-sm font-medium truncate">{name}</span>
                       <span className="text-sm font-semibold">{formatUZS(amt)}</span>
                     </div>
@@ -112,7 +112,7 @@ export default function Dashboard() {
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
     <div className={`rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-primary-foreground/15' : 'bg-primary/15 text-primary-strong'}`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-primary-foreground/15' : 'bg-primary/15 text-brand-ink'}`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
       <div className="text-xs uppercase tracking-wide opacity-70 mb-1">{label}</div>
@@ -125,7 +125,7 @@ function Panel({ title, icon: Icon, children }) {
   return (
     <div className="rounded-2xl bg-card border border-border premium-shadow p-5">
       <div className="flex items-center gap-2 mb-4">
-        <Icon className="w-4.5 h-4.5 text-primary-strong" />
+        <Icon className="w-4.5 h-4.5 text-brand-ink" />
         <h3 className="font-display text-lg font-bold">{title}</h3>
       </div>
       {children}

@@ -158,7 +158,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
               Keyingi smenaga qoldiriladigan pul sanalgan naqd puldan oshmasligi kerak.
             </div>
           )}
-          <div className={`rounded-xl px-3 py-2.5 text-sm font-medium ${difference === 0 ? 'bg-emerald-50 text-emerald-700' : difference > 0 ? 'bg-primary/10 text-primary-strong' : 'bg-red-50 text-destructive'}`}>
+          <div className={`rounded-xl px-3 py-2.5 text-sm font-medium ${difference === 0 ? 'bg-emerald-50 text-emerald-700' : difference > 0 ? 'bg-primary/10 text-brand-ink' : 'bg-red-50 text-destructive'}`}>
             Farq: {difference > 0 ? '+' : ''}{formatUZS(difference)}
           </div>
           <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-xs text-muted-foreground">

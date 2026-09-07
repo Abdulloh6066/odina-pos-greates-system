@@ -109,7 +109,7 @@ export default function Products() {
               <div className="p-3">
                 <div className="text-sm font-semibold truncate">{p.name}</div>
                 <div className="text-xs text-muted-foreground">{p.category_name || 'Kategoriyasiz'}</div>
-                <div className="text-[15px] font-bold text-primary-strong mt-1">{formatUZS(p.price)}</div>
+                <div className="text-[15px] font-bold text-brand-ink mt-1">{formatUZS(p.price)}</div>
                 {(role === 'production' || canManageCatalog) && (
                   <Button variant="outline" size="sm" className="w-full mt-2 min-h-10 rounded-xl text-xs touch-manipulation" onClick={() => setAvailability(p)}>
                     {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan vaqtincha olish'}

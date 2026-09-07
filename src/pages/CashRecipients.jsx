@@ -69,7 +69,7 @@ export default function CashRecipients() {
           {filtered.map((item) => (
             <article key={item.id} className={`rounded-2xl border border-border bg-card premium-shadow p-4 ${item.active === false ? 'opacity-60' : ''}`}>
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary-strong flex items-center justify-center shrink-0"><Building2 className="w-4.5 h-4.5" /></div>
+                <div className="w-10 h-10 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0"><Building2 className="w-4.5 h-4.5" /></div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate">{item.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{item.recipient_type === 'company' ? 'Kompaniya' : 'Yetkazib beruvchi'} · {item.active === false ? 'Faol emas' : 'Faol'}</p>

@@ -233,14 +233,14 @@ function ShiftCard({ shift, onOpen }) {
           diff === 0
             ? "bg-emerald-50 text-emerald-700"
             : diff > 0
-              ? "bg-primary/10 text-primary-strong"
+              ? "bg-primary/10 text-brand-ink"
               : "bg-red-50 text-destructive"
         )}>
           Naqd pul farqi: {diff > 0 ? "+" : ""}{formatUZS(diff)}
         </div>
       )}
 
-      <div className="mt-3 pt-3 border-t border-border flex items-center justify-end gap-1 text-xs font-medium text-primary-strong">
+      <div className="mt-3 pt-3 border-t border-border flex items-center justify-end gap-1 text-xs font-medium text-brand-ink">
         Batafsil ko‘rish <ChevronRight className="w-4 h-4" />
       </div>
     </button>
@@ -359,7 +359,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
                     <CashRow
                       label="Farq"
                       value={(diff > 0 ? "+" : "") + formatUZS(diff)}
-                      valueClass={diff === 0 ? "text-emerald-700" : diff > 0 ? "text-primary-strong" : "text-destructive"}
+                      valueClass={diff === 0 ? "text-emerald-700" : diff > 0 ? "text-brand-ink" : "text-destructive"}
                       bold
                     />
                   </>
@@ -443,7 +443,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
                         </div>
 
                         {Number(sale.discount_amount || 0) > 0 && (
-                          <div className="flex justify-between text-xs text-primary-strong mt-2">
+                          <div className="flex justify-between text-xs text-brand-ink mt-2">
                             <span>Chegirma{sale.discount_code ? " · " + sale.discount_code : ""}</span>
                             <span>−{formatUZS(sale.discount_amount)}</span>
                           </div>
@@ -536,7 +536,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
 function SectionTitle({ icon: Icon, title }) {
   return (
     <h3 className="font-semibold mb-2.5 flex items-center gap-2">
-      <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary-strong flex items-center justify-center">
+      <span className="w-8 h-8 rounded-lg bg-primary/10 text-brand-ink flex items-center justify-center">
         <Icon className="w-4 h-4" />
       </span>
       {title}

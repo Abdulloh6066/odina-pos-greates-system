@@ -52,7 +52,7 @@ export default function DiscountCodes() {
         <div className="grid sm:grid-cols-2 gap-3">
           {codes.map((c) => (
             <div key={c.id} className="flex items-center gap-3 rounded-2xl bg-card border border-border premium-shadow p-4">
-              <div className="w-11 h-11 rounded-xl bg-primary/15 text-primary-strong flex items-center justify-center"><Ticket className="w-5 h-5" /></div>
+              <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center"><Ticket className="w-5 h-5" /></div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold font-mono truncate">{c.code}</div>
                 <div className="text-xs text-muted-foreground">{c.percentage}% off · used {formatNum(c.usage_count || 0)}× · {c.active ? 'Active' : 'Inactive'}</div>

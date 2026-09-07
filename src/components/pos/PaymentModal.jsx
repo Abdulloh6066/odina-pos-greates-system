@@ -52,8 +52,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
         </DialogHeader>
 
         <div className="rounded-2xl bg-primary/10 px-4 py-3 mb-4 flex items-center justify-between">
-          <span className="text-sm font-medium text-primary-strong">To‘lanadigan jami</span>
-          <span className="font-display text-2xl font-bold text-primary-strong">{formatUZS(total)}</span>
+          <span className="text-sm font-medium text-brand-ink">To‘lanadigan jami</span>
+          <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
 
         <div className="space-y-2.5">
@@ -85,14 +85,14 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
         </div>
 
         <div className="flex items-center justify-between mt-3 text-sm">
-          <button onClick={addRow} disabled={remaining <= 0 && payments.length >= PAYMENT_METHODS.length} className="text-primary-strong font-medium flex items-center gap-1 disabled:opacity-40">
+          <button onClick={addRow} disabled={remaining <= 0 && payments.length >= PAYMENT_METHODS.length} className="text-brand-ink font-medium flex items-center gap-1 disabled:opacity-40">
             <Plus className="w-4 h-4" /> Add split payment
           </button>
           <div className="text-right">
             {remaining > 0 ? (
               <span className="text-destructive font-medium">Remaining {formatUZS(remaining)}</span>
             ) : overpay > 0 ? (
-              <span className="text-primary-strong font-medium">Change {formatUZS(overpay)}</span>
+              <span className="text-brand-ink font-medium">Change {formatUZS(overpay)}</span>
             ) : (
               <span className="text-emerald-600 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> Exact</span>
             )}

@@ -94,7 +94,7 @@ export default function SalesHistory() {
         <div className="space-y-3">
           {visible.map((s) => (
             <button key={s.id} onClick={() => setSelected(s)} className="w-full text-left rounded-2xl bg-card border border-border premium-shadow hover:premium-shadow-lg transition-all p-4 flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-primary/15 text-primary-strong flex items-center justify-center shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
                 <Eye className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
@@ -111,7 +111,7 @@ export default function SalesHistory() {
               </div>
               <div className="text-right shrink-0">
                 <div className="text-xs text-muted-foreground">{s.items?.length || 0} ta mahsulot</div>
-                {s.discount_amount > 0 && <div className="text-xs text-primary-strong">−{formatUZS(s.discount_amount)}</div>}
+                {s.discount_amount > 0 && <div className="text-xs text-brand-ink">−{formatUZS(s.discount_amount)}</div>}
               </div>
             </button>
           ))}
@@ -180,7 +180,7 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
 function Row({ label, value, bold, accent }) {
   return (
     <div className="flex justify-between">
-      <span className={accent ? 'text-primary-strong' : 'text-muted-foreground'}>{label}</span>
+      <span className={accent ? 'text-brand-ink' : 'text-muted-foreground'}>{label}</span>
       <span className={bold ? 'font-bold' : 'font-medium'}>{value}</span>
     </div>
   );

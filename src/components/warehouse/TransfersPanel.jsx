@@ -65,7 +65,7 @@ export default function TransfersPanel({
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-border bg-card premium-shadow p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-primary/15 text-primary-strong flex items-center justify-center shrink-0">
+        <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
           <Truck className="w-5 h-5" />
         </div>
         <div className="flex-1">
@@ -156,7 +156,7 @@ function TransferCard({ transfer, canReceive, receiving, onReceive }) {
         <span className="font-medium truncate">{transfer.source_location_name}</span>
         <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
         <span className="font-medium truncate">{transfer.destination_location_name}</span>
-        <span className="ml-auto font-bold text-primary-strong whitespace-nowrap">{formatNum(transfer.quantity)} dona</span>
+        <span className="ml-auto font-bold text-brand-ink whitespace-nowrap">{formatNum(transfer.quantity)} dona</span>
       </div>
 
       {transfer.notes && <p className="text-sm text-muted-foreground mt-3">{transfer.notes}</p>}

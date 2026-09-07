@@ -110,7 +110,7 @@ export default function Budget() {
       />
 
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 mb-5 flex gap-3">
-        <ShieldCheck className="w-5 h-5 text-primary-strong shrink-0 mt-0.5" />
+        <ShieldCheck className="w-5 h-5 text-brand-ink shrink-0 mt-0.5" />
         <div>
           <p className="font-semibold text-sm">Faqat egasi ko‘radi</p>
           <p className="text-xs text-muted-foreground mt-1">

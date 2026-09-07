@@ -344,7 +344,7 @@ export default function POS() {
       {/* Header */}
       <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-primary/15 text-primary-strong flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
             <Building2 className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">

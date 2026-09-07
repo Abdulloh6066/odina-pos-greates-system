@@ -119,7 +119,7 @@ export default function ProductionPanel({
     return (
       <>
         <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 mb-4 flex items-start gap-3">
-          <Beaker className="w-5 h-5 text-primary-strong shrink-0 mt-0.5" />
+          <Beaker className="w-5 h-5 text-brand-ink shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold">Retseptlar versiya bilan saqlanadi</p>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -207,7 +207,7 @@ export default function ProductionPanel({
       <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-5">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <ChefHat className="w-5 h-5 text-primary-strong" />
+            <ChefHat className="w-5 h-5 text-brand-ink" />
             <h3 className="font-display text-lg font-bold">Ishlab chiqarish</h3>
           </div>
 
@@ -231,7 +231,7 @@ export default function ProductionPanel({
                         <p className="font-semibold">{product.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">Retsept v{recipe.version} · taxminan {formatNum(possible)} dona tayyorlash mumkin</p>
                       </div>
-                      <Scale className="w-5 h-5 text-primary-strong shrink-0" />
+                      <Scale className="w-5 h-5 text-brand-ink shrink-0" />
                     </div>
                     {canProduce && (
                       <Button
@@ -250,7 +250,7 @@ export default function ProductionPanel({
 
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <History className="w-5 h-5 text-primary-strong" />
+            <History className="w-5 h-5 text-brand-ink" />
             <h3 className="font-display text-lg font-bold">Oxirgi ishlab chiqarishlar</h3>
           </div>
           {!historyRows.length ? (

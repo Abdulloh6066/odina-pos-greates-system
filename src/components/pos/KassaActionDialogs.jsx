@@ -20,7 +20,7 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
     <Dialog open={open} onOpenChange={(value) => !value && !loading && onClose()}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <div className="w-11 h-11 rounded-2xl bg-primary/15 text-primary-strong flex items-center justify-center mb-2">
+          <div className="w-11 h-11 rounded-2xl bg-primary/15 text-brand-ink flex items-center justify-center mb-2">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <DialogTitle className="font-display text-xl">{title}</DialogTitle>
