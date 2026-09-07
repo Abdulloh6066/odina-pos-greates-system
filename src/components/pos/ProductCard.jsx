@@ -9,9 +9,9 @@ export default function ProductCard({ product, stockQuantity = null, onAdd }) {
       type="button"
       onClick={() => onAdd(product)}
       aria-label={`${product.name}, ${formatUZS(product.price)}. Buyurtmaga qo‘shish`}
-      className="group relative text-left bg-card rounded-2xl overflow-hidden border border-border hover:border-brand-sand premium-shadow hover:premium-shadow-lg transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 touch-manipulation select-none"
+      className="odina-product-card group relative text-left bg-card rounded-2xl overflow-hidden border border-border hover:border-brand-sand premium-shadow hover:premium-shadow-lg transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 touch-manipulation select-none"
     >
-      <div className="relative aspect-square bg-secondary overflow-hidden">
+      <div className="odina-product-photo relative aspect-square bg-secondary overflow-hidden">
         {product.image_url ? (
           <Image
             src={product.image_url}
@@ -24,7 +24,7 @@ export default function ProductCard({ product, stockQuantity = null, onAdd }) {
             {product.name.charAt(0)}
           </div>
         )}
-        <div className="absolute top-2 right-2 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity shadow-lg">
+        <div className="odina-product-add absolute top-2 right-2 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity shadow-lg">
           <Plus className="w-5 h-5" strokeWidth={2.5} />
         </div>
         {stockQuantity !== null && stockQuantity <= 0 && (
@@ -33,9 +33,14 @@ export default function ProductCard({ product, stockQuantity = null, onAdd }) {
           </div>
         )}
       </div>
-      <div className="p-3 sm:p-3.5">
-        <div className="text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</div>
-        <div className="mt-1.5 text-[15px] font-bold text-brand-ink">{formatUZS(product.price)}</div>
+      <div className="odina-product-info p-3 sm:p-3.5">
+        <div className="odina-product-name text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</div>
+        <div className="odina-product-meta">
+          <span className="odina-product-price">{formatUZS(product.price)}</span>
+          {stockQuantity !== null && stockQuantity > 0 && (
+            <span className="odina-product-stock">{stockQuantity} dona</span>
+          )}
+        </div>
       </div>
     </button>
   );
