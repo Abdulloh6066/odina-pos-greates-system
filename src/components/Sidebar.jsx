@@ -6,7 +6,6 @@ import {
   ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, WalletCards, Warehouse,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
-import '@/styles/odina-retail.css';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -208,7 +207,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onClose()}>
         <SheetContent side="left" className="odina-sidebar-sheet w-72 max-w-[calc(100%-2rem)] p-0 bg-sidebar">
-          <SheetTitle className="sr-only">Odina Shop menyusi</SheetTitle>
+          <SheetTitle className="sr-only">Odina Cake menyusi</SheetTitle>
           <SheetDescription className="sr-only">Kerakli bo‘limni tanlang.</SheetDescription>
           {content}
         </SheetContent>
