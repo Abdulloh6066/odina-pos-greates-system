@@ -1,5 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, PackageCheck, RefreshCw, Search, Send, Truck } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Minus,
+  PackageCheck,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  ShoppingBasket,
+  Trash2,
+  Truck,
+} from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
@@ -14,6 +26,41 @@ const STATUS = {
   received: { label: 'Qabul qilindi', className: 'bg-emerald-50 text-emerald-700' },
 };
 
+function groupTransferRows(rows) {
+  const grouped = new Map();
+  rows.forEach((transfer) => {
+    const key = transfer.batch_id ? `batch:${transfer.batch_id}` : `single:${transfer.id}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(transfer);
+  });
+
+  return Array.from(grouped.entries()).map(([id, rawItems]) => {
+    const items = [...rawItems].sort(
+      (a, b) => Number(a.line_number || 0) - Number(b.line_number || 0),
+    );
+    const first = items[0];
+    const allReceived = items.every((item) => item.status === 'received');
+    const allPending = items.every((item) => item.status === 'pending');
+    return {
+      id,
+      batch_id: first.batch_id || '',
+      batch_number: first.batch_number || first.transfer_number,
+      source_location_id: first.source_location_id,
+      source_location_name: first.source_location_name,
+      destination_location_id: first.destination_location_id,
+      destination_location_name: first.destination_location_name,
+      notes: first.notes,
+      created_by_name: first.created_by_name,
+      sent_at: first.sent_at || first.created_date,
+      received_by_name: first.received_by_name,
+      received_at: first.received_at,
+      status: allReceived ? 'received' : allPending ? 'pending' : 'receiving',
+      items,
+      total_quantity: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    };
+  });
+}
+
 export default function TransfersPanel({
   user, location, locations, products, productStock, transfers, search, onReload,
 }) {
@@ -24,39 +71,48 @@ export default function TransfersPanel({
   const effectiveLocationId = location?.id || assignedShopId;
   const normalizedSearch = search.toLowerCase().trim();
 
-  const visibleTransfers = useMemo(() => transfers.filter((transfer) => {
-    const belongs = transfer.source_location_id === effectiveLocationId
-      || transfer.destination_location_id === effectiveLocationId;
-    if (!belongs) return false;
+  const transferGroups = useMemo(() => groupTransferRows(
+    transfers.filter((transfer) => transfer.source_location_id === effectiveLocationId
+      || transfer.destination_location_id === effectiveLocationId),
+  ), [transfers, effectiveLocationId]);
+
+  const visibleGroups = useMemo(() => transferGroups.filter((group) => {
     if (!normalizedSearch) return true;
     return [
-      transfer.transfer_number,
-      transfer.product_name_snapshot,
-      transfer.source_location_name,
-      transfer.destination_location_name,
-      transfer.created_by_name,
-      transfer.received_by_name,
+      group.batch_number,
+      group.source_location_name,
+      group.destination_location_name,
+      group.created_by_name,
+      group.received_by_name,
+      ...group.items.flatMap((item) => [item.transfer_number, item.product_name_snapshot]),
     ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch);
-  }), [transfers, effectiveLocationId, normalizedSearch]);
+  }), [transferGroups, normalizedSearch]);
 
-  const pending = visibleTransfers.filter((transfer) => transfer.status !== 'received');
-  const completed = visibleTransfers.filter((transfer) => transfer.status === 'received');
+  const pending = visibleGroups.filter((group) => group.status !== 'received');
+  const completed = visibleGroups.filter((group) => group.status === 'received');
 
-  const canReceive = (transfer) => user?.role !== 'manager'
-    && transfer.status === 'pending'
-    && transfer.destination_location_id === effectiveLocationId
-    && (user?.role === 'admin' || assignedShopId === transfer.destination_location_id);
+  const canReceive = (group) => user?.role !== 'manager'
+    && group.status === 'pending'
+    && group.items.every((item) => item.status === 'pending')
+    && group.destination_location_id === effectiveLocationId
+    && (user?.role === 'admin' || assignedShopId === group.destination_location_id);
 
-  const receive = async (transfer) => {
-    if (!confirm(`${transfer.product_name_snapshot} — ${formatNum(transfer.quantity)} dona qabul qilinsinmi?`)) return;
-    setReceivingId(transfer.id);
+  const receive = async (group) => {
+    const message = group.items.length > 1
+      ? `${group.batch_number}: ${group.items.length} tur, ${formatNum(group.total_quantity)} dona mahsulotning hammasi qabul qilinsinmi?`
+      : `${group.items[0].product_name_snapshot} — ${formatNum(group.total_quantity)} dona qabul qilinsinmi?`;
+    if (!confirm(message)) return;
+
+    setReceivingId(group.id);
     try {
-      const result = await base44.functions.invoke('stock-transfer', {
-        action: 'receive_transfer',
-        transfer_id: transfer.id,
-      });
+      const request = group.batch_id
+        ? { action: 'receive_transfer_batch', batch_id: group.batch_id }
+        : { action: 'receive_transfer', transfer_id: group.items[0].id };
+      const result = await base44.functions.invoke('stock-transfer', request);
       const payload = result?.data || result;
-      if (!payload?.transfer) throw new Error(payload?.error || 'Transferni qabul qilib bo‘lmadi.');
+      if (!payload?.transfer && !payload?.transfers?.length) {
+        throw new Error(payload?.error || 'Transferni qabul qilib bo‘lmadi.');
+      }
       await onReload();
     } catch (error) {
       alert('Qabul qilish amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
@@ -74,7 +130,7 @@ export default function TransfersPanel({
         <div className="flex-1">
           <p className="font-semibold">Mahsulot transferlari</p>
           <p className="text-sm text-muted-foreground">
-            Markaz jo‘natadi, do‘kon qabul qilgandan keyin uning qoldig‘iga qo‘shiladi.
+            Bir transferga bir nechta mahsulot qo‘shing; do‘kon ularning hammasini birga qabul qiladi.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -92,19 +148,19 @@ export default function TransfersPanel({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display text-lg font-bold">Jarayondagi transferlar</h3>
-          <span className="text-xs rounded-full bg-secondary px-2.5 py-1">{formatNum(pending.length)} ta</span>
+          <span className="text-xs rounded-full bg-secondary px-2.5 py-1">{formatNum(pending.length)} ta hujjat</span>
         </div>
         {pending.length === 0 ? (
           <Empty text="Qabul qilinishi kutilayotgan transfer yo‘q." />
         ) : (
-          <div className="grid lg:grid-cols-2 gap-3">
-            {pending.map((transfer) => (
-              <TransferCard
-                key={transfer.id}
-                transfer={transfer}
-                canReceive={canReceive(transfer)}
-                receiving={receivingId === transfer.id}
-                onReceive={() => receive(transfer)}
+          <div className="grid xl:grid-cols-2 gap-3">
+            {pending.map((group) => (
+              <TransferGroupCard
+                key={group.id}
+                group={group}
+                canReceive={canReceive(group)}
+                receiving={receivingId === group.id}
+                onReceive={() => receive(group)}
               />
             ))}
           </div>
@@ -114,15 +170,13 @@ export default function TransfersPanel({
       <section>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-display text-lg font-bold">Qabul qilinganlar tarixi</h3>
-          <span className="text-xs rounded-full bg-secondary px-2.5 py-1">{formatNum(completed.length)} ta</span>
+          <span className="text-xs rounded-full bg-secondary px-2.5 py-1">{formatNum(completed.length)} ta hujjat</span>
         </div>
         {completed.length === 0 ? (
           <Empty text="Hali qabul qilingan transfer yo‘q." />
         ) : (
           <div className="space-y-3">
-            {completed.map((transfer) => (
-              <TransferCard key={transfer.id} transfer={transfer} />
-            ))}
+            {completed.map((group) => <TransferGroupCard key={group.id} group={group} />)}
           </div>
         )}
       </section>
@@ -143,43 +197,68 @@ export default function TransfersPanel({
   );
 }
 
-function TransferCard({ transfer, canReceive, receiving, onReceive }) {
-  const status = STATUS[transfer.status] || STATUS.pending;
+function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
+  const status = STATUS[group.status] || STATUS.pending;
   return (
-    <article className="rounded-2xl border border-border bg-card p-4 premium-shadow">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold">{transfer.product_name_snapshot}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{transfer.transfer_number}</p>
+    <article className="overflow-hidden rounded-2xl border border-border bg-card premium-shadow">
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold">{group.batch_number}</p>
+              <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-brand-ink">
+                {formatNum(group.items.length)} tur
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Jami {formatNum(group.total_quantity)} dona mahsulot
+            </p>
+          </div>
+          <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${status.className}`}>{status.label}</span>
         </div>
-        <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${status.className}`}>{status.label}</span>
-      </div>
 
-      <div className="mt-4 rounded-xl bg-secondary/55 p-3 flex items-center gap-2 text-sm">
-        <span className="font-medium truncate">{transfer.source_location_name}</span>
-        <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
-        <span className="font-medium truncate">{transfer.destination_location_name}</span>
-        <span className="ml-auto font-bold text-brand-ink whitespace-nowrap">{formatNum(transfer.quantity)} dona</span>
-      </div>
-
-      {transfer.notes && <p className="text-sm text-muted-foreground mt-3">{transfer.notes}</p>}
-
-      <div className="text-xs text-muted-foreground mt-3 space-y-1">
-        <p>Jo‘natdi: {transfer.created_by_name} · {new Date(transfer.sent_at || transfer.created_date).toLocaleString('uz-UZ')}</p>
-        {transfer.received_at && <p>Qabul qildi: {transfer.received_by_name} · {new Date(transfer.received_at).toLocaleString('uz-UZ')}</p>}
-      </div>
-
-      {canReceive && (
-        <Button onClick={onReceive} disabled={receiving} className="w-full mt-4 min-h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 touch-manipulation">
-          <PackageCheck className="w-4 h-4 mr-1.5" />
-          {receiving ? 'Qabul qilinmoqda…' : 'Qabul qildim'}
-        </Button>
-      )}
-      {transfer.status === 'received' && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
-          <CheckCircle2 className="w-4 h-4" /> Do‘kon qoldig‘iga qo‘shilgan
+        <div className="mt-4 rounded-xl bg-secondary/55 p-3 flex items-center gap-2 text-sm">
+          <span className="font-medium truncate">{group.source_location_name}</span>
+          <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="font-medium truncate">{group.destination_location_name}</span>
         </div>
-      )}
+
+        <div className="mt-3 overflow-hidden rounded-xl border border-border/80 bg-background/70 divide-y divide-border/70">
+          {group.items.map((item, index) => (
+            <div key={item.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+              <span className="w-6 h-6 rounded-lg bg-primary/15 text-brand-ink flex items-center justify-center text-[11px] font-bold shrink-0">
+                {index + 1}
+              </span>
+              <span className="min-w-0 flex-1 font-medium truncate">{item.product_name_snapshot}</span>
+              <span className="font-bold text-brand-ink whitespace-nowrap">{formatNum(item.quantity)} dona</span>
+            </div>
+          ))}
+        </div>
+
+        {group.notes && <p className="text-sm text-muted-foreground mt-3">Izoh: {group.notes}</p>}
+
+        <div className="text-xs text-muted-foreground mt-3 space-y-1">
+          <p>Jo‘natdi: {group.created_by_name} · {new Date(group.sent_at).toLocaleString('uz-UZ')}</p>
+          {group.received_at && <p>Qabul qildi: {group.received_by_name} · {new Date(group.received_at).toLocaleString('uz-UZ')}</p>}
+        </div>
+
+        {canReceive && (
+          <Button onClick={onReceive} disabled={receiving} className="w-full mt-4 min-h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 touch-manipulation">
+            <PackageCheck className="w-4 h-4 mr-1.5" />
+            {receiving ? 'Qabul qilinmoqda…' : group.items.length > 1 ? 'Hammasini qabul qilish' : 'Qabul qildim'}
+          </Button>
+        )}
+        {group.status === 'received' && (
+          <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+            <CheckCircle2 className="w-4 h-4" /> Barcha mahsulotlar do‘kon qoldig‘iga qo‘shilgan
+          </div>
+        )}
+        {group.status === 'receiving' && (
+          <p className="mt-3 text-xs font-medium text-blue-700">
+            Transfer qayta ishlanmoqda. Yangilash tugmasini bosib holatini tekshiring.
+          </p>
+        )}
+      </div>
     </article>
   );
 }
@@ -188,8 +267,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
   const [destinationId, setDestinationId] = useState('');
   const [categoryId, setCategoryId] = useState('all');
   const [productSearch, setProductSearch] = useState('');
-  const [productId, setProductId] = useState('');
-  const [quantity, setQuantity] = useState('');
+  const [selectedQuantities, setSelectedQuantities] = useState({});
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -199,7 +277,10 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
       .filter((stock) => stock.location_id === source?.id)
       .map((stock) => [stock.product_id, Number(stock.quantity || 0)]),
   );
-  const availableProducts = products.filter((product) => Number(stockByProduct[product.id] || 0) > 0);
+  const availableProducts = products
+    .filter((product) => Number(stockByProduct[product.id] || 0) > 0)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uz'));
+  const productById = Object.fromEntries(availableProducts.map((product) => [product.id, product]));
   const categories = Array.from(new Map(
     availableProducts
       .filter((product) => product.category_id || product.category_name)
@@ -218,41 +299,81 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
       || [product.name, product.category_name].filter(Boolean).join(' ').toLowerCase().includes(normalizedProductSearch);
     return categoryMatches && searchMatches;
   });
-  const available = Number(stockByProduct[productId] || 0);
-  const transferAmount = Number(quantity);
-  const quantityValid = Number.isInteger(transferAmount) && transferAmount > 0 && transferAmount <= available;
+  const selectedEntries = Object.entries(selectedQuantities)
+    .map(([productId, rawQuantity]) => ({
+      product: productById[productId],
+      quantity: Number(rawQuantity),
+      available: Number(stockByProduct[productId] || 0),
+    }))
+    .filter((item) => item.product && Number.isInteger(item.quantity) && item.quantity > 0)
+    .sort((a, b) => String(a.product.name || '').localeCompare(String(b.product.name || ''), 'uz'));
+  const totalQuantity = selectedEntries.reduce((sum, item) => sum + item.quantity, 0);
+  const selectionValid = selectedEntries.length > 0
+    && selectedEntries.length <= 50
+    && selectedEntries.every((item) => item.quantity <= item.available);
 
-  const resetAndClose = () => {
-    if (saving) return;
+  const changeQuantity = (productId, nextValue) => {
+    const available = Math.floor(Number(stockByProduct[productId] || 0));
+    setSelectedQuantities((current) => {
+      const next = { ...current };
+      const parsed = Math.floor(Number(nextValue));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        delete next[productId];
+        return next;
+      }
+      const selectedTypeCount = Object.values(current).filter((value) => Number(value) > 0).length;
+      if (!current[productId] && selectedTypeCount >= 50) return current;
+      next[productId] = Math.min(parsed, available);
+      return next;
+    });
+  };
+
+  const addProduct = (product) => {
+    const current = Number(selectedQuantities[product.id] || 0);
+    changeQuantity(product.id, current + 1);
+  };
+
+  const removeProduct = (productId) => {
+    setSelectedQuantities((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+  };
+
+  const clearForm = () => {
     setDestinationId('');
     setCategoryId('all');
     setProductSearch('');
-    setProductId('');
-    setQuantity('');
+    setSelectedQuantities({});
     setNotes('');
+  };
+
+  const resetAndClose = () => {
+    if (saving) return;
+    clearForm();
     onClose();
   };
 
   const send = async () => {
-    if (!destinationId || !productId || !quantityValid) return;
+    if (!destinationId || !selectionValid) return;
     setSaving(true);
     try {
       const result = await base44.functions.invoke('stock-transfer', {
         action: 'create_transfer',
         source_location_id: source.id,
         destination_location_id: destinationId,
-        product_id: productId,
-        quantity: transferAmount,
+        items: selectedEntries.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+        })),
         notes: notes.trim(),
       });
       const payload = result?.data || result;
-      if (!payload?.transfer) throw new Error(payload?.error || 'Transferni yaratib bo‘lmadi.');
-      setDestinationId('');
-      setCategoryId('all');
-      setProductSearch('');
-      setProductId('');
-      setQuantity('');
-      setNotes('');
+      if (!payload?.transfer && !payload?.transfers?.length) {
+        throw new Error(payload?.error || 'Transferni yaratib bo‘lmadi.');
+      }
+      clearForm();
       await onSaved();
     } catch (error) {
       alert('Transfer jo‘natilmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
@@ -263,111 +384,151 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && resetAndClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Yangi transfer jo‘natish</DialogTitle>
-          <p className="text-sm text-muted-foreground">{source?.name} omboridan do‘konga</p>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
+              <ShoppingBasket className="w-5 h-5" />
+            </div>
+            <div>
+              <DialogTitle className="font-display text-xl">Yangi transfer tayyorlash</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">{source?.name} omboridan do‘konga</p>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
+          <div className="rounded-2xl border border-border bg-secondary/35 p-4">
             <Label className="text-xs mb-1.5 block">Qabul qiluvchi do‘kon</Label>
             <select value={destinationId} onChange={(event) => setDestinationId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
               <option value="">Do‘konni tanlang</option>
               {destinations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs mb-1.5 block">Kategoriya</Label>
-              <select
-                value={categoryId}
-                onChange={(event) => {
-                  setCategoryId(event.target.value);
-                  setProductId('');
-                  setQuantity('');
-                }}
-                className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
-              >
-                <option value="all">Barcha kategoriyalar</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={productSearch}
-                  onChange={(event) => {
-                    setProductSearch(event.target.value);
-                    setProductId('');
-                    setQuantity('');
-                  }}
-                  placeholder="Masalan: Almond"
-                  className="h-11 pl-9"
-                />
+
+          <div className="grid lg:grid-cols-3 gap-4 items-start">
+            <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div>
+                  <p className="font-semibold">Mahsulotlarni tanlang</p>
+                  <p className="text-xs text-muted-foreground">Har xil tort va mahsulotlarni bitta transferga qo‘shing.</p>
+                </div>
+                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs whitespace-nowrap">
+                  {formatNum(availableProducts.length)} ta mavjud
+                </span>
               </div>
+
+              <div className="grid sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <Label className="text-xs mb-1.5 block">Kategoriya</Label>
+                  <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+                    <option value="all">Barcha kategoriyalar</option>
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Masalan: Almond" className="h-11 pl-9" />
+                  </div>
+                </div>
+              </div>
+
+              {filteredProducts.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                  Bu kategoriya yoki qidiruv bo‘yicha qoldiqli mahsulot topilmadi.
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                  {filteredProducts.map((product) => {
+                    const available = Math.floor(Number(stockByProduct[product.id] || 0));
+                    const selected = Number(selectedQuantities[product.id] || 0);
+                    return (
+                      <div key={product.id} className={`rounded-xl border p-3 transition-colors ${selected > 0 ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{product.category_name || 'Kategoriyasiz'}</p>
+                          </div>
+                          {selected > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">{formatNum(selected)} ta</span>}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <span className="text-xs text-muted-foreground">Mavjud: <b className="text-foreground">{formatNum(available)}</b></span>
+                          <Button type="button" size="sm" variant={selected > 0 ? 'outline' : 'secondary'} onClick={() => addProduct(product)} disabled={selected >= available} className="h-8 rounded-lg">
+                            <Plus className="w-3.5 h-3.5 mr-1" /> {selected > 0 ? 'Yana' : 'Qo‘shish'}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+
+            <aside className="rounded-2xl border border-primary/25 bg-primary/5 p-3 sm:p-4 lg:sticky lg:top-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingBasket className="w-4 h-4 text-brand-ink" />
+                  <p className="font-semibold">Transfer savati</p>
+                </div>
+                <span className="rounded-full bg-card px-2.5 py-1 text-xs font-semibold">{formatNum(selectedEntries.length)} tur</span>
+              </div>
+
+              {selectedEntries.length === 0 ? (
+                <div className="py-8 text-center">
+                  <ShoppingBasket className="w-8 h-8 mx-auto text-muted-foreground/35 mb-2" />
+                  <p className="text-sm text-muted-foreground">Chap tomondan mahsulotlarni qo‘shing.</p>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2 max-h-[330px] overflow-y-auto pr-1">
+                  {selectedEntries.map(({ product, quantity, available }) => (
+                    <div key={product.id} className="rounded-xl border border-border bg-card p-3">
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{product.name}</p>
+                          <p className="text-[11px] text-muted-foreground">Jo‘natilgach {formatNum(available - quantity)} dona qoladi</p>
+                        </div>
+                        <button type="button" onClick={() => removeProduct(product.id)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center touch-manipulation" aria-label={`${product.name}ni olib tashlash`}>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity - 1)} className="w-9 h-9 rounded-lg shrink-0">
+                          <Minus className="w-3.5 h-3.5" />
+                        </Button>
+                        <Input type="number" inputMode="numeric" min="1" max={available} step="1" value={quantity} onChange={(event) => changeQuantity(product.id, event.target.value)} className="h-9 rounded-lg text-center px-1" />
+                        <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity + 1)} disabled={quantity >= available} className="w-9 h-9 rounded-lg shrink-0">
+                          <Plus className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 pt-3 border-t border-primary/20 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Jami miqdor</span>
+                <span className="font-display text-lg font-bold text-brand-ink">{formatNum(totalQuantity)} dona</span>
+              </div>
+            </aside>
           </div>
-          <div>
-            <Label className="text-xs mb-1.5 block">Mahsulot</Label>
-            <select value={productId} onChange={(event) => { setProductId(event.target.value); setQuantity(''); }} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
-              <option value="">Mahsulotni tanlang</option>
-              {filteredProducts.map((product) => (
-                <option key={product.id} value={product.id}>{product.name} · {formatNum(stockByProduct[product.id])} dona mavjud</option>
-              ))}
-            </select>
-            {filteredProducts.length === 0 && (
-              <p className="text-xs text-destructive mt-1.5">Bu kategoriya yoki qidiruv bo‘yicha qoldiqli mahsulot topilmadi.</p>
-            )}
-          </div>
-          <div>
-            <Label className="text-xs mb-1.5 block">Jo‘natiladigan miqdor (dona)</Label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              min="1"
-              max={available || undefined}
-              step="1"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              placeholder={productId ? `1 dan ${formatNum(available)} gacha` : 'Avval mahsulotni tanlang'}
-              disabled={!productId}
-              className="h-11 rounded-xl"
-            />
-            {productId && (
-              <p className="text-xs text-muted-foreground mt-1.5">
-                Markazda mavjud: {formatNum(available)} dona. Transfer yaratish uchun 1–{formatNum(available)} oralig‘idagi butun sonni kiriting.
-              </p>
-            )}
-            {quantity && !quantityValid && (
-              <p className="text-xs text-destructive mt-1.5">
-                Miqdor 1 dan {formatNum(available)} gacha bo‘lgan butun son bo‘lishi kerak.
-              </p>
-            )}
-          </div>
+
           <div>
             <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Masalan: ertalabki yetkazib berish" rows={2} />
           </div>
-          {productId && quantityValid && (
-            <div className="rounded-xl bg-secondary/60 p-3 text-sm flex items-center justify-between">
-              <span className="text-muted-foreground">Jo‘natilgandan keyin markazda</span>
-              <span className={`font-semibold ${Number(quantity) > available ? 'text-destructive' : ''}`}>
-                {formatNum(available - Number(quantity || 0))} dona
-              </span>
-            </div>
-          )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={resetAndClose} disabled={saving}>Bekor qilish</Button>
-          <Button onClick={send} disabled={saving || !destinationId || !productId || !quantityValid} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+          <Button onClick={send} disabled={saving || !destinationId || !selectionValid} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             <Send className="w-4 h-4 mr-1.5" />
-            {saving ? 'Jo‘natilmoqda…' : 'Transferni jo‘natish'}
+            {saving
+              ? 'Jo‘natilmoqda…'
+              : selectedEntries.length > 0
+                ? `${formatNum(selectedEntries.length)} tur · ${formatNum(totalQuantity)} dona jo‘natish`
+                : 'Mahsulotlarni tanlang'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -383,3 +544,4 @@ function Empty({ text }) {
     </div>
   );
 }
+
