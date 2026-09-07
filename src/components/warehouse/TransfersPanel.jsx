@@ -20,6 +20,7 @@ export default function TransfersPanel({
   const [sendOpen, setSendOpen] = useState(false);
   const [receivingId, setReceivingId] = useState('');
   const canSend = user?.role === 'admin' && location?.location_type === 'production';
+  const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
   const normalizedSearch = search.toLowerCase().trim();
 
   const visibleTransfers = useMemo(() => transfers.filter((transfer) => {
@@ -42,7 +43,7 @@ export default function TransfersPanel({
   const canReceive = (transfer) => user?.role !== 'manager'
     && transfer.status === 'pending'
     && transfer.destination_location_id === location?.id
-    && (user?.role === 'admin' || user?.shop_id === transfer.destination_location_id);
+    && (user?.role === 'admin' || assignedShopId === transfer.destination_location_id);
 
   const receive = async (transfer) => {
     if (!confirm(`${transfer.product_name_snapshot} — ${formatNum(transfer.quantity)} dona qabul qilinsinmi?`)) return;
