@@ -114,14 +114,14 @@ export default function CashOutHistory() {
   const ownerView = ['admin', 'manager'].includes(user?.role);
 
   return (
-    <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
         title="Kassadan pul olish tarixi"
         subtitle={ownerView ? 'Barcha do‘konlardan olingan naqd pullar' : 'Faqat sizning hisobingiz orqali olingan pullar'}
         icon={Banknote}
       />
 
-      <div className="rounded-2xl bg-card border border-border premium-shadow p-4 mb-6 space-y-4">
+      <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 mb-6 space-y-4">
         <div className="flex flex-wrap gap-2">
           {[
             ['today', 'Bugun'],
@@ -223,11 +223,11 @@ export default function CashOutHistory() {
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3 mb-3">
-        <div className="rounded-2xl bg-card border border-border premium-shadow p-4">
+        <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
           <p className="text-xs text-muted-foreground">Jami olingan naqd pul</p>
           <p className="text-2xl font-semibold mt-1">{formatUZS(total)}</p>
         </div>
-        <div className="rounded-2xl bg-card border border-border premium-shadow p-4">
+        <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
           <p className="text-xs text-muted-foreground">Yozuvlar</p>
           <p className="text-2xl font-semibold mt-1">{formatNum(filtered.length)}</p>
         </div>
@@ -235,7 +235,7 @@ export default function CashOutHistory() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {categoryTotals.map((item) => (
-          <div key={item.key} className="rounded-2xl bg-card border border-border p-3 sm:p-4">
+          <div key={item.key} className="odina-panel rounded-2xl bg-card border border-border p-3 sm:p-4">
             <p className="text-xs text-muted-foreground">{item.label}</p>
             <p className="text-base sm:text-lg font-semibold mt-1">{formatUZS(item.total)}</p>
           </div>
@@ -249,7 +249,7 @@ export default function CashOutHistory() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl bg-card border border-border py-16 text-center">
+        <div className="odina-panel rounded-2xl bg-card border border-border py-16 text-center">
           <Banknote className="w-9 h-9 mx-auto text-muted-foreground/50 mb-3" />
           <p className="font-medium">{search ? 'Mos yozuv topilmadi' : 'Hali kassadan pul olinmagan'}</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -263,7 +263,7 @@ export default function CashOutHistory() {
             const employee = movement.employee_name || movement.user_name || 'Noma’lum xodim';
             const category = categoryOf(movement);
             return (
-              <div key={movement.id} className="rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
+              <div key={movement.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
