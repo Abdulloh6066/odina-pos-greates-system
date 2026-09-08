@@ -1,0 +1,122 @@
+{
+  "properties": {
+    "cashier_id": {
+      "type": "string"
+    },
+    "cashier_name": {
+      "type": "string"
+    },
+    "closed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "counted_by_id": {
+      "type": "string"
+    },
+    "counted_by_name": {
+      "type": "string"
+    },
+    "counted_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "difference": {
+      "default": 0,
+      "type": "number"
+    },
+    "expected_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "image_url_snapshot": {
+      "type": "string"
+    },
+    "opening_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "other_change_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "received_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "returned_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "shift_id": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "sold_quantity": {
+      "default": 0,
+      "type": "number"
+    },
+    "unit": {
+      "default": "piece",
+      "enum": [
+        "piece"
+      ],
+      "type": "string"
+    },
+    "waste_quantity": {
+      "default": 0,
+      "type": "number"
+    }
+  },
+  "required": [
+    "shift_id",
+    "shop_id",
+    "cashier_id",
+    "product_id",
+    "product_name_snapshot",
+    "unit",
+    "expected_quantity",
+    "counted_quantity",
+    "difference",
+    "closed_at"
+  ],
+  "rls": {
+    "create": false,
+    "delete": false,
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.cashier_id": "{{user.id}}"
+        }
+      ]
+    },
+    "update": false
+  },
+  "type": "object",
+  "name": "ShiftProductSnapshot"
+}

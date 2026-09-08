@@ -223,8 +223,17 @@ function normalizeShiftStockCounts(value: unknown) {
   const counts = new Map<string, number>();
   for (const item of value) {
     const productId = String(item?.product_id || "");
-    const counted = Number(item?.counted_quantity);
-    if (!productId || !Number.isFinite(counted) || counted < 0 || !Number.isInteger(counted)) {
+    const rawCount = item?.counted_quantity;
+    const counted = Number(rawCount);
+    if (
+      !productId
+      || rawCount === ""
+      || rawCount === null
+      || rawCount === undefined
+      || !Number.isFinite(counted)
+      || counted < 0
+      || !Number.isInteger(counted)
+    ) {
       throw httpError("Har bir mahsulotning haqiqiy qoldig‘ini butun dona bilan kiriting.", 400);
     }
     if (counts.has(productId)) {
