@@ -212,44 +212,6 @@ async function buildShiftStockReport(service: any, shift: any, generatedAt: stri
   };
 }
 
-function normalizeShiftStockCounts(value: unknown) {
-  if (!Array.isArray(value)) {
-    throw httpError("Smenani yopishdan oldin mahsulot qoldiqlarini sanang.", 400);
-  }
-  if (value.length >= SHIFT_STOCK_ROW_LIMIT) {
-    throw httpError("Mahsulot qoldiqlari ro‘yxati juda katta.", 400);
-  }
-
-  const counts = new Map<string, number>();
-  for (const item of value) {
-    const productId = String(item?.product_id || "");
-    const rawCount = item?.counted_quantity;
-    const counted = Number(rawCount);
-    if (
-      !productId
-      || rawCount === ""
-      || rawCount === null
-      || rawCount === undefined
-      || !Number.isFinite(counted)
-      || counted < 0
-      || !Number.isInteger(counted)
-    ) {
-      throw httpError("Har bir mahsulotning haqiqiy qoldig‘ini butun dona bilan kiriting.", 400);
-    }
-    if (counts.has(productId)) {
-      throw httpError("Bir mahsulot qoldig‘i ikki marta yuborildi.", 400);
-    }
-    counts.set(productId, counted);
-  }
-  return counts;
-}
-
-function matchShiftStockCounts(rows: any[], counts: Map<string, number>) {
-  if (rows.length !== counts.size || rows.some((row: any) => !counts.has(row.product_id))) {
-    throw httpError("Mahsulot qoldig‘i o‘zgardi. Yopish oynasini qayta ochib, yana sanang.", 409);
-  }
-}
-
 const BUDGET_ACCOUNT_LABELS: Record<string, string> = {
   cash: "Naqd pul",
   uzcard: "Uzcard",
