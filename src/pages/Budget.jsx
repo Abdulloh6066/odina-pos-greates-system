@@ -93,7 +93,7 @@ export default function Budget() {
   if (user?.role !== "admin") return null;
 
   return (
-    <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Budget"
         subtitle="Smenalardan tushgan mablag‘lar va egasi tasdiqlagan chiqimlar"
@@ -135,7 +135,7 @@ export default function Budget() {
               <p className="text-xs opacity-75 mt-2">Barcha pul manbalari yig‘indisi</p>
             </div>
             {ACCOUNTS.map(({ id, label, icon: Icon, tone }) => (
-              <div key={id} className="rounded-2xl border border-border bg-card p-4 premium-shadow">
+              <div key={id} className="odina-panel rounded-2xl border border-border bg-card p-4 premium-shadow">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tone}`}>
                   <Icon className="w-5 h-5" />
                 </div>
@@ -145,7 +145,7 @@ export default function Budget() {
             ))}
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 mt-6">
+          <div className="odina-panel rounded-2xl border border-border bg-card p-4 sm:p-5 mt-6">
             <div className="flex flex-col lg:flex-row lg:items-end gap-3">
               <div className="flex-1">
                 <h3 className="font-display text-lg font-semibold">Budget tarixi</h3>
@@ -177,7 +177,7 @@ export default function Budget() {
 
           <div className="space-y-3 mt-4">
             {visibleTransactions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-card py-14 text-center text-sm text-muted-foreground">
+              <div className="odina-panel rounded-2xl border border-dashed border-border bg-card py-14 text-center text-sm text-muted-foreground">
                 Hozircha Budget harakati yo‘q.
               </div>
             ) : visibleTransactions.map((transaction) => {
@@ -185,7 +185,7 @@ export default function Budget() {
               const account = ACCOUNTS.find((item) => item.id === transaction.account);
               const Icon = incoming ? ArrowDownLeft : ArrowUpRight;
               return (
-                <div key={transaction.id} className="rounded-2xl border border-border bg-card p-4 flex items-start gap-3">
+                <div key={transaction.id} className="odina-panel rounded-2xl border border-border bg-card p-4 flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${incoming ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive"}`}>
                     <Icon className="w-5 h-5" />
                   </div>
