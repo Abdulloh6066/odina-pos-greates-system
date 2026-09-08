@@ -157,6 +157,7 @@ const loadContext = async (service: any, user: any) => {
   const productById = new Map((allProducts || []).map((product: any) => [product.id, product]));
   const stocks = (allStocks || []).filter((stock: any) =>
     allowedIds.has(stock.location_id) && cleanNumber(stock.quantity) > 0
+      && productById.has(stock.product_id)
       && (productById.get(stock.product_id) as any)?.archived !== true
   );
   const transfers = (allTransfers || []).filter((transfer: any) =>
