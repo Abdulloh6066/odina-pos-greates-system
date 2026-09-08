@@ -82,13 +82,13 @@ const ageSummary = (stock: any, transfers: any[], nowMs: number) => {
       && transfer.destination_location_id === stock.location_id
       && transfer.product_id === stock.product_id
       && Number.isFinite(Date.parse(transfer.received_at || ""))
-      && cleanNumber(transfer.quantity) > 0
+      && cleanNumber(transfer.received_quantity ?? transfer.quantity) > 0
     )
     .sort((a: any, b: any) => Date.parse(b.received_at) - Date.parse(a.received_at));
 
   for (const transfer of ordered) {
     if (unallocated <= 0) break;
-    const allocated = Math.min(unallocated, cleanNumber(transfer.quantity));
+    const allocated = Math.min(unallocated, cleanNumber(transfer.received_quantity ?? transfer.quantity));
     if (allocated <= 0) continue;
     const receivedTime = Date.parse(transfer.received_at);
     trackedQuantity += allocated;
