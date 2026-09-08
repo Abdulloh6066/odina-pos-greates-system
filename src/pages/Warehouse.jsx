@@ -23,7 +23,7 @@ const TABS = [
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
-const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona' };
+const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 const SOURCE_LABELS = {
   central_produced: 'Markaziy ishlab chiqarishda tayyorlanadi',
   shop_prepared: 'Do‘konning o‘zida tayyorlanadi',
@@ -292,7 +292,7 @@ export default function Warehouse() {
   }, [movements, selectedLocation, search]);
 
   const balancesForLocation = [...ingredientStock, ...productStock]
-    .filter((balance) => balance.location_id === selectedLocation);
+    .filter((balance) => balance.location_id === selectedLocation && (!balance.product_id || products.some((p) => p.id === balance.product_id)));
   const stockedCount = balancesForLocation.filter((balance) => Number(balance.quantity || 0) > 0).length;
 
   return (
@@ -436,6 +436,7 @@ export default function Warehouse() {
               <StockGrid
                 items={items}
                 stockMap={stockMap}
+                location={selectedLocationRecord}
                 kind={tab === 'products' ? 'product' : 'ingredient'}
                 onAdjust={['warehouse', 'manager'].includes(user?.role) ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
               />
@@ -471,7 +472,7 @@ function Summary({ label, value }) {
   );
 }
 
-function StockGrid({ items, stockMap, kind, onAdjust }) {
+function StockGrid({ items, stockMap, kind, location, onAdjust }) {
   if (!items.length) {
     return <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Mos mahsulot topilmadi.</div>;
   }
@@ -480,7 +481,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
       {items.map((item) => {
         const stock = stockMap[item.id];
         const quantity = Number(stock?.quantity || 0);
-        const unit = kind === 'ingredient' ? item.base_unit : 'piece';
+        const unit = kind === 'ingredient' ? item.base_unit : (stock?.unit || (location?.location_type === 'production' ? item.production_unit || 'piece' : 'piece'));
         return (
           <div key={item.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
             <div className="flex items-start justify-between gap-3">
@@ -650,7 +651,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
     }
   }, [open, current]);
 
-  const unit = kind === 'ingredient' ? item?.base_unit : 'piece';
+  const unit = kind === 'ingredient' ? item?.base_unit : (location?.location_type === 'production' ? item?.production_unit || 'piece' : 'piece');
   const change = (mode === 'remove' ? -1 : 1) * Number(quantity || 0);
   const after = current + change;
 
@@ -700,7 +701,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Miqdor ({UNIT_LABELS[unit] || unit})</Label>
-            <Input autoFocus type="number" min="0.001" step={unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
+            <Input autoFocus type="number" min="0.001" step={kind === 'product' || unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Sabab</Label>
