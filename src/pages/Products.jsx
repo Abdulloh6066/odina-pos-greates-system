@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
+import TestCatalogCleanup from '@/components/TestCatalogCleanup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,6 +69,8 @@ export default function Products() {
           </Button>
         )}
       />
+
+      {!loading && <TestCatalogCleanup user={user} products={products} onComplete={load} />}
 
       <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
