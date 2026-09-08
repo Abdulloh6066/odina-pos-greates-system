@@ -514,6 +514,7 @@ export default async function(req) {
       if (closingShift.user_id !== user.id) {
         return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
       }
+      const stockCounts = normalizeShiftStockCounts(body?.stock_counts);
 
       const claim = await service.entities.Shift.updateMany(
         { id: closingShift.id, user_id: user.id, status: "open" },
@@ -536,8 +537,51 @@ export default async function(req) {
       ].filter((deposit) => deposit.amount > 0);
       const balanceChanges: any[] = [];
       const budgetTransactions: any[] = [];
+      let stockReport: any = null;
+      let stockSnapshotPayloads: any[] = [];
+      let stockDifferenceQuantity = 0;
+      let stockDifferenceProductCount = 0;
 
       try {
+        stockReport = await buildShiftStockReport(service, closingShift, closedAt);
+        matchShiftStockCounts(stockReport.rows, stockCounts);
+        stockSnapshotPayloads = stockReport.rows.map((row: any) => {
+          const countedQuantity = stockNumber(stockCounts.get(row.product_id));
+          return {
+            shift_id: closingShift.id,
+            shop_id: closingShift.shop_id,
+            shop_name: closingShift.shop_name,
+            cashier_id: closingShift.user_id,
+            cashier_name: closingShift.user_name || userName,
+            product_id: row.product_id,
+            product_name_snapshot: row.product_name_snapshot,
+            image_url_snapshot: row.image_url_snapshot,
+            unit: "piece",
+            opening_quantity: row.opening_quantity,
+            received_quantity: row.received_quantity,
+            sold_quantity: row.sold_quantity,
+            waste_quantity: row.waste_quantity,
+            returned_quantity: row.returned_quantity,
+            other_change_quantity: row.other_change_quantity,
+            expected_quantity: row.expected_quantity,
+            counted_quantity: countedQuantity,
+            difference: stockNumber(countedQuantity - row.expected_quantity),
+            counted_by_id: user.id,
+            counted_by_name: userName,
+            closed_at: closedAt,
+          };
+        });
+        stockDifferenceQuantity = stockNumber(stockSnapshotPayloads.reduce(
+          (sum: number, row: any) => sum + Math.abs(Number(row.difference || 0)),
+          0,
+        ));
+        stockDifferenceProductCount = stockSnapshotPayloads.filter(
+          (row: any) => Number(row.difference || 0) !== 0,
+        ).length;
+        if (stockSnapshotPayloads.length) {
+          await service.entities.ShiftProductSnapshot.bulkCreate(stockSnapshotPayloads);
+        }
+
         for (const deposit of deposits) {
           const balanceChange = await creditBudgetBalance(
             service,
@@ -576,6 +620,10 @@ export default async function(req) {
             closed_at: closedAt,
             actual_cash: actualCash,
             difference: actualCash - expected,
+            stock_count_completed: true,
+            stock_snapshot_count: stockSnapshotPayloads.length,
+            stock_difference_quantity: stockDifferenceQuantity,
+            stock_difference_product_count: stockDifferenceProductCount,
             budget_settled: true,
             budget_settlement_reference: settlementReference,
             budget_cash_submitted: budgetCashSubmitted,
@@ -589,19 +637,46 @@ export default async function(req) {
           throw httpError("Smenani yakuniy yopib bo‘lmadi.", 409);
         }
 
-        const updated = await service.entities.Shift.get(closingShift.id);
+        const updated = {
+          ...closingShift,
+          status: "closed",
+          closed_at: closedAt,
+          actual_cash: actualCash,
+          difference: actualCash - expected,
+          stock_count_completed: true,
+          stock_snapshot_count: stockSnapshotPayloads.length,
+          stock_difference_quantity: stockDifferenceQuantity,
+          stock_difference_product_count: stockDifferenceProductCount,
+          budget_settled: true,
+          budget_settlement_reference: settlementReference,
+          budget_cash_submitted: budgetCashSubmitted,
+          cash_left_for_next_shift: cashLeftForNextShift,
+          budget_settled_at: closedAt,
+          budget_settled_by_id: user.id,
+          budget_settled_by_name: userName,
+        };
         await service.entities.ActionHistory.create({
           user_id: user.id,
           user_name: userName,
           action: "shift_closed",
-          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · farq ${actualCash - expected} UZS`,
+          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · mahsulot farqi ${stockDifferenceProductCount} tur / ${stockDifferenceQuantity} dona`,
         }).catch(() => {});
         return Response.json({
           shift: updated,
+          stock_report: {
+            ...stockReport,
+            rows: stockSnapshotPayloads,
+          },
           budget_transactions: budgetTransactions,
           print_report_required: true,
         });
       } catch (error) {
+        const orphanSnapshots = await service.entities.ShiftProductSnapshot
+          .filter({ shift_id: closingShift.id }, "-closed_at", SHIFT_STOCK_ROW_LIMIT)
+          .catch(() => []);
+        for (const snapshot of orphanSnapshots || []) {
+          await service.entities.ShiftProductSnapshot.delete(snapshot.id).catch(() => {});
+        }
         for (const transaction of [...budgetTransactions].reverse()) {
           await service.entities.BudgetTransaction.delete(transaction.id).catch(() => {});
         }
