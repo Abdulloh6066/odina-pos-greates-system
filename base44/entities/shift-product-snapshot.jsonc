@@ -1,0 +1,122 @@
+{
+  "name": "ShiftProductSnapshot",
+  "type": "object",
+  "properties": {
+    "shift_id": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "cashier_id": {
+      "type": "string"
+    },
+    "cashier_name": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "image_url_snapshot": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "piece"
+      ],
+      "default": "piece"
+    },
+    "opening_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "received_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "sold_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "waste_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "returned_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "other_change_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "expected_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "counted_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "difference": {
+      "type": "number",
+      "default": 0
+    },
+    "counted_by_id": {
+      "type": "string"
+    },
+    "counted_by_name": {
+      "type": "string"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "shift_id",
+    "shop_id",
+    "cashier_id",
+    "product_id",
+    "product_name_snapshot",
+    "unit",
+    "expected_quantity",
+    "counted_quantity",
+    "difference",
+    "closed_at"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.cashier_id": "{{user.id}}"
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}
