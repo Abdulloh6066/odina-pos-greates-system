@@ -212,41 +212,14 @@ async function buildShiftStockReport(service: any, shift: any, generatedAt: stri
   };
 }
 
-function normalizeShiftStockCounts(value: unknown) {
-  if (!Array.isArray(value)) {
-    throw httpError("Smenani yopishdan oldin mahsulot qoldiqlarini sanang.", 400);
-  }
-  if (value.length >= SHIFT_STOCK_ROW_LIMIT) {
-    throw httpError("Mahsulot qoldiqlari ro‘yxati juda katta.", 400);
-  }
-
-  const counts = new Map<string, number>();
-  for (const item of value) {
-    const productId = String(item?.product_id || "");
-    const rawCount = item?.counted_quantity;
-    const counted = Number(rawCount);
-    if (
-      !productId
-      || rawCount === ""
-      || rawCount === null
-      || rawCount === undefined
-      || !Number.isFinite(counted)
-      || counted < 0
-      || !Number.isInteger(counted)
-    ) {
-      throw httpError("Har bir mahsulotning haqiqiy qoldig‘ini butun dona bilan kiriting.", 400);
-    }
-    if (counts.has(productId)) {
-      throw httpError("Bir mahsulot qoldig‘i ikki marta yuborildi.", 400);
-    }
-    counts.set(productId, counted);
-  }
-  return counts;
-}
-
-function matchShiftStockCounts(rows: any[], counts: Map<string, number>) {
-  if (rows.length !== counts.size || rows.some((row: any) => !counts.has(row.product_id))) {
-    throw httpError("Mahsulot qoldig‘i o‘zgardi. Yopish oynasini qayta ochib, yana sanang.", 409);
+async function cleanupShiftStockSnapshots(service: any, shiftId: string) {
+  const snapshotsEntity = service?.entities?.ShiftProductSnapshot;
+  if (!snapshotsEntity?.filter || !snapshotsEntity?.delete) return;
+  const snapshots = await snapshotsEntity
+    .filter({ shift_id: shiftId }, "-closed_at", SHIFT_STOCK_ROW_LIMIT)
+    .catch(() => []);
+  for (const snapshot of snapshots || []) {
+    await snapshotsEntity.delete(snapshot.id).catch(() => {});
   }
 }
 
@@ -523,8 +496,6 @@ export default async function(req) {
       if (closingShift.user_id !== user.id) {
         return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
       }
-      const stockCounts = normalizeShiftStockCounts(body?.stock_counts);
-
       const claim = await service.entities.Shift.updateMany(
         { id: closingShift.id, user_id: user.id, status: "open" },
         { $set: { status: "closing" } },
@@ -548,15 +519,14 @@ export default async function(req) {
       const budgetTransactions: any[] = [];
       let stockReport: any = null;
       let stockSnapshotPayloads: any[] = [];
-      let stockDifferenceQuantity = 0;
-      let stockDifferenceProductCount = 0;
+      let stockSnapshotSucceeded = false;
+      const stockDifferenceQuantity = 0;
+      const stockDifferenceProductCount = 0;
 
       try {
-        stockReport = await buildShiftStockReport(service, closingShift, closedAt);
-        matchShiftStockCounts(stockReport.rows, stockCounts);
-        stockSnapshotPayloads = stockReport.rows.map((row: any) => {
-          const countedQuantity = stockNumber(stockCounts.get(row.product_id));
-          return {
+        try {
+          stockReport = await buildShiftStockReport(service, closingShift, closedAt);
+          stockSnapshotPayloads = stockReport.rows.map((row: any) => ({
             shift_id: closingShift.id,
             shop_id: closingShift.shop_id,
             shop_name: closingShift.shop_name,
@@ -573,22 +543,34 @@ export default async function(req) {
             returned_quantity: row.returned_quantity,
             other_change_quantity: row.other_change_quantity,
             expected_quantity: row.expected_quantity,
-            counted_quantity: countedQuantity,
-            difference: stockNumber(countedQuantity - row.expected_quantity),
-            counted_by_id: user.id,
-            counted_by_name: userName,
+            counted_quantity: row.expected_quantity,
+            difference: 0,
+            counted_by_id: "",
+            counted_by_name: "",
             closed_at: closedAt,
+          }));
+          if (stockSnapshotPayloads.length) {
+            await service.entities.ShiftProductSnapshot.bulkCreate(stockSnapshotPayloads);
+          }
+          stockSnapshotSucceeded = true;
+        } catch (stockError) {
+          console.warn("Shift stock snapshot skipped:", stockError);
+          await cleanupShiftStockSnapshots(service, closingShift.id);
+          stockReport = {
+            shift_id: closingShift.id,
+            shop_id: closingShift.shop_id,
+            opened_at: closingShift.opened_at,
+            generated_at: closedAt,
+            rows: [],
+            warning: "Mahsulot qoldig‘i tarixini avtomatik saqlab bo‘lmadi.",
           };
-        });
-        stockDifferenceQuantity = stockNumber(stockSnapshotPayloads.reduce(
-          (sum: number, row: any) => sum + Math.abs(Number(row.difference || 0)),
-          0,
-        ));
-        stockDifferenceProductCount = stockSnapshotPayloads.filter(
-          (row: any) => Number(row.difference || 0) !== 0,
-        ).length;
-        if (stockSnapshotPayloads.length) {
-          await service.entities.ShiftProductSnapshot.bulkCreate(stockSnapshotPayloads);
+          stockSnapshotPayloads = [];
+          await service.entities.ActionHistory.create({
+            user_id: user.id,
+            user_name: userName,
+            action: "shift_stock_snapshot_skipped",
+            details: `${closingShift.shop_name} · smena yopildi, mahsulot qoldig‘i tarixi saqlanmadi`,
+          }).catch(() => {});
         }
 
         for (const deposit of deposits) {
@@ -629,7 +611,7 @@ export default async function(req) {
             closed_at: closedAt,
             actual_cash: actualCash,
             difference: actualCash - expected,
-            stock_count_completed: true,
+            stock_count_completed: stockSnapshotSucceeded,
             stock_snapshot_count: stockSnapshotPayloads.length,
             stock_difference_quantity: stockDifferenceQuantity,
             stock_difference_product_count: stockDifferenceProductCount,
@@ -652,7 +634,7 @@ export default async function(req) {
           closed_at: closedAt,
           actual_cash: actualCash,
           difference: actualCash - expected,
-          stock_count_completed: true,
+          stock_count_completed: stockSnapshotSucceeded,
           stock_snapshot_count: stockSnapshotPayloads.length,
           stock_difference_quantity: stockDifferenceQuantity,
           stock_difference_product_count: stockDifferenceProductCount,
@@ -668,7 +650,7 @@ export default async function(req) {
           user_id: user.id,
           user_name: userName,
           action: "shift_closed",
-          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · mahsulot farqi ${stockDifferenceProductCount} tur / ${stockDifferenceQuantity} dona`,
+          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · tizim qoldig‘i ${stockSnapshotSucceeded ? `${stockSnapshotPayloads.length} tur` : "saqlanmadi"}`,
         }).catch(() => {});
         return Response.json({
           shift: updated,
@@ -680,12 +662,7 @@ export default async function(req) {
           print_report_required: true,
         });
       } catch (error) {
-        const orphanSnapshots = await service.entities.ShiftProductSnapshot
-          .filter({ shift_id: closingShift.id }, "-closed_at", SHIFT_STOCK_ROW_LIMIT)
-          .catch(() => []);
-        for (const snapshot of orphanSnapshots || []) {
-          await service.entities.ShiftProductSnapshot.delete(snapshot.id).catch(() => {});
-        }
+        await cleanupShiftStockSnapshots(service, closingShift.id);
         for (const transaction of [...budgetTransactions].reverse()) {
           await service.entities.BudgetTransaction.delete(transaction.id).catch(() => {});
         }
