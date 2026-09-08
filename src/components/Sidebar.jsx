@@ -16,7 +16,7 @@ const ICONS = {
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
-const KASSA_CHILD_KEYS = ['products', 'categories', 'waste', 'sales', 'cashouts', 'recipients'];
+const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
