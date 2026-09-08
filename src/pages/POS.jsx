@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Search, Star, Clock, Building2, Banknote } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 export default function POS() {
   const { user, sidebarCollapsed } = useOutletContext();
+  const navigate = useNavigate();
 
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -30,6 +31,7 @@ export default function POS() {
   const [supplierDebts, setSupplierDebts] = useState({});
   const [loadingData, setLoadingData] = useState(true);
   const [stockChecking, setStockChecking] = useState(false);
+  const [wasteAlerts, setWasteAlerts] = useState([]);
 
   const [discountCode, setDiscountCode] = useState('');
   const [discountPct, setDiscountPct] = useState(0);
@@ -52,7 +54,7 @@ export default function POS() {
 
   const loadAll = async () => {
     setLoadingData(true);
-    const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts, stockList] = await Promise.all([
+    const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts, stockList, wasteAlertResult] = await Promise.all([
       base44.entities.Category.list(),
       base44.entities.Product.list(),
       base44.entities.Shop.list(),
@@ -61,6 +63,7 @@ export default function POS() {
       base44.entities.CashRecipient.list('name', 500),
       base44.functions.invoke('supplier-ledger', { action: 'get_debts' }).catch(() => ({ data: { debts: {} } })),
       base44.entities.ProductStock.list('-updated_at', 500),
+      base44.functions.invoke('waste-ledger', { action: 'get_alerts' }).catch(() => ({ data: { expired_items: [] } })),
     ]);
     setCategories((cats || []).filter((c) => c.active));
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
@@ -70,6 +73,8 @@ export default function POS() {
     setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
     const debtPayload = supplierReceipts?.data || supplierReceipts;
     setSupplierDebts(debtPayload?.debts || {});
+    const wastePayload = wasteAlertResult?.data || wasteAlertResult;
+    setWasteAlerts(wastePayload?.expired_items || []);
     const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
     setShift(myOpen || null);
     setLoadingData(false);
@@ -259,6 +264,9 @@ export default function POS() {
       setPayOpen(false);
       setReceiptOpen(true);
       clearCart();
+      base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
+        .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
+        .catch(() => {});
     } catch (e) {
       alert('Savdoni yakunlab bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
@@ -373,6 +381,23 @@ export default function POS() {
           </Button>
         )}
       </div>
+
+      {wasteAlerts.length > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate('/waste')}
+          className="mx-3 sm:mx-5 mt-3 shrink-0 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-left text-red-900 hover:bg-red-100 transition-colors touch-manipulation"
+        >
+          <span className="w-9 h-9 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">{wasteAlerts.length} tur mahsulot 3 kundan oshgan</span>
+            <span className="block text-xs text-red-700/80 mt-0.5">Ko‘rish va chiqitga chiqarish uchun bosing.</span>
+          </span>
+          <span className="text-sm font-semibold shrink-0">Ko‘rish →</span>
+        </button>
+      )}
 
       <div className="flex-1 flex min-h-0">
         {/* Center: categories + grid */}
