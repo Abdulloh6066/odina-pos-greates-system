@@ -37,7 +37,7 @@ export default function CashRecipients() {
   if (!['admin', 'manager'].includes(user?.role)) return <Navigate to="/" replace />;
 
   return (
-    <div className="p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
       <PageHeader
         title="Qabul qiluvchilar"
         subtitle="Tovarlarga pul beriladigan kompaniya va yetkazib beruvchilar"
@@ -49,7 +49,7 @@ export default function CashRecipients() {
         )}
       />
 
-      <div className="rounded-2xl bg-card border border-border premium-shadow p-4 mb-5">
+      <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 mb-5">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kompaniya yoki yetkazib beruvchini qidirish…" className="h-11 pl-10 rounded-xl" />
@@ -59,7 +59,7 @@ export default function CashRecipients() {
       {loading ? (
         <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card py-16 text-center">
+        <div className="odina-panel rounded-2xl border border-border bg-card py-16 text-center">
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
           <p className="font-medium">Qabul qiluvchi topilmadi</p>
           <p className="text-sm text-muted-foreground mt-1">“Yangi qabul qiluvchi” orqali birinchi kompaniyani kiriting.</p>
@@ -67,7 +67,7 @@ export default function CashRecipients() {
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
           {filtered.map((item) => (
-            <article key={item.id} className={`rounded-2xl border border-border bg-card premium-shadow p-4 ${item.active === false ? 'opacity-60' : ''}`}>
+            <article key={item.id} className={`odina-panel rounded-2xl border border-border bg-card premium-shadow p-4 ${item.active === false ? 'opacity-60' : ''}`}>
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0"><Building2 className="w-4.5 h-4.5" /></div>
                 <div className="flex-1 min-w-0">
