@@ -4,6 +4,8 @@ const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "product
 const TRANSFER_VIEW_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const TRANSFER_ACTION_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
 
+// The production unit is frozen on every transfer: one sheet is converted to the product's configured piece count only when the shop receives it.
+
 const cleanNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.round(parsed * 1000) / 1000 : NaN;
