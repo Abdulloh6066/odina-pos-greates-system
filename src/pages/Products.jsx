@@ -133,6 +133,9 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
   const [sourceType, setSourceType] = useState('central_produced');
+  const [productionUnit, setProductionUnit] = useState('piece');
+  const [piecesPerSheet, setPiecesPerSheet] = useState(20);
+  const [sheetPrice, setSheetPrice] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -147,6 +150,9 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
       setImageUrl(product?.image_url || '');
       setDescription(product?.description || '');
       setSourceType(product?.source_type || 'central_produced');
+      setProductionUnit(product?.production_unit || 'piece');
+      setPiecesPerSheet(product?.pieces_per_sheet || 20);
+      setSheetPrice(product?.sheet_price ?? '');
       setIsFavorite(product?.is_favorite || false);
       setActive(product?.active !== false);
     }
@@ -164,7 +170,13 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
   };
 
   const save = async () => {
-    if (!name.trim() || !price) { alert('Nomi va narxi majburiy.'); return; }
+    if (!name.trim() || price === '' || !Number.isFinite(Number(price)) || Number(price) < 0) {
+      alert('Nomi va manfiy bo‘lmagan narx majburiy.'); return;
+    }
+    if (productionUnit === 'sheet' && (!Number.isSafeInteger(Number(piecesPerSheet)) || Number(piecesPerSheet) < 1
+      || sheetPrice === '' || !Number.isFinite(Number(sheetPrice)) || Number(sheetPrice) < 0)) {
+      alert('1 listdan chiqadigan butun bo‘lak soni va list narxini kiriting.'); return;
+    }
     setSaving(true);
     const cat = categories.find((c) => c.id === categoryId);
     const payload = {
@@ -176,6 +188,9 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
       description: description || undefined,
       source_type: sourceType,
       stock_unit: 'piece',
+      production_unit: productionUnit,
+      pieces_per_sheet: productionUnit === 'sheet' ? Number(piecesPerSheet) : 1,
+      sheet_price: productionUnit === 'sheet' ? Number(sheetPrice) : 0,
       track_stock: true,
       is_favorite: isFavorite,
       active,
@@ -237,7 +252,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs mb-1.5 block">Narxi (UZS)</Label>
+              <Label className="text-xs mb-1.5 block">{productionUnit === 'sheet' ? '1 bo‘lak narxi (UZS)' : '1 dona narxi (UZS)'}</Label>
               <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="45000" />
             </div>
             <div>
@@ -256,6 +271,23 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
               <option value="resale">Sotish uchun tayyor holda xarid qilinadi</option>
             </select>
             <p className="text-xs text-muted-foreground mt-1.5">Bu tanlov keyingi bosqichdagi retsept va avtomatik ombor qoidalari uchun ishlatiladi.</p>
+          </div>
+          <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
+            <div>
+              <Label className="text-xs mb-1.5 block">Ishlab chiqarish va jo‘natish birligi</Label>
+              <select value={productionUnit} disabled={Boolean(product)} onChange={(e) => setProductionUnit(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
+                <option value="piece">Donali — kruassan, pechenye va boshqalar</option>
+                <option value="sheet">Listli tort — do‘konda bo‘laklab sotiladi</option>
+              </select>
+            </div>
+            {productionUnit === 'sheet' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs mb-1.5 block">1 listdan bo‘lak soni</Label><Input type="number" min="1" step="1" value={piecesPerSheet} disabled={Boolean(product)} onChange={(e) => setPiecesPerSheet(e.target.value)} /></div>
+                <div><Label className="text-xs mb-1.5 block">1 list narxi (UZS)</Label><Input type="number" min="0" value={sheetPrice} onChange={(e) => setSheetPrice(e.target.value)} /></div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">{productionUnit === 'sheet' ? `Markazda list. Do‘kon qabul qilganda 1 list → ${piecesPerSheet} bo‘lak. Kassa narxi — bitta bo‘lak uchun.` : 'Markazda va do‘konda dona hisobida yuritiladi. Retseptda bir tayyorlashdan chiqadigan dona sonini ko‘rsatasiz.'}</p>
+            {product && <p className="text-xs text-muted-foreground">Qoldiq birliklari aralashmasligi uchun mavjud mahsulotning birligi va bo‘lak soni o‘zgarmaydi. Boshqa kesim uchun yangi mahsulot yarating.</p>}
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Tavsif</Label>
