@@ -54,7 +54,7 @@ export default async function(req) {
     const item = itemKind === "ingredient"
       ? await service.entities.Ingredient.get(itemId)
       : await service.entities.Product.get(itemId);
-    if (!item || item.active === false) {
+    if (!item || item.active === false || item.archived === true) {
       return Response.json({ error: "Stock item not found or inactive." }, { status: 404 });
     }
 
@@ -77,7 +77,11 @@ export default async function(req) {
 
     const now = new Date().toISOString();
     const userName = user.full_name || user.email || "Unknown user";
-    const unit = itemKind === "ingredient" ? item.base_unit : "piece";
+    const unit = itemKind === "ingredient" ? item.base_unit
+      : location.location_type === "production" ? (item.production_unit || "piece") : "piece";
+    if (itemKind === "product" && (!Number.isSafeInteger(quantityChange) || (existing && (existing.unit || "piece") !== unit))) {
+      return Response.json({ error: "Butun list/dona kiriting; qoldiq birligi mahsulotga mos bo‘lishi kerak." }, { status: 400 });
+    }
     let stock;
 
     if (existing) {
