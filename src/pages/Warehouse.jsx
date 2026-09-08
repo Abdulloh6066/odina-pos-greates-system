@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
 import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 import ProductionPanel from '@/components/warehouse/ProductionPanel';
+import { TEST_PRODUCT_IDS } from '@/lib/test-catalog-cleanup';
 
 const TABS = [
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
@@ -196,7 +197,10 @@ export default function Warehouse() {
 
       setLocations(activeLocations);
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
-      setArchivedProductIds((productList || []).filter((item) => item.archived === true).map((item) => item.id));
+      setArchivedProductIds([
+        ...(productList || []).filter((item) => item.archived === true).map((item) => item.id),
+        ...TEST_PRODUCT_IDS.filter((id) => !(productList || []).some((item) => item.id === id)),
+      ]);
       setProducts((productList || []).filter((item) => item.active !== false && item.archived !== true && item.track_stock !== false));
       setIngredientStock(ingredientBalances || []);
       setProductStock(productBalances || []);
