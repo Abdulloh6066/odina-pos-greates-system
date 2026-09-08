@@ -122,9 +122,16 @@ function fixture() {
 }
 
 function loadHandler(client) {
+  const sharedSrc = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, '');
+  const sharedCode = ts.transpileModule(sharedSrc, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  }).outputText;
+
   let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
+    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
+  source = sharedCode + '\n' + source;
   source += '\nglobalThis.testHandler = handler;';
   const code = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },

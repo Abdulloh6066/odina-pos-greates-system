@@ -293,7 +293,7 @@ export default function POS() {
   const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift }) => {
     setShiftLoading(true);
     try {
-      const result = await base44.functions.invoke('complete-sale', {
+      const result = await base44.functions.invoke('shift-close-v2', {
         action: 'close_shift',
         shift_id: shift.id,
         actual_cash,
