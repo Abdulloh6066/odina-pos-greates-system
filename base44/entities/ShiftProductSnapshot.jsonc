@@ -91,7 +91,11 @@
     "closed_at"
   ],
   "rls": {
-    "create": false,
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "delete": false,
     "read": {
       "$or": [
