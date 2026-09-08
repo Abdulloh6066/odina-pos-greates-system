@@ -52,7 +52,7 @@ export default function Dashboard() {
   if (role === 'cashier') return null;
 
   return (
-    <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader title="Bosh sahifa" subtitle={new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
 
       {loading ? (
@@ -111,7 +111,7 @@ export default function Dashboard() {
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
-    <div className={`rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
+    <div className={`odina-panel rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-primary-foreground/15' : 'bg-primary/15 text-brand-ink'}`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
@@ -123,7 +123,7 @@ function StatCard({ icon: Icon, label, value, accent }) {
 
 function Panel({ title, icon: Icon, children }) {
   return (
-    <div className="rounded-2xl bg-card border border-border premium-shadow p-5">
+    <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5">
       <div className="flex items-center gap-2 mb-4">
         <Icon className="w-4.5 h-4.5 text-brand-ink" />
         <h3 className="font-display text-lg font-bold">{title}</h3>
