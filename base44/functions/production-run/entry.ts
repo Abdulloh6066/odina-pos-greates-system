@@ -3,6 +3,8 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 const RECIPE_ROLES = new Set(["admin", "accountant"]);
 const PRODUCTION_ROLES = new Set(["admin", "production"]);
 
+// Recipe and production units always follow the product: central stock uses sheets, while shop stock uses pieces.
+
 const cleanNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.round(parsed * 1000) / 1000 : NaN;
