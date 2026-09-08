@@ -70,10 +70,10 @@ export default function SalesHistory() {
   };
 
   return (
-    <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader title="Savdolar tarixi" subtitle={`${formatNum(visible.length)} ta savdo · ${formatUZS(totalRev)}`} icon={ReceiptText} />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
+      <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Kassir yoki to‘lov usuli bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
@@ -93,7 +93,7 @@ export default function SalesHistory() {
       ) : (
         <div className="space-y-3">
           {visible.map((s) => (
-            <button key={s.id} onClick={() => setSelected(s)} className="w-full text-left rounded-2xl bg-card border border-border premium-shadow hover:premium-shadow-lg transition-all p-4 flex items-center gap-4">
+            <button key={s.id} onClick={() => setSelected(s)} className="odina-panel w-full text-left rounded-2xl bg-card border border-border premium-shadow hover:premium-shadow-lg transition-all p-4 flex items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
                 <Eye className="w-5 h-5" />
               </div>
