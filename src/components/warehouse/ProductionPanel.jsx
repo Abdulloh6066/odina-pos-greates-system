@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona' };
+const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 
 const cleanNumber = (value) => {
   const parsed = Number(value);
@@ -141,7 +141,7 @@ export default function ProductionPanel({
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{product.name}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {recipe ? `Faol retsept v${recipe.version} · ${recipe.output_quantity} dona natija` : 'Retsept yaratilmagan'}
+                        {recipe ? `Faol retsept v${recipe.version} · ${recipe.output_quantity} ${UNIT_LABELS[recipe.output_unit] || "dona"} natija` : 'Retsept yaratilmagan'}
                       </p>
                     </div>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${recipe ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
@@ -229,7 +229,7 @@ export default function ProductionPanel({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">{product.name}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Retsept v{recipe.version} · taxminan {formatNum(possible)} dona tayyorlash mumkin</p>
+                        <p className="text-xs text-muted-foreground mt-1">Retsept v{recipe.version} · taxminan {formatNum(possible)} {UNIT_LABELS[recipe.output_unit] || "dona"} tayyorlash mumkin</p>
                       </div>
                       <Scale className="w-5 h-5 text-brand-ink shrink-0" />
                     </div>
@@ -264,7 +264,7 @@ export default function ProductionPanel({
                       <p className="font-semibold truncate">{batch.product_name_snapshot}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{batch.batch_number} · Retsept v{batch.recipe_version}</p>
                     </div>
-                    <span className="font-semibold text-emerald-700 shrink-0">+{formatNum(batch.produced_quantity)} dona</span>
+                    <span className="font-semibold text-emerald-700 shrink-0">+{formatNum(batch.produced_quantity)} {UNIT_LABELS[batch.unit] || "dona"}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     {new Date(batch.completed_at || batch.created_at).toLocaleString('uz-UZ')} · {batch.user_name}
@@ -366,13 +366,13 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
             <Label className="text-xs mb-1.5 block">Ushbu retseptdan chiqadigan mahsulot</Label>
             <div className="flex items-center gap-2">
               <Input type="number" min="1" step="1" value={outputQuantity} onChange={(event) => setOutputQuantity(event.target.value)} />
-              <span className="text-sm font-medium">dona</span>
+              <span className="text-sm font-medium">{UNIT_LABELS[product?.production_unit] || "dona"}</span>
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-xs">Kerakli masalliqlar</Label>
+              <Label className="text-xs">Yuqoridagi natija uchun jami masalliqlar (1 kg = 1 000 g)</Label>
               <Button type="button" variant="outline" size="sm" onClick={addRow}>
                 <Plus className="w-4 h-4 mr-1" /> Qator qo‘shish
               </Button>
@@ -496,7 +496,7 @@ function ProductionDialog({ open, product, recipe, recipeItems, balances, locati
             <Label className="text-xs mb-1.5 block">Tayyorlangan miqdor</Label>
             <div className="flex items-center gap-2">
               <Input autoFocus type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
-              <span className="text-sm font-medium">dona</span>
+              <span className="text-sm font-medium">{UNIT_LABELS[product?.production_unit] || "dona"}</span>
             </div>
           </div>
 
@@ -537,7 +537,7 @@ function ProductionDialog({ open, product, recipe, recipeItems, balances, locati
             disabled={saving || !Number.isInteger(produced) || produced <= 0 || hasShortage}
             className="bg-primary text-primary-foreground hover:bg-primary-strong"
           >
-            {saving ? 'Saqlanmoqda…' : `${formatNum(produced)} dona ishlab chiqarildi`}
+            {saving ? 'Saqlanmoqda…' : `${formatNum(produced)} ${UNIT_LABELS[product?.production_unit] || "dona"} ishlab chiqarildi`}
           </Button>
         </DialogFooter>
       </DialogContent>
