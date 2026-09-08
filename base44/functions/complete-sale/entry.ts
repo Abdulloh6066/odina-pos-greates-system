@@ -11,6 +11,49 @@ const PAYMENT_METHODS = new Set([
 ]);
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
+
+const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
+
+const userRole = (value: any) => {
+  const rootRole = String(value?.role || "");
+  const nestedRole = String(value?.data?.role || "");
+  if (APP_ROLES.has(rootRole)) return rootRole;
+  if (APP_ROLES.has(nestedRole)) return nestedRole;
+  return rootRole || nestedRole;
+};
+
+const userShopId = (value: any) =>
+  String(value?.shop_id || value?.data?.shop_id || "");
+
+const resolveAppUser = async (service: any, authenticatedUser: any) => {
+  let storedUser: any = null;
+  const authenticatedId = String(authenticatedUser?.id || "");
+  const email = String(authenticatedUser?.email || "").trim().toLowerCase();
+
+  if (authenticatedId) {
+    storedUser = await service.entities.User.get(authenticatedId).catch(() => null);
+  }
+  if (!storedUser && email) {
+    const matches = await service.entities.User.filter({ email }, "-updated_date", 5);
+    storedUser = (matches || []).find(
+      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === email,
+    ) || null;
+  }
+
+  const storedRole = userRole(storedUser);
+  return {
+    ...authenticatedUser,
+    id: authenticatedUser?.id || storedUser?.id,
+    email: authenticatedUser?.email || storedUser?.email,
+    full_name: storedUser?.full_name || authenticatedUser?.full_name,
+    role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
+    shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
+    shop_name: storedUser?.shop_name || storedUser?.data?.shop_name
+      || authenticatedUser?.shop_name || authenticatedUser?.data?.shop_name || "",
+    active: storedUser?.active ?? authenticatedUser?.active,
+  };
+};
+
 const stockNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.round(parsed * 1000) / 1000 : 0;
@@ -202,9 +245,13 @@ export default async function(req) {
   let stockMovementRecords: any[] = [];
 
   try {
-    const user = await base44.auth.me();
-    if (!user) {
+    const authenticatedUser = await base44.auth.me();
+    if (!authenticatedUser) {
       return Response.json({ error: "Authentication required." }, { status: 401 });
+    }
+    const user = await resolveAppUser(service, authenticatedUser);
+    if (user.active === false) {
+      return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
     }
     if (!["admin", "cashier"].includes(user.role)) {
       return Response.json({ error: "Your role cannot complete Kassa sales." }, { status: 403 });
