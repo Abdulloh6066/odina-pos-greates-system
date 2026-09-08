@@ -1,5 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
+const COMPLETE_SALE_RUNTIME_VERSION = "shift-stock-v3-2026-09-09";
+
 const PAYMENT_METHODS = new Set([
   "cash",
   "uzcard",
@@ -418,6 +420,10 @@ export default async function(req) {
     const body = await req.json();
     const action = String(body?.action || "complete_sale");
 
+    if (action === "runtime_status") {
+      return Response.json({ ok: true, runtime_version: COMPLETE_SALE_RUNTIME_VERSION });
+    }
+
     if (action === "open_shift") {
       const startingCash = money(body?.starting_cash);
       if (startingCash < 0) return Response.json({ error: "Starting cash must be zero or more." }, { status: 400 });
@@ -650,9 +656,10 @@ export default async function(req) {
           user_id: user.id,
           user_name: userName,
           action: "shift_closed",
-          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · tizim qoldig‘i ${stockSnapshotSucceeded ? `${stockSnapshotPayloads.length} tur` : "saqlanmadi"}`,
+          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · tizim qoldig‘i ${stockSnapshotSucceeded ? `${stockSnapshotPayloads.length} tur` : "saqlanmadi"} · backend ${COMPLETE_SALE_RUNTIME_VERSION}`,
         }).catch(() => {});
         return Response.json({
+          runtime_version: COMPLETE_SALE_RUNTIME_VERSION,
           shift: updated,
           stock_report: {
             ...stockReport,
