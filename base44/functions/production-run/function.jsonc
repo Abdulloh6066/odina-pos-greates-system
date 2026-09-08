@@ -1,0 +1,4 @@
+{
+  "name": "production-run",
+  "entry": "entry.ts"
+}
