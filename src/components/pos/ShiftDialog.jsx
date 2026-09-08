@@ -7,21 +7,26 @@ import { formatUZS } from '@/lib/pos';
 export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading }) {
   const [shopId, setShopId] = useState('');
   const [startingCash, setStartingCash] = useState(0);
+  const assignedShopId = String(user?.shop_id || user?.data?.shop_id || '');
+  const assignedShopName = String(user?.shop_name || user?.data?.shop_name || 'Biriktirilgan do‘kon');
+  const assignedShop = shops.find((shop) => shop.id === assignedShopId)
+    || (assignedShopId ? { id: assignedShopId, name: assignedShopName } : null);
 
   useEffect(() => {
     if (open) {
       if (user?.role === 'cashier') {
-        setShopId(user.shop_id || '');
+        setShopId(assignedShopId);
       } else {
         const main = shops.find((s) => s.is_main);
         setShopId(main?.id || shops[0]?.id || '');
       }
       setStartingCash(0);
     }
-  }, [open, shops, user]);
+  }, [open, shops, user, assignedShopId]);
 
   const submit = () => {
-    const shop = shops.find((s) => s.id === shopId);
+    const shop = shops.find((s) => s.id === shopId)
+      || (shopId === assignedShopId ? assignedShop : null);
     onConfirm({ shop, starting_cash: Number(startingCash) || 0 });
   };
 
@@ -35,9 +40,9 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
           <div>
             <label className="text-sm font-medium mb-1.5 block">Do‘kon</label>
             {user?.role === 'cashier' ? (
-              <div className={`w-full min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${user.shop_id ? 'border-input bg-secondary/60' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
-                {user.shop_id
-                  ? (shops.find((s) => s.id === user.shop_id)?.name || 'Biriktirilgan do‘kon topilmadi')
+              <div className={`w-full min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${assignedShopId ? 'border-input bg-secondary/60' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
+                {assignedShopId
+                  ? assignedShopName
                   : 'Egasi kassirni do‘konga biriktirishi kerak.'}
               </div>
             ) : (
