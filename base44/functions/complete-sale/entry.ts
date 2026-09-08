@@ -464,6 +464,22 @@ export default async function(req) {
       return Response.json({ shift: newShift });
     }
 
+    if (action === "get_shift_stock_report") {
+      const shiftId = String(body?.shift_id || "");
+      if (!shiftId) {
+        return Response.json({ error: "Smena topilmadi." }, { status: 400 });
+      }
+      const reportShift = await service.entities.Shift.get(shiftId);
+      if (!reportShift || reportShift.status !== "open") {
+        return Response.json({ error: "Smena ochiq emas yoki allaqachon yopilgan." }, { status: 409 });
+      }
+      if (reportShift.user_id !== user.id) {
+        return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
+      }
+      const stockReport = await buildShiftStockReport(service, reportShift, new Date().toISOString());
+      return Response.json({ stock_report: stockReport });
+    }
+
     if (action === "close_shift") {
       const shiftId = String(body?.shift_id || "");
       const actualCashRaw = Number(body?.actual_cash);
