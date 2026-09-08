@@ -65,6 +65,182 @@ const httpError = (message: string, status: number) => {
   return error;
 };
 
+const SHIFT_STOCK_ROW_LIMIT = 1000;
+
+const stockMovementTime = (movement: any) =>
+  Date.parse(movement?.created_at || movement?.created_date || "");
+
+async function buildShiftStockReport(service: any, shift: any, generatedAt: string) {
+  const openedAt = String(shift?.opened_at || shift?.created_date || "");
+  const openedMs = Date.parse(openedAt);
+  const generatedMs = Date.parse(generatedAt);
+  if (!shift?.shop_id || !Number.isFinite(openedMs) || !Number.isFinite(generatedMs)) {
+    throw httpError("Smenaning boshlanish vaqti yoki do‘koni topilmadi.", 409);
+  }
+
+  const [stocks, movements, products] = await Promise.all([
+    service.entities.ProductStock.filter(
+      { location_id: shift.shop_id },
+      "product_name",
+      SHIFT_STOCK_ROW_LIMIT,
+    ),
+    service.entities.StockMovement.filter(
+      {
+        location_id: shift.shop_id,
+        item_kind: "product",
+        created_at: { $gte: openedAt, $lte: generatedAt },
+      },
+      "created_at",
+      SHIFT_STOCK_ROW_LIMIT,
+    ),
+    service.entities.Product.list("name", SHIFT_STOCK_ROW_LIMIT),
+  ]);
+
+  if ((stocks || []).length >= SHIFT_STOCK_ROW_LIMIT || (movements || []).length >= SHIFT_STOCK_ROW_LIMIT) {
+    throw httpError("Bu smenada mahsulot harakatlari juda ko‘p. Hisobotni administrator tekshirishi kerak.", 409);
+  }
+
+  const productById = new Map((products || []).map((product: any) => [String(product.id), product]));
+  const rowsByProduct = new Map<string, any>();
+  const stockIds = new Set<string>();
+
+  const ensureRow = (productIdValue: unknown, fallbackName = "Noma’lum mahsulot") => {
+    const productId = String(productIdValue || "");
+    if (!productId) return null;
+    const product: any = productById.get(productId) || {};
+    if (product.track_stock === false) return null;
+    if (!rowsByProduct.has(productId)) {
+      rowsByProduct.set(productId, {
+        product_id: productId,
+        product_name_snapshot: String(product.name || fallbackName || "Noma’lum mahsulot"),
+        image_url_snapshot: String(product.image_url || ""),
+        unit: "piece",
+        current_quantity: 0,
+        total_change: 0,
+        received_quantity: 0,
+        sold_quantity: 0,
+        waste_quantity: 0,
+        returned_quantity: 0,
+        latest_movement_at: Number.NEGATIVE_INFINITY,
+        latest_balance_after: null,
+      });
+    }
+    const row = rowsByProduct.get(productId);
+    if ((!row.product_name_snapshot || row.product_name_snapshot === "Noma’lum mahsulot") && fallbackName) {
+      row.product_name_snapshot = String(fallbackName);
+    }
+    return row;
+  };
+
+  for (const stock of stocks || []) {
+    const productId = String(stock?.product_id || "");
+    if (!productId) continue;
+    if (stockIds.has(productId)) {
+      throw httpError(`${stock?.product_name || "Mahsulot"} uchun takroriy do‘kon qoldig‘i topildi.`, 409);
+    }
+    stockIds.add(productId);
+    const row = ensureRow(productId, stock?.product_name);
+    if (!row) continue;
+    if (stock?.unit && stock.unit !== "piece") {
+      throw httpError(`${row.product_name_snapshot} do‘kon qoldig‘i dona formatida emas.`, 409);
+    }
+    row.current_quantity = stockNumber(stock?.quantity);
+  }
+
+  for (const movement of movements || []) {
+    const movementMs = stockMovementTime(movement);
+    if (!Number.isFinite(movementMs) || movementMs < openedMs || movementMs > generatedMs) continue;
+    const row = ensureRow(movement?.item_id, movement?.item_name);
+    if (!row) continue;
+    if (movement?.unit && movement.unit !== "piece") {
+      throw httpError(`${row.product_name_snapshot} harakati dona formatida emas.`, 409);
+    }
+
+    const change = stockNumber(movement?.quantity_change);
+    row.total_change = stockNumber(row.total_change + change);
+    if (movementMs >= row.latest_movement_at && Number.isFinite(Number(movement?.balance_after))) {
+      row.latest_movement_at = movementMs;
+      row.latest_balance_after = stockNumber(movement.balance_after);
+    }
+
+    if (movement.movement_type === "transfer_in" && change > 0) {
+      row.received_quantity = stockNumber(row.received_quantity + change);
+    } else if (movement.movement_type === "sale" && change < 0) {
+      row.sold_quantity = stockNumber(row.sold_quantity - change);
+    } else if (movement.movement_type === "waste" && change < 0) {
+      row.waste_quantity = stockNumber(row.waste_quantity - change);
+    } else if (movement.movement_type === "refund" && change > 0) {
+      row.returned_quantity = stockNumber(row.returned_quantity + change);
+    }
+  }
+
+  const rows = Array.from(rowsByProduct.values()).map((row: any) => {
+    const expectedQuantity = row.latest_balance_after === null
+      ? stockNumber(row.current_quantity)
+      : stockNumber(row.latest_balance_after);
+    const openingQuantity = stockNumber(expectedQuantity - row.total_change);
+    const explainedChange = stockNumber(
+      row.received_quantity
+      - row.sold_quantity
+      - row.waste_quantity
+      + row.returned_quantity,
+    );
+
+    return {
+      product_id: row.product_id,
+      product_name_snapshot: row.product_name_snapshot,
+      image_url_snapshot: row.image_url_snapshot,
+      unit: "piece",
+      opening_quantity: openingQuantity,
+      received_quantity: row.received_quantity,
+      sold_quantity: row.sold_quantity,
+      waste_quantity: row.waste_quantity,
+      returned_quantity: row.returned_quantity,
+      other_change_quantity: stockNumber(row.total_change - explainedChange),
+      expected_quantity: expectedQuantity,
+    };
+  }).sort((left: any, right: any) =>
+    String(left.product_name_snapshot).localeCompare(String(right.product_name_snapshot), "uz")
+  );
+
+  return {
+    shift_id: shift.id,
+    shop_id: shift.shop_id,
+    opened_at: openedAt,
+    generated_at: generatedAt,
+    rows,
+  };
+}
+
+function normalizeShiftStockCounts(value: unknown) {
+  if (!Array.isArray(value)) {
+    throw httpError("Smenani yopishdan oldin mahsulot qoldiqlarini sanang.", 400);
+  }
+  if (value.length >= SHIFT_STOCK_ROW_LIMIT) {
+    throw httpError("Mahsulot qoldiqlari ro‘yxati juda katta.", 400);
+  }
+
+  const counts = new Map<string, number>();
+  for (const item of value) {
+    const productId = String(item?.product_id || "");
+    const counted = Number(item?.counted_quantity);
+    if (!productId || !Number.isFinite(counted) || counted < 0 || !Number.isInteger(counted)) {
+      throw httpError("Har bir mahsulotning haqiqiy qoldig‘ini butun dona bilan kiriting.", 400);
+    }
+    if (counts.has(productId)) {
+      throw httpError("Bir mahsulot qoldig‘i ikki marta yuborildi.", 400);
+    }
+    counts.set(productId, counted);
+  }
+  return counts;
+}
+
+function matchShiftStockCounts(rows: any[], counts: Map<string, number>) {
+  if (rows.length !== counts.size || rows.some((row: any) => !counts.has(row.product_id))) {
+    throw httpError("Mahsulot qoldig‘i o‘zgardi. Yopish oynasini qayta ochib, yana sanang.", 409);
+  }
+}
+
 const BUDGET_ACCOUNT_LABELS: Record<string, string> = {
   cash: "Naqd pul",
   uzcard: "Uzcard",
