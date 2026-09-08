@@ -43,6 +43,7 @@ const MOVEMENT_LABELS = {
   transfer_in: 'Qabul qilingan transfer',
   sale: 'Kassa savdosi',
   waste: 'Chiqit',
+  waste_cancel: 'Chiqit bekor qilindi',
   refund: 'Qaytarish',
   receipt_cancel: 'Kirim bekor qilindi',
 };
