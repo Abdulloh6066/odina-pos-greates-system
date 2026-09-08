@@ -130,7 +130,7 @@ export default function Shifts() {
   };
 
   return (
-    <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
         title="Smenalar"
         subtitle={role === "cashier" ? "Sizning smenalar tarixingiz" : "Barcha do‘kon smenalari"}
@@ -193,7 +193,7 @@ function ShiftCard({ shift, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full text-left rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 transition-all hover:-translate-y-0.5 hover:premium-shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="odina-panel w-full text-left rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 transition-all hover:-translate-y-0.5 hover:premium-shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
