@@ -87,13 +87,13 @@ export default function Settings() {
   };
 
   return (
-    <div className="p-5 sm:p-8 max-w-3xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-3xl mx-auto animate-fade-in">
       <PageHeader title="Sozlamalar" subtitle="Do‘kon, chek va xavfsizlik sozlamalari" icon={SettingsIcon} />
       {loading ? (
         <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
         <>
-          <div className="rounded-2xl bg-card border border-border premium-shadow p-5 space-y-4">
+          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 space-y-4">
             <h2 className="font-display text-lg font-bold">Chek sozlamalari</h2>
             <div>
               <Label className="text-xs mb-1.5 block">Do‘kon nomi</Label>
@@ -116,7 +116,7 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
+          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-display text-lg font-bold">Qoldiqsiz sotuv</h2>
@@ -140,7 +140,7 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="rounded-2xl bg-card border border-border premium-shadow p-5 mt-5 space-y-4">
+          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 mt-5 space-y-4">
             <div>
               <h2 className="font-display text-lg font-bold">Egasi tasdiqlash PIN kodi</h2>
               <p className="text-xs text-muted-foreground mt-1">Qaytarish va himoyalangan kassa amallarida ishlatiladi. PIN kodning o‘zi saqlanmaydi.</p>
@@ -160,7 +160,7 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
+          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-lg font-bold flex items-center gap-2"><Building2 className="w-5 h-5 text-brand-ink" /> Do‘konlar</h2>
               <Button variant="outline" size="sm" onClick={addShop}>Do‘kon qo‘shish</Button>
