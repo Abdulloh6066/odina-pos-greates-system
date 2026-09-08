@@ -72,7 +72,7 @@ export default function Users() {
       ) : (
         <div className="space-y-3">
           {users.map((u) => (
-            <div key={u.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div key={u.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col gap-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-semibold shrink-0">
                   {(u.full_name || u.email || '?').charAt(0).toUpperCase()}
@@ -83,7 +83,7 @@ export default function Users() {
                 </div>
               </div>
               {u.id !== user.id ? (
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full min-w-0">
                   <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="admin" disabled>Egasi / Admin</option>
                     <option value="manager">Boshqaruvchi</option>
