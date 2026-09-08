@@ -57,7 +57,7 @@ export default function Products() {
   };
 
   return (
-    <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Mahsulotlar"
         subtitle={`${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
@@ -69,7 +69,7 @@ export default function Products() {
         )}
       />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
+      <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
@@ -95,7 +95,7 @@ export default function Products() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {filtered.map((p) => (
-            <div key={p.id} className="group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg">
+            <div key={p.id} className="odina-panel group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg">
               <div className="relative aspect-square bg-secondary overflow-hidden">
                 {p.image_url ? <Image src={p.image_url} alt={p.name} fittingType="fill" className="w-full h-full" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-display text-muted-foreground/40">{p.name.charAt(0)}</div>}
                 {p.is_favorite && <Star className="absolute top-2 left-2 w-4 h-4 fill-primary text-primary" />}
