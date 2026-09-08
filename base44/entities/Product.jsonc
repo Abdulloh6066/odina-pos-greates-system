@@ -1,6 +1,23 @@
 {
   "name": "Product",
   "properties": {
+    "production_unit": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "sheet"
+      ],
+      "default": "piece"
+    },
+    "pieces_per_sheet": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 20
+    },
+    "sheet_price": {
+      "type": "number",
+      "minimum": 0
+    },
     "active": {
       "default": true,
       "type": "boolean"
