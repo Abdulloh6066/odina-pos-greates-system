@@ -290,7 +290,7 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
-  const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift }) => {
+  const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift, stock_counts }) => {
     setShiftLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
@@ -299,14 +299,16 @@ export default function POS() {
         actual_cash,
         budget_cash_submitted,
         cash_left_for_next_shift,
+        stock_counts,
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani yopib bo‘lmadi.');
       window.print();
       setShift(null);
       setCloseShiftOpen(false);
-    } catch (e) { alert('Smenani yopib bo‘lmadi: ' + (e?.message || e)); }
-    finally { setShiftLoading(false); }
+    } catch (e) {
+      alert('Smenani yopib bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+    } finally { setShiftLoading(false); }
   };
 
   const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name, owner_pin }) => {
