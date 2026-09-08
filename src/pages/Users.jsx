@@ -60,7 +60,7 @@ export default function Users() {
   };
 
   return (
-    <div className="p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
       <PageHeader
         title="Xodimlar"
         subtitle={`${users.length} ta xodim`}
@@ -72,7 +72,7 @@ export default function Users() {
       ) : (
         <div className="space-y-3">
           {users.map((u) => (
-            <div key={u.id} className="rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div key={u.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-semibold shrink-0">
                   {(u.full_name || u.email || '?').charAt(0).toUpperCase()}
