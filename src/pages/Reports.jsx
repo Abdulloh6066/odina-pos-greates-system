@@ -55,7 +55,7 @@ export default function Reports() {
   if (role === 'cashier') return <Navigate to="/pos" replace />;
 
   return (
-    <div className="p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader title="Hisobotlar" subtitle={`${formatNum(sales.length)} ta savdo · jami ${formatUZS(totalRev)}`} icon={BarChart3} />
 
       {loading ? (
@@ -112,7 +112,7 @@ export default function Reports() {
 
 function Panel({ title, children, className }) {
   return (
-    <div className={`rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 ${className || ''}`}>
+    <div className={`odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 ${className || ''}`}>
       <h3 className="font-display text-lg font-bold mb-4">{title}</h3>
       {children}
     </div>
