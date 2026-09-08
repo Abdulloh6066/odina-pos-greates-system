@@ -27,6 +27,7 @@ const transferLabel = (transfer) => transfer.unit === 'sheet'
   : `${formatNum(transfer.quantity)} dona`;
 
 const STATUS = {
+  archived: { label: 'Mahsulot arxivda', className: 'bg-secondary text-muted-foreground' },
   pending: { label: 'Qabul kutilmoqda', className: 'bg-amber-50 text-amber-700' },
   receiving: { label: 'Qabul qilinmoqda', className: 'bg-blue-50 text-blue-700' },
   received: { label: 'Qabul qilindi', className: 'bg-emerald-50 text-emerald-700' },
@@ -68,7 +69,7 @@ function groupTransferRows(rows) {
 }
 
 export default function TransfersPanel({
-  user, location, locations, products, productStock, transfers, search, onReload,
+  user, location, locations, products, productStock, transfers, archivedProductIds = [], search, onReload,
 }) {
   const [sendOpen, setSendOpen] = useState(false);
   const [receivingId, setReceivingId] = useState('');
@@ -80,7 +81,8 @@ export default function TransfersPanel({
   const transferGroups = useMemo(() => groupTransferRows(
     transfers.filter((transfer) => transfer.source_location_id === effectiveLocationId
       || transfer.destination_location_id === effectiveLocationId),
-  ), [transfers, effectiveLocationId]);
+  ).map((group) => group.status !== 'received' && group.items.some((item) => archivedProductIds.includes(item.product_id))
+    ? { ...group, status: 'archived' } : group), [transfers, effectiveLocationId, archivedProductIds]);
 
   const visibleGroups = useMemo(() => transferGroups.filter((group) => {
     if (!normalizedSearch) return true;
@@ -94,8 +96,8 @@ export default function TransfersPanel({
     ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch);
   }), [transferGroups, normalizedSearch]);
 
-  const pending = visibleGroups.filter((group) => group.status !== 'received');
-  const completed = visibleGroups.filter((group) => group.status === 'received');
+  const pending = visibleGroups.filter((group) => ['pending', 'receiving'].includes(group.status));
+  const completed = visibleGroups.filter((group) => ['received', 'archived'].includes(group.status));
 
   const canReceive = (group) => user?.role !== 'manager'
     && group.status === 'pending'
