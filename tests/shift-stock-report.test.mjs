@@ -137,13 +137,12 @@ function loadHandler(client) {
   };
 }
 
-const closeBody = (stockCounts) => ({
+const closeBody = () => ({
   action: 'close_shift',
   shift_id: 'shift',
   actual_cash: 0,
   budget_cash_submitted: 0,
   cash_left_for_next_shift: 0,
-  stock_counts: stockCounts,
 });
 
 test('preview separates opening, received, sold, waste, refund and other changes', async () => {
@@ -169,40 +168,31 @@ test('preview separates opening, received, sold, waste, refund and other changes
   assert.equal(response.data.stock_report.rows.some((row) => row.product_id === 'service'), false);
 });
 
-test('every displayed product must have a counted whole-number quantity', async () => {
-  for (const counts of [
-    [{ product_id: 'cake', counted_quantity: 7 }],
-    [{ product_id: 'cake', counted_quantity: '' }, { product_id: 'cookie', counted_quantity: 0 }],
-    [{ product_id: 'cake', counted_quantity: 6.5 }, { product_id: 'cookie', counted_quantity: 0 }],
-  ]) {
-    const f = fixture();
-    const response = await loadHandler(f.client)(closeBody(counts));
-    assert.ok(response.status >= 400, JSON.stringify(response));
-    assert.equal(f.db.Shift[0].status, 'open');
-    assert.equal(f.db.ShiftProductSnapshot.length, 0);
-    assert.equal(f.db.BudgetTransaction.length, 0);
-  }
-});
-
-test('close stores immutable product snapshots and discrepancy summary', async () => {
+test('shift closes without any manual product counts', async () => {
   const f = fixture();
-  const call = loadHandler(f.client);
-  const response = await call(closeBody([
-    { product_id: 'cake', counted_quantity: 6 },
-    { product_id: 'cookie', counted_quantity: 0 },
-  ]));
+  const response = await loadHandler(f.client)(closeBody());
 
   assert.equal(response.status, 200, JSON.stringify(response));
   assert.equal(f.db.Shift[0].status, 'closed');
   assert.equal(f.db.Shift[0].stock_count_completed, true);
   assert.equal(f.db.Shift[0].stock_snapshot_count, 2);
-  assert.equal(f.db.Shift[0].stock_difference_product_count, 1);
-  assert.equal(f.db.Shift[0].stock_difference_quantity, 1);
+  assert.equal(f.db.ShiftProductSnapshot.length, 2);
+});
+
+test('close stores an immutable automatic system-stock snapshot', async () => {
+  const f = fixture();
+  const call = loadHandler(f.client);
+  const response = await call(closeBody());
+
+  assert.equal(response.status, 200, JSON.stringify(response));
+  assert.equal(f.db.Shift[0].stock_difference_product_count, 0);
+  assert.equal(f.db.Shift[0].stock_difference_quantity, 0);
 
   const cakeSnapshot = f.db.ShiftProductSnapshot.find((row) => row.product_id === 'cake');
   assert.equal(cakeSnapshot.expected_quantity, 7);
-  assert.equal(cakeSnapshot.counted_quantity, 6);
-  assert.equal(cakeSnapshot.difference, -1);
+  assert.equal(cakeSnapshot.counted_quantity, 7);
+  assert.equal(cakeSnapshot.difference, 0);
+  assert.equal(cakeSnapshot.counted_by_id, '');
   f.db.ProductStock.find((row) => row.product_id === 'cake').quantity = 999;
   assert.equal(cakeSnapshot.expected_quantity, 7);
 });
