@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Beaker, ChefHat, History, Pencil, Plus, Scale, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { formatNum } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export default function ProductionPanel({
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recipeProduct, setRecipeProduct] = useState(null);
+  const [recipePickerOpen, setRecipePickerOpen] = useState(false);
   const [productionProduct, setProductionProduct] = useState(null);
 
   const canManageRecipes = ['admin', 'accountant'].includes(user?.role);
@@ -118,6 +120,33 @@ export default function ProductionPanel({
   if (mode === 'recipes') {
     return (
       <>
+        {canManageRecipes && (
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => setRecipePickerOpen(true)} className="min-h-11 rounded-xl">
+              <Plus className="w-4 h-4 mr-1.5" /> Retsept yaratish
+            </Button>
+          </div>
+        )}
+        <Dialog open={recipePickerOpen} onOpenChange={setRecipePickerOpen}>
+          <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Retsept uchun mahsulot tanlang</DialogTitle></DialogHeader>
+            {products.some((product) => product.source_type !== 'resale') ? (
+              <select aria-label="Retsept mahsuloti" defaultValue="" className="w-full h-11 rounded-xl border border-input bg-card px-3"
+                onChange={(event) => {
+                  const selected = products.find((product) => product.id === event.target.value);
+                  if (selected) { setRecipePickerOpen(false); setRecipeProduct(selected); }
+                }}>
+                <option value="" disabled>Mahsulotni tanlang</option>
+                {products.filter((product) => product.source_type !== 'resale').map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+              </select>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Avval mahsulot nomi, narxi va list/dona birligini kiriting. Keyin shu mahsulot uchun retsept yaratasiz.</p>
+                <Button asChild className="w-full min-h-11"><Link to="/products">Mahsulot qo‘shish</Link></Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 mb-4 flex items-start gap-3">
           <Beaker className="w-5 h-5 text-brand-ink shrink-0 mt-0.5" />
           <div>
