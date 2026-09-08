@@ -1,4 +1,4 @@
 {
   "name": "complete-sale",
-  "entry": "index.ts"
+  "entry": "entry.ts"
 }
