@@ -376,6 +376,12 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
 
   const selected = items.find((item) => item.product_id === productId);
 
+  useEffect(() => {
+    if (!selected) return;
+    if (reasonCode === 'expired' && !selected.expired_quantity) setReasonCode('damaged');
+    if (Number(quantity) > Number(selected.quantity || 0)) setQuantity('1');
+  }, [selected?.product_id, selected?.quantity, selected?.expired_quantity, reasonCode, quantity]);
+
   const uploadPhoto = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
