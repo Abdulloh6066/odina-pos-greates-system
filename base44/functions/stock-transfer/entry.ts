@@ -75,7 +75,7 @@ const changeExistingStock = async (
       quantity: after,
       location_name: location.name,
       product_name: product.name,
-      unit: "piece",
+      unit: location.location_type === "production" ? (product.production_unit || "piece") : "piece",
       updated_at: now,
       updated_by: user.id,
       updated_by_name: userLabel(user),
@@ -106,7 +106,7 @@ const createMovement = async (
   item_kind: "product",
   item_id: data.product.id,
   item_name: data.transfer.product_name_snapshot || data.product.name,
-  unit: "piece",
+  unit: data.type === "transfer_out" ? (data.transfer.unit || "piece") : "piece",
   movement_type: data.type,
   quantity_change: data.change,
   balance_before: data.before,
@@ -231,13 +231,23 @@ export default async function(req) {
           return Response.json({ error: "Transfer ro‘yxatidagi faol ombor mahsulotlaridan biri topilmadi." }, { status: 404 });
         }
         const before = cleanNumber(sourceStock?.quantity || 0);
+        const unit = product.production_unit || "piece";
+        const factor = unit === "sheet" ? Number(product.pieces_per_sheet) : 1;
+        if (!["sheet", "piece"].includes(unit) || !Number.isSafeInteger(factor) || factor <= 0
+          || !Number.isSafeInteger(item.quantity * factor)) {
+          return Response.json({ error: "Mahsulotning list/bo‘lak sozlamasi noto‘g‘ri." }, { status: 409 });
+        }
+        if (sourceStock && (sourceStock.unit || "piece") !== unit) {
+          return Response.json({ error: "Markaz qoldig‘i birligi mahsulotga mos emas. Egasi tekshirishi kerak." }, { status: 409 });
+        }
+        const receivedQuantity = item.quantity * factor;
         const after = cleanNumber(before - item.quantity);
         if (!sourceStock || after < 0) {
           return Response.json({
-            error: `${product.name} uchun markaziy omborda qoldiq yetarli emas. Mavjud: ${before} dona.`,
+            error: `${product.name} uchun markaziy omborda qoldiq yetarli emas. Mavjud: ${before} ${unit === "sheet" ? "list" : "dona"}.`,
           }, { status: 409 });
         }
-        prepared.push({ item, product, sourceStock, before, after });
+        prepared.push({ item, product, sourceStock, before, after, unit, factor, receivedQuantity });
       }
 
       const now = new Date().toISOString();
@@ -272,7 +282,9 @@ export default async function(req) {
             product_id: row.product.id,
             product_name_snapshot: row.product.name,
             quantity: row.item.quantity,
-            unit: "piece",
+            unit: row.unit,
+            conversion_factor: row.factor,
+            received_quantity: row.receivedQuantity,
             status: "pending",
             notes,
             created_by: user.id,
@@ -317,17 +329,17 @@ export default async function(req) {
       }
 
       try {
-        const totalQuantity = prepared.reduce((sum, row) => sum + row.item.quantity, 0);
+        const totalQuantity = prepared.reduce((sum, row) => sum + row.receivedQuantity, 0);
         const productSummary = prepared
           .slice(0, 5)
-          .map((row) => `${row.product.name}: ${row.item.quantity}`)
+          .map((row) => `${row.product.name}: ${row.item.quantity} ${row.unit === "sheet" ? "list" : "dona"} → ${row.receivedQuantity} dona/bo‘lak`)
           .join(", ");
         const more = prepared.length > 5 ? ` va yana ${prepared.length - 5} tur` : "";
         await service.entities.ActionHistory.create({
           user_id: user.id,
           user_name: userLabel(user),
           action: "stock_transfer_sent",
-          details: `${source.name} → ${destination.name}. ${prepared.length} tur, ${totalQuantity} dona: ${productSummary}${more}.`,
+          details: `${source.name} → ${destination.name}. ${prepared.length} tur, ${totalQuantity} dona/bo‘lak: ${productSummary}${more}.`,
         });
       } catch {}
 
@@ -416,7 +428,7 @@ export default async function(req) {
           transferRows.map((transfer: any) => service.entities.Product.get(transfer.product_id)),
         ),
       ]);
-      if (!destination || destination.active === false || products.some((product: any) => !product)) {
+      if (!destination || destination.active === false || products.some((product: any) => !product || product.archived === true)) {
         return Response.json({ error: "Do‘kon yoki mahsulotlardan biri topilmadi." }, { status: 404 });
       }
 
@@ -428,12 +440,20 @@ export default async function(req) {
       const prepared = transferRows.map((transfer: any, index: number) => {
         const existing = destinationStocks[index];
         const before = cleanNumber(existing?.quantity || 0);
+        const incoming = transfer.unit === "sheet" ? Number(transfer.received_quantity) : Number(transfer.quantity);
+        const factor = transfer.unit === "sheet" ? Number(transfer.conversion_factor) : 1;
+        if (!Number.isSafeInteger(incoming) || incoming <= 0 || !Number.isSafeInteger(factor)
+          || factor <= 0 || incoming !== Number(transfer.quantity) * factor
+          || (existing && existing.unit !== "piece")) {
+          throw new Error("Transferning qabul miqdori yoki do‘kon qoldiq birligi noto‘g‘ri.");
+        }
         return {
           transfer,
           product: products[index],
           existing,
           before,
-          after: cleanNumber(before + cleanNumber(transfer.quantity)),
+          incoming,
+          after: cleanNumber(before + incoming),
         };
       });
 
@@ -492,7 +512,7 @@ export default async function(req) {
             location: destination,
             product: row.product,
             type: "transfer_in",
-            change: cleanNumber(row.transfer.quantity),
+            change: row.incoming,
             before: row.before,
             after: row.after,
             transfer: row.transfer,
@@ -520,7 +540,7 @@ export default async function(req) {
 
         try {
           const totalQuantity = prepared.reduce(
-            (sum: number, row: any) => sum + cleanNumber(row.transfer.quantity),
+            (sum: number, row: any) => sum + row.incoming,
             0,
           );
           await service.entities.ActionHistory.create({
