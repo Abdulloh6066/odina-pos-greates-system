@@ -508,8 +508,8 @@ export default async function(req) {
       const budgetTransactions: any[] = [];
       let stockReport: any = null;
       let stockSnapshotPayloads: any[] = [];
-      let stockDifferenceQuantity = 0;
-      let stockDifferenceProductCount = 0;
+      const stockDifferenceQuantity = 0;
+      const stockDifferenceProductCount = 0;
 
       try {
         stockReport = await buildShiftStockReport(service, closingShift, closedAt);
@@ -601,7 +601,7 @@ export default async function(req) {
           closed_at: closedAt,
           actual_cash: actualCash,
           difference: actualCash - expected,
-          stock_count_completed: true,
+          stock_count_completed: false,
           stock_snapshot_count: stockSnapshotPayloads.length,
           stock_difference_quantity: stockDifferenceQuantity,
           stock_difference_product_count: stockDifferenceProductCount,
