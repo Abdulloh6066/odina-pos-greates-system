@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
   Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
-  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Truck, Users, WalletCards, Warehouse,
+  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
@@ -12,11 +12,11 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings,
+  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Trash2,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
-const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
+const KASSA_CHILD_KEYS = ['products', 'categories', 'waste', 'sales', 'cashouts', 'recipients'];
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
