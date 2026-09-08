@@ -197,4 +197,24 @@ test('close stores an immutable automatic system-stock snapshot', async () => {
   assert.equal(cakeSnapshot.expected_quantity, 7);
 });
 
-console.log('3 shift stock report regression tests passed. No live data was used.');
+test('stock snapshot failure does not block the financial shift close', async () => {
+  const f = fixture();
+  f.db.ProductStock.push({
+    id: 'duplicate-cake-stock',
+    location_id: 'shop',
+    product_id: 'cake',
+    product_name: 'Cake',
+    unit: 'piece',
+    quantity: 7,
+  });
+
+  const response = await loadHandler(f.client)(closeBody());
+
+  assert.equal(response.status, 200, JSON.stringify(response));
+  assert.equal(f.db.Shift[0].status, 'closed');
+  assert.equal(f.db.Shift[0].stock_count_completed, false);
+  assert.equal(f.db.Shift[0].stock_snapshot_count, 0);
+  assert.equal(f.db.ShiftProductSnapshot.length, 0);
+});
+
+console.log('4 shift stock report regression tests passed. No live data was used.');
