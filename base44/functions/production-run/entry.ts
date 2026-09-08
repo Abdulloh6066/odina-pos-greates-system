@@ -49,7 +49,7 @@ export default async function(req) {
       const requestedItems = Array.isArray(body?.items) ? body.items : [];
 
       if (!productId || !Number.isInteger(outputQuantity) || outputQuantity <= 0) {
-        return Response.json({ error: "Mahsulot va retseptdan chiqadigan dona sonini kiriting." }, { status: 400 });
+        return Response.json({ error: "Mahsulot va retseptdan chiqadigan list/dona sonini kiriting." }, { status: 400 });
       }
       if (!requestedItems.length) {
         return Response.json({ error: "Retseptga kamida bitta masalliq qo‘shing." }, { status: 400 });
@@ -103,7 +103,7 @@ export default async function(req) {
           product_name_snapshot: product.name,
           version: nextVersion,
           output_quantity: outputQuantity,
-          output_unit: "piece",
+          output_unit: product.production_unit || "piece",
           active: false,
           notes,
           created_at: now,
@@ -144,7 +144,7 @@ export default async function(req) {
           user_id: user.id,
           user_name: userLabel(user),
           action: "recipe_saved",
-          details: `${product.name}. Retsept v${nextVersion}. Natija: ${outputQuantity} dona. ${normalizedItems.length} ta masalliq.`,
+          details: `${product.name}. Retsept v${nextVersion}. Natija: ${outputQuantity} ${product.production_unit === "sheet" ? "list" : "dona"}. ${normalizedItems.length} ta masalliq.`,
         });
       } catch {}
 
@@ -162,7 +162,7 @@ export default async function(req) {
       const notes = String(body?.notes || "").trim();
 
       if (!locationId || !productId || !Number.isInteger(producedQuantity) || producedQuantity <= 0) {
-        return Response.json({ error: "Ishlab chiqarish joyi, mahsulot va musbat butun dona kiriting." }, { status: 400 });
+        return Response.json({ error: "Ishlab chiqarish joyi, mahsulot va musbat butun miqdor kiriting." }, { status: 400 });
       }
       if (user.role === "production" && (!user.shop_id || user.shop_id !== locationId)) {
         return Response.json({ error: "Siz faqat biriktirilgan ishlab chiqarish omborida ishlashingiz mumkin." }, { status: 403 });
@@ -185,6 +185,9 @@ export default async function(req) {
       const recipe = await activeRecipe(service, product.id);
       if (!recipe) {
         return Response.json({ error: "Bu mahsulot uchun faol retsept yaratilmagan." }, { status: 409 });
+      }
+      if ((recipe.output_unit || "piece") !== (product.production_unit || "piece")) {
+        return Response.json({ error: "Retsept va mahsulot birligi mos emas. Retseptni yangilang." }, { status: 409 });
       }
       const recipeOutput = cleanNumber(recipe.output_quantity);
       if (!Number.isFinite(recipeOutput) || recipeOutput <= 0) {
@@ -267,6 +270,9 @@ export default async function(req) {
           throw fail("Bu mahsulot uchun takroriy tayyor mahsulot qoldig‘i topildi.", 409);
         }
         const existingProductStock = productRows?.[0] || null;
+        if (existingProductStock && (existingProductStock.unit || "piece") !== (product.production_unit || "piece")) {
+          throw fail("Mahsulot qoldig‘i birligi retseptga mos emas.", 409);
+        }
         const productBefore = cleanNumber(existingProductStock?.quantity || 0);
         const productAfter = cleanNumber(productBefore + producedQuantity);
 
@@ -277,7 +283,7 @@ export default async function(req) {
               quantity: productAfter,
               location_name: location.name,
               product_name: product.name,
-              unit: "piece",
+              unit: product.production_unit || "piece",
               updated_at: now,
               updated_by: user.id,
               updated_by_name: userLabel(user),
@@ -293,7 +299,7 @@ export default async function(req) {
             location_name: location.name,
             product_id: product.id,
             product_name: product.name,
-            unit: "piece",
+            unit: product.production_unit || "piece",
             quantity: productAfter,
             low_stock_level: 0,
             updated_at: now,
@@ -313,7 +319,7 @@ export default async function(req) {
           recipe_version: Number(recipe.version || 1),
           recipe_output_quantity: recipeOutput,
           produced_quantity: producedQuantity,
-          unit: "piece",
+          unit: product.production_unit || "piece",
           status: "processing",
           notes,
           created_at: now,
@@ -350,7 +356,7 @@ export default async function(req) {
             quantity_change: -plan.required,
             balance_before: plan.before,
             balance_after: plan.after,
-            reason: `${product.name} ishlab chiqarildi: ${producedQuantity} dona`,
+            reason: `${product.name} ishlab chiqarildi: ${producedQuantity} ${product.production_unit === "sheet" ? "list" : "dona"}`,
             reference_id: batch.id,
             reference_type: "production_batch",
             user_id: user.id,
@@ -367,7 +373,7 @@ export default async function(req) {
           item_kind: "product",
           item_id: product.id,
           item_name: product.name,
-          unit: "piece",
+          unit: product.production_unit || "piece",
           movement_type: "production_output",
           quantity_change: producedQuantity,
           balance_before: productBefore,
@@ -391,7 +397,7 @@ export default async function(req) {
             user_id: user.id,
             user_name: userLabel(user),
             action: "production_completed",
-            details: `${location.name}. ${product.name}: ${producedQuantity} dona. Retsept v${Number(recipe.version || 1)}.`,
+            details: `${location.name}. ${product.name}: ${producedQuantity} ${product.production_unit === "sheet" ? "list" : "dona"}. Retsept v${Number(recipe.version || 1)}.`,
           });
         } catch {}
 
