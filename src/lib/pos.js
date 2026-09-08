@@ -11,9 +11,9 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings'],
-  manager: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
-  cashier: ['pos', 'warehouse', 'sales', 'shifts', 'cashouts'],
+  admin: ['dashboard', 'pos', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings'],
+  manager: ['dashboard', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
+  cashier: ['pos', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
   production: ['warehouse', 'products'],
   warehouse: ['warehouse'],
@@ -31,6 +31,7 @@ export const ROLE_HOME = {
 export const MENU_ITEMS = [
   { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
   { key: 'pos', label: 'Kassa', path: '/pos', icon: 'ShoppingCart' },
+  { key: 'waste', label: 'Chiqitlar', path: '/waste', icon: 'Trash2' },
   { key: 'warehouse', label: 'Ombor', path: '/warehouse', icon: 'Ombor' },
   { key: 'products', label: 'Mahsulotlar', path: '/products', icon: 'Cake' },
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
