@@ -546,30 +546,33 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
 
 function StockSnapshotSection({ snapshots, recorded }) {
   const rows = snapshots || [];
-  const differentRows = rows.filter((row) => Number(row.difference || 0) !== 0);
-  const expectedTotal = rows.reduce((sum, row) => sum + Number(row.expected_quantity || 0), 0);
-  const countedTotal = rows.reduce((sum, row) => sum + Number(row.counted_quantity || 0), 0);
+  const openingTotal = rows.reduce((sum, row) => sum + Number(row.opening_quantity || 0), 0);
+  const receivedTotal = rows.reduce((sum, row) => sum + Number(row.received_quantity || 0), 0);
+  const remainingTotal = rows.reduce((sum, row) => sum + Number(row.expected_quantity || 0), 0);
 
   return (
     <section>
-      <SectionTitle icon={PackageCheck} title={"Yopilishdagi mahsulot qoldig‘i · " + formatNum(rows.length) + " tur"} />
+      <SectionTitle icon={PackageCheck} title={"Yopilishdagi tizim qoldig‘i · " + formatNum(rows.length) + " tur"} />
 
       {rows.length === 0 ? (
         <EmptyText
           text={recorded
-            ? "Bu smena yopilganda sanaladigan mahsulot qoldig‘i bo‘lmagan."
-            : "Bu eski smenada mahsulot qoldig‘i sanab saqlanmagan."}
+            ? "Bu smena yopilganda do‘konda mahsulot qoldig‘i bo‘lmagan."
+            : "Bu eski smena uchun yopilishdagi qoldiq saqlanmagan."}
         />
       ) : (
         <div className="space-y-3">
+          <p className="rounded-xl bg-secondary/60 px-3 py-2.5 text-xs text-muted-foreground">
+            Bu miqdorlar kassir tomonidan sanalmagan — tizim smena yopilgan paytda ularni avtomatik saqlagan.
+          </p>
           <div className="grid grid-cols-3 gap-2 text-xs">
-            <Cell label="Kutilgan" value={formatNum(expectedTotal)} bold />
-            <Cell label="Sanalgan" value={formatNum(countedTotal)} bold />
-            <Cell label="Farqli tur" value={formatNum(differentRows.length)} bold />
+            <Cell label="Smena boshida" value={formatNum(openingTotal)} bold />
+            <Cell label="Transfer keldi" value={formatNum(receivedTotal)} bold />
+            <Cell label="Yopilganda qoldi" value={formatNum(remainingTotal)} bold />
           </div>
 
           <div className="hidden sm:block rounded-2xl border border-border overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-secondary/70 text-xs text-muted-foreground">
                 <tr>
                   <th className="text-left font-medium px-3 py-2.5">Mahsulot</th>
@@ -577,65 +580,50 @@ function StockSnapshotSection({ snapshots, recorded }) {
                   <th className="text-right font-medium px-2 py-2.5">Keldi</th>
                   <th className="text-right font-medium px-2 py-2.5">Sotildi</th>
                   <th className="text-right font-medium px-2 py-2.5">Chiqit</th>
-                  <th className="text-right font-medium px-2 py-2.5">Kutilgan</th>
-                  <th className="text-right font-medium px-2 py-2.5">Sanalgan</th>
-                  <th className="text-right font-medium px-3 py-2.5">Farq</th>
+                  <th className="text-right font-medium px-3 py-2.5">Qoldi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {rows.map((row) => {
-                  const difference = Number(row.difference || 0);
-                  return (
-                    <tr key={row.id || row.product_id}>
-                      <td className="px-3 py-3">
-                        <p className="font-medium">{row.product_name_snapshot}</p>
-                        {(Number(row.returned_quantity || 0) !== 0 || Number(row.other_change_quantity || 0) !== 0) && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Qaytdi +{formatNum(row.returned_quantity)} · Boshqa {signedQuantity(row.other_change_quantity)}
-                          </p>
-                        )}
-                      </td>
-                      <td className="text-right px-2 py-3">{formatNum(row.opening_quantity)}</td>
-                      <td className="text-right px-2 py-3 text-emerald-700">+{formatNum(row.received_quantity)}</td>
-                      <td className="text-right px-2 py-3">{formatNum(row.sold_quantity)}</td>
-                      <td className="text-right px-2 py-3 text-amber-700">{formatNum(row.waste_quantity)}</td>
-                      <td className="text-right px-2 py-3 font-medium">{formatNum(row.expected_quantity)}</td>
-                      <td className="text-right px-2 py-3 font-semibold">{formatNum(row.counted_quantity)}</td>
-                      <td className={"text-right px-3 py-3 font-bold " + (difference === 0 ? "text-emerald-700" : "text-destructive")}>
-                        {signedQuantity(difference)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {rows.map((row) => (
+                  <tr key={row.id || row.product_id}>
+                    <td className="px-3 py-3">
+                      <p className="font-medium">{row.product_name_snapshot}</p>
+                      {(Number(row.returned_quantity || 0) !== 0 || Number(row.other_change_quantity || 0) !== 0) && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Qaytdi +{formatNum(row.returned_quantity)} · Boshqa {signedQuantity(row.other_change_quantity)}
+                        </p>
+                      )}
+                    </td>
+                    <td className="text-right px-2 py-3">{formatNum(row.opening_quantity)}</td>
+                    <td className="text-right px-2 py-3 text-emerald-700">+{formatNum(row.received_quantity)}</td>
+                    <td className="text-right px-2 py-3">{formatNum(row.sold_quantity)}</td>
+                    <td className="text-right px-2 py-3 text-amber-700">{formatNum(row.waste_quantity)}</td>
+                    <td className="text-right px-3 py-3 font-bold">{formatNum(row.expected_quantity)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
 
           <div className="sm:hidden space-y-2.5">
-            {rows.map((row) => {
-              const difference = Number(row.difference || 0);
-              return (
-                <div key={row.id || row.product_id} className="rounded-2xl border border-border p-3.5">
-                  <div className="flex justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate">{row.product_name_snapshot}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Boshida {formatNum(row.opening_quantity)} · Keldi +{formatNum(row.received_quantity)}
-                        <br />
-                        Sotildi {formatNum(row.sold_quantity)} · Chiqit {formatNum(row.waste_quantity)}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-muted-foreground">Kutilgan / sanalgan</p>
-                      <p className="font-semibold">{formatNum(row.expected_quantity)} / {formatNum(row.counted_quantity)}</p>
-                      <p className={difference === 0 ? "text-emerald-700 font-bold" : "text-destructive font-bold"}>
-                        Farq {signedQuantity(difference)}
-                      </p>
-                    </div>
+            {rows.map((row) => (
+              <div key={row.id || row.product_id} className="rounded-2xl border border-border p-3.5">
+                <div className="flex justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{row.product_name_snapshot}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Boshida {formatNum(row.opening_quantity)} · Keldi +{formatNum(row.received_quantity)}
+                      <br />
+                      Sotildi {formatNum(row.sold_quantity)} · Chiqit {formatNum(row.waste_quantity)}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">Yopilganda qoldi</p>
+                    <p className="font-bold">{formatNum(row.expected_quantity)} dona</p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
