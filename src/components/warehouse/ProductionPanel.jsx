@@ -136,7 +136,7 @@ export default function ProductionPanel({
               const recipe = recipeByProduct[product.id];
               const lines = recipeItemsByRecipe[recipe?.id] || [];
               return (
-                <div key={product.id} className="rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col">
+                <div key={product.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{product.name}</p>
@@ -225,7 +225,7 @@ export default function ProductionPanel({
                     }))))
                   : 0;
                 return (
-                  <div key={product.id} className="rounded-2xl bg-card border border-border premium-shadow p-4">
+                  <div key={product.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">{product.name}</p>
@@ -258,7 +258,7 @@ export default function ProductionPanel({
           ) : (
             <div className="space-y-2.5">
               {historyRows.slice(0, 12).map((batch) => (
-                <div key={batch.id} className="rounded-2xl bg-card border border-border p-3.5">
+                <div key={batch.id} className="odina-panel rounded-2xl bg-card border border-border p-3.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{batch.product_name_snapshot}</p>
@@ -295,7 +295,7 @@ export default function ProductionPanel({
 
 function Empty({ text, compact = false }) {
   return (
-    <div className={`rounded-2xl border border-border bg-card text-center text-sm text-muted-foreground ${compact ? 'py-8' : 'py-14'}`}>
+    <div className={`odina-panel rounded-2xl border border-border bg-card text-center text-sm text-muted-foreground ${compact ? 'py-8' : 'py-14'}`}>
       {text}
     </div>
   );
