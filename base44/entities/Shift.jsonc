@@ -83,6 +83,22 @@
       "type": "number",
       "default": 0
     },
+    "stock_count_completed": {
+      "type": "boolean",
+      "default": false
+    },
+    "stock_snapshot_count": {
+      "type": "number",
+      "default": 0
+    },
+    "stock_difference_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "stock_difference_product_count": {
+      "type": "number",
+      "default": 0
+    },
     "budget_settled": {
       "type": "boolean",
       "default": false
