@@ -62,7 +62,7 @@ export default function Layout() {
           <OdinaBrand compact />
           <div className="w-9" />
         </div>
-        <main className="flex-1 min-w-0">
+        <main className="odina-workspace flex-1 min-w-0">
           <Outlet context={{ user, sidebarCollapsed, reloadUser: async () => { const u = await base44.auth.me(); setUser(u); } }} />
         </main>
       </div>
