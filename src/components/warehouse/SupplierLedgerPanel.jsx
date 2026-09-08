@@ -231,7 +231,7 @@ export default function SupplierLedgerPanel({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="odina-panel rounded-2xl border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1">
           <p className="font-semibold">Yetkazib beruvchilar kirimi va qarzi</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -249,7 +249,7 @@ export default function SupplierLedgerPanel({
         )}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+      <div className="odina-panel rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={showThisMonth} className="min-h-10 rounded-xl">
             Shu oy
@@ -324,7 +324,7 @@ export default function SupplierLedgerPanel({
                 key={supplier.id}
                 type="button"
                 onClick={() => setSelectedSupplierId(supplier.id)}
-                className="text-left rounded-2xl border border-border bg-card premium-shadow p-4 transition-all hover:-translate-y-0.5 hover:premium-shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="odina-panel text-left rounded-2xl border border-border bg-card premium-shadow p-4 transition-all hover:-translate-y-0.5 hover:premium-shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -359,7 +359,7 @@ export default function SupplierLedgerPanel({
         </div>
 
         {visible.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card py-14 text-center">
+          <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center">
             <ClipboardList className="w-9 h-9 mx-auto text-muted-foreground/40 mb-3" />
             <p className="font-medium">Kirim topilmadi</p>
             <p className="text-sm text-muted-foreground mt-1">Filtrlarni o‘zgartiring yoki yangi kirim yarating.</p>
@@ -451,7 +451,7 @@ function ReceiptCard({ receipt, items, payments, onView }) {
   const cancelled = isCancelled(receipt);
 
   return (
-    <div className={"rounded-2xl border bg-card premium-shadow p-4 sm:p-5 " + (
+    <div className={"odina-panel rounded-2xl border bg-card premium-shadow p-4 sm:p-5 " + (
       cancelled ? "border-red-200 opacity-80" : "border-border"
     )}>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -518,7 +518,7 @@ function ReceiptCard({ receipt, items, payments, onView }) {
 
 function PaymentCard({ payment }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-3.5 sm:p-4 flex items-start justify-between gap-4">
+    <div className="odina-panel rounded-2xl border border-border bg-card p-3.5 sm:p-4 flex items-start justify-between gap-4">
       <div className="min-w-0">
         <p className="font-medium">{payment.supplier_name_snapshot}</p>
         <p className="text-xs text-muted-foreground mt-1">
@@ -953,7 +953,7 @@ function CancelReceiptDialog({ receipt, onClose, onCancelled }) {
 
 function Summary({ icon: Icon, label, value, warning, danger }) {
   return (
-    <div className={"rounded-2xl border bg-card p-4 " + (danger ? "border-red-200" : "border-border")}>
+    <div className={"odina-panel rounded-2xl border bg-card p-4 " + (danger ? "border-red-200" : "border-border")}>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Icon className="w-4 h-4" />{label}
       </div>
