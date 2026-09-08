@@ -297,7 +297,7 @@ export default function Warehouse() {
   return (
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
-        title="Ombor"
+        title={visibleTabs.find((item) => item.id === tab)?.label || 'Ombor'}
         subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
         actions={canCreateIngredients && (
@@ -463,7 +463,7 @@ export default function Warehouse() {
 
 function Summary({ label, value }) {
   return (
-    <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 transition-all hover:-translate-y-0.5">
+    <div className="odina-panel odina-summary rounded-2xl bg-card border border-border premium-shadow p-4 transition-all hover:-translate-y-0.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-xl font-semibold mt-1">{formatNum(value)}</p>
     </div>
