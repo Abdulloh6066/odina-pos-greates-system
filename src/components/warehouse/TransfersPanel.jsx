@@ -123,7 +123,7 @@ export default function TransfersPanel({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-border bg-card premium-shadow p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="odina-panel rounded-2xl border border-border bg-card premium-shadow p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
           <Truck className="w-5 h-5" />
         </div>
@@ -200,7 +200,7 @@ export default function TransfersPanel({
 function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
   const status = STATUS[group.status] || STATUS.pending;
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-card premium-shadow">
+    <article className="odina-panel overflow-hidden rounded-2xl border border-border bg-card premium-shadow">
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
@@ -414,7 +414,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
           </div>
 
           <div className="grid lg:grid-cols-3 gap-4 items-start">
-            <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
+            <div className="odina-panel lg:col-span-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div>
                   <p className="font-semibold">Mahsulotlarni tanlang</p>
@@ -545,7 +545,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
 
 function Empty({ text }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card py-10 text-center">
+    <div className="odina-panel rounded-2xl border border-dashed border-border bg-card py-10 text-center">
       <Truck className="w-9 h-9 mx-auto text-muted-foreground/35 mb-2" />
       <p className="text-sm text-muted-foreground">{text}</p>
     </div>
