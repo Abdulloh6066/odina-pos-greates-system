@@ -45,6 +45,14 @@
       ],
       "default": "piece"
     },
+    "received_quantity": {
+      "type": "number",
+      "minimum": 1
+    },
+    "conversion_factor": {
+      "type": "integer",
+      "minimum": 1
+    },
     "status": {
       "type": "string",
       "enum": [
