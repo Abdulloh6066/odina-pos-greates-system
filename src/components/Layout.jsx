@@ -2,23 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import OdinaBrand from './brand/OdinaBrand';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function Layout() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoadingAuth, checkUserAuth } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('odina-sidebar-collapsed') === 'true');
   const location = useLocation();
-
-  useEffect(() => {
-    let active = true;
-    base44.auth.me()
-      .then((u) => active && setUser(u))
-      .catch(() => {})
-      .finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, []);
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
 
@@ -37,7 +27,7 @@ export default function Layout() {
     });
   };
 
-  if (loading) {
+  if (isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="w-9 h-9 border-4 border-secondary border-t-primary rounded-full animate-spin" />
@@ -63,7 +53,7 @@ export default function Layout() {
           <div className="w-9" />
         </div>
         <main className="odina-workspace flex-1 min-w-0">
-          <Outlet context={{ user, sidebarCollapsed, reloadUser: async () => { const u = await base44.auth.me(); setUser(u); } }} />
+          <Outlet context={{ user, sidebarCollapsed, reloadUser: checkUserAuth }} />
         </main>
       </div>
     </div>
