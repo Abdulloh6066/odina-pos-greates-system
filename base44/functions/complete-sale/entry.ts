@@ -212,6 +212,17 @@ async function buildShiftStockReport(service: any, shift: any, generatedAt: stri
   };
 }
 
+async function cleanupShiftStockSnapshots(service: any, shiftId: string) {
+  const snapshotsEntity = service?.entities?.ShiftProductSnapshot;
+  if (!snapshotsEntity?.filter || !snapshotsEntity?.delete) return;
+  const snapshots = await snapshotsEntity
+    .filter({ shift_id: shiftId }, "-closed_at", SHIFT_STOCK_ROW_LIMIT)
+    .catch(() => []);
+  for (const snapshot of snapshots || []) {
+    await snapshotsEntity.delete(snapshot.id).catch(() => {});
+  }
+}
+
 const BUDGET_ACCOUNT_LABELS: Record<string, string> = {
   cash: "Naqd pul",
   uzcard: "Uzcard",
@@ -508,36 +519,58 @@ export default async function(req) {
       const budgetTransactions: any[] = [];
       let stockReport: any = null;
       let stockSnapshotPayloads: any[] = [];
+      let stockSnapshotSucceeded = false;
       const stockDifferenceQuantity = 0;
       const stockDifferenceProductCount = 0;
 
       try {
-        stockReport = await buildShiftStockReport(service, closingShift, closedAt);
-        stockSnapshotPayloads = stockReport.rows.map((row: any) => ({
-          shift_id: closingShift.id,
-          shop_id: closingShift.shop_id,
-          shop_name: closingShift.shop_name,
-          cashier_id: closingShift.user_id,
-          cashier_name: closingShift.user_name || userName,
-          product_id: row.product_id,
-          product_name_snapshot: row.product_name_snapshot,
-          image_url_snapshot: row.image_url_snapshot,
-          unit: "piece",
-          opening_quantity: row.opening_quantity,
-          received_quantity: row.received_quantity,
-          sold_quantity: row.sold_quantity,
-          waste_quantity: row.waste_quantity,
-          returned_quantity: row.returned_quantity,
-          other_change_quantity: row.other_change_quantity,
-          expected_quantity: row.expected_quantity,
-          counted_quantity: row.expected_quantity,
-          difference: 0,
-          counted_by_id: "",
-          counted_by_name: "",
-          closed_at: closedAt,
-        }));
-        if (stockSnapshotPayloads.length) {
-          await service.entities.ShiftProductSnapshot.bulkCreate(stockSnapshotPayloads);
+        try {
+          stockReport = await buildShiftStockReport(service, closingShift, closedAt);
+          stockSnapshotPayloads = stockReport.rows.map((row: any) => ({
+            shift_id: closingShift.id,
+            shop_id: closingShift.shop_id,
+            shop_name: closingShift.shop_name,
+            cashier_id: closingShift.user_id,
+            cashier_name: closingShift.user_name || userName,
+            product_id: row.product_id,
+            product_name_snapshot: row.product_name_snapshot,
+            image_url_snapshot: row.image_url_snapshot,
+            unit: "piece",
+            opening_quantity: row.opening_quantity,
+            received_quantity: row.received_quantity,
+            sold_quantity: row.sold_quantity,
+            waste_quantity: row.waste_quantity,
+            returned_quantity: row.returned_quantity,
+            other_change_quantity: row.other_change_quantity,
+            expected_quantity: row.expected_quantity,
+            counted_quantity: row.expected_quantity,
+            difference: 0,
+            counted_by_id: "",
+            counted_by_name: "",
+            closed_at: closedAt,
+          }));
+          if (stockSnapshotPayloads.length) {
+            await service.entities.ShiftProductSnapshot.bulkCreate(stockSnapshotPayloads);
+          }
+          stockSnapshotSucceeded = true;
+        } catch (stockError) {
+          console.warn("Shift stock snapshot skipped:", stockError);
+          await cleanupShiftStockSnapshots(service, closingShift.id);
+          stockReport = {
+            shift_id: closingShift.id,
+            shop_id: closingShift.shop_id,
+            opened_at: closingShift.opened_at,
+            generated_at: closedAt,
+            rows: [],
+            warning: "Mahsulot qoldig‘i tarixini avtomatik saqlab bo‘lmadi.",
+          };
+          stockSnapshotPayloads = [];
+          await service.entities.ActionHistory.create({
+            user_id: user.id,
+            user_name: userName,
+            action: "shift_stock_snapshot_skipped",
+            details: `${closingShift.shop_name} · smena yopildi, mahsulot qoldig‘i tarixi saqlanmadi`,
+          }).catch(() => {});
         }
 
         for (const deposit of deposits) {
@@ -578,7 +611,7 @@ export default async function(req) {
             closed_at: closedAt,
             actual_cash: actualCash,
             difference: actualCash - expected,
-            stock_count_completed: true,
+            stock_count_completed: stockSnapshotSucceeded,
             stock_snapshot_count: stockSnapshotPayloads.length,
             stock_difference_quantity: stockDifferenceQuantity,
             stock_difference_product_count: stockDifferenceProductCount,
@@ -601,7 +634,7 @@ export default async function(req) {
           closed_at: closedAt,
           actual_cash: actualCash,
           difference: actualCash - expected,
-          stock_count_completed: true,
+          stock_count_completed: stockSnapshotSucceeded,
           stock_snapshot_count: stockSnapshotPayloads.length,
           stock_difference_quantity: stockDifferenceQuantity,
           stock_difference_product_count: stockDifferenceProductCount,
@@ -617,7 +650,7 @@ export default async function(req) {
           user_id: user.id,
           user_name: userName,
           action: "shift_closed",
-          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · tizim qoldig‘i ${stockSnapshotPayloads.length} tur`,
+          details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · tizim qoldig‘i ${stockSnapshotSucceeded ? `${stockSnapshotPayloads.length} tur` : "saqlanmadi"}`,
         }).catch(() => {});
         return Response.json({
           shift: updated,
@@ -629,12 +662,7 @@ export default async function(req) {
           print_report_required: true,
         });
       } catch (error) {
-        const orphanSnapshots = await service.entities.ShiftProductSnapshot
-          .filter({ shift_id: closingShift.id }, "-closed_at", SHIFT_STOCK_ROW_LIMIT)
-          .catch(() => []);
-        for (const snapshot of orphanSnapshots || []) {
-          await service.entities.ShiftProductSnapshot.delete(snapshot.id).catch(() => {});
-        }
+        await cleanupShiftStockSnapshots(service, closingShift.id);
         for (const transaction of [...budgetTransactions].reverse()) {
           await service.entities.BudgetTransaction.delete(transaction.id).catch(() => {});
         }
