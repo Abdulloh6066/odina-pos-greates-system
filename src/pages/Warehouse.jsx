@@ -295,7 +295,7 @@ export default function Warehouse() {
   const stockedCount = balancesForLocation.filter((balance) => Number(balance.quantity || 0) > 0).length;
 
   return (
-    <div className="p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Ombor"
         subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
@@ -317,7 +317,7 @@ export default function Warehouse() {
         </div>
       )}
 
-      <div className="rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
+      <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
         <div className="flex flex-col sm:flex-row gap-3">
           {['admin', 'manager'].includes(user?.role) ? (
             <label className="sm:w-72 space-y-1.5">
@@ -353,7 +353,7 @@ export default function Warehouse() {
       </div>
 
       {!selectedLocation ? (
-        <div className="rounded-2xl border border-border bg-card py-16 text-center">
+        <div className="odina-panel rounded-2xl border border-border bg-card py-16 text-center">
           <WarehouseIcon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
           <p className="font-medium">Ombor joylashuvi biriktirilmagan</p>
           <p className="text-sm text-muted-foreground mt-1">Egasi ushbu xodimni joylashuvga biriktirishi kerak.</p>
@@ -463,7 +463,7 @@ export default function Warehouse() {
 
 function Summary({ label, value }) {
   return (
-    <div className="rounded-2xl bg-card border border-border premium-shadow p-4 transition-all hover:-translate-y-0.5">
+    <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 transition-all hover:-translate-y-0.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-xl font-semibold mt-1">{formatNum(value)}</p>
     </div>
@@ -472,7 +472,7 @@ function Summary({ label, value }) {
 
 function StockGrid({ items, stockMap, kind, onAdjust }) {
   if (!items.length) {
-    return <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Mos mahsulot topilmadi.</div>;
+    return <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Mos mahsulot topilmadi.</div>;
   }
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -481,7 +481,7 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
         const quantity = Number(stock?.quantity || 0);
         const unit = kind === 'ingredient' ? item.base_unit : 'piece';
         return (
-          <div key={item.id} className="rounded-2xl bg-card border border-border premium-shadow p-4">
+          <div key={item.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-semibold truncate">{item.name}</p>
@@ -508,12 +508,12 @@ function StockGrid({ items, stockMap, kind, onAdjust }) {
 
 function HistoryList({ movements }) {
   if (!movements.length) {
-    return <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Bu joylashuvda ombor harakati yo‘q.</div>;
+    return <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Bu joylashuvda ombor harakati yo‘q.</div>;
   }
   return (
     <div className="space-y-3">
       {movements.map((movement) => (
-        <div key={movement.id} className="rounded-2xl bg-card border border-border p-4 flex items-start gap-3">
+        <div key={movement.id} className="odina-panel rounded-2xl bg-card border border-border p-4 flex items-start gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-semibold shrink-0 ${movement.quantity_change > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-destructive'}`}>
             {movement.quantity_change > 0 ? '+' : '−'}
           </div>
