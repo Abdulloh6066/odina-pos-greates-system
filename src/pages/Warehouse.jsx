@@ -63,6 +63,7 @@ export default function Warehouse() {
   const [locations, setLocations] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [products, setProducts] = useState([]);
+  const [archivedProductIds, setArchivedProductIds] = useState([]);
   const [ingredientStock, setIngredientStock] = useState([]);
   const [productStock, setProductStock] = useState([]);
   const [movements, setMovements] = useState([]);
@@ -195,6 +196,7 @@ export default function Warehouse() {
 
       setLocations(activeLocations);
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
+      setArchivedProductIds((productList || []).filter((item) => item.archived === true).map((item) => item.id));
       setProducts((productList || []).filter((item) => item.active !== false && item.archived !== true && item.track_stock !== false));
       setIngredientStock(ingredientBalances || []);
       setProductStock(productBalances || []);
@@ -414,6 +416,7 @@ export default function Warehouse() {
               products={products}
               productStock={productStock}
               transfers={transfers}
+              archivedProductIds={archivedProductIds}
               search={search}
               onReload={load}
             />
