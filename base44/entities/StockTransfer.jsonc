@@ -40,7 +40,8 @@
     "unit": {
       "type": "string",
       "enum": [
-        "piece"
+        "piece",
+        "sheet"
       ],
       "default": "piece"
     },
