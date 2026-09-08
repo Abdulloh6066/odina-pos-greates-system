@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
+import { AlertTriangle, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
 import { formatUZS, formatNum, isSameDay, canAccess } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 
@@ -11,6 +11,7 @@ export default function Dashboard() {
   const role = user?.role || 'cashier';
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
+  const [expiredItems, setExpiredItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,13 +19,17 @@ export default function Dashboard() {
     let active = true;
     (async () => {
       try {
-        const [s, p] = await Promise.all([
+        const [s, p, wasteResult] = await Promise.all([
           base44.entities.Sale.list('-created_date', 500),
           base44.entities.Product.list(),
+          (role === 'admin' || role === 'manager')
+            ? base44.functions.invoke('waste-ledger', { action: 'get_alerts' }).catch(() => ({ data: { expired_items: [] } }))
+            : Promise.resolve({ data: { expired_items: [] } }),
         ]);
         if (!active) return;
         setSales(s || []);
         setProducts(p || []);
+        setExpiredItems((wasteResult?.data || wasteResult)?.expired_items || []);
       } catch (e) {} finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
@@ -54,6 +59,23 @@ export default function Dashboard() {
   return (
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader title="Bosh sahifa" subtitle={new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
+
+      {expiredItems.length > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate('/waste')}
+          className="w-full mb-5 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-left text-red-900 hover:bg-red-100 transition-colors premium-shadow touch-manipulation"
+        >
+          <span className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{expiredItems.length} tur mahsulot 3 kundan oshgan</span>
+            <span className="block text-sm text-red-700/80 mt-0.5">Do‘konlar bo‘yicha ko‘rish va chiqitga chiqarish uchun bosing.</span>
+          </span>
+          <ArrowRight className="w-5 h-5 shrink-0" />
+        </button>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
