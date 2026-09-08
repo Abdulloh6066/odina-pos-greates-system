@@ -86,6 +86,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
   const [stockReport, setStockReport] = useState({ rows: [] });
   const [stockCounts, setStockCounts] = useState({});
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockLoaded, setStockLoaded] = useState(false);
   const [stockError, setStockError] = useState('');
   const expected = shift?.expected_cash || 0;
   const countedCash = Number(actualCash) || 0;
@@ -99,7 +100,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
     && Number.isInteger(Number(value)) && Number(value) >= 0
   );
   const countedProductCount = stockRows.filter((row) => isValidCount(stockCounts[row.product_id])).length;
-  const stockCountComplete = !stockLoading && !stockError && countedProductCount === stockRows.length;
+  const stockCountComplete = stockLoaded && !stockLoading && !stockError && countedProductCount === stockRows.length;
   const differenceProductCount = stockRows.filter((row) => (
     isValidCount(stockCounts[row.product_id])
     && Number(stockCounts[row.product_id]) !== Number(row.expected_quantity || 0)
@@ -108,6 +109,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
   const loadStockReport = async () => {
     if (!shift?.id) return;
     setStockLoading(true);
+    setStockLoaded(false);
     setStockError('');
     setStockCounts({});
     try {
@@ -120,8 +122,10 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
         throw new Error(payload?.error || 'Mahsulot qoldiqlarini yuklab bo‘lmadi.');
       }
       setStockReport(payload.stock_report);
+      setStockLoaded(true);
     } catch (error) {
       setStockReport({ rows: [] });
+      setStockLoaded(false);
       setStockError(shiftErrorText(error));
     } finally {
       setStockLoading(false);
@@ -136,6 +140,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
     } else {
       setStockReport({ rows: [] });
       setStockCounts({});
+      setStockLoaded(false);
       setStockError('');
     }
   }, [open, shift?.id, expected]);
