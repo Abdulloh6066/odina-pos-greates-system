@@ -111,7 +111,7 @@ export default function Dashboard() {
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
-    <div className={`odina-panel rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
+    <div className={`odina-panel odina-metric rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'odina-metric-accent bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-primary-foreground/15' : 'bg-primary/15 text-brand-ink'}`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
