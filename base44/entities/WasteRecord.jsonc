@@ -1,0 +1,152 @@
+{
+  "name": "WasteRecord",
+  "type": "object",
+  "properties": {
+    "waste_number": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "piece"
+      ],
+      "default": "piece"
+    },
+    "reason_code": {
+      "type": "string",
+      "enum": [
+        "expired",
+        "damaged",
+        "quality",
+        "other"
+      ]
+    },
+    "reason_label": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "unit_price_snapshot": {
+      "type": "number"
+    },
+    "total_retail_value": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "recorded",
+        "cancelling",
+        "cancelled"
+      ],
+      "default": "recorded"
+    },
+    "source_received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "age_days": {
+      "type": "number"
+    },
+    "expired_quantity_at_record": {
+      "type": "number"
+    },
+    "stock_movement_id": {
+      "type": "string"
+    },
+    "recorded_by_id": {
+      "type": "string"
+    },
+    "recorded_by_name": {
+      "type": "string"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelled_by_id": {
+      "type": "string"
+    },
+    "cancelled_by_name": {
+      "type": "string"
+    },
+    "cancelled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancel_reason": {
+      "type": "string"
+    },
+    "cancel_movement_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "waste_number",
+    "location_id",
+    "location_name",
+    "product_id",
+    "product_name_snapshot",
+    "quantity",
+    "unit",
+    "reason_code",
+    "reason_label",
+    "status",
+    "recorded_by_id",
+    "recorded_by_name",
+    "recorded_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "data.location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
