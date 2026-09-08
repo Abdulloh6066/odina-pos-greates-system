@@ -129,7 +129,7 @@ export default function Budget() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div className="col-span-2 lg:col-span-1 rounded-2xl border border-primary/25 bg-primary text-primary-foreground p-5 premium-shadow">
+            <div className="odina-metric-accent col-span-2 lg:col-span-1 rounded-2xl border border-primary/25 bg-primary text-primary-foreground p-5 premium-shadow">
               <p className="text-xs opacity-80">Jami Budget</p>
               <p className="text-2xl sm:text-3xl font-semibold mt-2">{formatUZS(totalBalance)}</p>
               <p className="text-xs opacity-75 mt-2">Barcha pul manbalari yig‘indisi</p>
