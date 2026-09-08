@@ -20,6 +20,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
+const sourceUnitLabel = (product) => product?.production_unit === 'sheet' ? 'list' : 'dona';
+const incomingQuantity = (transfer) => Number(transfer.received_quantity ?? transfer.quantity ?? 0);
+const transferLabel = (transfer) => transfer.unit === 'sheet'
+  ? `${formatNum(transfer.quantity)} list → ${formatNum(incomingQuantity(transfer))} bo‘lak`
+  : `${formatNum(transfer.quantity)} dona`;
+
 const STATUS = {
   pending: { label: 'Qabul kutilmoqda', className: 'bg-amber-50 text-amber-700' },
   receiving: { label: 'Qabul qilinmoqda', className: 'bg-blue-50 text-blue-700' },
@@ -56,7 +62,7 @@ function groupTransferRows(rows) {
       received_at: first.received_at,
       status: allReceived ? 'received' : allPending ? 'pending' : 'receiving',
       items,
-      total_quantity: items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      total_quantity: items.reduce((sum, item) => sum + incomingQuantity(item), 0),
     };
   });
 }
@@ -99,8 +105,8 @@ export default function TransfersPanel({
 
   const receive = async (group) => {
     const message = group.items.length > 1
-      ? `${group.batch_number}: ${group.items.length} tur, ${formatNum(group.total_quantity)} dona mahsulotning hammasi qabul qilinsinmi?`
-      : `${group.items[0].product_name_snapshot} — ${formatNum(group.total_quantity)} dona qabul qilinsinmi?`;
+      ? `${group.batch_number}: ${group.items.length} tur, ${formatNum(group.total_quantity)} dona/bo‘lak mahsulotning hammasi qabul qilinsinmi?`
+      : `${group.items[0].product_name_snapshot} — ${transferLabel(group.items[0])} qabul qilinsinmi?`;
     if (!confirm(message)) return;
 
     setReceivingId(group.id);
@@ -211,7 +217,7 @@ function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Jami {formatNum(group.total_quantity)} dona mahsulot
+              Do‘konga {formatNum(group.total_quantity)} dona/bo‘lak mahsulot
             </p>
           </div>
           <span className={`text-xs font-medium rounded-full px-2.5 py-1 ${status.className}`}>{status.label}</span>
@@ -230,7 +236,7 @@ function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
                 {index + 1}
               </span>
               <span className="min-w-0 flex-1 font-medium truncate">{item.product_name_snapshot}</span>
-              <span className="font-bold text-brand-ink whitespace-nowrap">{formatNum(item.quantity)} dona</span>
+              <span className="font-bold text-brand-ink whitespace-nowrap">{transferLabel(item)}</span>
             </div>
           ))}
         </div>
@@ -307,7 +313,8 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
     }))
     .filter((item) => item.product && Number.isInteger(item.quantity) && item.quantity > 0)
     .sort((a, b) => String(a.product.name || '').localeCompare(String(b.product.name || ''), 'uz'));
-  const totalQuantity = selectedEntries.reduce((sum, item) => sum + item.quantity, 0);
+  const totalQuantity = selectedEntries.reduce((sum, item) =>
+    sum + item.quantity * (item.product.production_unit === 'sheet' ? Number(item.product.pieces_per_sheet || 20) : 1), 0);
   const selectionValid = selectedEntries.length > 0
     && selectedEntries.length <= 50
     && selectedEntries.every((item) => item.quantity <= item.available);
@@ -458,10 +465,10 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
                             <p className="font-medium text-sm truncate">{product.name}</p>
                             <p className="text-xs text-muted-foreground truncate">{product.category_name || 'Kategoriyasiz'}</p>
                           </div>
-                          {selected > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">{formatNum(selected)} ta</span>}
+                          {selected > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">{formatNum(selected)} {sourceUnitLabel(product)}</span>}
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-2">
-                          <span className="text-xs text-muted-foreground">Mavjud: <b className="text-foreground">{formatNum(available)}</b></span>
+                          <span className="text-xs text-muted-foreground">Mavjud: <b className="text-foreground">{formatNum(available)} {sourceUnitLabel(product)}</b></span>
                           <Button type="button" size="sm" variant={selected > 0 ? 'outline' : 'secondary'} onClick={() => addProduct(product)} disabled={selected >= available} className="h-8 rounded-lg">
                             <Plus className="w-3.5 h-3.5 mr-1" /> {selected > 0 ? 'Yana' : 'Qo‘shish'}
                           </Button>
@@ -494,12 +501,15 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
                       <div className="flex items-start gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-[11px] text-muted-foreground">Jo‘natilgach {formatNum(available - quantity)} dona qoladi</p>
+                          <p className="text-[11px] text-muted-foreground">Jo‘natilgach {formatNum(available - quantity)} {sourceUnitLabel(product)} qoladi</p>
                         </div>
                         <button type="button" onClick={() => removeProduct(product.id)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center touch-manipulation" aria-label={`${product.name}ni olib tashlash`}>
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+                      <p className="mt-2 text-xs font-semibold text-brand-ink">{product.production_unit === 'sheet'
+                        ? `${quantity} list → ${quantity * Number(product.pieces_per_sheet || 20)} bo‘lak qabul qilinadi`
+                        : `${quantity} dona qabul qilinadi`}</p>
                       <div className="mt-2 flex items-center gap-2">
                         <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity - 1)} className="w-9 h-9 rounded-lg shrink-0">
                           <Minus className="w-3.5 h-3.5" />
@@ -515,8 +525,8 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
               )}
 
               <div className="mt-3 pt-3 border-t border-primary/20 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Jami miqdor</span>
-                <span className="font-display text-lg font-bold text-brand-ink">{formatNum(totalQuantity)} dona</span>
+                <span className="text-sm text-muted-foreground">Do‘konda jami</span>
+                <span className="font-display text-lg font-bold text-brand-ink">{formatNum(totalQuantity)} dona/bo‘lak</span>
               </div>
             </aside>
           </div>
@@ -534,7 +544,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
             {saving
               ? 'Jo‘natilmoqda…'
               : selectedEntries.length > 0
-                ? `${formatNum(selectedEntries.length)} tur · ${formatNum(totalQuantity)} dona jo‘natish`
+                ? `${formatNum(selectedEntries.length)} tur · ${formatNum(totalQuantity)} dona/bo‘lak jo‘natish`
                 : 'Mahsulotlarni tanlang'}
           </Button>
         </DialogFooter>
