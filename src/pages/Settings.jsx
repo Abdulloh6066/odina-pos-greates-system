@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { Settings as SettingsIcon, Building2, Save } from 'lucide-react';
 import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -56,23 +57,23 @@ export default function Settings() {
       if (settings) await base44.entities.Settings.update(settings.id, payload);
       else { const created = await base44.entities.Settings.create(payload); setSettings(created); }
       await logAction(user, 'settings_updated', 'Updated shop settings');
-      alert('Sozlamalar saqlandi.');
-    } catch (e) { alert('Saqlashda xato: ' + (e?.message || e)); }
+      void odinaAlert('Sozlamalar saqlandi.');
+    } catch (e) { void odinaAlert('Saqlashda xato: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
   const saveOwnerPin = async () => {
-    if (!/^\d{4,8}$/.test(ownerPin)) return alert('PIN kod 4–8 ta raqamdan iborat bo‘lishi kerak.');
-    if (ownerPin !== confirmPin) return alert('PIN kodlar bir xil emas.');
+    if (!/^\d{4,8}$/.test(ownerPin)) return void odinaAlert('PIN kod 4–8 ta raqamdan iborat bo‘lishi kerak.');
+    if (ownerPin !== confirmPin) return void odinaAlert('PIN kodlar bir xil emas.');
     setSavingPin(true);
     try {
       await base44.functions.invoke('set-owner-pin', { pin: ownerPin });
       setOwnerPin('');
       setConfirmPin('');
-      alert('Egasi tasdiqlash PIN kodi xavfsiz saqlandi.');
+      void odinaAlert('Egasi tasdiqlash PIN kodi xavfsiz saqlandi.');
     } catch (e) {
       const message = e?.response?.data?.error || e?.message || e;
-      alert('PIN kodni saqlashda xato: ' + message);
+      void odinaAlert('PIN kodni saqlashda xato: ' + message);
     } finally {
       setSavingPin(false);
     }
