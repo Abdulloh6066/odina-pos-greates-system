@@ -3,6 +3,7 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { AlertTriangle, Beaker, ChefHat, History, Pencil, Plus, Scale, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +54,7 @@ export default function ProductionPanel({
       setRecipeItems(itemList || []);
       setBatches(batchList || []);
     } catch (error) {
-      alert('Retsept va ishlab chiqarish ma’lumotlarini yuklab bo‘lmadi: ' + errorMessage(error, 'Noma’lum xato'));
+      void odinaAlert('Retsept va ishlab chiqarish ma’lumotlarini yuklab bo‘lmadi: ' + errorMessage(error, 'Noma’lum xato'));
     } finally {
       setLoading(false);
     }
@@ -356,7 +357,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
   const save = async () => {
     const validRows = rows.filter((row) => row.ingredient_id && Number(row.quantity) > 0);
     if (!product || Number(outputQuantity) <= 0 || validRows.length !== rows.length) {
-      alert('Natija miqdori va barcha masalliqlarni to‘liq kiriting.');
+      void odinaAlert('Natija miqdori va barcha masalliqlarni to‘liq kiriting.');
       return;
     }
     setSaving(true);
@@ -375,7 +376,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
       if (!payload?.recipe) throw new Error(payload?.error || 'Retseptni saqlab bo‘lmadi.');
       onSaved();
     } catch (error) {
-      alert('Retsept saqlanmadi: ' + errorMessage(error, 'Noma’lum xato'));
+      void odinaAlert('Retsept saqlanmadi: ' + errorMessage(error, 'Noma’lum xato'));
     } finally {
       setSaving(false);
     }
@@ -507,7 +508,7 @@ function ProductionDialog({ open, product, recipe, recipeItems, balances, locati
       const details = shortages?.length
         ? '\n' + shortages.map((item) => `${item.ingredient_name}: ${formatNum(item.missing)} ${UNIT_LABELS[item.unit] || item.unit} yetishmaydi`).join('\n')
         : '';
-      alert('Ishlab chiqarish saqlanmadi: ' + message + details);
+      void odinaAlert('Ishlab chiqarish saqlanmadi: ' + message + details);
     } finally {
       setSaving(false);
     }
