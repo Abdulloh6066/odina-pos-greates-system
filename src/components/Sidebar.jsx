@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
-  Circle, Clock, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
+  Circle, Clock, ClipboardList, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
@@ -11,7 +11,7 @@ import { base44 } from '@/api/base44Client';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 
 const ICONS = {
-  LayoutDashboard, ShoppingCart, Cake, Tags, BarChart3, Ticket,
+  LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
   ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Trash2,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };

@@ -1,0 +1,105 @@
+{
+  "name": "CustomerOrderItem",
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string"
+    },
+    "order_number_snapshot": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "product_image_snapshot": {
+      "type": "string"
+    },
+    "category_name_snapshot": {
+      "type": "string"
+    },
+    "unit_snapshot": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "sheet"
+      ]
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "event_pieces_per_sheet_snapshot": {
+      "type": "number",
+      "default": 0
+    },
+    "unit_price_snapshot": {
+      "type": "number"
+    },
+    "line_total": {
+      "type": "number"
+    },
+    "customization_note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "order_id",
+    "product_id",
+    "product_name_snapshot",
+    "unit_snapshot",
+    "quantity",
+    "unit_price_snapshot",
+    "line_total"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

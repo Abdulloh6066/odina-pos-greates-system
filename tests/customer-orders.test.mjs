@@ -105,7 +105,7 @@ function loadHandler(client) {
   let source = readFileSync('base44/functions/customer-orders/entry.ts', 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
-    .replace('export default async function(req)', 'async function handler(req)');
+    .replace(/export default async function\(req[^{]*\{/, 'async function handler(req) {');
   source = sharedCode + '\n' + source;
   source += '\nglobalThis.testHandler = handler;';
   const code = ts.transpileModule(source, {
@@ -255,7 +255,7 @@ test('remaining balance is recorded on a later day on a later shift, counted exa
   assert.equal(created.status, 200, JSON.stringify(created));
   const orderId = created.data.order.id;
   // later day + new open shift
-  vm.runInContext('__setClock("2026-09-11T15:00:00.000Z")', vm.createContext({}));
+  clock = '2026-09-11T15:00:00.000Z';
   f.db.Shift[0].status = 'closed';
   f.db.Shift.push({
     id: 'shift-b', user_id: 'u1', user_name: 'Test Cashier', shop_id: 'shop-a', shop_name: 'Filial A',
@@ -322,8 +322,7 @@ test('adjustment is admin-only and requires a reason', async () => {
   assert.equal(res.status, 403);
   const admin = fixture('admin');
   const adminCall = loadHandler(harness(admin.db));
-  const ok = await adminCall.call ? null : null;
-  const okRes = await loadHandler(harness(admin.db))(baseOrder({ adjustment_amount: -50000, adjustment_reason: 'do‘stga chegirma' }));
+  const okRes = await adminCall(baseOrder({ shop_id: 'shop-b', adjustment_amount: -50000, adjustment_reason: 'do‘stga chegirma' }));
   assert.equal(okRes.status, 200, JSON.stringify(okRes));
   assert.equal(admin.db.CustomerOrder[0].original_calculated_total, admin.db.CustomerOrder[0].subtotal);
   assert.equal(admin.db.CustomerOrder[0].adjustment_amount, -50000);

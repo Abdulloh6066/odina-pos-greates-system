@@ -1,0 +1,185 @@
+{
+  "name": "CustomerOrder",
+  "type": "object",
+  "properties": {
+    "order_number": {
+      "type": "string"
+    },
+    "order_type": {
+      "type": "string",
+      "enum": [
+        "toy_va_bazmlar",
+        "tugilgan_kun_va_boshqa"
+      ]
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name_snapshot": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "required_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "required_time": {
+      "type": "string"
+    },
+    "fulfilment_type": {
+      "type": "string",
+      "enum": [
+        "pickup",
+        "delivery"
+      ]
+    },
+    "delivery_address": {
+      "type": "string"
+    },
+    "reference_image": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "cake_shape": {
+      "type": "string"
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "delivery_fee": {
+      "type": "number",
+      "default": 0
+    },
+    "adjustment_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "adjustment_reason": {
+      "type": "string"
+    },
+    "original_calculated_total": {
+      "type": "number",
+      "default": 0
+    },
+    "total": {
+      "type": "number",
+      "default": 0
+    },
+    "paid_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "remaining_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "unpaid",
+        "partial",
+        "paid"
+      ],
+      "default": "unpaid"
+    },
+    "order_status": {
+      "type": "string",
+      "enum": [
+        "qabul_qilindi",
+        "tayyorlanmoqda",
+        "tayyor",
+        "yuborildi_olib_ketildi",
+        "yakunlandi",
+        "bekor_qilindi"
+      ],
+      "default": "qabul_qilindi"
+    },
+    "creator_id": {
+      "type": "string"
+    },
+    "creator_name": {
+      "type": "string"
+    },
+    "creator_role": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "order_number",
+    "order_type",
+    "shop_id",
+    "customer_name",
+    "customer_phone",
+    "required_date",
+    "required_time",
+    "fulfilment_type",
+    "subtotal",
+    "total",
+    "paid_amount",
+    "remaining_balance",
+    "payment_status",
+    "order_status",
+    "creator_id"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

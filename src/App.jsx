@@ -16,6 +16,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import POS from '@/pages/POS';
+import Orders from '@/pages/Orders';
 import Products from '@/pages/Products';
 import Categories from '@/pages/Categories';
 import Users from '@/pages/Users';
@@ -68,6 +69,7 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<RoleRoute pageKey="dashboard"><Dashboard /></RoleRoute>} />
                 <Route path="/pos" element={<RoleRoute pageKey="pos"><POS /></RoleRoute>} />
+                <Route path="/orders" element={<RoleRoute pageKey="orders"><Orders /></RoleRoute>} />
                 <Route path="/products" element={<RoleRoute pageKey="products"><Products /></RoleRoute>} />
                 <Route path="/categories" element={<RoleRoute pageKey="categories"><Categories /></RoleRoute>} />
                 <Route path="/users" element={<RoleRoute pageKey="users"><Users /></RoleRoute>} />

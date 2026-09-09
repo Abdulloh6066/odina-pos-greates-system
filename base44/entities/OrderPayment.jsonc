@@ -1,0 +1,124 @@
+{
+  "name": "OrderPayment",
+  "type": "object",
+  "properties": {
+    "order_id": {
+      "type": "string"
+    },
+    "order_number_snapshot": {
+      "type": "string"
+    },
+    "payment_kind": {
+      "type": "string",
+      "enum": [
+        "advance",
+        "balance",
+        "additional"
+      ]
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "uzcard",
+        "humo",
+        "click",
+        "payme",
+        "bank_transfer",
+        "other"
+      ]
+    },
+    "amount": {
+      "type": "number"
+    },
+    "paid_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name_snapshot": {
+      "type": "string"
+    },
+    "employee_id": {
+      "type": "string"
+    },
+    "employee_name": {
+      "type": "string"
+    },
+    "employee_role": {
+      "type": "string"
+    },
+    "shift_id": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed"
+      ],
+      "default": "completed"
+    }
+  },
+  "required": [
+    "order_id",
+    "payment_kind",
+    "payment_method",
+    "amount",
+    "paid_at",
+    "shop_id",
+    "employee_id",
+    "idempotency_key",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
