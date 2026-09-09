@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
@@ -77,10 +78,10 @@ export default function Products() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
         </div>
-        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium sm:w-56">
+        <OdinaSelect value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium sm:w-56">
           <option value="all">Barcha kategoriyalar</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        </OdinaSelect>
         {role === 'admin' && (
           <Button variant="outline" onClick={() => setShowArchived((value) => !value)} className="whitespace-nowrap min-h-11 rounded-xl touch-manipulation">
             {showArchived ? <Cake className="w-4 h-4 mr-1.5" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
@@ -260,28 +261,28 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
             </div>
             <div>
               <Label className="text-xs mb-1.5 block">Kategoriya</Label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
                 <option value="">Tanlanmagan</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Mahsulot qayerdan ta’minlanadi</Label>
-            <select value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
               <option value="central_produced">Markaziy ishlab chiqarishda tayyorlanadi</option>
               <option value="shop_prepared">Har bir do‘konda tayyorlanadi</option>
               <option value="resale">Sotish uchun tayyor holda xarid qilinadi</option>
-            </select>
+            </OdinaSelect>
             <p className="text-xs text-muted-foreground mt-1.5">Bu tanlov keyingi bosqichdagi retsept va avtomatik ombor qoidalari uchun ishlatiladi.</p>
           </div>
           <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
             <div>
               <Label className="text-xs mb-1.5 block">Ishlab chiqarish va jo‘natish birligi</Label>
-              <select value={productionUnit} disabled={Boolean(product)} onChange={(e) => setProductionUnit(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
+              <OdinaSelect value={productionUnit} disabled={Boolean(product)} onChange={(e) => setProductionUnit(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
                 <option value="piece">Donali — kruassan, pechenye va boshqalar</option>
                 <option value="sheet">Listli tort — do‘konda bo‘laklab sotiladi</option>
-              </select>
+              </OdinaSelect>
             </div>
             {productionUnit === 'sheet' && (
               <div className="grid grid-cols-2 gap-3">
