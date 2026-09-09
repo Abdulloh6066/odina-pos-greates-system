@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import {
   ArrowRight,
   CheckCircle2,
@@ -416,10 +417,10 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-secondary/35 p-4">
             <Label className="text-xs mb-1.5 block">Qabul qiluvchi do‘kon</Label>
-            <select value={destinationId} onChange={(event) => setDestinationId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={destinationId} onChange={(event) => setDestinationId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
               <option value="">Do‘konni tanlang</option>
               {destinations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
+            </OdinaSelect>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-4 items-start">
@@ -437,10 +438,10 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
               <div className="grid sm:grid-cols-2 gap-3 mb-3">
                 <div>
                   <Label className="text-xs mb-1.5 block">Kategoriya</Label>
-                  <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+                  <OdinaSelect value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
                     <option value="all">Barcha kategoriyalar</option>
                     {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                  </select>
+                  </OdinaSelect>
                 </div>
                 <div>
                   <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
