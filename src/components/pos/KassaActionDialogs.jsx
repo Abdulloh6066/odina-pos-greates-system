@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { ShieldCheck, Banknote, RotateCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">Chiqim turi</Label>
-            <select
+            <OdinaSelect
               value={expenseCategory}
               onChange={(event) => {
                 setExpenseCategory(event.target.value);
@@ -121,16 +122,16 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
               <option value="goods_payment">Tovarlarga pul</option>
               <option value="owner_withdrawal">Egasi olgan pul</option>
               <option value="other_expense">Boshqa chiqim</option>
-            </select>
+            </OdinaSelect>
           </div>
 
           {recipientRequired && (
             <div>
               <Label className="text-xs mb-1.5 block">Kompaniya / yetkazib beruvchi</Label>
-              <select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="">Ro‘yxatdan tanlang</option>
                 {debtRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name} · qarz {formatUZS(supplierDebts[recipient.id])}</option>)}
-              </select>
+              </OdinaSelect>
               {debtRecipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Hozir to‘lanadigan yetkazib beruvchi qarzi yo‘q.</p>}
               {recipientId && <p className="text-xs text-muted-foreground mt-1.5">Qolgan umumiy qarz: <span className="font-semibold text-foreground">{formatUZS(selectedDebt)}</span></p>}
             </div>
@@ -155,10 +156,10 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
           {ownerRequired && (
             <div className="space-y-2">
               <Label className="text-xs block">Pulni olgan shaxs</Label>
-              <select value={ownerChoice} onChange={(event) => setOwnerChoice(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={ownerChoice} onChange={(event) => setOwnerChoice(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="Abdulloh">Abdulloh</option>
                 <option value="other">Boshqa shaxs</option>
-              </select>
+              </OdinaSelect>
               {ownerChoice === 'other' && (
                 <Input value={otherOwner} onChange={(event) => setOtherOwner(event.target.value)} placeholder="Shaxs ismini yozing" className="h-11 rounded-xl" />
               )}
