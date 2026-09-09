@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { ReceiptText, Search, Eye, RotateCcw } from 'lucide-react';
 import { formatUZS, formatNum, isSameDay } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -63,7 +64,7 @@ export default function SalesHistory() {
       await load();
     } catch (e) {
       const message = e?.response?.data?.error || e?.data?.error || e?.message || String(e);
-      alert('Qaytarishda xato: ' + message);
+      void odinaAlert('Qaytarishda xato: ' + message);
     } finally {
       setRefundLoading(false);
     }
