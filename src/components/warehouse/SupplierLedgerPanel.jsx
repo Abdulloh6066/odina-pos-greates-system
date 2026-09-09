@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import OdinaSelect from "@/components/ui/odina-select";
 import {
   Ban,
   CalendarDays,
@@ -273,7 +274,7 @@ export default function SupplierLedgerPanel({
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Yetkazib beruvchi</span>
-            <select
+            <OdinaSelect
               value={supplierFilter}
               onChange={(event) => setSupplierFilter(event.target.value)}
               className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
@@ -282,11 +283,11 @@ export default function SupplierLedgerPanel({
               {supplierOptions.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
               ))}
-            </select>
+            </OdinaSelect>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Holati</span>
-            <select
+            <OdinaSelect
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
               className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
@@ -296,7 +297,7 @@ export default function SupplierLedgerPanel({
               <option value="debt">Qarzi bor</option>
               <option value="paid">To‘langan</option>
               <option value="cancelled">Bekor qilingan</option>
-            </select>
+            </OdinaSelect>
           </label>
         </div>
       </div>
@@ -791,7 +792,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
 
         <div>
           <Label className="text-xs mb-1.5 block">Qaysi Budget hisobidan</Label>
-          <select
+          <OdinaSelect
             value={account}
             onChange={(event) => setAccount(event.target.value)}
             disabled={saving || loadingBalances}
@@ -802,7 +803,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
             <option value="humo">Humo · {formatUZS(balances.humo || 0)}</option>
             <option value="online">Onlayn · {formatUZS(balances.online || 0)}</option>
             <option value="bank">Bank · {formatUZS(balances.bank || 0)}</option>
-          </select>
+          </OdinaSelect>
         </div>
 
         <div>
@@ -1062,7 +1063,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <Label className="text-xs mb-1.5 block">Yetkazib beruvchi</Label>
-              <select
+              <OdinaSelect
                 value={supplierId}
                 onChange={(event) => setSupplierId(event.target.value)}
                 className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
@@ -1071,7 +1072,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                 {supplierList.map((supplier) => (
                   <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                 ))}
-              </select>
+              </OdinaSelect>
               {supplierList.length === 0 && (
                 <p className="text-xs text-amber-700 mt-1.5">
                   Owner avval Kassa → Qabul qiluvchilar bo‘limida yetkazib beruvchi yaratishi kerak.
@@ -1097,14 +1098,14 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                   <div className="grid sm:grid-cols-[1fr_130px_160px_auto] gap-2 items-end">
                     <div>
                       <Label className="text-xs mb-1.5 block">Masalliq yoki qadoq</Label>
-                      <select
+                      <OdinaSelect
                         value={line.ingredient_id}
                         onChange={(event) => updateLine(index, "ingredient_id", event.target.value)}
                         className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
                       >
                         <option value="">Tanlang</option>
                         {ingredients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                      </select>
+                      </OdinaSelect>
                     </div>
                     <div>
                       <Label className="text-xs mb-1.5 block">
