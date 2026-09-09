@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import {
@@ -178,14 +179,14 @@ export default function Waste() {
       {context.shops.length > 1 && (
         <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 mb-5">
           <Label htmlFor="waste-location" className="text-xs mb-1.5 block">Do‘kon</Label>
-          <select
+          <OdinaSelect
             id="waste-location"
             value={locationId}
             onChange={(event) => setLocationId(event.target.value)}
             className="w-full sm:max-w-sm h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium"
           >
             {context.shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-          </select>
+          </OdinaSelect>
         </div>
       )}
 
@@ -437,19 +438,19 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
           {role !== 'cashier' && shops.length > 1 && (
             <div>
               <Label className="text-xs mb-1.5 block">Do‘kon</Label>
-              <select
+              <OdinaSelect
                 value={locationId}
                 onChange={(event) => setLocationId(event.target.value)}
                 className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
               >
                 {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
           )}
 
           <div>
             <Label className="text-xs mb-1.5 block">Mahsulot</Label>
-            <select
+            <OdinaSelect
               value={productId}
               onChange={(event) => setProductId(event.target.value)}
               className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
@@ -460,7 +461,7 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
                   {item.product_name} · {formatNum(item.quantity)} dona
                 </option>
               ))}
-            </select>
+            </OdinaSelect>
             {selected && (
               <p className="text-xs text-muted-foreground mt-1.5">
                 Mavjud: {formatNum(selected.quantity)} dona
@@ -476,13 +477,13 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
             </div>
             <div>
               <Label className="text-xs mb-1.5 block">Sabab</Label>
-              <select value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
+              <OdinaSelect value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
                 {REASONS.map((reason) => (
                   <option key={reason.value} value={reason.value} disabled={reason.value === 'expired' && !selected?.expired_quantity}>
                     {reason.label}
                   </option>
                 ))}
-              </select>
+              </OdinaSelect>
             </div>
           </div>
 
