@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,7 +60,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
         <div className="space-y-2.5">
           {payments.map((p, idx) => (
             <div key={idx} className="flex gap-2 items-center">
-              <select
+              <OdinaSelect
                 value={p.method}
                 onChange={(e) => updatePayment(idx, 'method', e.target.value)}
                 className="h-10 rounded-lg border border-input bg-card px-2 text-sm font-medium flex-1 min-w-0"
@@ -67,7 +68,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
-              </select>
+              </OdinaSelect>
               <Input
                 type="number"
                 value={p.amount}
