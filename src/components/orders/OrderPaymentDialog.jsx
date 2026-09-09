@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
 import { buildIdempotencyKey } from '@/lib/orders';
@@ -56,17 +57,17 @@ export default function OrderPaymentDialog({ open, onClose, order, onDone }) {
         <div className="space-y-3 mt-2">
           <div>
             <Label>To‘lov turi</Label>
-            <select value={kind} onChange={(e) => setKind(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={kind} onChange={(e) => setKind(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
               <option value="balance">Qoldiq to‘lov</option>
               <option value="advance">Avans</option>
               <option value="additional">Qo‘shimcha</option>
-            </select>
+            </OdinaSelect>
           </div>
           <div>
             <Label>Usul</Label>
-            <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
               {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </select>
+            </OdinaSelect>
           </div>
           <div>
             <Label>Summa (UZS)</Label>
