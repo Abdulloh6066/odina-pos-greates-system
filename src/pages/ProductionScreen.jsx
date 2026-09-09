@@ -341,30 +341,32 @@ function ProductionScreenInner() {
 
       {/* Confirm dialog */}
       <Dialog open={!!confirm} onOpenChange={(open) => !open && setConfirm(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {confirm?.step === 'ready' ? 'Tayyor bo‘ldi?' : 'Yuborildi?'}
-            </DialogTitle>
-            <DialogDescription>
-              {confirm?.step === 'ready'
-                ? `${confirm.order.order_number} buyurtmasini tayyor deb belgilaysiz.`
-                : `${confirm.order.order_number} buyurtmasini yuborilgan deb belgilaysiz.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <DialogClose asChild>
-              <Button variant="outline">Bekor</Button>
-            </DialogClose>
-            <Button
-              onClick={() => doAction(confirm.order, confirm.step)}
-              disabled={busyId === confirm?.order?.id}
-            >
-              {busyId === confirm?.order?.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Tasdiqlash
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {confirm && (
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {confirm.step === 'ready' ? 'Tayyor bo‘ldi?' : 'Yuborildi?'}
+              </DialogTitle>
+              <DialogDescription>
+                {confirm.step === 'ready'
+                  ? `${confirm.order.order_number} buyurtmasini tayyor deb belgilaysiz.`
+                  : `${confirm.order.order_number} buyurtmasini yuborilgan deb belgilaysiz.`}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <DialogClose asChild>
+                <Button variant="outline">Bekor</Button>
+              </DialogClose>
+              <Button
+                onClick={() => doAction(confirm.order, confirm.step)}
+                disabled={busyId === confirm.order.id}
+              >
+                {busyId === confirm.order.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Tasdiqlash
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </Dialog>
 
       {/* Image preview */}
