@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
-import { buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES } from '@/lib/orders';
+import { buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES, MONTHS_UZ, tashkentNowParts, tashkentNowStamp, composeRequiredDate, isFutureDateTime } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Image } from '@/components/ui/image';
-import { Plus, Trash2, X, Loader2 } from 'lucide-react';
+import { Plus, Minus, Trash2, X, Loader2, Lock } from 'lucide-react';
+import ProductCombobox from '@/components/orders/ProductCombobox';
 import { useToast } from '@/components/ui/use-toast';
 
 const WEDDING_PCS = 40;
@@ -19,9 +20,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [pickProductId, setPickProductId] = useState('');
-  const [pickQty, setPickQty] = useState(1);
   const [items, setItems] = useState([]);
+  const [acceptanceStamp, setAcceptanceStamp] = useState('');
+  const [dateParts, setDateParts] = useState({ day: '', month: '', year: '' });
   const [form, setForm] = useState(() => ({
     order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '',
     required_date: '', required_time: '18:00', shop_id: user?.shop_id || '',
@@ -41,36 +42,47 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
   }, [open]);
 
   useEffect(() => {
+    if (!open) return;
+    setAcceptanceStamp(tashkentNowStamp());
+    const np = tashkentNowParts();
+    setDateParts({ day: '', month: String(np.month), year: String(np.year) });
+  }, [open]);
+
+  useEffect(() => {
     if (open && role === 'cashier') setForm((f) => ({ ...f, shop_id: user?.shop_id || '' }));
   }, [open, role, user]);
 
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
-  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
-
-  const addItem = () => {
-    const p = productById.get(pickProductId);
-    if (!p) { toast({ title: 'Mahsulot tanlang', variant: 'destructive' }); return; }
-    const qty = Math.max(1, Math.floor(Number(pickQty) || 0));
-    if (!qty) { toast({ title: 'To‘g‘ri miqdor kiriting', variant: 'destructive' }); return; }
+  const addFromCombobox = (p, qty) => {
+    const q = Math.max(1, Math.floor(Number(qty) || 0));
     setItems((prev) => {
       const existing = prev.find((i) => i.product_id === p.id);
       if (existing) {
-        return prev.map((i) => i.product_id === p.id ? { ...i, quantity: i.quantity + qty } : i);
+        return prev.map((i) => i.product_id === p.id ? { ...i, quantity: i.quantity + q } : i);
       }
       return [...prev, { product_id: p.id, name: p.name, image_url: p.image_url || '', category_name: p.category_name || '',
         production_unit: p.production_unit || 'piece', price: Number(p.price || 0), sheet_price: Number(p.sheet_price || 0),
-        pieces_per_sheet: Number(p.pieces_per_sheet || 20), quantity: qty, customization_note: '' }];
+        pieces_per_sheet: Number(p.pieces_per_sheet || 20), quantity: q, customization_note: '' }];
     });
-    setPickProductId('');
-    setPickQty(1);
   };
 
   const setItemQty = (id, qty) => setItems((prev) => prev.map((i) => i.product_id === id ? { ...i, quantity: Math.max(1, Math.floor(Number(qty) || 1)) } : i));
+  const incItemQty = (id, delta) => setItems((prev) => prev.map((i) => i.product_id === id ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i));
   const setItemNote = (id, note) => setItems((prev) => prev.map((i) => i.product_id === id ? { ...i, customization_note: note } : i));
   const removeItem = (id) => setItems((prev) => prev.filter((i) => i.product_id !== id));
 
   const isWedding = form.order_type === 'toy_va_bazmlar';
+  const composedDate = useMemo(() => composeRequiredDate(dateParts.year, dateParts.month, dateParts.day), [dateParts]);
+  const yearOptions = useMemo(() => { const np = tashkentNowParts(); return [np.year, np.year + 1, np.year + 2]; }, []);
+  const daysInMonth = useMemo(() => { const y = Number(dateParts.year); const m = Number(dateParts.month); return (y && m) ? new Date(y, m, 0).getDate() : 31; }, [dateParts.year, dateParts.month]);
+  const dateError = useMemo(() => {
+    if (!dateParts.day) return '';
+    if (!composedDate) return 'Noto‘g‘ri sana';
+    if (!isFutureDateTime(composedDate, form.required_time)) return 'O‘tib ketgan sana yoki vaqt';
+    return '';
+  }, [composedDate, dateParts.day, form.required_time]);
+  useEffect(() => { setForm((f) => ({ ...f, required_date: composedDate })); }, [composedDate]);
   const subtotal = useMemo(() => items.reduce((sum, i) => {
     const unit = i.production_unit === 'sheet' ? Number(i.sheet_price || 0) : Number(i.price || 0);
     return sum + unit * i.quantity;
@@ -83,6 +95,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
   const remaining = total - advanceAmount;
 
   const valid = form.customer_name.trim() && form.customer_phone.trim() && form.required_date && form.required_time
+    && !dateError
     && items.length > 0 && (isAdmin || form.shop_id === user?.shop_id)
     && (adjustment === 0 || (isAdmin && form.adjustment_reason.trim().length >= 3))
     && (!form.useAdvance || (advanceAmount > 0 && advanceAmount <= total));
@@ -131,6 +144,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
 
   const reset = () => {
     setItems([]);
+    const np = tashkentNowParts();
+    setDateParts({ day: '', month: String(np.month), year: String(np.year) });
+    setAcceptanceStamp(tashkentNowStamp());
     setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
       shop_id: user?.shop_id || '', fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
       cake_shape: '', reference_image: '', notes: '', adjustment_amount: 0, adjustment_reason: '',
@@ -175,10 +191,33 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border bg-secondary/20 p-3 flex items-center gap-2.5 text-sm">
+            <Lock className="w-4 h-4 text-brand-olive shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-muted-foreground">Qabul qilingan vaqt (avtomatik · Asia/Tashkent)</div>
+              <div className="font-medium truncate">{acceptanceStamp || '—'}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             <div>
-              <Label>Sana *</Label>
-              <input type="date" value={form.required_date} onChange={(e) => update({ required_date: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm" />
+              <Label>Topshirish kuni *</Label>
+              <select value={dateParts.day} onChange={(e) => setDateParts((d) => ({ ...d, day: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+                <option value="">Kun</option>
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => <option key={d} value={String(d)}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Oy *</Label>
+              <select value={dateParts.month} onChange={(e) => setDateParts((d) => ({ ...d, month: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+                {MONTHS_UZ.map((m, idx) => <option key={idx} value={String(idx + 1)}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label>Yil *</Label>
+              <select value={dateParts.year} onChange={(e) => setDateParts((d) => ({ ...d, year: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+                {yearOptions.map((y) => <option key={y} value={String(y)}>{y}</option>)}
+              </select>
             </div>
             <div>
               <Label>Vaqt *</Label>
@@ -192,6 +231,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
               </select>
             </div>
           </div>
+          {dateError && <p className="text-xs text-rose-600 -mt-2">{dateError}</p>}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -220,19 +260,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
               <span>Mahsulotlar *</span>
               <span className="text-xs font-normal text-muted-foreground">{items.length} ta</span>
             </Label>
-            <div className="mt-2 flex flex-col sm:flex-row gap-2">
-              <select value={pickProductId} onChange={(e) => setPickProductId(e.target.value)} className="h-11 flex-1 rounded-xl border border-input bg-card px-3 text-sm">
-                <option value="">Mahsulot tanlang</option>
-                {products.map((p) => {
-                  const unit = p.production_unit === 'sheet' ? 'varaq' : 'dona';
-                  const price = p.production_unit === 'sheet' ? p.sheet_price : p.price;
-                  return <option key={p.id} value={p.id}>{p.name} — {formatUZS(price)}/{unit}</option>;
-                })}
-              </select>
-              <Input type="number" min="1" value={pickQty} onChange={(e) => setPickQty(e.target.value)} className="sm:w-24" />
-              <Button type="button" variant="outline" onClick={addItem}><Plus className="w-4 h-4" /> Qo‘shish</Button>
+            <div className="mt-2">
+              <ProductCombobox products={products} onAdd={addFromCombobox} loading={loadingProducts} />
             </div>
-            {loadingProducts && <p className="text-xs text-muted-foreground mt-1">Mahsulotlar yuklanmoqda...</p>}
 
             <div className="mt-3 space-y-2">
               {items.map((i) => {
@@ -257,8 +287,10 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                       <Label className="text-xs shrink-0">Miqdor</Label>
-                      <Input type="number" min="1" value={i.quantity} onChange={(e) => setItemQty(i.product_id, e.target.value)} className="h-9 w-24" />
-                      <Input value={i.customization_note} onChange={(e) => setItemNote(i.product_id, e.target.value)} placeholder="Izoh (masalan: yozuv)" className="h-9 flex-1" />
+                      <button type="button" onClick={() => incItemQty(i.product_id, -1)} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary shrink-0"><Minus className="w-4 h-4" /></button>
+                      <Input type="number" min="1" value={i.quantity} onChange={(e) => setItemQty(i.product_id, e.target.value)} className="h-9 w-20 text-center" />
+                      <button type="button" onClick={() => incItemQty(i.product_id, 1)} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary shrink-0"><Plus className="w-4 h-4" /></button>
+                      <Input value={i.customization_note} onChange={(e) => setItemNote(i.product_id, e.target.value)} placeholder="Izoh (masalan: yozuv)" className="h-9 flex-1 min-w-0" />
                     </div>
                   </div>
                 );

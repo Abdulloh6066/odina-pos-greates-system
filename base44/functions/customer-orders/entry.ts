@@ -10,6 +10,21 @@ const ORDER_TYPES = new Set(["toy_va_bazmlar", "tugilgan_kun_va_boshqa"]);
 const PAYMENT_KINDS = new Set(["advance", "balance", "additional"]);
 const WEDDING_PIECES_PER_SHEET = 40;
 
+function tashkentNowParts() {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tashkent", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const o: any = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]));
+  return {
+    year: Number(o.year),
+    month: Number(o.month),
+    day: Number(o.day),
+    hour: Number(o.hour === "24" ? "0" : o.hour),
+    minute: Number(o.minute),
+  };
+}
+
 function methodToShiftField(method: string): string | null {
   if (method === "cash") return "cash_sales";
   if (method === "uzcard") return "uzcard_sales";
@@ -144,6 +159,26 @@ export default async function(req: Request): Promise<Response> {
       const fulfilmentType = String(body?.fulfilment_type || "");
       if (!customerName || !customerPhone || !requiredDate || !requiredTime) {
         return Response.json({ error: "Mijoz ismi, telefoni, sana va vaqt majburiy." }, { status: 400 });
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(requiredDate) || !/^\d{2}:\d{2}$/.test(requiredTime)) {
+        return Response.json({ error: "Sana yoki vaqt formati noto‘g‘ri." }, { status: 400 });
+      }
+      {
+        const [yy, mm, dd] = requiredDate.split("-").map(Number);
+        const probe = new Date(Date.UTC(yy, mm - 1, dd));
+        if (probe.getUTCFullYear() !== yy || probe.getUTCMonth() !== mm - 1 || probe.getUTCDate() !== dd) {
+          return Response.json({ error: "Noto‘g‘ri sana." }, { status: 400 });
+        }
+        const [hh, mi] = requiredTime.split(":").map(Number);
+        if (hh > 23 || mi > 59) {
+          return Response.json({ error: "Noto‘g‘ri vaqt." }, { status: 400 });
+        }
+        const np = tashkentNowParts();
+        const reqStamp = `${yy}${String(mm).padStart(2, "0")}${String(dd).padStart(2, "0")}${requiredTime.replace(":", "")}`;
+        const nowStamp = `${np.year}${String(np.month).padStart(2, "0")}${String(np.day).padStart(2, "0")}${String(np.hour).padStart(2, "0")}${String(np.minute).padStart(2, "0")}`;
+        if (reqStamp < nowStamp) {
+          return Response.json({ error: "Topshirish sanasi yoki vaqti o‘tib ketgan." }, { status: 400 });
+        }
       }
       if (!["pickup", "delivery"].includes(fulfilmentType)) {
         return Response.json({ error: "Yetkazib berish turi noto‘g‘ri." }, { status: 400 });

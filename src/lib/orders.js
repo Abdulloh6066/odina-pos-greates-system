@@ -38,3 +38,50 @@ export const fulfilmentLabel = (key) => FULFILMENT_TYPES.find((f) => f.key === k
 
 export const buildIdempotencyKey = (prefix = "order") =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const TZ = "Asia/Tashkent";
+
+export const MONTHS_UZ = [
+  "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+  "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr",
+];
+
+export const pad2 = (n) => String(n).padStart(2, "0");
+
+export function tashkentNowParts() {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const o = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]));
+  return {
+    year: Number(o.year),
+    month: Number(o.month),
+    day: Number(o.day),
+    hour: Number(o.hour === "24" ? "0" : o.hour),
+    minute: Number(o.minute),
+  };
+}
+
+export function tashkentNowStamp() {
+  const p = tashkentNowParts();
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)} ${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+export function composeRequiredDate(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (!y || !m || !d) return "";
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return "";
+  return `${y}-${pad2(m)}-${pad2(d)}`;
+}
+
+export function isFutureDateTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return null;
+  const req = dateStr.replace(/-/g, "") + timeStr.replace(":", "");
+  const p = tashkentNowParts();
+  const now = `${p.year}${pad2(p.month)}${pad2(p.day)}${pad2(p.hour)}${pad2(p.minute)}`;
+  return req >= now;
+}
