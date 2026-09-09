@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import {
   AlertTriangle, Camera, CheckCircle2, Clock3, Image as ImageIcon, Loader2,
   PackageX, Plus, RefreshCw, RotateCcw, Trash2,
@@ -69,7 +70,7 @@ export default function Waste() {
         return next.shops?.[0]?.id || '';
       });
     } catch (error) {
-      alert(errorText(error, 'Chiqit ma’lumotlarini yuklab bo‘lmadi.'));
+      void odinaAlert(errorText(error, 'Chiqit ma’lumotlarini yuklab bo‘lmadi.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -104,7 +105,7 @@ export default function Waste() {
 
   const openWaste = (item = null) => {
     if (!item && locationStock.length === 0) {
-      alert('Bu do‘konda chiqitga chiqarish uchun mahsulot qoldig‘i yo‘q.');
+      void odinaAlert('Bu do‘konda chiqitga chiqarish uchun mahsulot qoldig‘i yo‘q.');
       return;
     }
     setPrefill(item ? {
@@ -136,7 +137,7 @@ export default function Waste() {
       if (payload?.error) throw new Error(payload.error);
       await load({ quiet: true });
     } catch (error) {
-      alert(errorText(error, 'Chiqitni bekor qilib bo‘lmadi.'));
+      void odinaAlert(errorText(error, 'Chiqitni bekor qilib bo‘lmadi.'));
     } finally {
       setCancellingId('');
     }
@@ -391,7 +392,7 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setPhotoUrl(file_url || '');
     } catch (error) {
-      alert(errorText(error, 'Rasmni yuklab bo‘lmadi.'));
+      void odinaAlert(errorText(error, 'Rasmni yuklab bo‘lmadi.'));
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -400,7 +401,7 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
 
   const save = async () => {
     if (!locationId || !productId || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0) {
-      alert('Do‘kon, mahsulot va musbat butun dona sonini kiriting.');
+      void odinaAlert('Do‘kon, mahsulot va musbat butun dona sonini kiriting.');
       return;
     }
     setSaving(true);
@@ -418,7 +419,7 @@ function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved 
       if (!payload?.waste) throw new Error(payload?.error || 'Chiqitni saqlab bo‘lmadi.');
       await onSaved();
     } catch (error) {
-      alert(errorText(error, 'Chiqitni saqlab bo‘lmadi.'));
+      void odinaAlert(errorText(error, 'Chiqitni saqlab bo‘lmadi.'));
     } finally {
       setSaving(false);
     }
