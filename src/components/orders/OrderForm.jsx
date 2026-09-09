@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
 import { buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES, MONTHS_UZ, tashkentNowParts, tashkentNowStamp, composeRequiredDate, isFutureDateTime } from '@/lib/orders';
@@ -166,18 +167,18 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Buyurtma turi *</Label>
-              <select value={form.order_type} onChange={(e) => update({ order_type: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={form.order_type} onChange={(e) => update({ order_type: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 {ORDER_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
             <div>
               <Label>Qabul qiluvchi do‘kon {isAdmin ? '*' : ''}</Label>
-              <select value={isAdmin ? form.shop_id : user?.shop_id} disabled={!isAdmin}
+              <OdinaSelect value={isAdmin ? form.shop_id : user?.shop_id} disabled={!isAdmin}
                 onChange={(e) => update({ shop_id: e.target.value })}
                 className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
                 <option value="">Tanlang</option>
                 {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
           </div>
 
@@ -203,22 +204,22 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             <div>
               <Label>Topshirish kuni *</Label>
-              <select value={dateParts.day} onChange={(e) => setDateParts((d) => ({ ...d, day: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={dateParts.day} onChange={(e) => setDateParts((d) => ({ ...d, day: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="">Kun</option>
                 {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => <option key={d} value={String(d)}>{d}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
             <div>
               <Label>Oy *</Label>
-              <select value={dateParts.month} onChange={(e) => setDateParts((d) => ({ ...d, month: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={dateParts.month} onChange={(e) => setDateParts((d) => ({ ...d, month: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 {MONTHS_UZ.map((m, idx) => <option key={idx} value={String(idx + 1)}>{m}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
             <div>
               <Label>Yil *</Label>
-              <select value={dateParts.year} onChange={(e) => setDateParts((d) => ({ ...d, year: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={dateParts.year} onChange={(e) => setDateParts((d) => ({ ...d, year: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 {yearOptions.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
             <div>
               <Label>Vaqt *</Label>
@@ -226,10 +227,10 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
             </div>
             <div>
               <Label>Shakl</Label>
-              <select value={form.cake_shape} onChange={(e) => update({ cake_shape: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={form.cake_shape} onChange={(e) => update({ cake_shape: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="">—</option>
                 {CAKE_SHAPES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
           </div>
           {dateError && <p className="text-xs text-rose-600 -mt-2">{dateError}</p>}
@@ -237,9 +238,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Yetkazib berish *</Label>
-              <select value={form.fulfilment_type} onChange={(e) => update({ fulfilment_type: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={form.fulfilment_type} onChange={(e) => update({ fulfilment_type: e.target.value })} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 {FULFILMENT_TYPES.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-              </select>
+              </OdinaSelect>
             </div>
             {form.fulfilment_type === 'delivery' && !isWedding && (
               <div>
@@ -330,9 +331,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
             </label>
             {form.useAdvance && (
               <div className="grid grid-cols-2 gap-3 mt-3">
-                <select value={form.advance_method} onChange={(e) => update({ advance_method: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
+                <OdinaSelect value={form.advance_method} onChange={(e) => update({ advance_method: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
                   {PAYMENT_METHODS.filter((m) => m.id !== 'other').map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
+                </OdinaSelect>
                 <Input type="number" min="0" value={form.advance_amount} onChange={(e) => update({ advance_amount: Number(e.target.value) })} placeholder="Summa" />
               </div>
             )}
