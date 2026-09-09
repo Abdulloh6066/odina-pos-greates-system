@@ -44,19 +44,19 @@ export default function Categories() {
   return (
     <div className="odina-page p-5 sm:p-8 max-w-3xl mx-auto animate-fade-in">
       <PageHeader
-        title="Categories"
-        subtitle={`${categories.length} categories`}
+        title="Kategoriyalar"
+        subtitle={`${categories.length} ta kategoriya`}
         icon={Tags}
         actions={canManage && (
           <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            <Plus className="w-4 h-4 mr-1.5" /> Add
+            <Plus className="w-4 h-4 mr-1.5" /> Qo‘shish
           </Button>
         )}
       />
       {loading ? (
         <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : categories.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-16 text-center">No categories yet.</p>
+        <p className="text-sm text-muted-foreground py-16 text-center">Hozircha kategoriyalar yo‘q.</p>
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
           {categories.map((c) => (
@@ -64,7 +64,7 @@ export default function Categories() {
               <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center text-xl">{c.icon || '🍰'}</div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{c.name}</div>
-                <div className="text-xs text-muted-foreground">{c.active ? 'Active' : 'Inactive'}</div>
+                <div className="text-xs text-muted-foreground">{c.active ? 'Faol' : 'Nofaol'}</div>
               </div>
               {canManage && (
                 <div className="flex gap-1">
@@ -102,21 +102,21 @@ function CategoryDialog({ open, category, onClose, onSaved, user }) {
       if (category) { await base44.entities.Category.update(category.id, { name: name.trim(), icon, active }); await logAction(user, 'category_updated', name); }
       else { await base44.entities.Category.create({ name: name.trim(), icon, active, sort_order: 0 }); await logAction(user, 'category_created', name); }
       onSaved();
-    } catch (e) { void odinaAlert('Save failed: ' + (e?.message || e)); }
+    } catch (e) { void odinaAlert('Saqlashda xato: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-sm">
-        <DialogHeader><DialogTitle className="font-display text-xl">{category ? 'Edit category' : 'New category'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-xl">{category ? 'Kategoriyani tahrirlash' : 'Yangi kategoriya'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label className="text-xs mb-1.5 block">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cakes" />
+            <Label className="text-xs mb-1.5 block">Nomi</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Tortlar" />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Icon</Label>
+            <Label className="text-xs mb-1.5 block">Belgi</Label>
             <div className="flex flex-wrap gap-2">
               {ICONS.map((ic) => (
                 <button key={ic} onClick={() => setIcon(ic)} className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${icon === ic ? 'bg-primary premium-shadow scale-105' : 'bg-secondary hover:bg-secondary/70'}`}>{ic}</button>
@@ -124,12 +124,12 @@ function CategoryDialog({ open, category, onClose, onSaved, user }) {
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-4 h-4 accent-primary" /> Active
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-4 h-4 accent-primary" /> Faol
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">{saving ? 'Saving…' : 'Save'}</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+          <Button onClick={save} disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-strong">{saving ? 'Saqlanmoqda…' : 'Saqlash'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
