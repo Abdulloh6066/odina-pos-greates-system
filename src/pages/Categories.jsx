@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { Tags, Plus, Pencil, Trash2 } from 'lucide-react';
 import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -95,7 +96,7 @@ function CategoryDialog({ open, category, onClose, onSaved, user }) {
       if (category) { await base44.entities.Category.update(category.id, { name: name.trim(), icon, active }); await logAction(user, 'category_updated', name); }
       else { await base44.entities.Category.create({ name: name.trim(), icon, active, sort_order: 0 }); await logAction(user, 'category_created', name); }
       onSaved();
-    } catch (e) { alert('Save failed: ' + (e?.message || e)); }
+    } catch (e) { void odinaAlert('Save failed: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
