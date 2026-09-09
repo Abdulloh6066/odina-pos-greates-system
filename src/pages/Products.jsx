@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -217,7 +217,13 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     const question = archived
       ? `“${product?.name}” mahsulotini o‘chirishni tasdiqlaysizmi? Eski savdo va hisobotlar saqlanadi.`
       : `“${product?.name}” mahsulotini qayta tiklaysizmi?`;
-    if (!product || !window.confirm(question)) return;
+    if (!product) return;
+    const accepted = await odinaConfirm(question, {
+      title: archived ? 'Mahsulotni o‘chirish' : 'Mahsulotni tiklash',
+      tone: archived ? 'danger' : 'warning',
+      confirmLabel: archived ? 'O‘chirish' : 'Qayta tiklash',
+    });
+    if (!accepted) return;
     setArchiving(true);
     try {
       await base44.entities.Product.update(product.id, { archived, active: archived ? false : true });
