@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Users as UsersIcon, UserPlus, Shield } from 'lucide-react';
@@ -84,18 +85,18 @@ export default function Users() {
               </div>
               {u.id !== user.id ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full min-w-0">
-                  <select value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
+                  <OdinaSelect value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="admin" disabled>Egasi / Admin</option>
                     <option value="manager">Boshqaruvchi</option>
                     <option value="cashier">Kassir</option>
                     <option value="accountant">Hisobchi</option>
                     <option value="production">Ishlab chiqarish xodimi</option>
                     <option value="warehouse">Omborchi</option>
-                  </select>
-                  <select value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
+                  </OdinaSelect>
+                  <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="">Joy biriktirilmagan</option>
                     {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
-                  </select>
+                  </OdinaSelect>
                 </div>
               ) : (
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-secondary'} flex items-center gap-1 w-fit`}>
@@ -168,7 +169,7 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Lavozim</Label>
-            <select
+            <OdinaSelect
               value={role}
               onChange={(e) => setRole(e.target.value)}
               disabled={saving}
@@ -179,12 +180,12 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
               <option value="accountant">Hisobchi</option>
               <option value="production">Ishlab chiqarish xodimi</option>
               <option value="warehouse">Omborchi</option>
-            </select>
+            </OdinaSelect>
           </div>
           {needsShop && (
             <div>
               <Label className="text-xs mb-1.5 block">Ish joyi</Label>
-              <select
+              <OdinaSelect
                 value={shopId}
                 onChange={(e) => setShopId(e.target.value)}
                 disabled={saving}
@@ -196,7 +197,7 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
                     {shop.name} · {shop.location_type === 'production' ? 'Ishlab chiqarish markazi' : 'Do‘kon'}
                   </option>
                 ))}
-              </select>
+              </OdinaSelect>
             </div>
           )}
           <div className="rounded-xl bg-secondary/70 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
