@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { AlertTriangle, Search, Star, Clock, Building2, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -203,13 +203,21 @@ export default function POS() {
           .map((item) => `${item.product_name}: ${item.requested} ta kerak, ${item.available} ta mavjud`)
           .join('\n');
         if (payload.allow_negative_stock === false) {
-          void odinaAlert('Omborda mahsulot yetarli emas:\n\n' + details);
+          void odinaAlert('Savdoni davom ettirish mumkin emas.', {
+            title: 'Qoldiq yetarli emas',
+            details,
+            tone: 'danger',
+          });
           return;
         }
-        const accepted = window.confirm(
-          'DIQQAT: ayrim mahsulotlar qoldig‘i yetarli emas. Savdodan keyin qoldiq minus bo‘ladi.\n\n'
-          + details
-          + '\n\nBaribir sotuvni davom ettirasizmi?',
+        const accepted = await odinaConfirm(
+          'Savdodan keyin ayrim mahsulotlar qoldig‘i minus bo‘ladi.',
+          {
+            title: 'Qoldiq yetarli emas',
+            details,
+            tone: 'warning',
+            confirmLabel: 'Baribir sotish',
+          },
         );
         if (!accepted) return;
       }
