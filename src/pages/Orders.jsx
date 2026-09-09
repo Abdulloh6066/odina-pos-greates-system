@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatUZS } from '@/lib/pos';
@@ -114,20 +115,20 @@ export default function Orders() {
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nomer, mijoz, telefon" className="pl-9" />
           </div>
           {isAdmin && (
-            <select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
               <option value="">Barcha do‘konlar</option>
               {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            </OdinaSelect>
           )}
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
+          <OdinaSelect value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
             {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
+          </OdinaSelect>
+          <OdinaSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
             {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <select value={payFilter} onChange={(e) => setPayFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
+          </OdinaSelect>
+          <OdinaSelect value={payFilter} onChange={(e) => setPayFilter(e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
             {PAY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          </OdinaSelect>
           <div className="relative">
             <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card pl-9 pr-3 text-sm" />
