@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { Ticket, Plus, Pencil, Trash2 } from 'lucide-react';
 import { formatNum, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -89,14 +90,14 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
   }, [open, code]);
 
   const save = async () => {
-    if (!codeVal.trim() || !pct) { alert('Code and percentage are required.'); return; }
+    if (!codeVal.trim() || !pct) { void odinaAlert('Code and percentage are required.'); return; }
     setSaving(true);
     try {
       const payload = { code: codeVal.trim().toUpperCase(), percentage: Number(pct), active, note: note || undefined };
       if (code) { await base44.entities.DiscountCode.update(code.id, payload); await logAction(user, 'discount_updated', payload.code); }
       else { await base44.entities.DiscountCode.create({ ...payload, usage_count: 0 }); await logAction(user, 'discount_created', payload.code); }
       onSaved();
-    } catch (e) { alert('Save failed: ' + (e?.message || e)); }
+    } catch (e) { void odinaAlert('Save failed: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
