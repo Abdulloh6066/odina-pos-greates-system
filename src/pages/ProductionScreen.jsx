@@ -45,7 +45,78 @@ const shippedTime = (o) => {
   return v.length >= 16 ? v.slice(11, 16) : '';
 };
 
-export default function ProductionScreen() {
+// Error boundary that catches render/effect crashes of the screen content,
+// so the page can never blank out (React otherwise tears down the whole root).
+class ScreenErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    // Surface to console for diagnosis; never rethrow.
+    // eslint-disable-next-line no-console
+    console.error('ProductionScreen error:', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return <ScreenCrashFallback error={this.state.error} onReset={() => this.setState({ error: null })} />;
+    }
+    return this.props.children;
+  }
+}
+
+function ScreenCrashFallback({ error, onReset }) {
+  const { user } = useAuth();
+  const homePath = ROLE_HOME[user?.role] || '/';
+  const logout = () => base44.auth.logout();
+  return (
+    <div className="min-h-dvh bg-background flex flex-col">
+      <header className="shrink-0 sticky top-0 z-20 bg-card border-b border-border premium-shadow">
+        <div className="px-4 sm:px-6 h-16 flex items-center gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex"><OdinaBrand /></div>
+            <div className="flex items-center gap-2 sm:hidden">
+              <span className="w-9 h-9 rounded-xl brand-mark flex items-center justify-center"><ChefHat className="w-5 h-5 text-brand-ink" /></span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-display text-lg sm:text-xl font-semibold leading-tight truncate flex items-center gap-2">
+                <Monitor className="w-5 h-5 text-brand-olive hidden sm:inline" />
+                Ishlab chiqarish ekrani
+              </h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Texnik nosozlik</p>
+            </div>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <Link to={homePath} className="hidden sm:flex">
+              <Button variant="outline" size="sm"><Home className="w-4 h-4" /> Menyu</Button>
+            </Link>
+            <Button variant="ghost" size="sm" onClick={logout}><LogOut className="w-4 h-4" /> Chiqish</Button>
+          </div>
+        </div>
+      </header>
+      <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+        <div className="h-[60vh] flex flex-col items-center justify-center gap-3 text-center">
+          <AlertTriangle className="w-12 h-12 text-rose-500" />
+          <p className="font-display text-xl font-semibold">Ekranni yuklab bo‘lmadi</p>
+          <p className="text-sm text-muted-foreground max-w-md break-words">
+            {error?.message || 'Noma’lum xatolik.'}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+            <Button onClick={onReset}><Loader2 className="w-4 h-4" /> Qayta yuklash</Button>
+            <Link to={homePath}>
+              <Button variant="outline"><Home className="w-4 h-4" /> Menyuga qaytish</Button>
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function ProductionScreenInner() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [active, setActive] = useState([]);
@@ -54,7 +125,7 @@ export default function ProductionScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
-  const [confirm, setConfirm] = useState(null); // { order, step }
+  const [confirm, setConfirm] = useState(null);
   const [preview, setPreview] = useState('');
   const [clock, setClock] = useState(clockStr());
   const loadedOnce = useRef(false);
@@ -63,13 +134,11 @@ export default function ProductionScreen() {
     try {
       const all = await base44.entities.CustomerOrder.list('-created_date', 200);
       const list = all || [];
-      const act = list.filter((o) => ACTIVE_STATUSES.includes(o.order_status));
+      setActive(list.filter((o) => ACTIVE_STATUSES.includes(o.order_status)));
       const today = todayStr();
-      const ship = list.filter(
-        (o) => o.order_status === 'yuborildi_olib_ketildi' && (o.shipped_at || '').slice(0, 10) === today,
+      setShippedToday(
+        list.filter((o) => o.order_status === 'yuborildi_olib_ketildi' && (o.shipped_at || '').slice(0, 10) === today),
       );
-      setActive(act);
-      setShippedToday(ship);
       return true;
     } catch (e) {
       if (!loadedOnce.current) setError(e?.message || 'Buyurtmalarni yuklab bo‘lmadi.');
@@ -88,7 +157,6 @@ export default function ProductionScreen() {
       setItemsByOrder(map);
       return true;
     } catch (e) {
-      // Items failing must never blank the page; cards just show a placeholder.
       setItemsByOrder({});
       return false;
     }
@@ -96,7 +164,6 @@ export default function ProductionScreen() {
 
   const load = async () => {
     setError('');
-    // Load independently: one failed request cannot blank the whole page.
     await Promise.allSettled([loadOrders(), loadItems()]);
     loadedOnce.current = true;
     setLoading(false);
@@ -107,7 +174,6 @@ export default function ProductionScreen() {
       const unsub = base44.entities[entityName]?.subscribe?.(handler);
       return typeof unsub === 'function' ? unsub : () => {};
     } catch (e) {
-      // A subscription error must not unmount the page.
       return () => {};
     }
   };
@@ -316,6 +382,14 @@ export default function ProductionScreen() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ProductionScreen() {
+  return (
+    <ScreenErrorBoundary>
+      <ProductionScreenInner />
+    </ScreenErrorBoundary>
   );
 }
 
