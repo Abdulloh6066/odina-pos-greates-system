@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { Navigate, useOutletContext } from 'react-router-dom';
 import { Building2, Pencil, Plus, Search } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -133,10 +134,10 @@ function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
           <div><Label className="text-xs mb-1.5 block">Nomi</Label><Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Masalan: Makro Trade" className="h-11 rounded-xl" /></div>
           <div>
             <Label className="text-xs mb-1.5 block">Turi</Label>
-            <select value={type} onChange={(event) => setType(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={type} onChange={(event) => setType(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
               <option value="supplier">Yetkazib beruvchi</option>
               <option value="company">Kompaniya</option>
-            </select>
+            </OdinaSelect>
           </div>
           <div><Label className="text-xs mb-1.5 block">Izoh</Label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Telefon yoki qo‘shimcha ma’lumot (ixtiyoriy)" rows={2} /></div>
           {recipient?.id && (
