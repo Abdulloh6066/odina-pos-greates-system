@@ -15,6 +15,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { odinaAlert } from "@/lib/odina-dialog";
 import { formatNum, formatUZS } from "@/lib/pos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,7 +101,7 @@ export default function SupplierLedgerPanel({
       setReceiptItems(itemList || []);
       setPayments(paymentList || []);
     } catch (error) {
-      alert("Kirim va qarzlarni yuklab bo‘lmadi: " + errorText(error));
+      void odinaAlert("Kirim va qarzlarni yuklab bo‘lmadi: " + errorText(error));
     } finally {
       setLoading(false);
     }
@@ -748,7 +749,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
         ));
       })
       .catch((error) => {
-        if (active) alert("Budget balansi yuklanmadi: " + errorText(error));
+        if (active) void odinaAlert("Budget balansi yuklanmadi: " + errorText(error));
       })
       .finally(() => {
         if (active) setLoadingBalances(false);
@@ -772,7 +773,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
       if (!payload?.paid) throw new Error(payload?.error || "Qarz to‘lovi bajarilmadi.");
       onPaid();
     } catch (error) {
-      alert("Qarz to‘lanmadi: " + errorText(error));
+      void odinaAlert("Qarz to‘lanmadi: " + errorText(error));
     } finally {
       setSaving(false);
     }
@@ -891,7 +892,7 @@ function CancelReceiptDialog({ receipt, onClose, onCancelled }) {
       }
       onCancelled();
     } catch (error) {
-      alert("Kirim bekor qilinmadi: " + errorText(error));
+      void odinaAlert("Kirim bekor qilinmadi: " + errorText(error));
     } finally {
       setSaving(false);
     }
@@ -1043,7 +1044,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
       if (!payload?.receipt) throw new Error(payload?.error || "Kirimni saqlab bo‘lmadi.");
       onSaved();
     } catch (error) {
-      alert("Kirim amalga oshmadi: " + errorText(error));
+      void odinaAlert("Kirim amalga oshmadi: " + errorText(error));
     } finally {
       setSaving(false);
     }
