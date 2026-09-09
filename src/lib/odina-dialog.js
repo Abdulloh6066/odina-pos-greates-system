@@ -38,6 +38,7 @@ const normalizeRequest = (kind, message, options = {}) => {
     inputLabel: config.inputLabel || '',
     placeholder: config.placeholder || '',
     defaultValue: config.defaultValue || '',
+    inputRequired: config.inputRequired !== false,
   };
 };
 
