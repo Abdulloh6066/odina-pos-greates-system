@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import {
   AlertTriangle, Camera, CheckCircle2, Clock3, Image as ImageIcon, Loader2,
   PackageX, Plus, RefreshCw, RotateCcw, Trash2,
@@ -123,8 +123,14 @@ export default function Waste() {
   };
 
   const cancelWaste = async (record) => {
-    const accepted = window.confirm(
-      `${record.product_name_snapshot} — ${formatNum(record.quantity)} dona chiqit yozuvini bekor qilasizmi?\n\nMahsulot do‘kon qoldig‘iga qaytariladi va bekor qilish tarixi saqlanadi.`,
+    const accepted = await odinaConfirm(
+      `${record.product_name_snapshot} — ${formatNum(record.quantity)} dona chiqit yozuvini bekor qilasizmi?`,
+      {
+        title: 'Chiqitni bekor qilish',
+        details: 'Mahsulot do‘kon qoldig‘iga qaytariladi va bekor qilish tarixi saqlanadi.',
+        tone: 'warning',
+        confirmLabel: 'Qoldiqqa qaytarish',
+      },
     );
     if (!accepted) return;
     setCancellingId(record.id);
