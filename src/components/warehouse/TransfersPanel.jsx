@@ -14,6 +14,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -124,7 +125,7 @@ export default function TransfersPanel({
       }
       await onReload();
     } catch (error) {
-      alert('Qabul qilish amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
+      void odinaAlert('Qabul qilish amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
     } finally {
       setReceivingId('');
     }
@@ -393,7 +394,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
       clearForm();
       await onSaved();
     } catch (error) {
-      alert('Transfer jo‘natilmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
+      void odinaAlert('Transfer jo‘natilmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
     } finally {
       setSaving(false);
     }
