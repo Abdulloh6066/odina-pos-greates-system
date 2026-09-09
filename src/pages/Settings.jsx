@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaPrompt } from '@/lib/odina-dialog';
 import { Settings as SettingsIcon, Building2, Save } from 'lucide-react';
 import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -80,9 +80,21 @@ export default function Settings() {
   };
 
   const addShop = async () => {
-    const name = prompt('Do‘kon nomi:');
+    const name = await odinaPrompt('Yangi do‘kon nomini kiriting.', {
+      title: 'Yangi do‘kon',
+      inputLabel: 'Do‘kon nomi',
+      placeholder: 'Masalan: Odina Chilonzor',
+      confirmLabel: 'Davom etish',
+    });
     if (!name) return;
-    const address = prompt('Manzil (ixtiyoriy):') || '';
+    const address = await odinaPrompt('Manzilni kiriting yoki bo‘sh qoldiring.', {
+      title: 'Do‘kon manzili',
+      inputLabel: 'Manzil (ixtiyoriy)',
+      placeholder: 'Tuman, ko‘cha, mo‘ljal',
+      inputRequired: false,
+      confirmLabel: 'Do‘konni yaratish',
+    });
+    if (address === null) return;
     await base44.entities.Shop.create({ name, address });
     load();
   };
