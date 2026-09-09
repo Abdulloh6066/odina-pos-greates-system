@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
-  Circle, Clock, ClipboardList, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen,
+  Circle, Clock, ClipboardList, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
@@ -12,11 +12,14 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Trash2,
+  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Trash2, Monitor,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
 const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
+const SCREENS_CHILDREN = [
+  { key: 'production-screen', label: 'Ishlab chiqarish ekrani', path: '/production-screen', icon: ChefHat, roles: ['admin', 'production'] },
+];
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
@@ -37,9 +40,11 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
   const kassaPaths = ['/pos', ...kassaChildren.map((item) => item.path)];
   const kassaActive = kassaPaths.includes(location.pathname);
   const warehouseActive = location.pathname === '/warehouse';
+  const screensActive = location.pathname === '/production-screen';
   const warehouseTab = new URLSearchParams(location.search).get('tab') || 'ingredients';
   const [kassaOpen, setKassaOpen] = useState(kassaActive);
   const [warehouseOpen, setWarehouseOpen] = useState(warehouseActive);
+  const [screensOpen, setScreensOpen] = useState(screensActive);
 
   useEffect(() => {
     if (kassaActive) setKassaOpen(true);
@@ -48,6 +53,10 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
   useEffect(() => {
     if (warehouseActive) setWarehouseOpen(true);
   }, [warehouseActive]);
+
+  useEffect(() => {
+    if (screensActive) setScreensOpen(true);
+  }, [screensActive]);
 
   const handleLogout = async () => {
     await base44.auth.logout();
@@ -161,6 +170,20 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
               children: WAREHOUSE_CHILDREN.filter((child) => !child.roles || child.roles.includes(role)).map((child) => ({
                 ...child,
                 active: warehouseActive && warehouseTab === child.tab,
+              })),
+            });
+          }
+
+          if (item.key === 'screens') {
+            return renderGroup({
+              item,
+              active: screensActive,
+              open: screensOpen,
+              setOpen: setScreensOpen,
+              ParentIcon: Monitor,
+              children: SCREENS_CHILDREN.filter((child) => !child.roles || child.roles.includes(role)).map((child) => ({
+                ...child,
+                active: location.pathname === child.path,
               })),
             });
           }

@@ -30,6 +30,7 @@ import CashRecipients from '@/pages/CashRecipients';
 import Warehouse from '@/pages/Warehouse';
 import Waste from '@/pages/Waste';
 import Budget from '@/pages/Budget';
+import ProductionScreen from '@/pages/ProductionScreen';
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -66,6 +67,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<AuthGate />}>
+              <Route path="/production-screen" element={<RoleRoute pageKey="screens"><ProductionScreen /></RoleRoute>} />
               <Route element={<Layout />}>
                 <Route path="/" element={<RoleRoute pageKey="dashboard"><Dashboard /></RoleRoute>} />
                 <Route path="/pos" element={<RoleRoute pageKey="pos"><POS /></RoleRoute>} />

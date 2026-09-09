@@ -25,6 +25,12 @@ function tashkentNowParts() {
   };
 }
 
+function tashkentStamp(): string {
+  const np = tashkentNowParts();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${np.year}-${pad(np.month)}-${pad(np.day)}T${pad(np.hour)}:${pad(np.minute)}:00+05:00`;
+}
+
 function methodToShiftField(method: string): string | null {
   if (method === "cash") return "cash_sales";
   if (method === "uzcard") return "uzcard_sales";
@@ -498,6 +504,65 @@ export default async function(req: Request): Promise<Response> {
         ).catch(() => {});
         throw error;
       }
+    }
+
+    if (action === "update_production_status") {
+      const orderId = String(body?.order_id || "");
+      const step = String(body?.step || "");
+      if (!orderId) {
+        return Response.json({ error: "Buyurtma ID majburiy." }, { status: 400 });
+      }
+      if (!["admin", "production"].includes(user.role)) {
+        return Response.json({ error: "Ishlab chiqarish ekrani uchun ruxsat yo‘q." }, { status: 403 });
+      }
+      const order = await service.entities.CustomerOrder.get(orderId);
+      if (!order) {
+        return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
+      }
+      const prev = String(order.order_status || "qabul_qilindi");
+      let nextStatus = "";
+      let stampField = "";
+      if (step === "ready") {
+        if (prev !== "qabul_qilindi" && prev !== "tayyorlanmoqda") {
+          return Response.json({ error: "Tayyor bo‘lish uchun buyurtma yangi bo‘lishi kerak." }, { status: 409 });
+        }
+        nextStatus = "tayyor";
+        stampField = "ready_at";
+      } else if (step === "shipped") {
+        if (prev !== "tayyor") {
+          return Response.json({ error: "Yuborish uchun avval Tayyor bo‘lishi kerak." }, { status: 409 });
+        }
+        nextStatus = "yuborildi_olib_ketildi";
+        stampField = "shipped_at";
+      } else {
+        return Response.json({ error: "Noto‘g‘ri amal." }, { status: 400 });
+      }
+      const stamp = tashkentStamp();
+      const claim = await service.entities.CustomerOrder.updateMany(
+        { id: order.id, order_status: prev },
+        {
+          $set: {
+            order_status: nextStatus,
+            [stampField]: stamp,
+            updated_at: new Date().toISOString(),
+          },
+        },
+      );
+      if (!claim?.success || Number(claim.updated || 0) !== 1) {
+        return Response.json({ error: "Buyurtma holati o‘zgardi. Yangilang va qayta urinib ko‘ring." }, { status: 409 });
+      }
+      const userName = user.full_name || user.email || "Noma’lum xodim";
+      await service.entities.ActionHistory.create({
+        user_id: user.id,
+        user_name: userName,
+        action: "production_status_change",
+        details: `${order.order_number} · ${prev} → ${nextStatus} · ${userName} · ${stamp}`,
+      }).catch(() => {});
+      return Response.json({
+        order: { ...order, order_status: nextStatus, [stampField]: stamp },
+        previous_status: prev,
+        runtime_version: ORDER_RUNTIME_VERSION,
+      });
     }
 
     return Response.json({ error: "Noto‘g‘ri amal." }, { status: 400 });
