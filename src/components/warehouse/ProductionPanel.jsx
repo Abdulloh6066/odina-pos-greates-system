@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { AlertTriangle, Beaker, ChefHat, History, Pencil, Plus, Scale, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -131,14 +132,14 @@ export default function ProductionPanel({
           <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>Retsept uchun mahsulot tanlang</DialogTitle></DialogHeader>
             {products.some((product) => product.source_type !== 'resale') ? (
-              <select aria-label="Retsept mahsuloti" defaultValue="" className="w-full h-11 rounded-xl border border-input bg-card px-3"
+              <OdinaSelect aria-label="Retsept mahsuloti" defaultValue="" className="w-full h-11 rounded-xl border border-input bg-card px-3"
                 onChange={(event) => {
                   const selected = products.find((product) => product.id === event.target.value);
                   if (selected) { setRecipePickerOpen(false); setRecipeProduct(selected); }
                 }}>
                 <option value="" disabled>Mahsulotni tanlang</option>
                 {products.filter((product) => product.source_type !== 'resale').map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-              </select>
+              </OdinaSelect>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">Avval mahsulot nomi, narxi va list/dona birligini kiriting. Keyin shu mahsulot uchun retsept yaratasiz.</p>
@@ -411,7 +412,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
                 const selected = ingredients.find((item) => item.id === row.ingredient_id);
                 return (
                   <div key={index} className="grid grid-cols-[minmax(0,1fr)_130px_40px] gap-2">
-                    <select
+                    <OdinaSelect
                       value={row.ingredient_id}
                       onChange={(event) => updateRow(index, 'ingredient_id', event.target.value)}
                       className="h-10 rounded-lg border border-input bg-card px-3 text-sm min-w-0"
@@ -420,7 +421,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
                       {ingredients.map((ingredient) => (
                         <option key={ingredient.id} value={ingredient.id}>{ingredient.name} · {UNIT_LABELS[ingredient.base_unit] || ingredient.base_unit}</option>
                       ))}
-                    </select>
+                    </OdinaSelect>
                     <div className="relative">
                       <Input
                         type="number"
