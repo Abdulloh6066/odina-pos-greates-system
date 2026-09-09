@@ -3,6 +3,7 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -569,7 +570,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
       || (baseUnit === 'ml' && ['ml', 'l'].includes(purchaseUnit))
       || (baseUnit === 'piece' && purchaseUnit === 'piece');
     if (!validPair) {
-      alert('Xarid birligi asosiy birlikka mos bo‘lishi kerak.');
+      void odinaAlert('Xarid birligi asosiy birlikka mos bo‘lishi kerak.');
       return;
     }
     setSaving(true);
@@ -584,7 +585,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
       });
       onSaved();
     } catch (error) {
-      alert('Masalliqni yaratib bo‘lmadi: ' + (error?.message || error));
+      void odinaAlert('Masalliqni yaratib bo‘lmadi: ' + (error?.message || error));
     } finally {
       setSaving(false);
     }
@@ -666,7 +667,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
   const save = async () => {
     if (!item || !location || !Number.isFinite(change) || change === 0 || !reason.trim()) return;
     if (after < 0) {
-      alert('Ombor qoldig‘i manfiy bo‘lishi mumkin emas.');
+      void odinaAlert('Ombor qoldig‘i manfiy bo‘lishi mumkin emas.');
       return;
     }
     setSaving(true);
@@ -684,7 +685,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
       if (!payload?.stock) throw new Error(payload?.error || 'Ombor qoldig‘ini yangilab bo‘lmadi.');
       onSaved();
     } catch (error) {
-      alert('Ombor yangilanishi amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
+      void odinaAlert('Ombor yangilanishi amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
     } finally {
       setSaving(false);
     }
