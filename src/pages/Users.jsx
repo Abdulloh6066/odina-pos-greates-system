@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { Users as UsersIcon, UserPlus, Shield } from 'lucide-react';
 import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -124,11 +125,11 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
   const submit = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
-      alert('Xodimning email manzilini kiriting.');
+      void odinaAlert('Xodimning email manzilini kiriting.');
       return;
     }
     if (needsShop && !shopId) {
-      alert('Xodim ishlaydigan joyni tanlang.');
+      void odinaAlert('Xodim ishlaydigan joyni tanlang.');
       return;
     }
 
@@ -145,14 +146,14 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
 
       await logAction(user, 'staff_invite_requested', `${normalizedEmail} · ${role}`);
       const locationText = data.shop_name ? `\nIsh joyi: ${data.shop_name}` : '';
-      alert(`Taklif yuborildi.\nLavozim: ${ROLE_LABELS[role]}${locationText}\n\nXodim emaildagi havolani ochib, o‘z parolini yaratadi.`);
+      void odinaAlert(`Taklif yuborildi.\nLavozim: ${ROLE_LABELS[role]}${locationText}\n\nXodim emaildagi havolani ochib, o‘z parolini yaratadi.`);
       setEmail('');
       setRole('cashier');
       setShopId('');
       onDone();
     } catch (e) {
       const message = e?.response?.data?.error || e?.message || String(e);
-      alert(message);
+      void odinaAlert(message);
     } finally {
       setSaving(false);
     }
