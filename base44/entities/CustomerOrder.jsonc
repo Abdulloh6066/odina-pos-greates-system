@@ -102,6 +102,14 @@
       ],
       "default": "qabul_qilindi"
     },
+    "ready_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "shipped_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "creator_id": {
       "type": "string"
     },
@@ -164,6 +172,11 @@
         {
           "user_condition": {
             "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "production"
           }
         },
         {
