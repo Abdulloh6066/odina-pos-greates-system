@@ -3,6 +3,7 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { Navigate, useOutletContext } from 'react-router-dom';
 import { Building2, Pencil, Plus, Search } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,7 +121,7 @@ function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
       else await base44.entities.CashRecipient.create({ ...payload, created_by: user.id, created_by_name: user.full_name || user.email });
       onSaved();
     } catch (error) {
-      alert('Qabul qiluvchini saqlab bo‘lmadi: ' + (error?.message || error));
+      void odinaAlert('Qabul qiluvchini saqlab bo‘lmadi: ' + (error?.message || error));
     } finally {
       setSaving(false);
     }
