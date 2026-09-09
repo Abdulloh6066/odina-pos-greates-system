@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import OdinaSelect from "@/components/ui/odina-select";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -153,17 +154,17 @@ export default function Budget() {
               </div>
               <label className="lg:w-44">
                 <span className="text-xs text-muted-foreground block mb-1.5">Hisob</span>
-                <select value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm">
+                <OdinaSelect value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm">
                   <option value="all">Barcha hisoblar</option>
                   {ACCOUNTS.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
-                </select>
+                </OdinaSelect>
               </label>
               <label className="lg:w-52">
                 <span className="text-xs text-muted-foreground block mb-1.5">Amal turi</span>
-                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm">
+                <OdinaSelect value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm">
                   <option value="all">Barcha amallar</option>
                   {Object.entries(TYPE_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-                </select>
+                </OdinaSelect>
               </label>
               <label className="lg:w-64">
                 <span className="text-xs text-muted-foreground block mb-1.5">Qidiruv</span>
@@ -286,11 +287,11 @@ function AdjustmentDialog({ open, balances, onClose, onSaved }) {
 
         <div>
           <Label className="text-xs mb-1.5 block">Pul hisobi</Label>
-          <select value={account} onChange={(event) => setAccount(event.target.value)} disabled={saving} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+          <OdinaSelect value={account} onChange={(event) => setAccount(event.target.value)} disabled={saving} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
             {ACCOUNTS.map((item) => (
               <option key={item.id} value={item.id}>{item.label} · {formatUZS(balances[item.id] || 0)}</option>
             ))}
-          </select>
+          </OdinaSelect>
         </div>
 
         <div>
