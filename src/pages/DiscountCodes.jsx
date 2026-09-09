@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Ticket, Plus, Pencil, Trash2 } from 'lucide-react';
 import { formatNum, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -27,7 +27,12 @@ export default function DiscountCodes() {
   useEffect(() => { load(); }, []);
 
   const remove = async (code) => {
-    if (!confirm(`Delete code "${code.code}"?`)) return;
+    const accepted = await odinaConfirm(`“${code.code}” chegirma kodini o‘chirasizmi?`, {
+      title: 'Chegirma kodini o‘chirish',
+      tone: 'danger',
+      confirmLabel: 'O‘chirish',
+    });
+    if (!accepted) return;
     await base44.entities.DiscountCode.delete(code.id);
     await logAction(user, 'discount_deleted', code.code);
     load();
