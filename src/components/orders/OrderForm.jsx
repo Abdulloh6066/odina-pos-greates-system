@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Image } from '@/components/ui/image';
 import { Plus, Minus, Trash2, X, Loader2, Lock } from 'lucide-react';
 import ProductCombobox from '@/components/orders/ProductCombobox';
+import ReferenceImageField from '@/components/orders/ReferenceImageField';
 import { useToast } from '@/components/ui/use-toast';
 
 const WEDDING_PCS = 40;
@@ -298,15 +299,15 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <Label>Havola rasm (URL)</Label>
-              <Input value={form.reference_image} onChange={(e) => update({ reference_image: e.target.value })} className="mt-1" />
+          <div>
+            <Label>Namuna rasm (ixtiyoriy)</Label>
+            <div className="mt-1">
+              <ReferenceImageField value={form.reference_image} onChange={(url) => update({ reference_image: url })} disabled={submitting} />
             </div>
-            <div>
-              <Label>Umumiy izoh</Label>
-              <Input value={form.notes} onChange={(e) => update({ notes: e.target.value })} className="mt-1" />
-            </div>
+          </div>
+          <div>
+            <Label>Umumiy izoh</Label>
+            <Input value={form.notes} onChange={(e) => update({ notes: e.target.value })} className="mt-1" />
           </div>
 
           {isAdmin && (
