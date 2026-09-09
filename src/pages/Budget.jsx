@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { odinaAlert } from "@/lib/odina-dialog";
 import { formatUZS } from "@/lib/pos";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ export default function Budget() {
       setBalances(payload.balances);
       setTransactions(payload.transactions);
     } catch (error) {
-      alert("Budget yuklanmadi: " + errorText(error));
+      void odinaAlert("Budget yuklanmadi: " + errorText(error));
     } finally {
       setLoading(false);
     }
@@ -266,7 +267,7 @@ function AdjustmentDialog({ open, balances, onClose, onSaved }) {
       if (!payload?.transaction) throw new Error(payload?.error || "Budget amali bajarilmadi.");
       onSaved();
     } catch (error) {
-      alert("Budget amali bajarilmadi: " + errorText(error));
+      void odinaAlert("Budget amali bajarilmadi: " + errorText(error));
     } finally {
       setSaving(false);
     }
