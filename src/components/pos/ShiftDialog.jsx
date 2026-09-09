@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,13 +47,13 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
                   : 'Egasi kassirni do‘konga biriktirishi kerak.'}
               </div>
             ) : (
-              <select
+              <OdinaSelect
                 value={shopId}
                 onChange={(e) => setShopId(e.target.value)}
                 className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
               >
                 {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              </OdinaSelect>
             )}
           </div>
           <div>
