@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -329,7 +330,7 @@ export default function Warehouse() {
           {['admin', 'manager'].includes(user?.role) ? (
             <label className="sm:w-72 space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
-              <select
+              <OdinaSelect
                 value={selectedLocation}
                 onChange={(event) => setSelectedLocation(event.target.value)}
                 className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -339,7 +340,7 @@ export default function Warehouse() {
                     {location.name}{location.location_type === 'production' ? ' · Ishlab chiqarish' : ' · Do‘kon'}
                   </option>
                 ))}
-              </select>
+              </OdinaSelect>
             </label>
           ) : (
             <div className="sm:w-72">
@@ -600,15 +601,15 @@ function IngredientDialog({ open, onClose, onSaved }) {
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Turi</Label>
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={category} onChange={(event) => setCategory(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
               <option value="food">Oziq-ovqat masallig‘i</option>
               <option value="packaging">Qadoqlash</option>
-            </select>
+            </OdinaSelect>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs mb-1.5 block">Retsept / ombor birligi</Label>
-              <select value={baseUnit} onChange={(event) => {
+              <OdinaSelect value={baseUnit} onChange={(event) => {
                 const value = event.target.value;
                 setBaseUnit(value);
                 setPurchaseUnit(value === 'g' ? 'kg' : value === 'ml' ? 'l' : 'piece');
@@ -616,15 +617,15 @@ function IngredientDialog({ open, onClose, onSaved }) {
                 <option value="g">Gramm (g)</option>
                 <option value="ml">Millilitr (ml)</option>
                 <option value="piece">Dona</option>
-              </select>
+              </OdinaSelect>
             </div>
             <div>
               <Label className="text-xs mb-1.5 block">Odatda qaysi birlikda olinadi</Label>
-              <select value={purchaseUnit} onChange={(event) => setPurchaseUnit(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+              <OdinaSelect value={purchaseUnit} onChange={(event) => setPurchaseUnit(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
                 {baseUnit === 'g' && <><option value="kg">Kilogramm (kg)</option><option value="g">Gramm (g)</option></>}
                 {baseUnit === 'ml' && <><option value="l">Litr (L)</option><option value="ml">Millilitr (ml)</option></>}
                 {baseUnit === 'piece' && <option value="piece">Dona</option>}
-              </select>
+              </OdinaSelect>
             </div>
           </div>
           <p className="text-xs text-muted-foreground rounded-xl bg-secondary/60 p-3">
@@ -716,10 +717,10 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Yozuv turi</Label>
-            <select value={movementType} onChange={(event) => setMovementType(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+            <OdinaSelect value={movementType} onChange={(event) => setMovementType(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
               <option value="opening">Boshlang‘ich qoldiq</option>
               <option value="adjustment">Qo‘lda tuzatish</option>
-            </select>
+            </OdinaSelect>
           </div>
           <div className="rounded-xl bg-secondary/60 p-3 text-sm flex items-center justify-between">
             <span className="text-muted-foreground">O‘zgarishdan keyingi qoldiq</span>
