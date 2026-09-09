@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Tags, Plus, Pencil, Trash2 } from 'lucide-react';
 import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -29,7 +29,13 @@ export default function Categories() {
   useEffect(() => { load(); }, []);
 
   const remove = async (cat) => {
-    if (!confirm(`Delete category "${cat.name}"? Products will keep their category name.`)) return;
+    const accepted = await odinaConfirm(`“${cat.name}” kategoriyasini o‘chirasizmi?`, {
+      title: 'Kategoriyani o‘chirish',
+      details: 'Mahsulotlarda kategoriya nomi saqlanib qoladi.',
+      tone: 'danger',
+      confirmLabel: 'O‘chirish',
+    });
+    if (!accepted) return;
     await base44.entities.Category.delete(cat.id);
     await logAction(user, 'category_deleted', cat.name);
     load();
