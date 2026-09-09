@@ -14,7 +14,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { odinaAlert } from '@/lib/odina-dialog';
+import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,7 +111,12 @@ export default function TransfersPanel({
     const message = group.items.length > 1
       ? `${group.batch_number}: ${group.items.length} tur, ${formatNum(group.total_quantity)} dona/bo‘lak mahsulotning hammasi qabul qilinsinmi?`
       : `${group.items[0].product_name_snapshot} — ${transferLabel(group.items[0])} qabul qilinsinmi?`;
-    if (!confirm(message)) return;
+    const accepted = await odinaConfirm(message, {
+      title: 'Transferni qabul qilish',
+      tone: 'warning',
+      confirmLabel: 'Qabul qilish',
+    });
+    if (!accepted) return;
 
     setReceivingId(group.id);
     try {
