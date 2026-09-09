@@ -87,6 +87,11 @@
           }
         },
         {
+          "user_condition": {
+            "role": "production"
+          }
+        },
+        {
           "data.shop_id": "{{user.data.shop_id}}"
         }
       ]
