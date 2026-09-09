@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -52,15 +52,17 @@ export default function ProductionScreen() {
   const [shippedToday, setShippedToday] = useState([]);
   const [itemsByOrder, setItemsByOrder] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
   const [confirm, setConfirm] = useState(null); // { order, step }
   const [preview, setPreview] = useState('');
   const [clock, setClock] = useState(clockStr());
+  const loadedOnce = useRef(false);
 
-  const load = async () => {
+  const loadOrders = async () => {
     try {
       const all = await base44.entities.CustomerOrder.list('-created_date', 200);
-      const list = (all || []);
+      const list = all || [];
       const act = list.filter((o) => ACTIVE_STATUSES.includes(o.order_status));
       const today = todayStr();
       const ship = list.filter(
@@ -68,33 +70,65 @@ export default function ProductionScreen() {
       );
       setActive(act);
       setShippedToday(ship);
-      const itemRows = await base44.entities.CustomerOrderItem.list('-created_date', 500);
+      return true;
+    } catch (e) {
+      if (!loadedOnce.current) setError(e?.message || 'Buyurtmalarni yuklab bo‘lmadi.');
+      return false;
+    }
+  };
+
+  const loadItems = async () => {
+    try {
+      const rows = await base44.entities.CustomerOrderItem.list('-created_date', 500);
       const map = {};
-      (itemRows || []).forEach((it) => {
+      (rows || []).forEach((it) => {
         if (!map[it.order_id]) map[it.order_id] = [];
         map[it.order_id].push(it);
       });
       setItemsByOrder(map);
+      return true;
     } catch (e) {
-      // keep last state; show toast only on first load
-      if (loading) toast({ title: 'Yuklash xatosi', description: e?.message || 'Buyurtmalar yuklanmadi', variant: 'destructive' });
-    } finally {
-      setLoading(false);
+      // Items failing must never blank the page; cards just show a placeholder.
+      setItemsByOrder({});
+      return false;
+    }
+  };
+
+  const load = async () => {
+    setError('');
+    // Load independently: one failed request cannot blank the whole page.
+    await Promise.allSettled([loadOrders(), loadItems()]);
+    loadedOnce.current = true;
+    setLoading(false);
+  };
+
+  const safeSubscribe = (entityName, handler) => {
+    try {
+      const unsub = base44.entities[entityName]?.subscribe?.(handler);
+      return typeof unsub === 'function' ? unsub : () => {};
+    } catch (e) {
+      // A subscription error must not unmount the page.
+      return () => {};
     }
   };
 
   useEffect(() => {
-    load();
-    const tick = setInterval(() => setClock(clockStr()), 30000);
+    let cancelled = false;
     let t;
+    const tick = () => { if (!cancelled) setClock(clockStr()); };
     const schedule = () => { clearTimeout(t); t = setTimeout(load, 250); };
-    const u1 = base44.entities.CustomerOrder.subscribe(schedule);
-    const u2 = base44.entities.CustomerOrderItem.subscribe(schedule);
+
+    load();
+    const interval = setInterval(tick, 30000);
+    const u1 = safeSubscribe('CustomerOrder', schedule);
+    const u2 = safeSubscribe('CustomerOrderItem', schedule);
+
     return () => {
-      clearInterval(tick);
+      cancelled = true;
+      clearInterval(interval);
       clearTimeout(t);
-      if (u1) u1();
-      if (u2) u2();
+      try { u1(); } catch (e) {}
+      try { u2(); } catch (e) {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,10 +169,11 @@ export default function ProductionScreen() {
   }, [active]);
 
   const logout = () => base44.auth.logout();
+  const homePath = ROLE_HOME[user?.role] || '/';
 
   return (
     <div className="min-h-dvh bg-background flex flex-col">
-      {/* Header */}
+      {/* Header — always rendered */}
       <header className="shrink-0 sticky top-0 z-20 bg-card border-b border-border premium-shadow">
         <div className="px-4 sm:px-6 h-16 flex items-center gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -158,7 +193,7 @@ export default function ProductionScreen() {
             <div className="hidden md:flex items-center gap-2 text-sm font-medium text-muted-foreground bg-secondary/60 rounded-xl px-3 h-10">
               <Clock className="w-4 h-4 text-brand-olive" /> {clock}
             </div>
-            <Link to={ROLE_HOME[user?.role] || '/'} className="hidden sm:flex">
+            <Link to={homePath} className="hidden sm:flex">
               <Button variant="outline" size="sm"><Home className="w-4 h-4" /> Menyu</Button>
             </Link>
             <Button variant="ghost" size="sm" onClick={logout}><LogOut className="w-4 h-4" /> Chiqish</Button>
@@ -166,12 +201,24 @@ export default function ProductionScreen() {
         </div>
       </header>
 
-      {/* Body */}
+      {/* Body — always one of loading / error / empty / orders */}
       <main className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 sm:p-6">
         {loading ? (
           <div className="h-[60vh] flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="w-8 h-8 animate-spin text-brand-olive" />
             <span className="text-sm">Buyurtmalar yuklanmoqda…</span>
+          </div>
+        ) : error ? (
+          <div className="h-[60vh] flex flex-col items-center justify-center gap-3 text-center">
+            <AlertTriangle className="w-12 h-12 text-rose-500" />
+            <p className="font-display text-xl font-semibold">Yuklashda xatolik</p>
+            <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+              <Button onClick={load}><Loader2 className="w-4 h-4" /> Qayta yuklash</Button>
+              <Link to={homePath}>
+                <Button variant="outline"><Home className="w-4 h-4" /> Menyuga qaytish</Button>
+              </Link>
+            </div>
           </div>
         ) : sortedActive.length === 0 ? (
           <div className="h-[60vh] flex flex-col items-center justify-center gap-2 text-center">
@@ -196,7 +243,7 @@ export default function ProductionScreen() {
         )}
 
         {/* Bugun yuborilgan */}
-        {shippedToday.length > 0 && (
+        {shippedToday.length > 0 && !loading && !error && (
           <section className="mt-8">
             <div className="flex items-center gap-2 mb-3">
               <Truck className="w-5 h-5 text-brand-olive" />
@@ -274,7 +321,6 @@ export default function ProductionScreen() {
 
 function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
   const u = urgency(order);
-  const isNew = order.order_status === 'qabul_qilindi' || order.order_status === 'tayyorlanmoqda';
   const isReady = order.order_status === 'tayyor';
   const hasImage = !!order.reference_image;
 
