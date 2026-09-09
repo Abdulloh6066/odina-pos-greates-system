@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Outlet } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import OdinaDialogProvider from '@/components/ui/odina-dialog-provider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import RoleRoute from '@/components/RoleRoute';
@@ -59,6 +60,7 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
+        <OdinaDialogProvider>
         <Router>
           <ScrollToTop />
           <Routes>
@@ -91,6 +93,7 @@ function App() {
           </Routes>
         </Router>
         <Toaster />
+        </OdinaDialogProvider>
       </QueryClientProvider>
     </AuthProvider>
   )
