@@ -11,11 +11,11 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'orders', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings'],
+  admin: ['dashboard', 'pos', 'orders', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
   cashier: ['pos', 'orders', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
-  production: ['warehouse', 'products'],
+  production: ['warehouse', 'products', 'screens'],
   warehouse: ['warehouse'],
 };
 
@@ -32,6 +32,7 @@ export const MENU_ITEMS = [
   { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
   { key: 'pos', label: 'Kassa', path: '/pos', icon: 'ShoppingCart' },
   { key: 'orders', label: 'Buyurtmalar', path: '/orders', icon: 'ClipboardList' },
+  { key: 'screens', label: 'Ekranlar', path: '/production-screen', icon: 'Monitor' },
   { key: 'waste', label: 'Chiqitlar', path: '/waste', icon: 'Trash2' },
   { key: 'warehouse', label: 'Ombor', path: '/warehouse', icon: 'Ombor' },
   { key: 'products', label: 'Mahsulotlar', path: '/products', icon: 'Cake' },
