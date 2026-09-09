@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { AlertTriangle, Search, Star, Clock, Building2, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -202,7 +203,7 @@ export default function POS() {
           .map((item) => `${item.product_name}: ${item.requested} ta kerak, ${item.available} ta mavjud`)
           .join('\n');
         if (payload.allow_negative_stock === false) {
-          alert('Omborda mahsulot yetarli emas:\n\n' + details);
+          void odinaAlert('Omborda mahsulot yetarli emas:\n\n' + details);
           return;
         }
         const accepted = window.confirm(
@@ -218,7 +219,7 @@ export default function POS() {
       const details = (payload.shortages || [])
         .map((item) => `${item.product_name}: ${item.available} ta mavjud`)
         .join('\n');
-      alert((payload.error || error?.message || 'Qoldiqni tekshirib bo‘lmadi.') + (details ? '\n\n' + details : ''));
+      void odinaAlert((payload.error || error?.message || 'Qoldiqni tekshirib bo‘lmadi.') + (details ? '\n\n' + details : ''));
     } finally {
       setStockChecking(false);
     }
@@ -268,7 +269,7 @@ export default function POS() {
         .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
         .catch(() => {});
     } catch (e) {
-      alert('Savdoni yakunlab bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+      void odinaAlert('Savdoni yakunlab bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
       setPaying(false);
     }
@@ -286,7 +287,7 @@ export default function POS() {
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani ochib bo‘lmadi.');
       setShift(payload.shift);
       setOpenShiftOpen(false);
-    } catch (e) { alert('Smenani ochib bo‘lmadi: ' + (e?.message || e)); }
+    } catch (e) { void odinaAlert('Smenani ochib bo‘lmadi: ' + (e?.message || e)); }
     finally { setShiftLoading(false); }
   };
 
@@ -306,7 +307,7 @@ export default function POS() {
       setShift(null);
       setCloseShiftOpen(false);
     } catch (e) {
-      alert('Smenani yopib bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+      void odinaAlert('Smenani yopib bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally { setShiftLoading(false); }
   };
 
@@ -342,7 +343,7 @@ export default function POS() {
       }
       setCashWithdrawalOpen(false);
     } catch (e) {
-      alert('Pul olish amalga oshmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+      void odinaAlert('Pul olish amalga oshmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
       setCashWithdrawalLoading(false);
     }
