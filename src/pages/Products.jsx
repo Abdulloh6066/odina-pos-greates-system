@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { odinaAlert } from '@/lib/odina-dialog';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -55,7 +56,7 @@ export default function Products() {
       const payload = result?.data || result;
       if (!payload?.product) throw new Error(payload?.error || 'Mavjudlik holatini yangilab bo‘lmadi.');
       setProducts((items) => items.map((p) => p.id === product.id ? payload.product : p));
-    } catch (e) { alert('Mavjudlikni yangilashda xato: ' + (e?.message || e)); }
+    } catch (e) { void odinaAlert('Mavjudlikni yangilashda xato: ' + (e?.message || e)); }
   };
 
   return (
@@ -169,17 +170,17 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setImageUrl(file_url);
-    } catch (err) { alert('Rasmni yuklashda xato: ' + (err?.message || err)); }
+    } catch (err) { void odinaAlert('Rasmni yuklashda xato: ' + (err?.message || err)); }
     finally { setUploading(false); }
   };
 
   const save = async () => {
     if (!name.trim() || price === '' || !Number.isFinite(Number(price)) || Number(price) < 0) {
-      alert('Nomi va manfiy bo‘lmagan narx majburiy.'); return;
+      void odinaAlert('Nomi va manfiy bo‘lmagan narx majburiy.'); return;
     }
     if (productionUnit === 'sheet' && (!Number.isSafeInteger(Number(piecesPerSheet)) || Number(piecesPerSheet) < 1
       || sheetPrice === '' || !Number.isFinite(Number(sheetPrice)) || Number(sheetPrice) < 0)) {
-      alert('1 listdan chiqadigan butun bo‘lak soni va list narxini kiriting.'); return;
+      void odinaAlert('1 listdan chiqadigan butun bo‘lak soni va list narxini kiriting.'); return;
     }
     setSaving(true);
     const cat = categories.find((c) => c.id === categoryId);
@@ -208,7 +209,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
         await logAction(user, 'product_created', payload.name);
       }
       onSaved();
-    } catch (e) { alert('Saqlashda xato: ' + (e?.message || e)); }
+    } catch (e) { void odinaAlert('Saqlashda xato: ' + (e?.message || e)); }
     finally { setSaving(false); }
   };
 
@@ -223,7 +224,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
       await logAction(user, archived ? 'product_archived' : 'product_restored', product.name);
       onSaved();
     } catch (e) {
-      alert((archived ? 'Mahsulotni o‘chirishda xato: ' : 'Mahsulotni tiklashda xato: ') + (e?.message || e));
+      void odinaAlert((archived ? 'Mahsulotni o‘chirishda xato: ' : 'Mahsulotni tiklashda xato: ') + (e?.message || e));
     } finally {
       setArchiving(false);
     }
