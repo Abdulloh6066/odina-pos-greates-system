@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { Banknote, CalendarDays, Search, Store, Tag, UserRound, WalletCards, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -165,37 +166,37 @@ export default function CashOutHistory() {
           {ownerView && (
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Do‘kon</span>
-              <select
+              <OdinaSelect
                 value={selectedShop}
                 onChange={(event) => setSelectedShop(event.target.value)}
                 className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 <option value="all">Barcha do‘konlar</option>
                 {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-              </select>
+              </OdinaSelect>
             </label>
           )}
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Chiqim turi</span>
-            <select
+            <OdinaSelect
               value={selectedCategory}
               onChange={(event) => setSelectedCategory(event.target.value)}
               className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">Barcha chiqimlar</option>
               {Object.entries(CATEGORY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-            </select>
+            </OdinaSelect>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Kimga berildi</span>
-            <select
+            <OdinaSelect
               value={selectedRecipient}
               onChange={(event) => setSelectedRecipient(event.target.value)}
               className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">Barcha qabul qiluvchilar</option>
               {recipientNames.map((name) => <option key={name} value={name}>{name}</option>)}
-            </select>
+            </OdinaSelect>
           </label>
         </div>
 
