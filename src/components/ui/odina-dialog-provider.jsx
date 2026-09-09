@@ -106,7 +106,7 @@ export default function OdinaDialogProvider({ children }) {
                   value={inputValue}
                   onChange={(event) => setInputValue(event.target.value)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter' && inputValue.trim()) {
+                    if (event.key === 'Enter' && (!request.inputRequired || inputValue.trim())) {
                       event.preventDefault();
                       complete(inputValue);
                     }
@@ -117,7 +117,7 @@ export default function OdinaDialogProvider({ children }) {
               </label>
             )}
 
-            <AlertDialogFooter className="mt-6 grid grid-cols-1-reverse gap-2 sm:flex sm:justify-end sm:space-x-0">
+            <AlertDialogFooter className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-0">
               {request?.kind !== 'alert' && (
                 <AlertDialogCancel
                   onClick={() => complete(cancelValue)}
@@ -128,7 +128,7 @@ export default function OdinaDialogProvider({ children }) {
               )}
               <AlertDialogAction
                 onClick={() => complete(confirmValue)}
-                disabled={request?.kind === 'prompt' && !inputValue.trim()}
+                disabled={request?.kind === 'prompt' && request.inputRequired && !inputValue.trim()}
                 className={`min-h-12 rounded-xl px-6 text-base font-bold shadow-sm disabled:cursor-not-allowed disabled:opacity-45 ${tone.actionClass}`}
               >
                 {request?.confirmLabel}
