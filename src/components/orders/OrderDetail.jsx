@@ -6,13 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Image } from '@/components/ui/image';
 import OrderPaymentDialog from '@/components/orders/OrderPaymentDialog';
-import { Calendar, Clock, Phone, MapPin, Store, User, CreditCard } from 'lucide-react';
+import OrderCompleteDialog from '@/components/orders/OrderCompleteDialog';
+import { useAuth } from '@/lib/AuthContext';
+import { Calendar, Clock, Phone, MapPin, Store, User, CreditCard, Truck, PackageCheck } from 'lucide-react';
 
 export default function OrderDetail({ order, onClose, onPaid }) {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -127,16 +131,31 @@ export default function OrderDetail({ order, onClose, onPaid }) {
               )}
             </div>
 
-            {order.remaining_balance > 0 && order.order_status !== 'bekor_qilindi' && (
-              <div className="flex justify-end gap-2 sticky bottom-0 bg-card pt-3">
-                <Button onClick={() => setPayOpen(true)}>To‘lov qo‘shish</Button>
-              </div>
-            )}
+            {(() => {
+              const canComplete = (order.order_status === 'tayyor' || order.order_status === 'yuborildi_olib_ketildi')
+                && order.order_status !== 'bekor_qilindi'
+                && (user?.role === 'admin' || (user?.role === 'cashier' && user?.shop_id === order.shop_id));
+              const handoffLabel = order.fulfilment_type === 'delivery' ? 'Yuborildi' : 'Olib ketildi';
+              const showPay = order.remaining_balance > 0 && order.order_status !== 'bekor_qilindi';
+              if (!canComplete && !showPay) return null;
+              return (
+                <div className="flex justify-end gap-2 sticky bottom-0 bg-card pt-3">
+                  {showPay && <Button variant="outline" onClick={() => setPayOpen(true)}>To‘lov qo‘shish</Button>}
+                  {canComplete && (
+                    <Button onClick={() => setCompleteOpen(true)}>
+                      {order.fulfilment_type === 'delivery' ? <Truck className="w-4 h-4" /> : <PackageCheck className="w-4 h-4" />}
+                      {handoffLabel}
+                    </Button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </DialogContent>
 
       <OrderPaymentDialog open={payOpen} onClose={() => setPayOpen(false)} order={order} onDone={() => { setPayOpen(false); refresh(); }} />
+      <OrderCompleteDialog open={completeOpen} onClose={() => setCompleteOpen(false)} order={order} onDone={() => { setCompleteOpen(false); refresh(); }} />
     </Dialog>
   );
 }
