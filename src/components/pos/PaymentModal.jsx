@@ -7,12 +7,12 @@ import { Plus, X, Check } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
 export default function PaymentModal({ open, total, onClose, onConfirm, loading }) {
-  const [payments, setPayments] = useState([{ method: 'cash', amount: total }]);
+  const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
-      setPayments([{ method: 'cash', amount: total }]);
+      setPayments(total > 0 ? [{ method: 'cash', amount: total }] : []);
       setError('');
     }
   }, [open, total]);
@@ -35,6 +35,10 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
   const removeRow = (idx) => setPayments((prev) => prev.filter((_, i) => i !== idx));
 
   const handleConfirm = () => {
+    if (total <= 0) {
+      onConfirm([]);
+      return;
+    }
     const valid = payments.filter((p) => Number(p.amount) > 0);
     if (valid.length === 0) { setError('Kamida bitta to‘lov kiriting.'); return; }
     const sum = valid.reduce((s, p) => s + Number(p.amount), 0);
@@ -57,7 +61,14 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
           <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
 
-        <div className="space-y-2.5">
+        {total <= 0 && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-700 flex items-center gap-2">
+            <Check className="w-5 h-5 shrink-0" />
+            100% chegirma qo‘llandi — to‘lov talab qilinmaydi.
+          </div>
+        )}
+
+        <div className={total <= 0 ? 'hidden' : 'space-y-2.5'}>
           {payments.map((p, idx) => (
             <div key={idx} className="flex gap-2 items-center">
               <OdinaSelect
@@ -85,7 +96,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
           ))}
         </div>
 
-        <div className="flex items-center justify-between mt-3 text-sm">
+        <div className={total <= 0 ? 'hidden' : 'flex items-center justify-between mt-3 text-sm'}>
           <button onClick={addRow} disabled={remaining <= 0 && payments.length >= PAYMENT_METHODS.length} className="text-brand-ink font-medium flex items-center gap-1 disabled:opacity-40">
             <Plus className="w-4 h-4" /> Add split payment
           </button>
