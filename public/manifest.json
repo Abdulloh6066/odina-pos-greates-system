@@ -1,0 +1,18 @@
+{
+  "name": "Odina POS",
+  "short_name": "Odina POS",
+  "description": "Odina Cake savdo va boshqaruv tizimi",
+  "lang": "uz",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#ACA95D",
+  "icons": [
+    {
+      "src": "/odina-mark.png",
+      "sizes": "2047x2048",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
