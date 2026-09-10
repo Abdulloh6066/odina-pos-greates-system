@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
@@ -15,12 +15,39 @@ import { useToast } from '@/components/ui/use-toast';
 
 const WEDDING_PCS = 40;
 
-export default function OrderForm({ open, onClose, onCreated, user, shops }) {
+function mapPrefillItems(sourceItems, products) {
+  return (sourceItems || []).map((si) => {
+    const p = (products || []).find((x) => x.id === si.product_id);
+    if (p) {
+      return {
+        product_id: p.id, name: p.name, image_url: p.image_url || '',
+        category_name: p.category_name || '', production_unit: p.production_unit || 'piece',
+        price: Number(p.price || 0), sheet_price: Number(p.sheet_price || 0),
+        pieces_per_sheet: Number(p.pieces_per_sheet || 20),
+        quantity: Math.max(1, Math.floor(Number(si.quantity) || 1)),
+        customization_note: si.customization_note || '',
+      };
+    }
+    const isSheet = si.unit_snapshot === 'sheet';
+    return {
+      product_id: si.product_id, name: si.product_name_snapshot,
+      image_url: si.product_image_snapshot || '', category_name: si.category_name_snapshot || '',
+      production_unit: isSheet ? 'sheet' : 'piece',
+      price: isSheet ? 0 : Number(si.unit_price_snapshot || 0),
+      sheet_price: isSheet ? Number(si.unit_price_snapshot || 0) : 0,
+      pieces_per_sheet: Number(si.event_pieces_per_sheet_snapshot) || 20,
+      quantity: Math.max(1, Math.floor(Number(si.quantity) || 1)),
+      customization_note: si.customization_note || '',
+    };
+  });
+}
+
+export default function OrderForm({ open, onClose, onCreated, user, shops, prefill }) {
   const { toast } = useToast();
   const role = user?.role || 'cashier';
   const isAdmin = role === 'admin';
   const [products, setProducts] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState([]);
   const [acceptanceStamp, setAcceptanceStamp] = useState('');
@@ -53,6 +80,49 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
   useEffect(() => {
     if (open && role === 'cashier') setForm((f) => ({ ...f, shop_id: user?.shop_id || '' }));
   }, [open, role, user]);
+
+  const appliedPrefillId = useRef('');
+  const hadPrefill = useRef(false);
+
+  useEffect(() => {
+    if (!open) { appliedPrefillId.current = ''; return; }
+    if (prefill) {
+      if (loadingProducts) return;
+      if (appliedPrefillId.current === prefill.order.id) return;
+      appliedPrefillId.current = prefill.order.id;
+      hadPrefill.current = true;
+      const np = tashkentNowParts();
+      setForm({
+        order_type: prefill.order.order_type || 'toy_va_bazmlar',
+        customer_name: prefill.order.customer_name || '',
+        customer_phone: prefill.order.customer_phone || '',
+        required_date: '',
+        required_time: prefill.order.required_time || '18:00',
+        shop_id: isAdmin ? (prefill.order.shop_id || '') : (user?.shop_id || ''),
+        fulfilment_type: prefill.order.fulfilment_type || 'pickup',
+        delivery_address: prefill.order.delivery_address || '',
+        delivery_fee: prefill.order.delivery_fee || 0,
+        cake_shape: prefill.order.cake_shape || '',
+        reference_image: prefill.order.reference_image || '',
+        notes: prefill.order.notes || '',
+        adjustment_amount: 0, adjustment_reason: '',
+        useAdvance: false, advance_method: 'cash', advance_amount: 0,
+      });
+      setDateParts({ day: '', month: String(np.month), year: String(np.year) });
+      setItems(mapPrefillItems(prefill.items || [], products));
+    } else if (hadPrefill.current) {
+      hadPrefill.current = false;
+      appliedPrefillId.current = '';
+      setItems([]);
+      const np = tashkentNowParts();
+      setDateParts({ day: '', month: String(np.month), year: String(np.year) });
+      setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
+        shop_id: user?.shop_id || '', fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
+        cake_shape: '', reference_image: '', notes: '', adjustment_amount: 0, adjustment_reason: '',
+        useAdvance: false, advance_method: 'cash', advance_amount: 0 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prefill, loadingProducts, products]);
 
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -159,8 +229,10 @@ export default function OrderForm({ open, onClose, onCreated, user, shops }) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto scrollbar-thin">
         <DialogHeader>
-          <DialogTitle>Yangi buyurtma</DialogTitle>
-          <DialogDescription>Mijoz va mahsulot ma’lumotlarini to‘ldiring.</DialogDescription>
+          <DialogTitle>{prefill ? 'Qayta buyurtma' : 'Yangi buyurtma'}</DialogTitle>
+          <DialogDescription>
+            {prefill ? `${prefill.order.order_number} asosida yangi buyurtma — sanani va vaqtni qaytadan tanlang.` : 'Mijoz va mahsulot ma’lumotlarini to‘ldiring.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 mt-2">

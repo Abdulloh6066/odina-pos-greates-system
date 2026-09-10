@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import OrderForm from '@/components/orders/OrderForm';
 import OrderDetail from '@/components/orders/OrderDetail';
-import { ClipboardList, Plus, Search, Filter, Calendar, Phone, MapPin, Store } from 'lucide-react';
+import { ClipboardList, Plus, Search, Filter, Calendar, Phone, MapPin, Store, Repeat2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const TYPE_OPTIONS = [
@@ -49,6 +49,7 @@ export default function Orders() {
   const [dateFilter, setDateFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
+  const [repeatPrefill, setRepeatPrefill] = useState(null);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -88,8 +89,21 @@ export default function Orders() {
     });
   }, [orders, query, shopFilter, typeFilter, statusFilter, payFilter, dateFilter]);
 
+  const handleRepeat = async (order, items) => {
+    try {
+      let it = items;
+      if (!it) it = await base44.entities.CustomerOrderItem.filter({ order_id: order.id });
+      setDetailOrder(null);
+      setRepeatPrefill({ order, items: it || [] });
+      setFormOpen(true);
+    } catch (e) {
+      toast({ title: 'Buyurtma ma’lumotlarini yuklab bo‘lmadi', description: e?.message, variant: 'destructive' });
+    }
+  };
+
   const handleCreated = (order) => {
     setFormOpen(false);
+    setRepeatPrefill(null);
     setDetailOrder(order);
     loadOrders();
   };
@@ -146,7 +160,7 @@ export default function Orders() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((o) => (
-            <button key={o.id} onClick={() => setDetailOrder(o)} className="text-left bg-card rounded-2xl border border-border premium-shadow p-4 hover:border-brand-olive/40 hover:premium-shadow-lg transition-all">
+            <div key={o.id} onClick={() => setDetailOrder(o)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailOrder(o); } }} className="text-left bg-card rounded-2xl border border-border premium-shadow p-4 hover:border-brand-olive/40 hover:premium-shadow-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="min-w-0">
                   <div className="font-semibold text-foreground truncate">{o.order_number}</div>
@@ -177,16 +191,22 @@ export default function Orders() {
                 <Calendar className="w-3.5 h-3.5" /> {o.required_date} · {o.required_time}
                 {o.fulfilment_type === 'delivery' && <><MapPin className="w-3.5 h-3.5 ml-2" /> {o.delivery_address || '—'}</>}
               </div>
-            </button>
+              <div className="mt-3 border-t border-border pt-2 flex justify-end">
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleRepeat(o); }} className="h-8 text-xs">
+                  <Repeat2 className="w-3.5 h-3.5" /> Qayta buyurtma
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      <OrderForm open={formOpen} onClose={() => setFormOpen(false)} onCreated={handleCreated} user={user} shops={shops} />
+      <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
       <OrderDetail
         order={detailOrder}
         onClose={() => setDetailOrder(null)}
         onPaid={() => { loadOrders(); }}
+        onRepeat={handleRepeat}
       />
     </div>
   );
