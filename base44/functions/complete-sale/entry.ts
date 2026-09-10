@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
-const COMPLETE_SALE_RUNTIME_VERSION = "shift-stock-v3-2026-09-09";
+const COMPLETE_SALE_RUNTIME_VERSION = "discount-approval-v4-2026-09-10";
 
 const PAYMENT_METHODS = new Set([
   "cash",
@@ -131,6 +131,7 @@ export default async function(req) {
   let saleItems: any[] = [];
   let paymentRecords: any[] = [];
   let claimedDiscount: any = null;
+  let discountChanged = false;
   let stockChanges: any[] = [];
   let stockMovementRecords: any[] = [];
 
@@ -415,16 +416,28 @@ export default async function(req) {
     }
 
     if (action === "validate_discount") {
-      if (user.role === "cashier" && !(await verifyOwnerPin(service, body?.owner_pin))) {
-        return Response.json({ error: "Owner PIN is incorrect." }, { status: 403 });
-      }
       const code = String(body?.code || "").trim().toUpperCase();
       const matches = code ? await service.entities.DiscountCode.filter({ code, active: true }) : [];
       const discount = matches?.[0];
       if (!discount || (discount.single_use !== false && Number(discount.usage_count || 0) >= 1)) {
-        return Response.json({ error: "Invalid, inactive, or already-used discount code." }, { status: 404 });
+        return Response.json({ error: "Kod noto‘g‘ri, nofaol yoki avval ishlatilgan." }, { status: 404 });
       }
-      return Response.json({ code: discount.code, percentage: Number(discount.percentage) });
+      const percentage = Number(discount.percentage);
+      if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+        return Response.json({ error: "Chegirma foizi noto‘g‘ri." }, { status: 409 });
+      }
+      const requiresOwnerPin = user.role === "cashier" && percentage === 100;
+      if (requiresOwnerPin && !(await verifyOwnerPin(service, body?.owner_pin))) {
+        return Response.json({
+          error: "100% chegirma uchun OWNER PIN noto‘g‘ri yoki kiritilmagan.",
+          requires_owner_pin: true,
+        }, { status: 403 });
+      }
+      return Response.json({
+        code: discount.code,
+        percentage,
+        requires_owner_pin: false,
+      });
     }
 
     if (action === "cash_withdrawal") {
@@ -781,8 +794,8 @@ export default async function(req) {
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
     const requestedDiscountCode = String(body?.discount_code || "").trim().toUpperCase();
 
-    if (!shiftId || requestedItems.length === 0 || requestedPayments.length === 0) {
-      return Response.json({ error: "Shift, items, and payments are required." }, { status: 400 });
+    if (!shiftId || requestedItems.length === 0) {
+      return Response.json({ error: "Smena va mahsulotlar majburiy." }, { status: 400 });
     }
 
     const shift = await service.entities.Shift.get(shiftId);
@@ -833,6 +846,16 @@ export default async function(req) {
       }
       discountCode = discount.code;
       claimedDiscount = discount;
+      if (
+        user.role === "cashier" &&
+        discountPercentage === 100 &&
+        !(await verifyOwnerPin(service, body?.owner_pin))
+      ) {
+        return Response.json({
+          error: "100% chegirma bilan savdoni yakunlash uchun OWNER PIN kerak.",
+          requires_owner_pin: true,
+        }, { status: 403 });
+      }
     }
 
     const discountAmount = money(subtotal * discountPercentage / 100);
@@ -844,21 +867,40 @@ export default async function(req) {
       reference: String(payment?.reference || "").trim(),
     }));
 
+    if (total > 0 && normalizedPayments.length === 0) {
+      return Response.json({ error: "Kamida bitta to‘lov usulini kiriting." }, { status: 400 });
+    }
     if (normalizedPayments.some((payment) => !PAYMENT_METHODS.has(payment.method) || payment.amount <= 0)) {
-      return Response.json({ error: "A payment method or amount is invalid." }, { status: 400 });
+      return Response.json({ error: "To‘lov usuli yoki summasi noto‘g‘ri." }, { status: 400 });
     }
 
     const paidTotal = normalizedPayments.reduce((sum, payment) => sum + payment.amount, 0);
     if (paidTotal !== total) {
       return Response.json({
-        error: `Payments must equal the sale total. Expected ${total}, received ${paidTotal}.`,
+        error: `To‘lovlar savdo summasiga teng bo‘lishi kerak. Kutilgan: ${total}, kiritilgan: ${paidTotal}.`,
       }, { status: 400 });
     }
 
     const now = new Date().toISOString();
     const day = now.slice(0, 10).replaceAll("-", "");
     const saleNumber = `OD-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-    const paymentSummary = normalizedPayments.map((payment) => payment.method).join(" + ");
+    const paymentSummary = normalizedPayments.length
+      ? normalizedPayments.map((payment) => payment.method).join(" + ")
+      : "100% chegirma";
+
+    if (claimedDiscount?.single_use !== false) {
+      const discountClaim = await service.entities.DiscountCode.updateMany(
+        { id: claimedDiscount.id, active: true },
+        {
+          $inc: { usage_count: 1 },
+          $set: { active: false, used_at: now },
+        },
+      );
+      if (!discountClaim?.success || Number(discountClaim.updated || 0) !== 1) {
+        throw httpError("Bu chegirma kodi boshqa kassada ishlatildi.", 409);
+      }
+      discountChanged = true;
+    }
 
     for (const plan of stockPlans) {
       let stockRecord = plan.stock;
@@ -942,19 +984,21 @@ export default async function(req) {
     });
 
     saleItems = await service.entities.SaleItem.bulkCreate(itemPayloads);
-    paymentRecords = await service.entities.Payment.bulkCreate(
-      normalizedPayments.map((payment) => ({
-        sale_id: sale.id,
-        sale_number: saleNumber,
-        shop_id: shift.shop_id,
-        shift_id: shift.id,
-        cashier_id: user.id,
-        method: payment.method,
-        amount: payment.amount,
-        reference: payment.reference || undefined,
-        created_at: now,
-      })),
-    );
+    paymentRecords = normalizedPayments.length
+      ? await service.entities.Payment.bulkCreate(
+        normalizedPayments.map((payment) => ({
+          sale_id: sale.id,
+          sale_number: saleNumber,
+          shop_id: shift.shop_id,
+          shift_id: shift.id,
+          cashier_id: user.id,
+          method: payment.method,
+          amount: payment.amount,
+          reference: payment.reference || undefined,
+          created_at: now,
+        })),
+      )
+      : [];
 
     for (const change of stockChanges) {
       const movement = await service.entities.StockMovement.create({
@@ -980,12 +1024,23 @@ export default async function(req) {
     }
 
     if (claimedDiscount) {
-      await service.entities.DiscountCode.update(claimedDiscount.id, {
-        usage_count: Number(claimedDiscount.usage_count || 0) + 1,
-        used_at: now,
-        used_by_sale_id: sale.id,
-        active: claimedDiscount.single_use === false,
-      });
+      if (claimedDiscount.single_use !== false) {
+        await service.entities.DiscountCode.update(claimedDiscount.id, {
+          used_by_sale_id: sale.id,
+        });
+      } else {
+        const discountUpdate = await service.entities.DiscountCode.updateMany(
+          { id: claimedDiscount.id, active: true },
+          {
+            $inc: { usage_count: 1 },
+            $set: { used_at: now, used_by_sale_id: sale.id },
+          },
+        );
+        if (!discountUpdate?.success || Number(discountUpdate.updated || 0) !== 1) {
+          throw httpError("Chegirma kodini ishlatilgan deb belgilab bo‘lmadi.", 409);
+        }
+        discountChanged = true;
+      }
     }
 
     const cashIncrement = normalizedPayments
@@ -1071,7 +1126,7 @@ export default async function(req) {
         );
       } catch {}
     }
-    if (claimedDiscount && sale) {
+    if (claimedDiscount && discountChanged) {
       try {
         await base44.asServiceRole.entities.DiscountCode.update(claimedDiscount.id, {
           usage_count: Number(claimedDiscount.usage_count || 0),
