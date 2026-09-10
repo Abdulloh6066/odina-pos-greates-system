@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Ticket, Plus, Pencil, Trash2 } from 'lucide-react';
-import { formatNum, logAction } from '@/lib/pos';
+import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,10 @@ export default function DiscountCodes() {
   const load = async () => {
     setLoading(true);
     const c = await base44.entities.DiscountCode.list();
-    setCodes(c || []);
+    setCodes((c || []).filter((item) => (
+      item.active !== false &&
+      (item.single_use === false || Number(item.usage_count || 0) < 1)
+    )));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -61,7 +64,7 @@ export default function DiscountCodes() {
               <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center"><Ticket className="w-5 h-5" /></div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold font-mono truncate">{c.code}</div>
-                <div className="text-xs text-muted-foreground">{c.percentage}% chegirma · {formatNum(c.usage_count || 0)} marta ishlatilgan · {c.active ? 'Faol' : 'Nofaol'}</div>
+                <div className="text-xs text-muted-foreground">{c.percentage}% chegirma · Bir martalik · Faol</div>
               </div>
               {canManage && (
                 <div className="flex gap-1">
@@ -95,10 +98,20 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
   }, [open, code]);
 
   const save = async () => {
-    if (!codeVal.trim() || !pct) { void odinaAlert('Kod va chegirma foizini kiriting.'); return; }
+    const percentage = Number(pct);
+    if (!codeVal.trim() || !Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+      void odinaAlert('Kod va 1–100 oralig‘idagi chegirma foizini kiriting.');
+      return;
+    }
     setSaving(true);
     try {
-      const payload = { code: codeVal.trim().toUpperCase(), percentage: Number(pct), active, note: note || undefined };
+      const payload = {
+        code: codeVal.trim().toUpperCase(),
+        percentage,
+        active,
+        single_use: true,
+        note: note || undefined,
+      };
       if (code) { await base44.entities.DiscountCode.update(code.id, payload); await logAction(user, 'discount_updated', payload.code); }
       else { await base44.entities.DiscountCode.create({ ...payload, usage_count: 0 }); await logAction(user, 'discount_created', payload.code); }
       onSaved();
