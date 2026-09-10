@@ -11,10 +11,10 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'orders', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  admin: ['dashboard', 'pos', 'orders', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
   cashier: ['pos', 'orders', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
-  accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts'],
+  accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'profit', 'discounts', 'sales', 'shifts'],
   production: ['warehouse', 'products', 'screens'],
   warehouse: ['warehouse'],
 };
@@ -38,6 +38,7 @@ export const MENU_ITEMS = [
   { key: 'products', label: 'Mahsulotlar', path: '/products', icon: 'Cake' },
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },
+  { key: 'profit', label: 'Tannarx va foyda', path: '/profit', icon: 'TrendingUp' },
   { key: 'discounts', label: 'Chegirma kodlari', path: '/discounts', icon: 'Ticket' },
   { key: 'sales', label: 'Savdolar tarixi', path: '/sales', icon: 'ReceiptText' },
   { key: 'shifts', label: 'Smenalar', path: '/shifts', icon: 'Clock' },

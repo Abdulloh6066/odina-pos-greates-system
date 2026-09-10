@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { loadIngredientCosts, recipeCostFromMap } from "../../shared/cost-engine.ts";
 
 const RECIPE_ROLES = new Set(["admin", "accountant"]);
 const PRODUCTION_ROLES = new Set(["admin", "production"]);
@@ -238,6 +239,22 @@ export default async function(req) {
         }, { status: 409 });
       }
 
+      // Save the calculated unit cost on the produced finished goods (best-effort).
+      let batchUnitCost = 0;
+      let batchTotalCost = 0;
+      let costComputed = false;
+      try {
+        const ingredientCosts = await loadIngredientCosts(service);
+        const { batchCost, hasAllPrices } = recipeCostFromMap(recipeItems, ingredientCosts);
+        if (hasAllPrices && recipeOutput > 0) {
+          batchUnitCost = batchCost / recipeOutput; // per output unit (piece/sheet)
+          batchTotalCost = batchUnitCost * producedQuantity;
+          costComputed = true;
+        }
+      } catch (costError) {
+        console.warn("Production cost skipped:", costError);
+      }
+
       const now = new Date().toISOString();
       const batchNumber = `PR-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 7).toUpperCase()}`;
       const claimedIngredients: any[] = [];
@@ -322,6 +339,8 @@ export default async function(req) {
           recipe_output_quantity: recipeOutput,
           produced_quantity: producedQuantity,
           unit: product.production_unit || "piece",
+          unit_cost: costComputed ? batchUnitCost : 0,
+          total_cost: costComputed ? batchTotalCost : 0,
           status: "processing",
           notes,
           created_at: now,
@@ -393,6 +412,12 @@ export default async function(req) {
           status: "completed",
           completed_at: now,
         });
+
+        if (costComputed) {
+          try {
+            await service.entities.Product.update(product.id, { last_production_cost: batchUnitCost });
+          } catch {}
+        }
 
         try {
           await service.entities.ActionHistory.create({

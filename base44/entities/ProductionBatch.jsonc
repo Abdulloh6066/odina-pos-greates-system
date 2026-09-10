@@ -37,6 +37,16 @@
       ],
       "default": "piece"
     },
+    "unit_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "1 natija birligi (dona/varaq) tannarxi \u2014 ishlab chiqarish yakunida saqlanadi"
+    },
+    "total_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Butun partiya tannarxi = unit_cost * produced_quantity"
+    },
     "status": {
       "type": "string",
       "enum": [

@@ -67,6 +67,11 @@
     "track_stock": {
       "default": true,
       "type": "boolean"
+    },
+    "last_production_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Oxirgi ishlab chiqarishdagi 1 natija birligi tannarxi"
     }
   },
   "required": [

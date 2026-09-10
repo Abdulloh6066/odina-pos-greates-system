@@ -18,6 +18,7 @@ import {
   buildShiftStockReport, cleanupShiftStockSnapshots,
   BUDGET_ACCOUNT_LABELS, creditBudgetBalance, rollbackBudgetBalance,
 } from "../../shared/shift-close-helpers.ts";
+import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
 
 async function normalizeSaleItems(service: any, requestedItems: any[]) {
   const quantities = new Map<string, number>();
@@ -824,6 +825,20 @@ export default async function(req) {
       }, { status: 409 });
     }
 
+    // Best-effort immutable cost snapshot per sale item. Never blocks a sale.
+    const unitCostByProduct: Map<string, any> = new Map();
+    try {
+      const ingredientCosts = await loadIngredientCosts(service);
+      for (const item of normalizedItems) {
+        unitCostByProduct.set(
+          item.product_id,
+          await computeProductCost(service, item.product_id, ingredientCosts),
+        );
+      }
+    } catch (costError) {
+      console.warn("Cost snapshot skipped:", costError);
+    }
+
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
     let discountCode = "";
     let discountPercentage = 0;
@@ -962,6 +977,9 @@ export default async function(req) {
         ? discountAmount - allocatedDiscount
         : money(discountAmount * item.subtotal / subtotal);
       allocatedDiscount += itemDiscount;
+      const costInfo = unitCostByProduct.get(item.product_id) || { costPerPiece: 0, hasPrice: false };
+      const snapUnitCost = costInfo.hasPrice ? money(costInfo.costPerPiece) : 0;
+      const snapTotalCost = snapUnitCost * item.quantity;
       return {
         sale_id: sale.id,
         sale_number: saleNumber,
@@ -979,6 +997,9 @@ export default async function(req) {
         unit_price: item.price,
         discount_amount: itemDiscount,
         line_total: item.subtotal - itemDiscount,
+        unit_cost_at_sale: snapUnitCost,
+        total_cost_at_sale: snapTotalCost,
+        cost_is_estimate: !costInfo.hasPrice,
         created_at: now,
       };
     });

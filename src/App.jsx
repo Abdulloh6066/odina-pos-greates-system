@@ -32,6 +32,7 @@ import Warehouse from '@/pages/Warehouse';
 import Waste from '@/pages/Waste';
 import Budget from '@/pages/Budget';
 import ProductionScreen from '@/pages/ProductionScreen';
+import ProfitReport from '@/pages/ProfitReport';
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -87,6 +88,7 @@ function App() {
                 <Route path="/warehouse" element={<RoleRoute pageKey="warehouse"><Warehouse /></RoleRoute>} />
                 <Route path="/waste" element={<RoleRoute pageKey="waste"><Waste /></RoleRoute>} />
                 <Route path="/budget" element={<RoleRoute pageKey="budget"><Budget /></RoleRoute>} />
+                <Route path="/profit" element={<RoleRoute pageKey="profit"><ProfitReport /></RoleRoute>} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />

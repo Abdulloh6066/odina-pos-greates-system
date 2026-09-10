@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
   Circle, Clock, ClipboardList, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
-  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse,
+  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
@@ -12,7 +12,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Trash2, Monitor,
+  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Trash2, Monitor, TrendingUp,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
