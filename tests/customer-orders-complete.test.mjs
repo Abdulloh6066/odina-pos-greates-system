@@ -129,6 +129,7 @@ function loadHandler(client) {
 
 // Create a wedding order, then mark it ready/dispatched for completion tests.
 async function setupReadyOrder(call, db, overrides = {}) {
+  clock = '2026-09-10T10:00:00.000Z';
   const createRes = await call({
     action: 'create_order',
     idempotency_key: 'key-' + Math.random().toString(36).slice(2),
@@ -281,16 +282,17 @@ test('duplicate complete request does not duplicate payment, stock, or completio
 });
 
 test('cashier cannot complete another shop order', async () => {
-  const f = fixture('cashier', 'shop-a');
+  const f = fixture('admin');
   const call = loadHandler(harness(f.db));
-  const order = await setupReadyOrder(call, f.db, { shop_id: 'shop-b' });
-  // Cashier is shop-a, order is shop-b
+  const order = await setupReadyOrder(call, f.db, { shop_id: 'shop-b', advance_payment: { method: 'uzcard', amount: 950000 } });
+  // Switch to cashier assigned to a different shop
+  f.db.User[0] = { id: 'u2', email: 'cashier@example.test', full_name: 'Test Cashier', role: 'cashier', shop_id: 'shop-a', active: true };
   const res = await call({
     action: 'complete_order', order_id: order.id,
     idempotency_key: 'cmp-' + Math.random().toString(36).slice(2),
   });
   assert.equal(res.status, 403);
-  assert.equal(f.db.CustomerOrder[0].order_status, 'tayyor');
+  assert.equal(f.db.CustomerOrder.find((o) => o.id === order.id).order_status, 'tayyor');
 });
 
 test('admin can complete any shop order', async () => {
@@ -306,15 +308,17 @@ test('admin can complete any shop order', async () => {
 });
 
 test('production role cannot complete orders', async () => {
-  const f = fixture('production', 'shop-a');
+  const f = fixture('admin');
   const call = loadHandler(harness(f.db));
   const order = await setupReadyOrder(call, f.db, { advance_payment: { method: 'uzcard', amount: 950000 } });
+  // Switch to production role
+  f.db.User[0] = { id: 'u3', email: 'prod@example.test', full_name: 'Prod User', role: 'production', shop_id: 'shop-a', active: true };
   const res = await call({
     action: 'complete_order', order_id: order.id,
     idempotency_key: 'cmp-' + Math.random().toString(36).slice(2),
   });
   assert.equal(res.status, 403);
-  assert.equal(f.db.CustomerOrder[0].order_status, 'tayyor');
+  assert.equal(f.db.CustomerOrder.find((o) => o.id === order.id).order_status, 'tayyor');
 });
 
 test('non-eligible status (qabul qilindi) is rejected', async () => {
