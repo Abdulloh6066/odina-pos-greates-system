@@ -37,6 +37,7 @@ export default function POS() {
   const [discountCode, setDiscountCode] = useState('');
   const [discountPct, setDiscountPct] = useState(0);
   const [discountError, setDiscountError] = useState('');
+  const [discountOwnerPin, setDiscountOwnerPin] = useState('');
 
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -127,26 +128,37 @@ export default function POS() {
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
   }));
   const removeItem = (item) => setCart((p) => p.filter((i) => i.product_id !== item.product_id));
-  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); };
+  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); };
 
-  const validateDiscount = async (code, ownerPin) => {
+  const validateDiscount = async (code, ownerPin = '') => {
     setDiscountLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
         action: 'validate_discount',
         code,
-        owner_pin: ownerPin,
+        owner_pin: ownerPin || undefined,
       });
       const dc = result?.data || result;
       if (!dc?.code) throw new Error(dc?.error || 'Kod noto‘g‘ri yoki faol emas.');
-      setDiscountPct(dc.percentage);
+      const percentage = Number(dc.percentage);
+      setDiscountPct(percentage);
       setDiscountCode(dc.code);
+      setDiscountOwnerPin(user?.role === 'cashier' && percentage === 100 ? ownerPin : '');
       setDiscountError('');
       setDiscountApprovalOpen(false);
       setPendingDiscountCode('');
     } catch (e) {
-      setDiscountError(e?.response?.data?.error || e?.data?.error || e?.message || 'Kodni tekshirib bo‘lmadi.');
-      setDiscountApprovalOpen(false);
+      const errorPayload = e?.response?.data || e?.data || {};
+      if (errorPayload.requires_owner_pin && !ownerPin) {
+        setPendingDiscountCode(code);
+        setDiscountApprovalOpen(true);
+        setDiscountError('');
+      } else {
+        setDiscountError(errorPayload.error || e?.message || 'Kodni tekshirib bo‘lmadi.');
+        setDiscountApprovalOpen(false);
+        setPendingDiscountCode('');
+        setDiscountOwnerPin('');
+      }
     } finally {
       setDiscountLoading(false);
     }
@@ -155,15 +167,16 @@ export default function POS() {
   const applyDiscount = (code) => {
     const normalized = code?.trim().toUpperCase();
     if (!normalized) return;
-    if (user?.role === 'cashier') {
-      setPendingDiscountCode(normalized);
-      setDiscountApprovalOpen(true);
-      return;
-    }
     validateDiscount(normalized);
   };
 
-  const removeDiscount = () => { setDiscountCode(''); setDiscountPct(0); setDiscountError(''); };
+  const removeDiscount = () => {
+    setDiscountCode('');
+    setDiscountPct(0);
+    setDiscountError('');
+    setDiscountOwnerPin('');
+    setPendingDiscountCode('');
+  };
 
   const filtered = useMemo(() => {
     let list = products;
@@ -243,6 +256,7 @@ export default function POS() {
           quantity: item.quantity,
         })),
         discount_code: discountCode || undefined,
+        owner_pin: discountPct === 100 && discountOwnerPin ? discountOwnerPin : undefined,
         payments,
       });
       const payload = result?.data || result;
@@ -507,8 +521,8 @@ export default function POS() {
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
         open={discountApprovalOpen}
-        title="Chegirmani tasdiqlash"
-        description={pendingDiscountCode ? `${pendingDiscountCode} kodini qo‘llash uchun egasi tasdig‘i kerak.` : ''}
+        title="100% chegirmani tasdiqlash"
+        description={pendingDiscountCode ? `${pendingDiscountCode} — 100% chegirma uchun OWNER PIN kiriting.` : ''}
         onClose={() => { setDiscountApprovalOpen(false); setPendingDiscountCode(''); }}
         onConfirm={(pin) => validateDiscount(pendingDiscountCode, pin)}
         loading={discountLoading}
