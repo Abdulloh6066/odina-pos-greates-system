@@ -10,7 +10,7 @@ import OdinaBrand from '@/components/brand/OdinaBrand';
 import { typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
 import {
-  ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor,
+  ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays,
 } from 'lucide-react';
 
 const ACTIVE_STATUSES = ['qabul_qilindi', 'tayyorlanmoqda', 'tayyor'];
@@ -18,9 +18,17 @@ const URGENT_HOURS = 12;
 
 const unitLabel = (u) => (u === 'sheet' ? 'varaq' : 'dona');
 
-const todayStr = () => {
+const dateOffsetStr = (days = 0) => {
   const p = tashkentNowParts();
-  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+  const date = new Date(Date.UTC(p.year, p.month - 1, p.day + days));
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+};
+
+const todayStr = () => dateOffsetStr(0);
+
+const displayDate = (value) => {
+  const [year, month, day] = (value || '').split('-');
+  return year && month && day ? `${day}.${month}.${year}` : value || '—';
 };
 
 const clockStr = () => {
@@ -225,14 +233,20 @@ function ProductionScreenInner() {
     }
   };
 
-  const sortedActive = useMemo(() => {
-    return [...active].sort((a, b) => {
-      const ua = urgency(a) === 'overdue' ? 0 : urgency(a) === 'urgent' ? 1 : 2;
-      const ub = urgency(b) === 'overdue' ? 0 : urgency(b) === 'urgent' ? 1 : 2;
-      if (ua !== ub) return ua - ub;
-      return (a.required_date || '').localeCompare(b.required_date || '');
-    });
-  }, [active]);
+  const visibleDays = useMemo(() => {
+    const today = todayStr();
+    const tomorrow = dateOffsetStr(1);
+    const sortByTime = (a, b) => {
+      const timeCompare = (a.required_time || '').localeCompare(b.required_time || '');
+      return timeCompare || (a.order_number || '').localeCompare(b.order_number || '');
+    };
+    const ordersFor = (date) => active.filter((o) => o.required_date === date).sort(sortByTime);
+
+    return [
+      { key: 'today', title: 'Bugungi buyurtmalar', date: today, orders: ordersFor(today) },
+      { key: 'tomorrow', title: 'Ertangi buyurtmalar', date: tomorrow, orders: ordersFor(tomorrow) },
+    ];
+  }, [active, clock]);
 
   const logout = () => base44.auth.logout();
   const homePath = ROLE_HOME[user?.role] || '/';
@@ -286,23 +300,19 @@ function ProductionScreenInner() {
               </Link>
             </div>
           </div>
-        ) : sortedActive.length === 0 ? (
-          <div className="h-[60vh] flex flex-col items-center justify-center gap-2 text-center">
-            <CheckCircle2 className="w-12 h-12 text-brand-olive/60" />
-            <p className="font-display text-xl font-semibold">Faol buyurtmalar yo‘q</p>
-            <p className="text-sm text-muted-foreground">Yangi buyurtmalar shu yerda avtomatik paydo bo‘ladi.</p>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {sortedActive.map((o) => (
-              <OrderCard
-                key={o.id}
-                order={o}
-                items={itemsByOrder[o.id] || []}
-                busy={busyId === o.id}
-                onReady={() => setConfirm({ order: o, step: 'ready' })}
-                onShip={() => setConfirm({ order: o, step: 'shipped' })}
-                onPreview={() => setPreview(o.reference_image)}
+          <div className="space-y-8">
+            {visibleDays.map((day) => (
+              <OrderDaySection
+                key={day.key}
+                title={day.title}
+                date={day.date}
+                orders={day.orders}
+                itemsByOrder={itemsByOrder}
+                busyId={busyId}
+                onReady={(order) => setConfirm({ order, step: 'ready' })}
+                onShip={(order) => setConfirm({ order, step: 'shipped' })}
+                onPreview={(order) => setPreview(order.reference_image)}
               />
             ))}
           </div>
@@ -378,7 +388,7 @@ function ProductionScreenInner() {
           </DialogHeader>
           {preview ? (
             <div className="rounded-xl overflow-hidden bg-secondary">
-              <Image src={preview} fittingType="fit" className="w-full max-h-[70vh]" />
+              <Image src={preview} fittingType="fit" className="w-full max-h-[70vh] object-contain" />
             </div>
           ) : null}
         </DialogContent>
@@ -395,20 +405,63 @@ export default function ProductionScreen() {
   );
 }
 
+function OrderDaySection({
+  title, date, orders, itemsByOrder, busyId, onReady, onShip, onPreview,
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-brand-olive/15 flex items-center justify-center shrink-0">
+          <CalendarDays className="w-5 h-5 text-brand-olive" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-display text-lg sm:text-xl font-semibold leading-tight">{title}</h2>
+          <p className="text-xs text-muted-foreground">{displayDate(date)}</p>
+        </div>
+        <span className="ml-auto text-xs font-semibold bg-secondary text-muted-foreground rounded-full px-2.5 py-1">
+          {orders.length}
+        </span>
+      </div>
+
+      {orders.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card/60 py-8 px-4 text-center">
+          <CheckCircle2 className="w-9 h-9 text-brand-olive/50 mx-auto mb-2" />
+          <p className="text-sm font-medium">Bu kun uchun faol buyurtma yo‘q</p>
+          <p className="text-xs text-muted-foreground mt-1">Yangi buyurtma bo‘lsa, avtomatik shu yerda chiqadi.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {orders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              items={itemsByOrder[order.id] || []}
+              busy={busyId === order.id}
+              onReady={() => onReady(order)}
+              onShip={() => onShip(order)}
+              onPreview={() => onPreview(order)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
   const u = urgency(order);
   const isReady = order.order_status === 'tayyor';
   const hasImage = !!order.reference_image;
 
   return (
-    <div className={`rounded-2xl border bg-card premium-shadow flex flex-col overflow-hidden ${
+    <div className={`rounded-2xl border bg-card premium-shadow overflow-hidden ${
       u === 'overdue' ? 'border-rose-300' : u === 'urgent' ? 'border-amber-300' : 'border-border'
     }`}>
       {/* Card head */}
-      <div className="p-4 pb-3 flex items-start gap-3">
+      <div className="p-4 sm:p-5 pb-3 sm:pb-3 flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-display text-base font-semibold">{order.order_number}</span>
+            <span className="font-display text-base sm:text-lg font-semibold">{order.order_number}</span>
             <span className="text-[11px] font-medium bg-secondary text-muted-foreground rounded-full px-2 py-0.5">
               {typeLabel(order.order_type)}
             </span>
@@ -434,81 +487,89 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
         )}
       </div>
 
-      {/* Reference image */}
-      {hasImage && (
-        <div className="px-4">
-          <button
-            type="button"
-            onClick={onPreview}
-            className="relative w-full h-28 rounded-xl overflow-hidden bg-secondary border border-border block"
-            aria-label="Rasmini kattalashtirish"
-          >
-            <Image src={order.reference_image} fittingType="fill" className="w-full h-full" />
-          </button>
+      <div className={hasImage ? 'grid lg:grid-cols-[minmax(280px,38%)_minmax(0,1fr)]' : ''}>
+        {/* Reference image */}
+        {hasImage && (
+          <div className="px-4 sm:px-5 pb-4 lg:pr-2">
+            <button
+              type="button"
+              onClick={onPreview}
+              className="relative w-full h-52 sm:h-60 lg:h-64 xl:h-72 rounded-xl overflow-hidden bg-secondary/70 border border-border block"
+              aria-label="Rasmini kattalashtirish"
+            >
+              <Image
+                src={order.reference_image}
+                fittingType="fit"
+                className="w-full h-full object-contain"
+              />
+            </button>
+          </div>
+        )}
+
+        <div className="min-w-0 flex flex-col">
+          {/* Products */}
+          <div className="p-4 pt-0 sm:px-5 flex-1 min-h-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Mahsulotlar</div>
+            {items.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <ImageOff className="w-4 h-4" /> Mahsulotlar yuklanmoqda…
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 xl:grid-cols-2 gap-x-5 gap-y-2">
+                {items.map((it) => (
+                  <li key={it.id} className="flex items-start gap-2.5">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
+                      {it.product_image_snapshot ? (
+                        <Image src={it.product_image_snapshot} fittingType="fill" className="w-full h-full" />
+                      ) : (
+                        <span className="text-sm font-medium text-muted-foreground">{(it.product_name_snapshot || '?')[0]}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium leading-snug">{it.product_name_snapshot}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {it.quantity} {unitLabel(it.unit_snapshot)}
+                        {it.category_name_snapshot ? ` · ${it.category_name_snapshot}` : ''}
+                      </div>
+                      {it.customization_note && (
+                        <div className="text-xs text-brand-ink mt-0.5">✎ {it.customization_note}</div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {order.notes && (
+              <div className="mt-3 rounded-xl bg-secondary/50 border border-border p-2.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Umumiy izoh</div>
+                <div className="text-sm leading-snug whitespace-pre-wrap">{order.notes}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="p-4 sm:px-5 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
+            <Button
+              variant={isReady ? 'secondary' : 'outline'}
+              size="lg"
+              disabled={busy || isReady}
+              onClick={onReady}
+              className="h-12 text-sm sm:text-base"
+            >
+              {isReady ? <CheckCircle2 className="w-5 h-5 text-brand-olive" /> : busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+              Tayyor bo‘ldi
+            </Button>
+            <Button
+              size="lg"
+              disabled={busy || !isReady}
+              onClick={onShip}
+              className="h-12 text-sm sm:text-base"
+            >
+              {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
+              Yuborildi
+            </Button>
+          </div>
         </div>
-      )}
-
-      {/* Products */}
-      <div className="p-4 pt-3 flex-1 min-h-0">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Mahsulotlar</div>
-        {items.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <ImageOff className="w-4 h-4" /> Mahsulotlar yuklanmoqda…
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {items.map((it) => (
-              <li key={it.id} className="flex items-start gap-2.5">
-                <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
-                  {it.product_image_snapshot ? (
-                    <Image src={it.product_image_snapshot} fittingType="fill" className="w-full h-full" />
-                  ) : (
-                    <span className="text-sm font-medium text-muted-foreground">{(it.product_name_snapshot || '?')[0]}</span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium leading-snug">{it.product_name_snapshot}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {it.quantity} {unitLabel(it.unit_snapshot)}
-                    {it.category_name_snapshot ? ` · ${it.category_name_snapshot}` : ''}
-                  </div>
-                  {it.customization_note && (
-                    <div className="text-xs text-brand-ink mt-0.5">✎ {it.customization_note}</div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {order.notes && (
-          <div className="mt-3 rounded-xl bg-secondary/50 border border-border p-2.5">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Umumiy izoh</div>
-            <div className="text-sm leading-snug whitespace-pre-wrap">{order.notes}</div>
-          </div>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="p-4 pt-2 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
-        <Button
-          variant={isReady ? 'secondary' : 'outline'}
-          size="lg"
-          disabled={busy || isReady}
-          onClick={onReady}
-          className="h-12 text-base"
-        >
-          {isReady ? <CheckCircle2 className="w-5 h-5 text-brand-olive" /> : busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-          Tayyor bo‘ldi
-        </Button>
-        <Button
-          size="lg"
-          disabled={busy || !isReady}
-          onClick={onShip}
-          className="h-12 text-base"
-        >
-          {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
-          Yuborildi
-        </Button>
       </div>
     </div>
   );
