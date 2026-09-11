@@ -2,8 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Minus, Plus, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { remainingForItem, unitLabel } from '@/lib/shop-demand';
 import { formatNum } from '@/lib/pos';

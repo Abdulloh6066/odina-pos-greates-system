@@ -6,8 +6,7 @@ import OdinaSelect from '@/components/ui/odina-select';
 import ShopDemandCard from '@/components/shop-demand/ShopDemandCard';
 import ShopDemandForm from '@/components/shop-demand/ShopDemandForm';
 import { useShopDemand } from '@/components/shop-demand/useShopDemand';
-import { DEMAND_STATUSES, displayDate, sortRequests } from '@/lib/shop-demand';
-import { formatNum } from '@/lib/pos';
+import { DEMAND_STATUSES, sortRequests } from '@/lib/shop-demand';
 
 export default function ShopDemandPanel({ user, products, locations }) {
   const { requests, itemsByRequest, loading, error, reload, create, update, cancel, accept, progress, send, safe } = useShopDemand(user);

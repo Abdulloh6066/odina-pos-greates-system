@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { unitLabel } from '@/lib/shop-demand';
-import { formatNum } from '@/lib/pos';
 
 export default function ShopDemandForm({ open, onClose, user, shopName, products, editing, onSubmit }) {
   const [requiredDate, setRequiredDate] = useState('');

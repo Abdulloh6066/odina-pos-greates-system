@@ -3,7 +3,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Edit3, Loader2, PackageCheck, Send, Truck, XOctagon, Warehouse,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { demandStatus, displayDate, remainingForItem, sentPieces, unitLabel } from '@/lib/shop-demand';
+import { demandStatus, displayDate, remainingForItem, unitLabel } from '@/lib/shop-demand';
 import { formatNum } from '@/lib/pos';
 import ShopDemandSendDialog from '@/components/shop-demand/ShopDemandSendDialog';
 
