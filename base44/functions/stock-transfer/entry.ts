@@ -1,6 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-
-const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
+import { APP_ROLES, userLabel, userRole, userShopId, userShopName } from "../../shared/user-helpers.ts";
 const TRANSFER_VIEW_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const TRANSFER_ACTION_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
 
@@ -11,16 +10,7 @@ const cleanNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? Math.round(parsed * 1000) / 1000 : NaN;
 };
 
-const userLabel = (user: any) => user.full_name || user.email || "Noma’lum xodim";
-const userRole = (user: any) => {
-  const rootRole = String(user?.role || "");
-  const nestedRole = String(user?.data?.role || "");
-  if (APP_ROLES.has(rootRole)) return rootRole;
-  if (APP_ROLES.has(nestedRole)) return nestedRole;
-  return rootRole || nestedRole;
-};
-const userShopId = (user: any) => String(user?.shop_id || user?.data?.shop_id || "");
-const userShopName = (user: any) => String(user?.shop_name || user?.data?.shop_name || "");
+
 
 const resolveAppUser = async (service: any, authenticatedUser: any) => {
   let storedUser: any = null;

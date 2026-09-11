@@ -1,0 +1,123 @@
+{
+  "name": "StockCount",
+  "type": "object",
+  "properties": {
+    "count_number": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "submitted",
+        "approved",
+        "cancelled"
+      ],
+      "default": "draft"
+    },
+    "total_items": {
+      "type": "number",
+      "default": 0
+    },
+    "counted_items": {
+      "type": "number",
+      "default": 0
+    },
+    "difference_items": {
+      "type": "number",
+      "default": 0
+    },
+    "net_difference": {
+      "type": "number",
+      "default": 0
+    },
+    "counted_by_id": {
+      "type": "string"
+    },
+    "counted_by_name": {
+      "type": "string"
+    },
+    "submitted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approved_by_id": {
+      "type": "string"
+    },
+    "approved_by_name": {
+      "type": "string"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approval_request_id": {
+      "type": "string"
+    },
+    "cancelled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "count_number",
+    "location_id",
+    "location_name",
+    "status",
+    "counted_by_id",
+    "counted_by_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        },
+        {
+          "data.location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

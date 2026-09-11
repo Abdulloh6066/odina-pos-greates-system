@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
+import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, ClipboardCheck, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
 import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 import ProductionPanel from '@/components/warehouse/ProductionPanel';
+import StockCountPanel from '@/components/warehouse/StockCountPanel';
 import { TEST_PRODUCT_IDS } from '@/lib/test-catalog-cleanup';
 
 const TABS = [
@@ -23,6 +24,7 @@ const TABS = [
   { id: 'recipes', label: 'Retseptlar', icon: BookOpen, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'production', label: 'Ishlab chiqarish', icon: ChefHat, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { id: 'count', label: 'Ombor sanog‘i', icon: ClipboardCheck, roles: ['admin', 'manager', 'cashier', 'accountant'] },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
@@ -426,6 +428,8 @@ export default function Warehouse() {
               search={search}
               onReload={load}
             />
+          ) : tab === 'count' ? (
+            <StockCountPanel user={user} location={selectedLocationRecord} locations={locations} />
           ) : (
             <>
               {tab === 'products' && selectedLocationRecord?.location_type === 'production' && visibleTabs.some((item) => item.id === 'production') && (

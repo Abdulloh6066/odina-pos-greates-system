@@ -6,7 +6,7 @@ import ts from 'typescript';
 import vm from 'node:vm';
 
 function loadEngine() {
-  const url = new URL('../base44/shared/cost-engine.ts', import.meta.url);
+  const url = new URL('../../base44/shared/cost-engine.ts', import.meta.url);
   const src = readFileSync(url, 'utf8');
   const js = ts.transpileModule(src, {
     compilerOptions: { module: 'commonjs', target: 'es2020' },

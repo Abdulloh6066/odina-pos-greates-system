@@ -1,0 +1,128 @@
+{
+  "name": "StockCountItem",
+  "type": "object",
+  "properties": {
+    "stock_count_id": {
+      "type": "string"
+    },
+    "count_number": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "sheet"
+      ],
+      "default": "piece"
+    },
+    "system_quantity": {
+      "type": "number"
+    },
+    "system_version": {
+      "type": "string",
+      "description": "Qoldiq sanog'i boshlanganda olingan updated_date/updated_date surati"
+    },
+    "counted_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "was_counted": {
+      "type": "boolean",
+      "default": false,
+      "description": "Maydon to'ldirilgan = sanalgan. Bo'sh = sanalmagan (nol emas)."
+    },
+    "difference": {
+      "type": "number",
+      "default": 0
+    },
+    "reason": {
+      "type": "string"
+    },
+    "item_order": {
+      "type": "integer",
+      "default": 0
+    },
+    "applied": {
+      "type": "boolean",
+      "default": false
+    },
+    "stale": {
+      "type": "boolean",
+      "default": false,
+      "description": "Qoldiq sanog'dan keyin o'zgargan \u2014 qayta sanash kerak"
+    },
+    "movement_id": {
+      "type": "string"
+    },
+    "applied_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "stock_count_id",
+    "location_id",
+    "product_id",
+    "product_name_snapshot",
+    "unit",
+    "system_quantity"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        },
+        {
+          "data.location_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

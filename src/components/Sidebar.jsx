@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
   Circle, Clock, ClipboardList, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
-  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp,
+  ReceiptText, Settings, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp, ClipboardCheck,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
@@ -27,6 +27,7 @@ const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-recipes', label: 'Retseptlar', path: '/warehouse?tab=recipes', icon: BookOpen, tab: 'recipes', roles: ['admin', 'manager', 'accountant', 'production'] },
   { key: 'warehouse-production', label: 'Ishlab chiqarish', path: '/warehouse?tab=production', icon: ChefHat, tab: 'production', roles: ['admin', 'manager', 'accountant', 'production'] },
   { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { key: 'warehouse-count', label: 'Ombor sanog‘i', path: '/warehouse?tab=count', icon: ClipboardCheck, tab: 'count', roles: ['admin', 'manager', 'cashier', 'accountant'] },
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];
 
