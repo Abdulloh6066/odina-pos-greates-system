@@ -48,7 +48,11 @@ export default function WasteBatchDialog({ open, initial, shops, stockItems, onC
   }, [open, initial]);
 
   const selected = Object.values(rows);
-  const visibleItems = items.filter((item) => String(item.product_name).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  // Keep uncertain rows visible even if a refresh no longer returns their stock.
+  const displayItems = [...items, ...selected
+    .filter((row) => !items.some((item) => item.product_id === row.product_id))
+    .map((row) => ({ product_id: row.product_id, product_name: row.product_name, quantity: 0 }))];
+  const visibleItems = displayItems.filter((item) => String(item.product_name).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const totalQuantity = selected.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
 
   const toggle = (item, checked) => {
