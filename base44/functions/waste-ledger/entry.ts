@@ -304,7 +304,7 @@ export default async function(req) {
       }
 
       const productId = String(body?.product_id || "");
-      const quantity = cleanNumber(body?.quantity);
+      const quantity = Number(body?.quantity);
       const reasonCode = String(body?.reason_code || "");
       const notes = String(body?.notes || "").trim().slice(0, 2000);
       const photoUrl = String(body?.photo_url || "").trim().slice(0, 3000);
@@ -314,7 +314,7 @@ export default async function(req) {
         || typeof body?.expected_stock_version !== "string")) {
         return Response.json({ error: "So‘rov noto‘g‘ri. Mahsulotni qayta tanlang." }, { status: 400 });
       }
-      if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+      if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0) {
         return Response.json({ error: "Mahsulot va musbat butun dona sonini kiriting." }, { status: 400 });
       }
       if (!REASON_LABELS[reasonCode]) {
