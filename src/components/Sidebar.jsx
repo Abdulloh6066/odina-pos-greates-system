@@ -9,6 +9,7 @@ import OdinaBrand from '@/components/brand/OdinaBrand';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
@@ -18,7 +19,9 @@ const ICONS = {
 
 const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
 const SCREENS_CHILDREN = [
-  { key: 'production-screen', label: 'Ishlab chiqarish ekrani', path: '/production-screen', icon: ChefHat, roles: ['admin', 'production'] },
+  { key: 'launch-pos', label: 'Kassada ochish', path: '/pos', icon: ShoppingCart, roles: ['admin', 'cashier'] },
+  { key: 'launch-warehouse', label: 'Omborda ochish', path: '/warehouse', icon: Warehouse, roles: ['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse'] },
+  { key: 'launch-production', label: 'Ishlab chiqarish ekranini ochish', path: '/production-screen', icon: ChefHat, roles: ['admin', 'production'] },
 ];
 const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
@@ -180,17 +183,45 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
           }
 
           if (item.key === 'screens') {
-            return renderGroup({
-              item,
-              active: screensActive,
-              open: screensOpen,
-              setOpen: setScreensOpen,
-              ParentIcon: Monitor,
-              children: SCREENS_CHILDREN.filter((child) => !child.roles || child.roles.includes(role)).map((child) => ({
-                ...child,
-                active: location.pathname === child.path,
-              })),
-            });
+            const screenChildren = SCREENS_CHILDREN.filter((child) => !child.roles || child.roles.includes(role));
+            if (screenChildren.length === 0) return null;
+            return (
+              <div key={item.key}>
+                <div data-active={screensActive} className={`odina-nav-group flex items-center rounded-xl border transition-colors ${screensActive ? 'bg-brand-olive/20 border-brand-olive/35 text-foreground' : 'border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (collapsed) { onToggle(); setScreensOpen(true); }
+                      else setScreensOpen((current) => !current);
+                    }}
+                    title={collapsed ? item.label : undefined}
+                    aria-label={item.label}
+                    aria-expanded={screensOpen}
+                    className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D0B17F] focus-visible:ring-inset ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                  >
+                    <Monitor className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
+                    <span className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+                    <span aria-hidden="true" className={`ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${collapsed ? 'lg:hidden' : ''}`}>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${screensOpen ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+                </div>
+                {screensOpen && (
+                  <div className={`odina-nav-children ml-5 mt-1 mb-2 pl-2 border-l-2 border-brand-sand/60 space-y-1 ${collapsed ? 'lg:hidden' : ''}`}>
+                    {screenChildren.map((child) => (
+                      <ScreenLaunchButton
+                        key={child.key}
+                        to={child.path}
+                        label={child.label}
+                        icon={child.icon}
+                        active={location.pathname === child.path}
+                        onAfterOpen={onClose}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
           }
 
           return renderRegularItem(item);
