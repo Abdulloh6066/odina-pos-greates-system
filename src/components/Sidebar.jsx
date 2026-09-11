@@ -49,6 +49,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
   const [kassaOpen, setKassaOpen] = useState(kassaActive);
   const [warehouseOpen, setWarehouseOpen] = useState(warehouseActive);
   const [screensOpen, setScreensOpen] = useState(screensActive);
+  const [blockedScreens, setBlockedScreens] = useState({});
 
   useEffect(() => {
     if (kassaActive) setKassaOpen(true);
@@ -216,6 +217,13 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
                         icon={child.icon}
                         active={location.pathname === child.path}
                         onAfterOpen={onClose}
+                        blocked={Boolean(blockedScreens[child.key])}
+                        onBlocked={() => setBlockedScreens((prev) => ({ ...prev, [child.key]: true }))}
+                        onClear={() => setBlockedScreens((prev) => {
+                          const next = { ...prev };
+                          delete next[child.key];
+                          return next;
+                        })}
                       />
                     ))}
                   </div>

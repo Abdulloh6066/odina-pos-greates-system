@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,15 +13,14 @@ import { Button } from '@/components/ui/button';
  * No global screen selection is stored: each tab keeps its own route, so
  * Kassa, Ombor and Ishlab chiqarish can stay open in separate tabs at once.
  */
-export default function ScreenLaunchButton({ to, label, icon: Icon, active, onAfterOpen }) {
-  const [blocked, setBlocked] = useState(false);
+export default function ScreenLaunchButton({ to, label, icon: Icon, active, onAfterOpen, blocked, onBlocked, onClear }) {
   const url = `${window.location.origin}${to}`;
 
   const handleOpen = (e) => {
     e.preventDefault();
     const win = window.open(url, '_blank', 'noopener,noreferrer');
     if (!win) {
-      setBlocked(true);
+      onBlocked?.();
       return;
     }
     onAfterOpen?.();
@@ -50,7 +49,7 @@ export default function ScreenLaunchButton({ to, label, icon: Icon, active, onAf
           type="button"
           variant="outline"
           aria-label="Yopish"
-          onClick={() => setBlocked(false)}
+          onClick={onClear}
           className="w-full min-h-11 h-11 border-red-200 text-red-700 hover:bg-red-100 hover:text-red-800"
         >
           Yopish
