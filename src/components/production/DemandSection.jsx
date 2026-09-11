@@ -3,7 +3,7 @@ import { CalendarDays, ChefHat, ClipboardList, Loader2, RefreshCw } from 'lucide
 import { Button } from '@/components/ui/button';
 import { useShopDemand } from '@/components/shop-demand/useShopDemand';
 import ShopDemandCard from '@/components/shop-demand/ShopDemandCard';
-import { aggregateByProduct, displayDate, groupByDateAndShop, unitLabel } from '@/lib/shop-demand';
+import { aggregateByProduct, displayDate, groupByDateAndShop } from '@/lib/shop-demand';
 import { formatNum } from '@/lib/pos';
 
 export default function DemandSection({ user, products }) {
