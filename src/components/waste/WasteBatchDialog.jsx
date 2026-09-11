@@ -185,10 +185,12 @@ export default function WasteBatchDialog({ open, initial, shops, stockItems, onC
                   <span className="font-bold shrink-0">{formatNum(row.quantity)} dona</span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{WASTE_REASONS.find((reason) => reason.value === row.reason_code)?.label}</p>
+                {(row.attempt ? row.attempt.notes : notes) && (
+                  <p className="mt-1 text-sm text-muted-foreground break-words">Izoh: {row.attempt ? row.attempt.notes : notes}</p>
+                )}
                 {row.error && <p role="alert" className="mt-2 text-sm text-red-700">{row.error}</p>}
               </div>
             ))}
-            {notes && <p className="text-sm text-muted-foreground break-words">Izoh: {notes}</p>}
           </div>
         ) : (
           <div className="space-y-4">
