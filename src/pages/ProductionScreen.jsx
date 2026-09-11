@@ -9,6 +9,9 @@ import { useToast } from '@/components/ui/use-toast';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
+import { useOrderAlerts } from '@/hooks/useOrderAlerts';
+import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
+import OrderDetail from '@/components/orders/OrderDetail';
 import {
   ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays,
 } from 'lucide-react';
@@ -135,8 +138,10 @@ function ProductionScreenInner() {
   const [busyId, setBusyId] = useState('');
   const [confirm, setConfirm] = useState(null);
   const [preview, setPreview] = useState('');
+  const [detailOrder, setDetailOrder] = useState(null);
   const [clock, setClock] = useState(clockStr());
   const loadedOnce = useRef(false);
+  const { alerts, counts } = useOrderAlerts(active);
 
   const loadOrders = async () => {
     try {
@@ -302,6 +307,7 @@ function ProductionScreenInner() {
           </div>
         ) : (
           <div className="space-y-8">
+            <OrderAlertSummary alerts={alerts} counts={counts} onOpen={(o) => setDetailOrder(o)} />
             {visibleDays.map((day) => (
               <OrderDaySection
                 key={day.key}
@@ -393,6 +399,13 @@ function ProductionScreenInner() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <OrderDetail
+        order={detailOrder}
+        onClose={() => setDetailOrder(null)}
+        onPaid={() => load()}
+        onRepeat={() => setDetailOrder(null)}
+      />
     </div>
   );
 }

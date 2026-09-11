@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import OrderForm from '@/components/orders/OrderForm';
 import OrderDetail from '@/components/orders/OrderDetail';
+import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
+import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import { ClipboardList, Plus, Search, Filter, Calendar, Phone, MapPin, Store, Repeat2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -50,6 +52,7 @@ export default function Orders() {
   const [formOpen, setFormOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
+  const { alerts, counts } = useOrderAlerts(orders);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -149,6 +152,8 @@ export default function Orders() {
           </div>
         </div>
       </div>
+
+      <OrderAlertSummary alerts={alerts} counts={counts} onOpen={(o) => setDetailOrder(o)} loading={loading} />
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-secondary border-t-primary rounded-full animate-spin" /></div>
