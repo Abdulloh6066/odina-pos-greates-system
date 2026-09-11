@@ -2,6 +2,10 @@
   "name": "WasteRecord",
   "type": "object",
   "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "Client request identifier for safe retry of the same waste operation."
+    },
     "waste_number": {
       "type": "string"
     },
