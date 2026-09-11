@@ -10,24 +10,15 @@ import {
 import { formatNum, formatUZS } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
-
-const REASONS = [
-  { value: 'expired', label: '3 kundan oshgan' },
-  { value: 'damaged', label: 'Shikastlangan' },
-  { value: 'quality', label: 'Sifati buzilgan' },
-  { value: 'other', label: 'Boshqa sabab' },
-];
+import WasteBatchDialog from '@/components/waste/WasteBatchDialog';
+import { wasteDateTime as dateTime } from '@/lib/waste';
 
 const emptyContext = {
   shops: [],
   stock_items: [],
   expired_items: [],
+  near_expiry_items: [],
   waste_records: [],
   summary: {},
 };
@@ -36,15 +27,6 @@ const payloadOf = (result) => result?.data || result || {};
 const errorText = (error, fallback) => (
   error?.response?.data?.error || error?.data?.error || error?.message || fallback
 );
-
-const dateTime = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('uz-UZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-};
 
 export default function Waste() {
   const { user } = useOutletContext();
@@ -57,6 +39,7 @@ export default function Waste() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [prefill, setPrefill] = useState(null);
   const [cancellingId, setCancellingId] = useState('');
+  const [expiryFilter, setExpiryFilter] = useState('expired');
 
   const load = async ({ quiet = false } = {}) => {
     quiet ? setRefreshing(true) : setLoading(true);
@@ -88,12 +71,19 @@ export default function Waste() {
     context.expired_items.filter((item) => item.location_id === locationId)
   ), [context.expired_items, locationId]);
 
+  const locationNearExpiry = useMemo(() => (
+    context.near_expiry_items.filter((item) => item.location_id === locationId)
+  ), [context.near_expiry_items, locationId]);
+
+  const alertItems = expiryFilter === 'expired' ? locationExpired : locationNearExpiry;
+
   const locationRecords = useMemo(() => (
     context.waste_records.filter((record) => record.location_id === locationId)
   ), [context.waste_records, locationId]);
 
   const locationSummary = useMemo(() => ({
     expiredTypes: locationExpired.length,
+    nearExpiryQuantity: locationNearExpiry.reduce((sum, item) => sum + Number(item.near_expiry_quantity || 0), 0),
     expiredQuantity: locationExpired.reduce((sum, item) => sum + Number(item.expired_quantity || 0), 0),
     wasteQuantity: locationRecords
       .filter((record) => record.status === 'recorded')
@@ -101,23 +91,25 @@ export default function Waste() {
     wasteValue: locationRecords
       .filter((record) => record.status === 'recorded')
       .reduce((sum, record) => sum + Number(record.total_retail_value || 0), 0),
-  }), [locationExpired, locationRecords]);
+  }), [locationExpired, locationNearExpiry, locationRecords]);
 
-  const openWaste = (item = null) => {
-    if (!item && locationStock.length === 0) {
+  const openWaste = (item = null, selectExpired = false) => {
+    if (locationStock.length === 0) {
       void odinaAlert('Bu do‘konda chiqitga chiqarish uchun mahsulot qoldig‘i yo‘q.');
       return;
     }
-    setPrefill(item ? {
-      location_id: item.location_id,
-      product_id: item.product_id,
-      quantity: String(Math.max(1, Number(item.expired_quantity || 1))),
-      reason_code: 'expired',
-    } : {
+    const selectedItems = selectExpired ? locationExpired : item ? [item] : [];
+    if (selectedItems.length > 50) {
+      void odinaAlert('Bir martada 50 tagacha tur tanlanadi. Chiqit kiritish oynasidan kerakli mahsulotlarni belgilang.');
+      return;
+    }
+    setPrefill({
       location_id: locationId,
-      product_id: locationStock[0]?.product_id || '',
-      quantity: '1',
-      reason_code: 'damaged',
+      items: selectedItems.map((entry) => ({
+        product_id: entry.product_id,
+        quantity: entry.expired_quantity > 0 ? entry.expired_quantity : 1,
+        reason_code: entry.expired_quantity > 0 ? 'expired' : 'damaged',
+      })),
     });
     setDialogOpen(true);
   };
@@ -153,7 +145,7 @@ export default function Waste() {
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Chiqitlar"
-        subtitle="Do‘kondagi tayyor mahsulotlar va 3 kunlik nazorat"
+        subtitle="Muddat nazorati va mahsulotlarni birgalikda hisobdan chiqarish"
         icon={Trash2}
         actions={(
           <div className="flex gap-2">
@@ -161,7 +153,7 @@ export default function Waste() {
               <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Yangilash</span>
             </Button>
-            <Button onClick={() => openWaste()} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+            <Button onClick={() => openWaste()} disabled={loading || !locationStock.length} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
               <Plus className="w-4 h-4 mr-1.5" /> Chiqit kiritish
             </Button>
           </div>
@@ -176,8 +168,8 @@ export default function Waste() {
           <div>
             <h2 className="font-semibold">3 kunlik mahsulot nazorati</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Transfer do‘konda qabul qilinganidan 72 soat o‘tgach qolgan mahsulot bu yerda ogohlantirish sifatida chiqadi.
-              Masalliqlar va markaziy ombordagi mahsulotlar avtomatik chiqit hisoblanmaydi.
+              Nazorat muddati — transfer do‘konda qabul qilinganidan 72 soat. Muddati o‘tgan va keyingi 24 soatda tugaydigan qoldiqlar ko‘rsatiladi.
+              Hisobdan chiqarish siz mahsulot va miqdorlarni tasdiqlaganingizda bajariladi.
             </p>
           </div>
         </div>
@@ -204,50 +196,74 @@ export default function Waste() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <Metric icon={AlertTriangle} label="3 kundan oshgan turlar" value={`${formatNum(locationSummary.expiredTypes)} ta`} danger={locationSummary.expiredTypes > 0} />
+            <Metric icon={Clock3} label="24 soat ichida muddat" value={`${formatNum(locationSummary.nearExpiryQuantity)} dona`} />
             <Metric icon={PackageX} label="3 kundan oshgan mahsulot" value={`${formatNum(locationSummary.expiredQuantity)} dona`} danger={locationSummary.expiredQuantity > 0} />
             <Metric icon={Trash2} label="Jami faol chiqit" value={`${formatNum(locationSummary.wasteQuantity)} dona`} />
             <Metric icon={ImageIcon} label="Sotuv narxidagi qiymat" value={formatUZS(locationSummary.wasteValue)} />
           </div>
 
           <section className="mt-7">
-            <div className="flex items-end justify-between gap-3 mb-3">
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
               <div>
                 <p className="odina-page-eyebrow">NAZORAT</p>
-                <h2 className="font-display text-xl sm:text-2xl font-bold">3 kundan oshganlar</h2>
+                <h2 className="font-display text-xl sm:text-2xl font-bold">Mahsulotlar muddati</h2>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${locationExpired.length ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
-                {locationExpired.length ? `${locationExpired.length} tur` : 'Hammasi joyida'}
-              </span>
+              {expiryFilter === 'expired' && locationExpired.length > 0 && (
+                <Button variant="outline" onClick={() => openWaste(null, true)} className="min-h-11 rounded-xl">
+                  <Trash2 className="w-4 h-4 mr-2" /> Birgalikda chiqarish
+                </Button>
+              )}
+            </div>
+            <div role="group" aria-label="Muddat bo‘yicha ro‘yxat" className="flex flex-wrap gap-2 mb-4">
+              <Button variant={expiryFilter === 'expired' ? 'default' : 'outline'}
+                aria-pressed={expiryFilter === 'expired'} onClick={() => setExpiryFilter('expired')} className="min-h-11 rounded-xl">
+                <AlertTriangle className="w-4 h-4 mr-2" /> 3 kundan oshganlar · {locationExpired.length} tur
+              </Button>
+              <Button variant={expiryFilter === 'soon' ? 'default' : 'outline'}
+                aria-pressed={expiryFilter === 'soon'} onClick={() => setExpiryFilter('soon')} className="min-h-11 rounded-xl">
+                <Clock3 className="w-4 h-4 mr-2" /> Keyingi 24 soatda · {locationNearExpiry.length} tur
+              </Button>
             </div>
 
-            {locationExpired.length === 0 ? (
+            {alertItems.length === 0 ? (
               <div className="odina-panel rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 text-center">
                 <CheckCircle2 className="w-9 h-9 text-emerald-600 mx-auto mb-2" />
-                <p className="font-semibold text-emerald-800">3 kundan oshgan qoldiq yo‘q</p>
-                <p className="text-sm text-emerald-700/75 mt-1">Yangi transferlar qabul qilingan vaqt bo‘yicha avtomatik tekshiriladi.</p>
+                <p className="font-semibold text-emerald-800">
+                  {expiryFilter === 'expired' ? '3 kundan oshgan qoldiq yo‘q' : '24 soat ichida muddati tugaydigan qoldiq yo‘q'}
+                </p>
+                <p className="text-sm text-emerald-700/75 mt-1">Hisob transferning qabul qilingan vaqtiga asoslanadi.</p>
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {locationExpired.map((item) => (
-                  <div key={`${item.location_id}:${item.product_id}`} className="odina-panel overflow-hidden rounded-2xl border border-red-200 bg-card premium-shadow">
+                {alertItems.map((item) => (
+                  <div key={`${item.location_id}:${item.product_id}`}
+                    className={`odina-panel overflow-hidden rounded-2xl border bg-card premium-shadow ${expiryFilter === 'expired' ? 'border-red-200' : 'border-brand-sand/60'}`}>
                     <div className="flex gap-3 p-4">
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
                         {item.image_url
-                          ? <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-red-400"><PackageX className="w-6 h-6" /></div>}
+                          ? <img src={item.image_url} alt={item.product_name} className="w-full h-full object-contain" />
+                          : <div className="w-full h-full flex items-center justify-center text-muted-foreground"><PackageX className="w-6 h-6" /></div>}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold truncate">{item.product_name}</h3>
-                        <p className="text-sm text-red-700 font-semibold mt-1">{formatNum(item.expired_quantity)} dona · {item.age_days} kun</p>
-                        <p className="text-xs text-muted-foreground mt-1">Qabul: {dateTime(item.oldest_expired_at)}</p>
+                        <h3 className="font-semibold break-words">{item.product_name}</h3>
+                        <p className={`text-sm font-semibold mt-1 ${expiryFilter === 'expired' ? 'text-red-700' : 'text-brand-ink'}`}>
+                          {formatNum(expiryFilter === 'expired' ? item.expired_quantity : item.near_expiry_quantity)} dona
+                          {expiryFilter === 'expired' ? ` · ${item.age_days} kun` : ' · muddat yaqin'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {expiryFilter === 'expired'
+                            ? `Qabul: ${dateTime(item.oldest_expired_at)}`
+                            : `Muddat: ${dateTime(item.next_expires_at)}`}
+                        </p>
                       </div>
                     </div>
-                    <div className="px-4 pb-4">
-                      <Button onClick={() => openWaste(item)} className="w-full min-h-11 rounded-xl bg-red-600 text-white hover:bg-red-700 touch-manipulation">
-                        <Trash2 className="w-4 h-4 mr-1.5" /> Chiqitga chiqarish
-                      </Button>
-                    </div>
+                    {expiryFilter === 'expired' && (
+                      <div className="px-4 pb-4">
+                        <Button onClick={() => openWaste(item)} className="w-full min-h-11 rounded-xl bg-red-600 text-white hover:bg-red-700 touch-manipulation">
+                          <Trash2 className="w-4 h-4 mr-1.5" /> Chiqitga chiqarish
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -281,12 +297,12 @@ export default function Waste() {
         </>
       )}
 
-      <WasteDialog
+      <WasteBatchDialog
         open={dialogOpen}
         initial={prefill}
         shops={context.shops}
         stockItems={context.stock_items}
-        role={role}
+        onUpdated={() => load({ quiet: true })}
         onClose={() => setDialogOpen(false)}
         onSaved={async () => {
           setDialogOpen(false);
@@ -352,180 +368,4 @@ function WasteRow({ record, canCancel, cancelling, onCancel }) {
   );
 }
 
-function WasteDialog({ open, initial, shops, stockItems, role, onClose, onSaved }) {
-  const [locationId, setLocationId] = useState('');
-  const [productId, setProductId] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [reasonCode, setReasonCode] = useState('damaged');
-  const [notes, setNotes] = useState('');
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setLocationId(initial?.location_id || shops[0]?.id || '');
-    setProductId(initial?.product_id || '');
-    setQuantity(initial?.quantity || '1');
-    setReasonCode(initial?.reason_code || 'damaged');
-    setNotes('');
-    setPhotoUrl('');
-  }, [open, initial, shops]);
-
-  const items = useMemo(() => (
-    stockItems.filter((item) => item.location_id === locationId)
-      .sort((a, b) => String(a.product_name).localeCompare(String(b.product_name)))
-  ), [stockItems, locationId]);
-
-  useEffect(() => {
-    if (!open || (productId && items.some((item) => item.product_id === productId))) return;
-    setProductId(items[0]?.product_id || '');
-  }, [open, locationId, items, productId]);
-
-  const selected = items.find((item) => item.product_id === productId);
-
-  useEffect(() => {
-    if (!selected) return;
-    if (reasonCode === 'expired' && !selected.expired_quantity) setReasonCode('damaged');
-    if (Number(quantity) > Number(selected.quantity || 0)) setQuantity('1');
-  }, [selected?.product_id, selected?.quantity, selected?.expired_quantity, reasonCode, quantity]);
-
-  const uploadPhoto = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setPhotoUrl(file_url || '');
-    } catch (error) {
-      void odinaAlert(errorText(error, 'Rasmni yuklab bo‘lmadi.'));
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
-  };
-
-  const save = async () => {
-    if (!locationId || !productId || !Number.isInteger(Number(quantity)) || Number(quantity) <= 0) {
-      void odinaAlert('Do‘kon, mahsulot va musbat butun dona sonini kiriting.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const result = await base44.functions.invoke('waste-ledger', {
-        action: 'create_waste',
-        location_id: locationId,
-        product_id: productId,
-        quantity: Number(quantity),
-        reason_code: reasonCode,
-        notes: notes.trim() || undefined,
-        photo_url: photoUrl || undefined,
-      });
-      const payload = payloadOf(result);
-      if (!payload?.waste) throw new Error(payload?.error || 'Chiqitni saqlab bo‘lmadi.');
-      await onSaved();
-    } catch (error) {
-      void odinaAlert(errorText(error, 'Chiqitni saqlab bo‘lmadi.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && !saving && onClose()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">Chiqit kiritish</DialogTitle>
-          <DialogDescription>
-            Faqat do‘kondagi tayyor mahsulot qoldig‘i kamayadi. Owner PIN kerak emas.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {role !== 'cashier' && shops.length > 1 && (
-            <div>
-              <Label className="text-xs mb-1.5 block">Do‘kon</Label>
-              <OdinaSelect
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-                className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
-              >
-                {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
-              </OdinaSelect>
-            </div>
-          )}
-
-          <div>
-            <Label className="text-xs mb-1.5 block">Mahsulot</Label>
-            <OdinaSelect
-              value={productId}
-              onChange={(event) => setProductId(event.target.value)}
-              className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
-            >
-              {items.length === 0 && <option value="">Qoldiq mavjud emas</option>}
-              {items.map((item) => (
-                <option key={item.product_id} value={item.product_id}>
-                  {item.product_name} · {formatNum(item.quantity)} dona
-                </option>
-              ))}
-            </OdinaSelect>
-            {selected && (
-              <p className="text-xs text-muted-foreground mt-1.5">
-                Mavjud: {formatNum(selected.quantity)} dona
-                {selected.expired_quantity > 0 ? ` · 3 kundan oshgan: ${formatNum(selected.expired_quantity)} dona` : ''}
-              </p>
-            )}
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs mb-1.5 block">Miqdor (dona)</Label>
-              <Input type="number" min="1" step="1" max={selected?.quantity || undefined} value={quantity} onChange={(event) => setQuantity(event.target.value)} className="h-11" />
-            </div>
-            <div>
-              <Label className="text-xs mb-1.5 block">Sabab</Label>
-              <OdinaSelect value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm">
-                {REASONS.map((reason) => (
-                  <option key={reason.value} value={reason.value} disabled={reason.value === 'expired' && !selected?.expired_quantity}>
-                    {reason.label}
-                  </option>
-                ))}
-              </OdinaSelect>
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
-            <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={2000} placeholder="Masalan: qadoqlash vaqtida shikastlandi" className="min-h-24" />
-          </div>
-
-          <div>
-            <Label className="text-xs mb-1.5 block">Rasm (ixtiyoriy)</Label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <label className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-medium cursor-pointer hover:bg-secondary transition-colors touch-manipulation">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-                {uploading ? 'Yuklanmoqda…' : photoUrl ? 'Boshqa rasm' : 'Rasm yuklash'}
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={uploadPhoto} disabled={uploading || saving} />
-              </label>
-              {photoUrl && (
-                <div className="flex items-center gap-3 min-w-0 rounded-xl bg-secondary/70 p-2">
-                  <img src={photoUrl} alt="Chiqit rasmi" className="w-12 h-12 rounded-lg object-cover" />
-                  <span className="text-xs text-emerald-700 font-medium">Rasm tayyor</span>
-                  <button type="button" onClick={() => setPhotoUrl('')} className="ml-auto min-h-10 px-3 text-xs text-muted-foreground hover:text-foreground">Olib tashlash</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving || uploading}>Bekor qilish</Button>
-          <Button onClick={save} disabled={saving || uploading || !selected} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
-            {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
-            {saving ? 'Saqlanmoqda…' : 'Chiqitga chiqarish'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
