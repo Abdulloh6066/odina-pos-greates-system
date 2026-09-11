@@ -57,7 +57,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     required_date: '', required_time: '18:00', shop_id: user?.shop_id || '',
     fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
     cake_shape: '', reference_image: '', notes: '',
-    adjustment_amount: 0, adjustment_reason: '',
+    adjustment_amount: '', adjustment_reason: '',
     useAdvance: false, advance_method: 'cash', advance_amount: 0,
   }));
 
@@ -105,7 +105,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
         cake_shape: prefill.order.cake_shape || '',
         reference_image: prefill.order.reference_image || '',
         notes: prefill.order.notes || '',
-        adjustment_amount: 0, adjustment_reason: '',
+        adjustment_amount: '', adjustment_reason: '',
         useAdvance: false, advance_method: 'cash', advance_amount: 0,
       });
       setDateParts({ day: '', month: String(np.month), year: String(np.year) });
@@ -118,7 +118,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
       setDateParts({ day: '', month: String(np.month), year: String(np.year) });
       setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
         shop_id: user?.shop_id || '', fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
-        cake_shape: '', reference_image: '', notes: '', adjustment_amount: 0, adjustment_reason: '',
+        cake_shape: '', reference_image: '', notes: '', adjustment_amount: '', adjustment_reason: '',
         useAdvance: false, advance_method: 'cash', advance_amount: 0 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +161,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   }, 0), [items]);
 
   const deliveryFee = form.fulfilment_type === 'delivery' ? (isWedding ? 0 : Math.max(0, Number(form.delivery_fee || 0))) : 0;
-  const adjustment = Number(form.adjustment_amount || 0);
+  const adjustment = Number(form.adjustment_amount) || 0;
   const total = Math.max(0, subtotal + deliveryFee + adjustment);
   const advanceAmount = form.useAdvance ? Math.min(Number(form.advance_amount || 0), total) : 0;
   const remaining = total - advanceAmount;
@@ -221,7 +221,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     setAcceptanceStamp(tashkentNowStamp());
     setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
       shop_id: user?.shop_id || '', fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
-      cake_shape: '', reference_image: '', notes: '', adjustment_amount: 0, adjustment_reason: '',
+      cake_shape: '', reference_image: '', notes: '', adjustment_amount: '', adjustment_reason: '',
       useAdvance: false, advance_method: 'cash', advance_amount: 0 });
   };
 
@@ -387,7 +387,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border pt-4">
               <div>
                 <Label>Chegirma / Qo‘shimcha (UZS)</Label>
-                <Input type="number" value={form.adjustment_amount} onChange={(e) => update({ adjustment_amount: Number(e.target.value) })} className="mt-1" />
+                <Input type="number" value={form.adjustment_amount} onChange={(e) => update({ adjustment_amount: e.target.value })} placeholder="Masalan: 25000 yoki -25000" className="mt-1" />
               </div>
               <div>
                 <Label>Sabab (majburiy)</Label>
