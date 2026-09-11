@@ -9,6 +9,7 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('odina-sidebar-collapsed') === 'true');
   const location = useLocation();
+  const screenMode = location.pathname === '/pos' && new URLSearchParams(location.search).get('screen') === '1';
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
 
@@ -35,6 +36,16 @@ export default function Layout() {
     );
   }
 
+  if (screenMode) {
+    return (
+      <div className="min-h-dvh bg-background flex flex-col">
+        <main className="odina-workspace flex-1 min-w-0">
+          <Outlet context={{ user, sidebarCollapsed: false, reloadUser: checkUserAuth, screenMode: true }} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-background flex">
       <Sidebar
@@ -53,7 +64,7 @@ export default function Layout() {
           <div className="w-9" />
         </div>
         <main className="odina-workspace flex-1 min-w-0">
-          <Outlet context={{ user, sidebarCollapsed, reloadUser: checkUserAuth }} />
+          <Outlet context={{ user, sidebarCollapsed, reloadUser: checkUserAuth, screenMode: false }} />
         </main>
       </div>
     </div>

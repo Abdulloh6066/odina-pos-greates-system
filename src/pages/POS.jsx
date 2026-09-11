@@ -15,7 +15,7 @@ import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActi
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 export default function POS() {
-  const { user, sidebarCollapsed } = useOutletContext();
+  const { user, sidebarCollapsed, screenMode } = useOutletContext();
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState([]);
@@ -372,7 +372,7 @@ export default function POS() {
   };
 
   return (
-    <div className="odina-pos flex flex-col w-full max-w-full h-[calc(100dvh-3.5rem)] lg:h-dvh bg-background overflow-x-hidden">
+    <div className={`odina-pos flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
       {/* Header */}
       <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -406,7 +406,7 @@ export default function POS() {
         )}
       </div>
 
-      {wasteAlerts.length > 0 && (
+      {!screenMode && wasteAlerts.length > 0 && (
         <button
           type="button"
           onClick={() => navigate('/waste')}
@@ -496,7 +496,7 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className={`xl:hidden fixed left-0 ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
+      <div className={`xl:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
         <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-14 h-auto py-4 whitespace-normal text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>

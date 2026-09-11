@@ -19,7 +19,7 @@ const ICONS = {
 
 const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
 const SCREENS_CHILDREN = [
-  { key: 'launch-pos', label: 'Kassada ochish', path: '/pos', icon: ShoppingCart, roles: ['admin', 'cashier'] },
+  { key: 'launch-pos', label: 'Kassada ochish', path: '/pos?screen=1', icon: ShoppingCart, roles: ['admin', 'cashier'] },
   { key: 'launch-warehouse', label: 'Omborda ochish', path: '/warehouse', icon: Warehouse, roles: ['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse'] },
   { key: 'launch-production', label: 'Ishlab chiqarish ekranini ochish', path: '/production-screen', icon: ChefHat, roles: ['admin', 'production'] },
 ];
@@ -215,7 +215,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
                         to={child.path}
                         label={child.label}
                         icon={child.icon}
-                        active={location.pathname === child.path}
+                        active={location.pathname === child.path.split('?')[0]}
                         onAfterOpen={onClose}
                         blocked={Boolean(blockedScreens[child.key])}
                         onBlocked={() => setBlockedScreens((prev) => ({ ...prev, [child.key]: true }))}
