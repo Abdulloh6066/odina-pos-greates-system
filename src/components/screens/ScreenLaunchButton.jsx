@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 /**
  * Opens an existing app route in a new browser tab without navigating the
@@ -28,7 +29,10 @@ export default function ScreenLaunchButton({ to, label, icon: Icon, active, onAf
 
   if (blocked) {
     return (
-      <div className="odina-nav-child flex flex-col gap-1.5 min-h-11 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-900">
+      <div
+        role="alert"
+        className="odina-nav-child flex flex-col gap-2 min-h-11 px-3 py-3 rounded-xl bg-red-50 border border-red-200 text-red-900"
+      >
         <span className="text-[12px] leading-snug font-medium">
           Brauzer yangi oynani blokladi. Iltimos, quyidagi havolaga bosing:
         </span>
@@ -36,19 +40,21 @@ export default function ScreenLaunchButton({ to, label, icon: Icon, active, onAf
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-[13px] font-semibold text-brand-ink hover:underline"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl px-1 py-1.5 text-[13px] font-semibold text-brand-ink hover:underline"
         >
           <Icon className="w-4 h-4 shrink-0" strokeWidth={2} />
           <span className="min-w-0 break-words">{label}</span>
           <ExternalLink className="w-3.5 h-3.5 shrink-0" />
         </a>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          aria-label="Yopish"
           onClick={() => setBlocked(false)}
-          className="self-start text-[12px] font-medium text-red-700 hover:underline"
+          className="w-full min-h-11 h-11 border-red-200 text-red-700 hover:bg-red-100 hover:text-red-800"
         >
           Yopish
-        </button>
+        </Button>
       </div>
     );
   }

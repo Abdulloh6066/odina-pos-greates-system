@@ -197,7 +197,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
                     title={collapsed ? item.label : undefined}
                     aria-label={item.label}
                     aria-expanded={screensOpen}
-                    className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D0B17F] focus-visible:ring-inset ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                    className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-sm font-semibold cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D0B17F] focus-visible:ring-inset ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}
                   >
                     <Monitor className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
                     <span className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
