@@ -4,7 +4,8 @@ const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "product
 const VIEW_ROLES = new Set(["admin", "manager", "cashier"]);
 const WRITE_ROLES = new Set(["admin", "manager", "cashier"]);
 const CANCEL_ROLES = new Set(["admin", "manager"]);
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const THREE_DAYS_MS = 3 * DAY_MS;
 const REASON_LABELS: Record<string, string> = {
   expired: "3 kundan oshgan",
   damaged: "Shikastlangan",
@@ -70,6 +71,8 @@ const stockKey = (locationId: string, productId: string) => `${locationId}:${pro
 const ageSummary = (stock: any, transfers: any[], nowMs: number) => {
   let unallocated = Math.max(0, cleanNumber(stock?.quantity || 0));
   let expiredQuantity = 0;
+  let nearExpiryQuantity = 0;
+  let nextExpiryTime = Number.POSITIVE_INFINITY;
   let trackedQuantity = 0;
   let oldestReceivedAt = "";
   let oldestExpiredAt = "";
@@ -104,12 +107,17 @@ const ageSummary = (stock: any, transfers: any[], nowMs: number) => {
         oldestExpiredTime = receivedTime;
         oldestExpiredAt = new Date(receivedTime).toISOString();
       }
+    } else if (receivedTime + THREE_DAYS_MS <= nowMs + DAY_MS) {
+      nearExpiryQuantity += allocated;
+      nextExpiryTime = Math.min(nextExpiryTime, receivedTime + THREE_DAYS_MS);
     }
   }
 
   const referenceTime = Number.isFinite(oldestExpiredTime) ? oldestExpiredTime : oldestTime;
   return {
     expired_quantity: cleanNumber(expiredQuantity),
+    near_expiry_quantity: cleanNumber(nearExpiryQuantity),
+    next_expires_at: Number.isFinite(nextExpiryTime) ? new Date(nextExpiryTime).toISOString() : null,
     tracked_quantity: cleanNumber(trackedQuantity),
     untracked_quantity: cleanNumber(unallocated),
     oldest_received_at: oldestReceivedAt || null,
@@ -174,6 +182,7 @@ const loadContext = async (service: any, user: any) => {
       product_id: stock.product_id,
       product_name: stock.product_name || product.name,
       quantity: cleanNumber(stock.quantity),
+      stock_version: String(stock.updated_date || stock.updated_at || ""),
       image_url: product.image_url || "",
       price: money(product.price),
       ...age,
@@ -186,16 +195,22 @@ const loadContext = async (service: any, user: any) => {
       (b.age_days || 0) - (a.age_days || 0)
       || String(a.product_name).localeCompare(String(b.product_name))
     );
+  const nearExpiryItems = stockItems
+    .filter((item: any) => item.near_expiry_quantity > 0)
+    .sort((a: any, b: any) => Date.parse(a.next_expires_at) - Date.parse(b.next_expires_at));
   const records = (allRecords || []).filter((record: any) => allowedIds.has(record.location_id));
 
   return {
     shops,
     stock_items: stockItems,
     expired_items: expiredItems,
+    near_expiry_items: nearExpiryItems,
     waste_records: records,
     expiry_days: 3,
     generated_at: new Date(nowMs).toISOString(),
     summary: {
+      near_expiry_product_types: nearExpiryItems.length,
+      near_expiry_quantity: nearExpiryItems.reduce((sum: number, item: any) => sum + item.near_expiry_quantity, 0),
       expired_product_types: expiredItems.length,
       expired_quantity: expiredItems.reduce(
         (sum: number, item: any) => sum + cleanNumber(item.expired_quantity), 0,
@@ -267,6 +282,7 @@ export default async function(req) {
       if (action === "get_alerts") {
         return Response.json({
           expired_items: context.expired_items,
+          near_expiry_items: context.near_expiry_items,
           summary: context.summary,
           expiry_days: context.expiry_days,
           generated_at: context.generated_at,
@@ -292,6 +308,12 @@ export default async function(req) {
       const reasonCode = String(body?.reason_code || "");
       const notes = String(body?.notes || "").trim().slice(0, 2000);
       const photoUrl = String(body?.photo_url || "").trim().slice(0, 3000);
+      const requestId = String(body?.request_id || "");
+      if (requestId && (!/^[a-zA-Z0-9_-]{16,100}$/.test(requestId)
+        || !Number.isInteger(body?.expected_quantity) || body.expected_quantity < 0
+        || typeof body?.expected_stock_version !== "string")) {
+        return Response.json({ error: "So‘rov noto‘g‘ri. Mahsulotni qayta tanlang." }, { status: 400 });
+      }
       if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
         return Response.json({ error: "Mahsulot va musbat butun dona sonini kiriting." }, { status: 400 });
       }
@@ -300,6 +322,26 @@ export default async function(req) {
       }
       if (photoUrl && !/^https:\/\//i.test(photoUrl)) {
         return Response.json({ error: "Rasm manzili xavfsiz HTTPS havola bo‘lishi kerak." }, { status: 400 });
+      }
+
+      // A retry after a lost response returns the original record, including after cancellation.
+      // The original stock version is also required, so concurrent requests cannot double-deduct.
+      if (requestId) {
+        const previous = await service.entities.WasteRecord.filter({
+          request_id: requestId, recorded_by_id: user.id, location_id: location.id,
+        }, "-recorded_at", 2);
+        if (previous?.length) {
+          const existing = previous[0];
+          if (existing.product_id !== productId || Number(existing.quantity) !== quantity
+            || existing.reason_code !== reasonCode || String(existing.notes || "") !== notes
+            || String(existing.photo_url || "") !== photoUrl) {
+            return Response.json({ error: "Bu so‘rov boshqa ma’lumot bilan saqlangan. Tarixni tekshiring." }, { status: 409 });
+          }
+          if (!existing.stock_movement_id) {
+            return Response.json({ error: "Bu yozuv hali qayta ishlanmoqda. Birozdan so‘ng qayta urinib ko‘ring." }, { status: 409 });
+          }
+          return Response.json({ waste: existing, replayed: true });
+        }
       }
 
       const [product, stock, transfers] = await Promise.all([
@@ -318,6 +360,12 @@ export default async function(req) {
         return Response.json({ error: "Do‘konda bu mahsulot qoldig‘i topilmadi." }, { status: 404 });
       }
       const before = cleanNumber(stock.quantity);
+      const stockVersion = String(stock.updated_date || stock.updated_at || "");
+      if (requestId && (body.expected_quantity !== before || body.expected_stock_version !== stockVersion)) {
+        return Response.json({
+          error: "Qoldiq o‘zgargan. Yangilangan qoldiqni tekshirib, mahsulotni qayta tanlang.",
+        }, { status: 409 });
+      }
       if (quantity > before) {
         return Response.json({ error: `Chiqit miqdori qoldiqdan oshmasligi kerak. Mavjud: ${before} dona.` }, { status: 409 });
       }
@@ -332,7 +380,10 @@ export default async function(req) {
       const now = new Date().toISOString();
       const after = cleanNumber(before - quantity);
       const stockUpdate = await service.entities.ProductStock.updateMany(
-        { id: stock.id, quantity: before },
+        { id: stock.id, quantity: before,
+          ...(stock.updated_date ? { updated_date: stock.updated_date }
+            : stock.updated_at ? { updated_at: stock.updated_at } : {}),
+        },
         { $set: {
           quantity: after,
           updated_at: now,
@@ -352,6 +403,7 @@ export default async function(req) {
         const wasteNumber = `CH-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
         waste = await service.entities.WasteRecord.create({
           waste_number: wasteNumber,
+          request_id: requestId || undefined,
           location_id: location.id,
           location_name: location.name,
           product_id: product.id,
