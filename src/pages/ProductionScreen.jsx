@@ -12,6 +12,7 @@ import { ROLE_HOME } from '@/lib/pos';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderDetail from '@/components/orders/OrderDetail';
+import DemandSection from '@/components/production/DemandSection';
 import {
   ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays,
 } from 'lucide-react';
@@ -321,6 +322,8 @@ function ProductionScreenInner() {
                 onPreview={(order) => setPreview(order.reference_image)}
               />
             ))}
+
+            <DemandSection user={user} />
           </div>
         )}
 

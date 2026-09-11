@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, ClipboardCheck, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
+import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, ClipboardCheck, ClipboardList, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
+import ShopDemandPanel from '@/components/shop-demand/ShopDemandPanel';
 import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 import ProductionPanel from '@/components/warehouse/ProductionPanel';
 import StockCountPanel from '@/components/warehouse/StockCountPanel';
@@ -24,6 +25,7 @@ const TABS = [
   { id: 'recipes', label: 'Retseptlar', icon: BookOpen, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'production', label: 'Ishlab chiqarish', icon: ChefHat, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { id: 'demands', label: 'Do‘kon talablari', icon: ClipboardList, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { id: 'count', label: 'Ombor sanog‘i', icon: ClipboardCheck, roles: ['admin', 'manager', 'cashier', 'accountant'] },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
@@ -428,6 +430,8 @@ export default function Warehouse() {
               search={search}
               onReload={load}
             />
+          ) : tab === 'demands' ? (
+            <ShopDemandPanel user={user} products={products} locations={locations} />
           ) : tab === 'count' ? (
             <StockCountPanel user={user} location={selectedLocationRecord} locations={locations} />
           ) : (

@@ -30,6 +30,7 @@ const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-recipes', label: 'Retseptlar', path: '/warehouse?tab=recipes', icon: BookOpen, tab: 'recipes', roles: ['admin', 'manager', 'accountant', 'production'] },
   { key: 'warehouse-production', label: 'Ishlab chiqarish', path: '/warehouse?tab=production', icon: ChefHat, tab: 'production', roles: ['admin', 'manager', 'accountant', 'production'] },
   { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { key: 'warehouse-demands', label: 'Do‘kon talablari', path: '/warehouse?tab=demands', icon: ClipboardList, tab: 'demands', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-count', label: 'Ombor sanog‘i', path: '/warehouse?tab=count', icon: ClipboardCheck, tab: 'count', roles: ['admin', 'manager', 'cashier', 'accountant'] },
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];

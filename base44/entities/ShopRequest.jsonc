@@ -1,0 +1,150 @@
+{
+  "name": "ShopRequest",
+  "type": "object",
+  "properties": {
+    "request_number": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name_snapshot": {
+      "type": "string"
+    },
+    "required_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "yangi",
+        "qabul_qilindi",
+        "tayyorlanmoqda",
+        "tayyor",
+        "yuborildi",
+        "qabul_qilingan",
+        "bekor_qilindi"
+      ],
+      "default": "yangi"
+    },
+    "transfer_batch_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "send_log": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Yuborish idempotency kalitlari \u2014 takroriy yuborishni oldini oladi"
+    },
+    "total_requested": {
+      "type": "number",
+      "default": 0
+    },
+    "total_sent": {
+      "type": "number",
+      "default": 0
+    },
+    "total_remaining": {
+      "type": "number",
+      "default": 0
+    },
+    "creator_id": {
+      "type": "string"
+    },
+    "creator_name": {
+      "type": "string"
+    },
+    "accepted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "accepted_by_id": {
+      "type": "string"
+    },
+    "accepted_by_name": {
+      "type": "string"
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "request_number",
+    "shop_id",
+    "shop_name_snapshot",
+    "required_date",
+    "status",
+    "creator_id",
+    "creator_name",
+    "idempotency_key",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "production"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

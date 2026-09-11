@@ -1,0 +1,100 @@
+{
+  "name": "ShopRequestItem",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string"
+    },
+    "request_number": {
+      "type": "string"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name_snapshot": {
+      "type": "string"
+    },
+    "category_name_snapshot": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "sheet"
+      ],
+      "default": "piece"
+    },
+    "pieces_per_sheet_snapshot": {
+      "type": "number",
+      "default": 0
+    },
+    "requested_quantity": {
+      "type": "number"
+    },
+    "sent_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "received_quantity": {
+      "type": "number",
+      "default": 0,
+      "description": "Do'kon tomonidan qabul qilingan tayyor mahsulot (dona/bo'lak)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "request_id",
+    "shop_id",
+    "product_id",
+    "product_name_snapshot",
+    "unit",
+    "requested_quantity",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "production"
+          }
+        },
+        {
+          "data.shop_id": "{{user.data.shop_id}}"
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
