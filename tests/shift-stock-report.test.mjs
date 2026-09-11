@@ -131,7 +131,10 @@ function loadHandler(client) {
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
-  source = sharedCode + '\n' + source;
+  // Load the real local cost helpers added to complete-sale, without importing the live SDK.
+  const costSource = readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, '');
+  source = source.replace(/import \{ loadIngredientCosts, computeProductCost \} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '');
+  source = sharedCode + '\n' + costSource + '\n' + source;
   source += '\nglobalThis.testHandler = handler;';
   const code = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
