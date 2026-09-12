@@ -168,6 +168,9 @@ function loadHandler(client) {
   const code = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
+  if (process.env.ODINA_DEBUG_TEST) {
+    console.log(code.split('\n').slice(1342, 1352).map((line, index) => `${1343 + index}: ${line}`).join('\n'));
+  }
   const context = vm.createContext({
     client,
     Response,
