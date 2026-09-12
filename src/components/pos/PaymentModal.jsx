@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Plus, X, Check } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
-export default function PaymentModal({ open, total, onClose, onConfirm, loading }) {
+export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
 
@@ -43,7 +43,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
     if (valid.length === 0) { setError('Kamida bitta to‘lov kiriting.'); return; }
     const sum = valid.reduce((s, p) => s + Number(p.amount), 0);
     if (Math.abs(sum - total) > 1) {
-      setError(`Total is ${formatUZS(total)} but payments sum to ${formatUZS(sum)}. Difference: ${formatUZS(Math.abs(sum - total))}.`);
+      setError(`Jami ${formatUZS(total)}, to‘lovlar esa ${formatUZS(sum)}. Farq: ${formatUZS(Math.abs(sum - total))}.`);
       return;
     }
     onConfirm(valid.map((p) => ({ method: p.method, amount: Number(p.amount) })));
@@ -65,6 +65,12 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-700 flex items-center gap-2">
             <Check className="w-5 h-5 shrink-0" />
             100% chegirma qo‘llandi — to‘lov talab qilinmaydi.
+          </div>
+        )}
+
+        {offline && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 mb-3 text-sm text-amber-900">
+            Internet yo‘q. Savdo qurilmaga saqlanib, aloqa qaytganda avtomatik yuboriladi.
           </div>
         )}
 
@@ -98,15 +104,15 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
 
         <div className={total <= 0 ? 'hidden' : 'flex items-center justify-between mt-3 text-sm'}>
           <button onClick={addRow} disabled={remaining <= 0 && payments.length >= PAYMENT_METHODS.length} className="text-brand-ink font-medium flex items-center gap-1 disabled:opacity-40">
-            <Plus className="w-4 h-4" /> Add split payment
+            <Plus className="w-4 h-4" /> To‘lov usuli qo‘shish
           </button>
           <div className="text-right">
             {remaining > 0 ? (
-              <span className="text-destructive font-medium">Remaining {formatUZS(remaining)}</span>
+              <span className="text-destructive font-medium">Qoldi: {formatUZS(remaining)}</span>
             ) : overpay > 0 ? (
-              <span className="text-brand-ink font-medium">Change {formatUZS(overpay)}</span>
+              <span className="text-brand-ink font-medium">Qaytim: {formatUZS(overpay)}</span>
             ) : (
-              <span className="text-emerald-600 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> Exact</span>
+              <span className="text-emerald-600 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> To‘liq</span>
             )}
           </div>
         </div>
@@ -116,7 +122,9 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading 
         <DialogFooter className="mt-4 gap-2">
           <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
           <Button onClick={handleConfirm} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            {loading ? 'Amalga oshirilmoqda…' : `Yakunlash · ${formatUZS(total)}`}
+            {loading
+              ? 'Amalga oshirilmoqda…'
+              : `${offline ? 'Qurilmaga saqlash' : 'Yakunlash'} · ${formatUZS(total)}`}
           </Button>
         </DialogFooter>
       </DialogContent>
