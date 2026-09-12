@@ -75,6 +75,13 @@
       "type": "number",
       "default": 0
     },
+    "sale_request_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "cash_removed": {
       "type": "number",
       "default": 0
