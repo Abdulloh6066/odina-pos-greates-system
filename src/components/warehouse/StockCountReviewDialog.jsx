@@ -4,10 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { formatNum } from '@/lib/pos';
 
-const UNIT = { piece: 'dona', sheet: 'list' };
+const UNIT = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 
 export default function StockCountReviewDialog({ changes, onConfirm, onClose, approving }) {
-  const total = changes.reduce((s, c) => s + c.diff, 0);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
@@ -22,7 +21,7 @@ export default function StockCountReviewDialog({ changes, onConfirm, onClose, ap
           <table className="w-full text-sm">
             <thead className="bg-secondary/50 text-xs uppercase text-muted-foreground sticky top-0">
               <tr>
-                <th className="text-left font-semibold px-3 py-2">Mahsulot</th>
+                <th className="text-left font-semibold px-3 py-2">Nomi</th>
                 <th className="text-right font-semibold px-2 py-2">Tizim</th>
                 <th className="text-right font-semibold px-2 py-2">Amalda</th>
                 <th className="text-right font-semibold px-3 py-2">Farq</th>
@@ -41,7 +40,7 @@ export default function StockCountReviewDialog({ changes, onConfirm, onClose, ap
               ))}
             </tbody>
             <tfoot className="bg-secondary/40 border-t-2 border-border">
-              <tr><td className="px-3 py-2 font-semibold" colSpan={3}>Jami net farq</td><td className="px-3 py-2 text-right font-bold">{formatNum(total)} dona</td></tr>
+              <tr><td className="px-3 py-2 font-semibold" colSpan={4}>Jami farqli pozitsiya: {changes.length} ta</td></tr>
             </tfoot>
           </table>
         </div>
