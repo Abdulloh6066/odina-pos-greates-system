@@ -13,6 +13,7 @@ import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderDetail from '@/components/orders/OrderDetail';
 import DemandSection from '@/components/production/DemandSection';
+import TomorrowIngredientForecast from '@/components/production/TomorrowIngredientForecast';
 import {
   ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays,
 } from 'lucide-react';
@@ -141,6 +142,9 @@ function ProductionScreenInner() {
   const [preview, setPreview] = useState('');
   const [detailOrder, setDetailOrder] = useState(null);
   const [clock, setClock] = useState(clockStr());
+  const [forecast, setForecast] = useState(null);
+  const [forecastLoading, setForecastLoading] = useState(true);
+  const [forecastError, setForecastError] = useState('');
   const loadedOnce = useRef(false);
   const { alerts, counts } = useOrderAlerts(active);
 
@@ -176,9 +180,27 @@ function ProductionScreenInner() {
     }
   };
 
+  const loadForecast = async () => {
+    try {
+      const response = await base44.functions.invoke('production-run', {
+        action: 'tomorrow_ingredient_forecast',
+      });
+      const data = response?.data || response;
+      if (data?.error) throw new Error(data.error);
+      setForecast(data || null);
+      setForecastError('');
+      return true;
+    } catch (e) {
+      setForecastError(e?.response?.data?.error || e?.message || 'Masalliq nazoratini yuklab bo‘lmadi.');
+      return false;
+    } finally {
+      setForecastLoading(false);
+    }
+  };
+
   const load = async () => {
     setError('');
-    await Promise.allSettled([loadOrders(), loadItems()]);
+    await Promise.allSettled([loadOrders(), loadItems(), loadForecast()]);
     loadedOnce.current = true;
     setLoading(false);
   };
@@ -202,6 +224,9 @@ function ProductionScreenInner() {
     const interval = setInterval(tick, 30000);
     const u1 = safeSubscribe('CustomerOrder', schedule);
     const u2 = safeSubscribe('CustomerOrderItem', schedule);
+    const u3 = safeSubscribe('IngredientStock', schedule);
+    const u4 = safeSubscribe('Recipe', schedule);
+    const u5 = safeSubscribe('RecipeItem', schedule);
 
     return () => {
       cancelled = true;
@@ -209,6 +234,9 @@ function ProductionScreenInner() {
       clearTimeout(t);
       try { u1(); } catch (e) {}
       try { u2(); } catch (e) {}
+      try { u3(); } catch (e) {}
+      try { u4(); } catch (e) {}
+      try { u5(); } catch (e) {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -320,6 +348,13 @@ function ProductionScreenInner() {
                 onReady={(order) => setConfirm({ order, step: 'ready' })}
                 onShip={(order) => setConfirm({ order, step: 'shipped' })}
                 onPreview={(order) => setPreview(order.reference_image)}
+                forecast={day.key === 'tomorrow' ? (
+                  <TomorrowIngredientForecast
+                    forecast={forecast}
+                    loading={forecastLoading}
+                    error={forecastError}
+                  />
+                ) : null}
               />
             ))}
 
@@ -476,7 +511,7 @@ function ProductionPlanSummary({ orders, itemsByOrder }) {
 }
 
 function OrderDaySection({
-  title, date, orders, itemsByOrder, busyId, onReady, onShip, onPreview,
+  title, date, orders, itemsByOrder, busyId, onReady, onShip, onPreview, forecast,
 }) {
   return (
     <section>
@@ -492,6 +527,8 @@ function OrderDaySection({
           {orders.length}
         </span>
       </div>
+
+      {forecast}
 
       {orders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/60 py-8 px-4 text-center">
