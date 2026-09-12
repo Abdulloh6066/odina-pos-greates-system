@@ -41,6 +41,21 @@ test('senariy 2: bo\'sh maydon nol emas — sanalmagan, o\'tkazib yuboriladi', (
   assert.equal(L.isApprovalComplete(items), true);
 });
 
+test('masalliq miqdori kasr son bo‘lishi mumkin, dona/list esa butun bo‘lishi kerak', () => {
+  assert.equal(L.validateCountedQuantity('', 'g').value, null);
+  assert.equal(L.validateCountedQuantity(1250.5555, 'g').value, 1250.556);
+  assert.equal(L.validateCountedQuantity(4.25, 'piece').error.length > 0, true);
+  assert.equal(L.validateCountedQuantity(-1, 'ml').error.length > 0, true);
+  assert.equal(L.validateCountedQuantity('xato', 'g').error.length > 0, true);
+});
+
+test('masalliq sanog‘ida kasr farq xavfsiz hisoblanadi', () => {
+  const item = { was_counted: true, system_quantity: 1500.25, system_version: 'v1', counted_quantity: 1499.75, difference: -0.5, applied: false, stale: false };
+  const result = L.classifyItem(item, { quantity: 1500.25, updated_date: 'v1' });
+  assert.equal(result.stale, false);
+  assert.equal(result.change, -0.5);
+});
+
 test('senariy 3: o\'zgarmagan miqdor (12==12) -> farq 0, harakat yo\'q', () => {
   const items = [{ was_counted: true, system_quantity: 12, counted_quantity: 12, difference: 0, applied: false, stale: false }];
   assert.equal(L.summarizeCount(items).difference_items, 0);
