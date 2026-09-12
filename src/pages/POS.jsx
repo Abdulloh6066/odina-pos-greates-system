@@ -245,43 +245,107 @@ export default function POS() {
     );
   }, [productStock, queuedQuantityByProduct, shift?.shop_id, user?.shop_id]);
 
+  const confirmStockWarnings = async (shortages, allowNegativeStock) => {
+    if (!shortages.length) return true;
+    const details = shortages
+      .map((item) => `${item.product_name}: ${item.requested} ta kerak, ${item.available} ta mavjud`)
+      .join('\n');
+    if (allowNegativeStock === false) {
+      await odinaAlert('Savdoni davom ettirish mumkin emas.', {
+        title: 'Qoldiq yetarli emas',
+        details,
+        tone: 'danger',
+      });
+      return false;
+    }
+    return odinaConfirm(
+      'Savdodan keyin ayrim mahsulotlar qoldig‘i minus bo‘ladi.',
+      {
+        title: 'Qoldiq yetarli emas',
+        details,
+        tone: 'warning',
+        confirmLabel: 'Baribir sotish',
+      },
+    );
+  };
+
+  const openPayment = (offline) => {
+    checkoutRequestKeyRef.current = createSaleIdempotencyKey();
+    setCheckoutOffline(offline);
+    setPayOpen(true);
+  };
+
+  const openOfflinePayment = async () => {
+    if (discountCode) {
+      await odinaAlert('Chegirmali savdoni tekshirish uchun internet kerak. Savat saqlanib turadi.', {
+        title: 'Internet kerak',
+        tone: 'warning',
+      });
+      return false;
+    }
+
+    const shortages = cart
+      .filter((item) => productsById[item.product_id]?.track_stock !== false)
+      .map((item) => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        requested: Number(item.quantity || 0),
+        available: Number(stockByProduct[item.product_id] ?? 0),
+      }))
+      .filter((item) => item.requested > item.available);
+
+    const accepted = await confirmStockWarnings(shortages, settings?.allow_negative_stock !== false);
+    if (!accepted) return false;
+    openPayment(true);
+    return true;
+  };
+
   const openCheckout = async () => {
-    if (!shift) { setOpenShiftOpen(true); return; }
-    if (!cart.length || stockChecking) return;
+    if (!shift) {
+      if (!isOnline) {
+        void odinaAlert('Smenani ochish uchun internet kerak.');
+      } else {
+        setOpenShiftOpen(true);
+      }
+      return;
+    }
+    if (!cart.length || stockChecking || offlineSyncing) return;
+
     setStockChecking(true);
     try {
+      if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+        await openOfflinePayment();
+        return;
+      }
+
+      if (offlineSales.length) {
+        const syncResult = await syncOfflineSales();
+        if (syncResult?.remaining > 0) {
+          await odinaAlert('Avval qurilmada qolgan savdolarni serverga yuborish kerak.', {
+            title: 'Sinxronlash tugamadi',
+            details: syncResult?.failed?.message || offlineSyncError || '',
+            tone: 'warning',
+          });
+          return;
+        }
+      }
+
       const result = await base44.functions.invoke('complete-sale', {
         action: 'check_stock',
         shift_id: shift.id,
         items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
       });
       const payload = result?.data || result;
-      const shortages = payload?.shortages || [];
-      if (shortages.length) {
-        const details = shortages
-          .map((item) => `${item.product_name}: ${item.requested} ta kerak, ${item.available} ta mavjud`)
-          .join('\n');
-        if (payload.allow_negative_stock === false) {
-          void odinaAlert('Savdoni davom ettirish mumkin emas.', {
-            title: 'Qoldiq yetarli emas',
-            details,
-            tone: 'danger',
-          });
-          return;
-        }
-        const accepted = await odinaConfirm(
-          'Savdodan keyin ayrim mahsulotlar qoldig‘i minus bo‘ladi.',
-          {
-            title: 'Qoldiq yetarli emas',
-            details,
-            tone: 'warning',
-            confirmLabel: 'Baribir sotish',
-          },
-        );
-        if (!accepted) return;
-      }
-      setPayOpen(true);
+      const accepted = await confirmStockWarnings(
+        payload?.shortages || [],
+        payload?.allow_negative_stock,
+      );
+      if (accepted) openPayment(false);
     } catch (error) {
+      if (isRetryableSyncError(error)) {
+        await openOfflinePayment();
+        return;
+      }
       const payload = error?.response?.data || error?.data || {};
       const details = (payload.shortages || [])
         .map((item) => `${item.product_name}: ${item.available} ta mavjud`)
@@ -292,10 +356,84 @@ export default function POS() {
     }
   };
 
+  const closePayment = () => {
+    if (paying) return;
+    checkoutRequestKeyRef.current = '';
+    setCheckoutOffline(false);
+    setPayOpen(false);
+  };
+
+  const finishQueuedSale = (record) => {
+    setLastSale(record.local_sale);
+    setPayOpen(false);
+    setReceiptOpen(true);
+    setCheckoutOffline(false);
+    checkoutRequestKeyRef.current = '';
+    clearCart();
+  };
+
+  const applyCompletedSale = (payload) => {
+    setLastSale(payload.sale);
+    if (payload.shift) setShift(payload.shift);
+    if (payload.stock_updates?.length) {
+      const updatedByProduct = Object.fromEntries(payload.stock_updates.map((item) => [item.product_id, item.quantity]));
+      const saleShopId = payload.sale?.shop_id || shift.shop_id;
+      setProductStock((current) => {
+        const existingIds = new Set(current.map((stock) => `${stock.location_id}:${stock.product_id}`));
+        const changed = current.map((stock) => (
+          stock.location_id === saleShopId && Object.prototype.hasOwnProperty.call(updatedByProduct, stock.product_id)
+            ? { ...stock, quantity: updatedByProduct[stock.product_id] }
+            : stock
+        ));
+        for (const item of payload.stock_updates) {
+          const key = `${saleShopId}:${item.product_id}`;
+          if (!existingIds.has(key)) {
+            changed.push({ location_id: saleShopId, product_id: item.product_id, quantity: item.quantity });
+          }
+        }
+        return changed;
+      });
+    }
+    setPayOpen(false);
+    setReceiptOpen(true);
+    setCheckoutOffline(false);
+    checkoutRequestKeyRef.current = '';
+    clearCart();
+    base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
+      .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
+      .catch(() => {});
+  };
+
   const completeSale = async (payments) => {
     setPaying(true);
+    const idempotencyKey = checkoutRequestKeyRef.current || createSaleIdempotencyKey();
+    checkoutRequestKeyRef.current = idempotencyKey;
+    const recordedAt = new Date().toISOString();
+    let pendingRecord = null;
+
     try {
-      const result = await base44.functions.invoke('complete-sale', {
+      if (!discountCode) {
+        pendingRecord = buildPendingSale({
+          idempotencyKey,
+          recordedAt,
+          shift,
+          user,
+          cart,
+          payments,
+        });
+      }
+
+      if (checkoutOffline || !isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+        if (!pendingRecord) {
+          throw new Error('Chegirmali savdoni offline saqlab bo‘lmaydi. Internetni kuting.');
+        }
+        await enqueueOfflineSale(pendingRecord);
+        finishQueuedSale(pendingRecord);
+        return;
+      }
+
+      const request = pendingRecord?.request || {
+        action: 'complete_sale',
         shift_id: shift.id,
         items: cart.map((item) => ({
           product_id: item.product_id,
@@ -304,40 +442,26 @@ export default function POS() {
         discount_code: discountCode || undefined,
         owner_pin: discountPct === 100 && discountOwnerPin ? discountOwnerPin : undefined,
         payments,
-      });
-      const payload = result?.data || result;
-      if (!payload?.sale) {
-        throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
-      }
+        idempotency_key: idempotencyKey,
+        recorded_at: recordedAt,
+      };
 
-      setLastSale(payload.sale);
-      if (payload.shift) setShift(payload.shift);
-      if (payload.stock_updates?.length) {
-        const updatedByProduct = Object.fromEntries(payload.stock_updates.map((item) => [item.product_id, item.quantity]));
-        setProductStock((current) => {
-          const existingIds = new Set(current.map((stock) => `${stock.location_id}:${stock.product_id}`));
-          const changed = current.map((stock) => (
-            stock.location_id === shift.shop_id && Object.prototype.hasOwnProperty.call(updatedByProduct, stock.product_id)
-              ? { ...stock, quantity: updatedByProduct[stock.product_id] }
-              : stock
-          ));
-          for (const item of payload.stock_updates) {
-            const key = `${shift.shop_id}:${item.product_id}`;
-            if (!existingIds.has(key)) {
-              changed.push({ location_id: shift.shop_id, product_id: item.product_id, quantity: item.quantity });
-            }
-          }
-          return changed;
-        });
+      try {
+        const result = await base44.functions.invoke('complete-sale', request);
+        const payload = result?.data || result;
+        if (!payload?.sale) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
+        applyCompletedSale(payload);
+      } catch (error) {
+        if (!pendingRecord || !isRetryableSyncError(error)) throw error;
+        await enqueueOfflineSale(pendingRecord);
+        finishQueuedSale(pendingRecord);
       }
-      setPayOpen(false);
-      setReceiptOpen(true);
-      clearCart();
-      base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
-        .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
-        .catch(() => {});
-    } catch (e) {
-      void odinaAlert('Savdoni yakunlab bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+    } catch (error) {
+      const message = syncErrorMessage(error);
+      const discountHint = discountCode && isRetryableSyncError(error)
+        ? ' Aloqa qaytgach shu to‘lov oynasidan yana bosing.'
+        : '';
+      void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
     } finally {
       setPaying(false);
     }
