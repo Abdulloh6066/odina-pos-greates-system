@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -13,6 +13,13 @@ import Receipt from '@/components/pos/Receipt';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
+import {
+  buildPendingSale,
+  createSaleIdempotencyKey,
+  isRetryableSyncError,
+  syncErrorMessage,
+} from '@/lib/offline-sales';
 
 export default function POS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
@@ -41,6 +48,8 @@ export default function POS() {
 
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [checkoutOffline, setCheckoutOffline] = useState(false);
+  const checkoutRequestKeyRef = useRef('');
   const [lastSale, setLastSale] = useState(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
 
@@ -82,7 +91,19 @@ export default function POS() {
     setLoadingData(false);
   };
 
-  useEffect(() => { if (user) loadAll(); }, [user]);
+  const {
+    isOnline,
+    records: offlineSales,
+    syncing: offlineSyncing,
+    storageError: offlineStorageError,
+    syncError: offlineSyncError,
+    enqueue: enqueueOfflineSale,
+    syncNow: syncOfflineSales,
+  } = useOfflineSaleQueue(user?.id, () => loadAll().catch(() => {}));
+
+  useEffect(() => {
+    if (user) loadAll().catch(() => setLoadingData(false));
+  }, [user]);
 
   useEffect(() => {
     if (!user) return undefined;
