@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { ReceiptText, Search, Eye, RotateCcw } from 'lucide-react';
-import { formatUZS, formatNum, isSameDay } from '@/lib/pos';
+import { formatUZS, formatNum, saleBusinessDate, saleOccurredAt } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -32,12 +32,14 @@ export default function SalesHistory() {
   const visible = useMemo(() => {
     let list = sales;
     if (role === 'cashier') list = list.filter((s) => s.user_id === user?.id);
-    if (filterDate) list = list.filter((s) => isSameDay(s.created_date, new Date(filterDate)));
+    if (filterDate) list = list.filter((s) => saleBusinessDate(s) === filterDate);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((s) => (s.user_name || '').toLowerCase().includes(q) || (s.payment_methods_summary || '').toLowerCase().includes(q));
     }
-    return list;
+    return [...list].sort(
+      (left, right) => new Date(saleOccurredAt(right)).getTime() - new Date(saleOccurredAt(left)).getTime(),
+    );
   }, [sales, role, user, search, filterDate]);
 
   const totalRev = visible.reduce((s, x) => s + (x.status === 'refunded' ? 0 : x.total), 0);
@@ -105,7 +107,7 @@ export default function SalesHistory() {
                   {s.status === 'refunded' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-destructive">Qaytarilgan</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(s.created_date).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  {new Date(saleOccurredAt(s)).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tashkent' })}
                   {role !== 'cashier' && ` · ${s.user_name || ''}`}
                   {s.shop_name && ` · ${s.shop_name}`}
                 </div>
@@ -140,7 +142,7 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
           <DialogTitle className="font-display text-xl">Savdo tafsilotlari</DialogTitle>
         </DialogHeader>
         <div className="text-xs text-muted-foreground mb-3">
-          {new Date(sale.created_date).toLocaleString('uz-UZ')}
+          {new Date(saleOccurredAt(sale)).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}
           {sale.shop_name && ` · ${sale.shop_name}`} · Kassir: {sale.user_name}
         </div>
         <div className="space-y-2 mb-3">
