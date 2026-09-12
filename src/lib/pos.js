@@ -78,7 +78,28 @@ export function todayISO() {
   return new Date().toISOString();
 }
 
+export function tashkentDateKey(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function saleOccurredAt(sale) {
+  return sale?.sold_at || sale?.created_date || sale?.created_at || '';
+}
+
+export function saleBusinessDate(sale) {
+  return sale?.business_date || tashkentDateKey(saleOccurredAt(sale));
+}
+
 export function isSameDay(a, b) {
-  const d1 = new Date(a), d2 = new Date(b);
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  const first = tashkentDateKey(a);
+  return Boolean(first) && first === tashkentDateKey(b);
 }
