@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { formatNum } from '@/lib/pos';
 import StockCountReviewDialog from './StockCountReviewDialog';
 
-const UNIT = { piece: 'dona', sheet: 'list' };
+const UNIT = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 
 export default function StockCountDraft({ user, data, onClose, onSaved }) {
   const role = user?.role || 'cashier';
@@ -26,7 +26,11 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
 
   useEffect(() => {
     setRows((items || []).map((it) => ({
-      id: it.id, product_id: it.product_id, name: it.product_name_snapshot, unit: it.unit,
+      id: it.id,
+      item_kind: it.item_kind === 'ingredient' ? 'ingredient' : 'product',
+      item_id: it.item_id || it.product_id,
+      name: it.item_name_snapshot || it.product_name_snapshot,
+      unit: it.unit,
       system: Number(it.system_quantity || 0),
       counted: it.was_counted ? String(it.counted_quantity) : '',
       reason: it.reason || '', was_counted: !!it.was_counted, applied: !!it.applied, stale: !!it.stale,
@@ -71,10 +75,11 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
     if (!ok) return;
     setSubmitting(true);
     try {
-      await base44.functions.invoke('stock-count', { action: 'save_items', count_id: count.id, items: buildPayload() });
+      const savedResponse = await base44.functions.invoke('stock-count', { action: 'save_items', count_id: count.id, items: buildPayload() });
+      const saved = savedResponse?.data || savedResponse;
       const res = await base44.functions.invoke('stock-count', { action: 'submit_count', count_id: count.id });
       const d = res?.data || res;
-      onSaved(d.count, items);
+      onSaved(d.count, saved.items || items);
       void odinaAlert('Tasdiqlashga yuborildi.');
     } catch (e) { void odinaAlert('Yuborish amalga oshmadi: ' + (e?.response?.data?.error || e?.message || e)); }
     finally { setSubmitting(false); }
@@ -99,7 +104,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
         onSaved(d.count, d.items);
       } else {
         onSaved(d.count, d.items);
-        if (d.stale > 0) void odinaAlert(`${d.stale} ta mahsulot qoldig'i sanog'dan keyin o'zgargan. "Yangilash" tugmasini bosing va qayta sanang.`);
+        if (d.stale > 0) void odinaAlert(`${d.stale} ta qoldiq sanog'dan keyin o'zgargan. "Yangilash" tugmasini bosing va qayta sanang.`);
         else void odinaAlert('Ayrim tuzatishlar qo\'llanmadi. Qayta tasdiqlang.');
       }
     } catch (e) { void odinaAlert('Tasdiqlash amalga oshmadi: ' + (e?.response?.data?.error || e?.message || e)); }
@@ -113,7 +118,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
       const res = await base44.functions.invoke('stock-count', { action: 'refresh_stale_items', count_id: count.id });
       const d = res?.data || res;
       onSaved(d.count, d.items);
-      void odinaAlert('Yangilandi. Belgilangan mahsulotlarni qayta sanang, so‘ng yana yuboring.');
+      void odinaAlert('Yangilandi. Belgilangan qoldiqlarni qayta sanang, so‘ng yana yuboring.');
     } catch (e) { void odinaAlert('Yangilash amalga oshmadi: ' + (e?.message || e)); }
   };
 
@@ -128,12 +133,12 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
   };
 
   const summary = useMemo(() => {
-    let counted = 0, diffs = 0, net = 0;
+    let counted = 0, diffs = 0;
     for (const r of rows) {
       const d = computeDiff(r);
-      if (d !== null) { counted++; if (d !== 0) diffs++; net += d; }
+      if (d !== null) { counted++; if (d !== 0) diffs++; }
     }
-    return { counted, diffs, net };
+    return { counted, diffs };
   }, [rows]);
 
   const statusText = isDraft ? 'Qoralama — qoldiqlarni sanang.' : isSubmitted ? 'Tasdiqlashga yuborilgan.' : isApproved ? "Tasdiqlangan — o'zgartirib bo'lmaydi." : 'Bekor qilingan.';
@@ -153,9 +158,9 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulot qidirish…" className="h-11 pl-10 rounded-xl" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulot yoki masalliq qidirish…" className="h-11 pl-10 rounded-xl" />
           </div>
-          <div className="text-xs text-muted-foreground">Sanaldi: <b>{summary.counted}</b>/{rows.length} · Farq: <b>{summary.diffs}</b> · Net: <b>{formatNum(summary.net)}</b></div>
+          <div className="text-xs text-muted-foreground">Sanaldi: <b>{summary.counted}</b>/{rows.length} · Farqli pozitsiya: <b>{summary.diffs}</b></div>
         </div>
 
         <div className="rounded-2xl border border-border overflow-hidden">
@@ -163,7 +168,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
             <table className="w-full text-sm">
               <thead className="bg-secondary/50 text-xs uppercase tracking-wide text-muted-foreground sticky top-0">
                 <tr>
-                  <th className="text-left font-semibold px-3 py-2.5">Mahsulot</th>
+                  <th className="text-left font-semibold px-3 py-2.5">Nomi</th>
                   <th className="text-center font-semibold px-2 py-2.5">Birlik</th>
                   <th className="text-right font-semibold px-3 py-2.5">Tizimdagi qoldiq</th>
                   <th className="text-right font-semibold px-3 py-2.5">Amalda sanaldi</th>
@@ -178,16 +183,24 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
                     <tr key={r.id} className={`border-t border-border ${r.stale ? 'bg-amber-50' : ''}`}>
                       <td className="px-3 py-2 font-medium">
                         {r.name}
-                        {r.stale && <span className="ml-1 text-amber-600" title="Qoldiq sanog‘dan keyin o‘zgargan">⚠</span>}
+                        <div className="text-[11px] font-normal text-muted-foreground">{r.item_kind === 'ingredient' ? 'Masalliq / qadoq' : 'Tayyor mahsulot'}</div>
+                        {r.stale && <span className="ml-1 text-amber-600" title="Qoldiq sanog‘dan keyin o‘zgargan">⚠</span>
                         {r.applied && <span className="ml-1 text-emerald-600" title="Tuzatildi">✓</span>}
                       </td>
                       <td className="px-2 py-2 text-center text-muted-foreground">{UNIT[r.unit] || r.unit}</td>
                       <td className="px-3 py-2 text-right text-muted-foreground">{formatNum(r.system)}</td>
                       <td className="px-3 py-2 text-right">
                         {isDraft ? (
-                          <Input type="number" inputMode="numeric" min="0" step="1" value={r.counted}
+                          <Input
+                            type="number"
+                            inputMode={['piece', 'sheet'].includes(r.unit) ? 'numeric' : 'decimal'}
+                            min="0"
+                            step={['piece', 'sheet'].includes(r.unit) ? '1' : '0.001'}
+                            value={r.counted}
                             onChange={(e) => setRow(r.id, { counted: e.target.value })}
-                            placeholder="—" className="h-10 w-24 text-right rounded-lg ml-auto" />
+                            placeholder="—"
+                            className="h-10 w-24 text-right rounded-lg ml-auto"
+                          />
                         ) : (
                           <span className="font-medium">{r.was_counted ? formatNum(Number(r.counted)) : '—'}</span>
                         )}
@@ -212,9 +225,9 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
           </div>
         </div>
 
-        {isApproved && count.net_difference != null && (
+        {isApproved && (
           <div className="rounded-xl bg-secondary/50 p-3 text-sm flex justify-between">
-            <span>Yakunlangan net farq</span><b>{formatNum(count.net_difference)} dona</b>
+            <span>Yakunlangan sanoq</span><b>{count.difference_items || 0} ta farqli pozitsiya</b>
           </div>
         )}
 
