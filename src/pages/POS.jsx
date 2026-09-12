@@ -586,7 +586,7 @@ export default function POS() {
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">{shift?.shop_name || 'Faol smena yo‘q'}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {shift ? `${formatUZS(shift.total_sales)} · ${shift.order_count} ta buyurtma` : 'Savdoni boshlash uchun smenani oching'}
+              {shift ? `${formatUZS(Number(shift.total_sales || 0) + queuedShiftTotal)} · ${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : 'Savdoni boshlash uchun smenani oching'}
             </div>
           </div>
         </div>
@@ -609,6 +609,15 @@ export default function POS() {
           </Button>
         )}
       </div>
+
+      <OfflineSalesBanner
+        isOnline={isOnline}
+        records={offlineSales}
+        syncing={offlineSyncing}
+        storageError={offlineStorageError}
+        syncError={offlineSyncError}
+        onRetry={syncOfflineSales}
+      />
 
       {!screenMode && wasteAlerts.length > 0 && (
         <button
@@ -719,7 +728,14 @@ export default function POS() {
         </SheetContent>
       </Sheet>
 
-      <PaymentModal open={payOpen} total={total} onClose={() => setPayOpen(false)} onConfirm={completeSale} loading={paying} />
+      <PaymentModal
+        open={payOpen}
+        total={total}
+        onClose={closePayment}
+        onConfirm={completeSale}
+        loading={paying}
+        offline={checkoutOffline || !isOnline}
+      />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => setReceiptOpen(false)} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
@@ -741,6 +757,55 @@ export default function POS() {
         onConfirm={recordCashWithdrawal}
         loading={cashWithdrawalLoading}
       />
+    </div>
+  );
+}
+
+function OfflineSalesBanner({ isOnline, records, syncing, storageError, syncError, onRetry }) {
+  const failed = records.find((record) => record.status === 'failed');
+  const error = storageError || failed?.last_error || syncError;
+  if (isOnline && !records.length && !syncing && !error) return null;
+
+  const danger = Boolean(storageError || failed);
+  const tone = danger
+    ? 'border-red-200 bg-red-50 text-red-900'
+    : 'border-amber-200 bg-amber-50 text-amber-900';
+  const Icon = !isOnline ? CloudOff : syncing ? RefreshCw : CloudUpload;
+  const title = storageError
+    ? 'Offline xotira ishlamayapti'
+    : !isOnline
+      ? `Internet yo‘q${records.length ? ` · ${records.length} ta savdo navbatda` : ''}`
+      : syncing
+        ? `${records.length} ta savdo yuborilmoqda…`
+        : `${records.length} ta savdo serverga yuborilmagan`;
+  const description = error
+    ? error
+    : !isOnline
+      ? 'Oddiy savdolar shu qurilmada xavfsiz saqlanadi.'
+      : 'Internet ishlayapti. Navbatni qayta yuborishingiz mumkin.';
+
+  return (
+    <div className={`mx-3 sm:mx-5 mt-3 shrink-0 flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${tone}`}>
+      <span className="w-9 h-9 rounded-xl bg-white/60 flex items-center justify-center shrink-0">
+        <Icon className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block text-xs opacity-80 mt-0.5 truncate">{description}</span>
+      </span>
+      {isOnline && records.length > 0 && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={syncing}
+          onClick={() => { void onRetry(); }}
+          className="h-10 shrink-0 bg-white/70"
+        >
+          <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Qayta yuborish</span>
+        </Button>
+      )}
     </div>
   );
 }
