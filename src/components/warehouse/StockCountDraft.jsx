@@ -184,7 +184,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
                       <td className="px-3 py-2 font-medium">
                         {r.name}
                         <div className="text-[11px] font-normal text-muted-foreground">{r.item_kind === 'ingredient' ? 'Masalliq / qadoq' : 'Tayyor mahsulot'}</div>
-                        {r.stale && <span className="ml-1 text-amber-600" title="Qoldiq sanog‘dan keyin o‘zgargan">⚠</span>
+                        {r.stale && <span className="ml-1 text-amber-600" title="Qoldiq sanog‘dan keyin o‘zgargan">⚠</span>}
                         {r.applied && <span className="ml-1 text-emerald-600" title="Tuzatildi">✓</span>}
                       </td>
                       <td className="px-2 py-2 text-center text-muted-foreground">{UNIT[r.unit] || r.unit}</td>
