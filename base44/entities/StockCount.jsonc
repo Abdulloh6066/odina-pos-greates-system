@@ -95,17 +95,28 @@
           }
         },
         {
-          "user_condition": {
-            "role": "accountant"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "accountant"
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
         },
         {
-          "user_condition": {
-            "role": "cashier"
-          }
-        },
-        {
-          "data.location_id": "{{user.data.shop_id}}"
+          "$and": [
+            {
+              "user_condition": {
+                "role": "cashier"
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
         }
       ]
     },
