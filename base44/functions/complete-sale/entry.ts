@@ -1015,9 +1015,13 @@ export default async function(req) {
       }, { status: 400 });
     }
 
-    const now = new Date().toISOString();
-    const day = now.slice(0, 10).replaceAll("-", "");
-    const saleNumber = `OD-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const receivedAt = new Date().toISOString();
+    const soldAt = idempotencyKey
+      ? resolveSoldAt(body?.recorded_at, shift, receivedAt)
+      : receivedAt;
+    const businessDate = tashkentBusinessDate(soldAt);
+    const day = businessDate.replaceAll("-", "");
+    const saleNumber = saleNumberFor(idempotencyKey, soldAt);
     const paymentSummary = normalizedPayments.length
       ? normalizedPayments.map((payment) => payment.method).join(" + ")
       : "100% chegirma";
@@ -1027,7 +1031,7 @@ export default async function(req) {
         { id: claimedDiscount.id, active: true },
         {
           $inc: { usage_count: 1 },
-          $set: { active: false, used_at: now },
+          $set: { active: false, used_at: soldAt },
         },
       );
       if (!discountClaim?.success || Number(discountClaim.updated || 0) !== 1) {
@@ -1046,7 +1050,7 @@ export default async function(req) {
             location_name: shift.shop_name,
             product_name: plan.item.product_name,
             unit: "piece",
-            updated_at: now,
+            updated_at: receivedAt,
             updated_by: user.id,
             updated_by_name: user.full_name || user.email,
           } },
@@ -1063,7 +1067,7 @@ export default async function(req) {
           unit: "piece",
           quantity: plan.after,
           low_stock_level: 0,
-          updated_at: now,
+          updated_at: receivedAt,
           updated_by: user.id,
           updated_by_name: user.full_name || user.email,
         });
@@ -1073,6 +1077,10 @@ export default async function(req) {
 
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
+      idempotency_key: idempotencyKey || undefined,
+      request_fingerprint: requestFingerprint || undefined,
+      sold_at: soldAt,
+      business_date: businessDate,
       financial_records_version: 2,
       sale_items_count: normalizedItems.length,
       shift_id: shift.id,
@@ -1119,7 +1127,7 @@ export default async function(req) {
         unit_cost_at_sale: snapUnitCost,
         total_cost_at_sale: snapTotalCost,
         cost_is_estimate: !costInfo.hasPrice,
-        created_at: now,
+        created_at: soldAt,
       };
     });
 
@@ -1135,7 +1143,7 @@ export default async function(req) {
           method: payment.method,
           amount: payment.amount,
           reference: payment.reference || undefined,
-          created_at: now,
+          created_at: soldAt,
         })),
       )
       : [];
@@ -1158,7 +1166,7 @@ export default async function(req) {
         reference_type: "sale",
         user_id: user.id,
         user_name: user.full_name || user.email,
-        created_at: now,
+        created_at: soldAt,
       });
       stockMovementRecords.push(movement);
     }
@@ -1173,7 +1181,7 @@ export default async function(req) {
           { id: claimedDiscount.id, active: true },
           {
             $inc: { usage_count: 1 },
-            $set: { used_at: now, used_by_sale_id: sale.id },
+            $set: { used_at: soldAt, used_by_sale_id: sale.id },
           },
         );
         if (!discountUpdate?.success || Number(discountUpdate.updated || 0) !== 1) {
