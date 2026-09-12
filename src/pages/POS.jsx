@@ -468,6 +468,10 @@ export default function POS() {
   };
 
   const openShift = async ({ shop, starting_cash }) => {
+    if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      void odinaAlert('Smenani ochish uchun internet kerak.');
+      return;
+    }
     setShiftLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
@@ -483,7 +487,33 @@ export default function POS() {
     finally { setShiftLoading(false); }
   };
 
+  const requestCloseShift = async () => {
+    if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      await odinaAlert('Smenani yopishdan oldin internetga ulaning.', {
+        title: 'Internet kerak',
+        tone: 'warning',
+      });
+      return;
+    }
+    if (queuedForCurrentShift.length) {
+      const result = await syncOfflineSales();
+      if (result?.remaining > 0) {
+        await odinaAlert('Qurilmadagi barcha savdolar serverga yuborilmaguncha smenani yopib bo‘lmaydi.', {
+          title: 'Navbatdagi savdolar bor',
+          details: result?.failed?.message || offlineSyncError || '',
+          tone: 'warning',
+        });
+        return;
+      }
+    }
+    setCloseShiftOpen(true);
+  };
+
   const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift }) => {
+    if (!isOnline || offlineSales.some((record) => record.shift_id === shift?.id)) {
+      void odinaAlert('Smenani yopishdan oldin offline savdolarni serverga yuboring.');
+      return;
+    }
     setShiftLoading(true);
     try {
       const result = await base44.functions.invoke('shift-close-v2', {
@@ -505,6 +535,10 @@ export default function POS() {
 
   const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name, owner_pin }) => {
     if (!shift) return;
+    if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      void odinaAlert('Kassadan pul olishni saqlash uchun internet kerak.');
+      return;
+    }
     setCashWithdrawalLoading(true);
     try {
       const isDebtPayment = expense_category === 'goods_payment';
@@ -565,7 +599,7 @@ export default function POS() {
             <Button variant="outline" size="sm" aria-label="Kassadan pul olish" onClick={() => setCashWithdrawalOpen(true)} className="h-10 px-3 touch-manipulation">
               <Banknote className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pul olish</span>
             </Button>
-            <Button variant="outline" size="sm" aria-label="Smenani yopish" onClick={() => setCloseShiftOpen(true)} className="h-10 px-3 touch-manipulation">
+            <Button variant="outline" size="sm" aria-label="Smenani yopish" onClick={requestCloseShift} disabled={offlineSyncing} className="h-10 px-3 touch-manipulation">
               <Clock className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Smenani yopish</span><span className="sm:hidden">Yopish</span>
             </Button>
           </>
