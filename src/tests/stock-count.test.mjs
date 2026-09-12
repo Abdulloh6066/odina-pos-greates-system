@@ -47,6 +47,7 @@ test('masalliq miqdori kasr son bo‘lishi mumkin, dona/list esa butun bo‘lish
   assert.equal(L.validateCountedQuantity(4.25, 'piece').error.length > 0, true);
   assert.equal(L.validateCountedQuantity(-1, 'ml').error.length > 0, true);
   assert.equal(L.validateCountedQuantity('xato', 'g').error.length > 0, true);
+  assert.equal(L.num(0.1 + 0.2), 0.3);
 });
 
 test('masalliq sanog‘ida kasr farq xavfsiz hisoblanadi', () => {
