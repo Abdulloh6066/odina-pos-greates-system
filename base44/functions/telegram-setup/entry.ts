@@ -1,7 +1,9 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { userRole } from "../../shared/user-helpers.ts";
 
-// Read-only setup: no messages sent, updates acknowledged, or business records changed.
+// Recipient explicitly supplied by the owner. Never accept a recipient or text from the browser.
+const GROUP_ID = "-5570444945";
+const TEST_TEXT = "✅ Odina POS bilan ulanish ishlayapti.\nBu sinov xabari. Avtomatik ogohlantirishlar hali yoqilmagan.";
 Deno.serve(async (req) => {
   try {
     const client = createClientFromRequest(req);
@@ -11,6 +13,9 @@ Deno.serve(async (req) => {
     if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
+    const body = await req.json().catch(() => ({}));
+    const action = body.action || "inspect";
+    if (!["inspect", "test"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) return Response.json({ error: "Base44 Secrets ichida TELEGRAM_BOT_TOKEN topilmadi." }, { status: 400 });
     const call = async (method: string, body = {}) => {
@@ -22,6 +27,8 @@ Deno.serve(async (req) => {
       if (!response.ok || !data.ok) {
         // Never propagate provider errors or request URLs containing the token.
         const messages: Record<number, string> = {
+          400: "Telegram guruhini tekshiring. Guruh turi yoki ID o‘zgargan bo‘lishi mumkin.",
+          403: "Bot guruhga xabar yubora olmayapti. Bot a’zoligi va yozish ruxsatini tekshiring.",
           401: "Telegram tokeni yaroqsiz. Base44 Secrets ichidagi tokenni tekshiring.",
           409: "Bot boshqa ulanishda ishlayapti. Mavjud ulanishni tekshirish kerak.",
           429: "Telegram so‘rovlar chegarasi. Birozdan keyin qayta urinib ko‘ring.",
@@ -34,30 +41,34 @@ Deno.serve(async (req) => {
     if (String(bot.username).toLowerCase() !== "odina_nazorat_bot") {
       return Response.json({ error: "Saqlangan token @Odina_nazorat_bot ga tegishli emas." }, { status: 400 });
     }
-    const webhook = await call("getWebhookInfo");
-    if (webhook.url) return Response.json({ error: "Botda webhook mavjud. Guruhni aniqlashdan oldin mavjud ulanishni tekshirish kerak." }, { status: 409 });
-    // No offset or allowed_updates: don't consume the queue or alter its subscription.
-    const updates = await call("getUpdates", { timeout: 0, limit: 100 });
-    const groups = new Map();
-    for (const update of updates || []) {
-      const msg = update.message;
-      if (!msg || !["group", "supergroup"].includes(msg.chat?.type)) continue;
-      if (!/^\/start@odina_nazorat_bot(?:\s|$)/i.test(msg.text || "")) continue;
-      if (!Number.isSafeInteger(msg.chat.id) || msg.chat.id >= 0) continue;
-      groups.set(String(msg.chat.id), {
-        id: String(msg.chat.id), title: String(msg.chat.title || ""),
-        command_at: new Date(msg.date * 1000).toISOString(),
-      });
+    const group = await call("getChat", { chat_id: GROUP_ID });
+    if (String(group.id) !== GROUP_ID || !["group", "supergroup"].includes(group.type)) {
+      return Response.json({ error: "Tasdiqlangan Telegram guruhi mos kelmadi." }, { status: 409 });
     }
-    return Response.json({ bot_username: bot.username, groups: [...groups.values()], notifications_enabled: false });
+    let messageId = null;
+    if (action === "test") {
+      // Exactly one attempt. A timeout may mean Telegram accepted the message;
+      // never automatically retry and risk posting a duplicate.
+      const sent = await call("sendMessage", { chat_id: GROUP_ID, text: TEST_TEXT });
+      messageId = sent.message_id;
+    }
+    return Response.json({
+      bot_username: bot.username,
+      groups: [{ id: GROUP_ID, title: String(group.title || "Odina-Ish Jarayoni") }],
+      notifications_enabled: false,
+      test_sent: action === "test",
+      message_id: messageId,
+    });
   } catch (error) {
     const known = [
+      "Telegram guruhini tekshiring. Guruh turi yoki ID o‘zgargan bo‘lishi mumkin.",
+      "Bot guruhga xabar yubora olmayapti. Bot a’zoligi va yozish ruxsatini tekshiring.",
       "Telegram tokeni yaroqsiz. Base44 Secrets ichidagi tokenni tekshiring.",
       "Bot boshqa ulanishda ishlayapti. Mavjud ulanishni tekshirish kerak.",
       "Telegram so‘rovlar chegarasi. Birozdan keyin qayta urinib ko‘ring.",
       "Telegram bilan ulanishda xato.",
     ];
-    const message = error instanceof Error && known.includes(error.message) ? error.message : "Tekshirish amalga oshmadi. Qayta kirib, yana urinib ko‘ring.";
+    const message = error instanceof Error && known.includes(error.message) ? error.message : "Javob olinmadi. Sinov yuborgan bo‘lsangiz, qayta bosishdan oldin Telegram guruhini tekshiring.";
     return Response.json({ error: message }, { status: 502 });
   }
 });
