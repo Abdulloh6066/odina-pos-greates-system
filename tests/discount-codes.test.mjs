@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
+import { TextEncoder } from 'node:util';
 import vm from 'node:vm';
 import ts from 'typescript';
 
@@ -158,6 +159,7 @@ function loadHandler(client) {
     client,
     Response,
     crypto: webcrypto,
+    TextEncoder,
     console,
     structuredClone,
   });
@@ -285,6 +287,61 @@ test('failed sale rolls back the reserved discount code', async () => {
   assert.equal(f.db.DiscountCode[0].usage_count, 0);
 });
 
+test('same offline sale request is processed only once', async () => {
+  const f = fixture(5);
+  const call = loadHandler(f.client);
+  const request = {
+    action: 'complete_sale',
+    shift_id: 'shift',
+    items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+    idempotency_key: 'pos-offline-test-00000001',
+    recorded_at: '2026-09-11T20:30:00.000Z',
+  };
+
+  const first = await call(request);
+  const second = await call(structuredClone(request));
+
+  assert.equal(first.status, 200, JSON.stringify(first));
+  assert.equal(second.status, 200, JSON.stringify(second));
+  assert.equal(second.data.already_processed, true);
+  assert.equal(second.data.sale.id, first.data.sale.id);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.SaleItem.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.StockMovement.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  assert.equal(f.db.Shift[0].order_count, 1);
+  assert.equal(first.data.sale.sold_at, request.recorded_at);
+  assert.equal(first.data.sale.business_date, '2026-09-12');
+});
+
+test('same offline key cannot be reused for a different sale', async () => {
+  const f = fixture(5);
+  const call = loadHandler(f.client);
+  const request = {
+    action: 'complete_sale',
+    shift_id: 'shift',
+    items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+    idempotency_key: 'pos-offline-test-00000002',
+    recorded_at: '2026-09-11T20:30:00.000Z',
+  };
+
+  const first = await call(request);
+  const conflict = await call({
+    ...request,
+    items: [{ product_id: 'cake', quantity: 2 }],
+    payments: [{ method: 'cash', amount: 200000 }],
+  });
+
+  assert.equal(first.status, 200, JSON.stringify(first));
+  assert.equal(conflict.status, 409, JSON.stringify(conflict));
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  assert.equal(f.db.Shift[0].order_count, 1);
+});
+
 test('discount management hides used codes and creates one-time codes', () => {
   const source = readFileSync('src/pages/DiscountCodes.jsx', 'utf8');
   assert.match(source, /item\.active !== false/);
@@ -292,4 +349,4 @@ test('discount management hides used codes and creates one-time codes', () => {
   assert.match(source, /single_use: true/);
 });
 
-console.log('9 discount-code regression tests passed. No live data was used.');
+console.log('11 discount and idempotency regression tests passed. No live data was used.');
