@@ -13,7 +13,7 @@ import {
   RotateCcw,
   WalletCards,
 } from "lucide-react";
-import { formatUZS, formatNum } from "@/lib/pos";
+import { formatUZS, formatNum, saleOccurredAt } from "@/lib/pos";
 import PageHeader from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ const dateTime = (value) => {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Tashkent",
   });
 };
 
@@ -425,7 +426,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-semibold">{sale.sale_number || "Savdo"}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{dateTime(sale.created_date)}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{dateTime(saleOccurredAt(sale))}</p>
                           </div>
                           <div className="text-right">
                             <p className={"font-semibold " + (sale.status === "refunded" ? "line-through text-muted-foreground" : "")}>
