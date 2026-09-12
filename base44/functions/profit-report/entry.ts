@@ -7,6 +7,24 @@ import {
 // owner_withdrawal is a capital distribution, not an operating expense.
 const EXPENSE_CATEGORIES = new Set(["shop_expense", "other_expense"]);
 
+function tashkentBusinessDate(value: unknown) {
+  const date = new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Tashkent",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function saleBusinessDate(sale: any) {
+  return String(sale?.business_date || "")
+    || tashkentBusinessDate(sale?.sold_at || sale?.created_date);
+}
+
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -75,8 +93,8 @@ export default async function (req) {
     // ---- report ----
     const sales = await service.entities.Sale.list("-created_date", 1000);
     let filtered = (sales || []).filter((s: any) => s.status === "completed");
-    if (dateFrom) filtered = filtered.filter((s: any) => String(s.created_date || "").slice(0, 10) >= dateFrom);
-    if (dateTo) filtered = filtered.filter((s: any) => String(s.created_date || "").slice(0, 10) <= dateTo);
+    if (dateFrom) filtered = filtered.filter((s: any) => saleBusinessDate(s) >= dateFrom);
+    if (dateTo) filtered = filtered.filter((s: any) => saleBusinessDate(s) <= dateTo);
     if (shopId) filtered = filtered.filter((s: any) => s.shop_id === shopId);
     const saleIds = new Set(filtered.map((s: any) => s.id));
 
