@@ -5,6 +5,25 @@
     "sale_number": {
       "type": "string"
     },
+    "idempotency_key": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Kassa so\u2018rovini takroran yozishni oldini oladigan qurilma kaliti"
+    },
+    "request_fingerprint": {
+      "type": "string",
+      "description": "Idempotency kalitiga bog\u2018langan server hisoblagan so\u2018rov izi"
+    },
+    "sold_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Savdo kassada amalga oshirilgan vaqt"
+    },
+    "business_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Asia/Tashkent bo\u2018yicha savdo kuni"
+    },
     "financial_records_version": {
       "type": "number",
       "default": 2
