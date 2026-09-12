@@ -158,7 +158,11 @@ function loadHandler(client) {
       /async function verifyOwnerPin\(service: any, pinValue: unknown\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
       'async function verifyOwnerPin(_service, pinValue) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN',
     )
-    .replace('export default async function(req)', 'async function handler(req)');
+    .replace('export default async function(req)', 'async function handler(req)')
+    .replace(
+      'error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",',
+      'error: error instanceof Error ? (error.stack || error.message) : "Savdoni yakunlab bo‘lmadi.",',
+    );
   source = sharedCode + '\n' + costCode + '\n' + source + '\nglobalThis.testHandler = handler;';
 
   const code = ts.transpileModule(source, {
