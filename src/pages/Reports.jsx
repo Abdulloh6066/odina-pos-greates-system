@@ -3,7 +3,7 @@ import { useOutletContext, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { formatUZS, formatNum, isSameDay } from '@/lib/pos';
+import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 
 const PAY_COLORS = { cash: 'hsl(var(--primary))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
@@ -30,10 +30,16 @@ export default function Reports() {
 
   const last7 = useMemo(() => {
     const days = [];
+    const now = Date.now();
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const daySales = completedSales.filter((s) => isSameDay(s.created_date, d));
-      days.push({ date: d.toLocaleDateString('uz-UZ', { weekday: 'short' }), total: daySales.reduce((sum, s) => sum + s.total, 0), orders: daySales.length });
+      const day = new Date(now - i * 24 * 60 * 60 * 1000);
+      const dateKey = tashkentDateKey(day);
+      const daySales = completedSales.filter((sale) => saleBusinessDate(sale) === dateKey);
+      days.push({
+        date: day.toLocaleDateString('uz-UZ', { weekday: 'short', timeZone: 'Asia/Tashkent' }),
+        total: daySales.reduce((sum, sale) => sum + sale.total, 0),
+        orders: daySales.length,
+      });
     }
     return days;
   }, [completedSales]);
