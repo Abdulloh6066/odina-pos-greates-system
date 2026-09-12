@@ -22,13 +22,13 @@ async function run(opts = {}) {
       calls.push({ method, body: JSON.parse(init.body) });
       if (opts.fail) throw new Error(url);
       const result = method === 'getMe' ? { username: opts.bot || 'Odina_nazorat_bot' }
-        : method === 'getWebhookInfo' ? { url: opts.webhook ? 'https://example.com/hook' : '' }
-        : opts.updates || [];
+        : method === 'getChat' ? { id: opts.groupId || -5570444945, type: opts.groupType || 'group', title: 'Odina-Ish Jarayoni' }
+        : { message_id: 123 };
       return { ok: true, json: async () => ({ ok: true, result }) };
     },
   };
   vm.runInNewContext(ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }), context);
-  const response = await handler({});
+  const response = await handler({ json: async () => opts.body || {} });
   const data = await response.json();
   assert.equal(JSON.stringify(data).includes(token), false);
   return { status: response.status, data, calls };
@@ -46,25 +46,37 @@ test('disabled admin rejected', async () => {
 test('missing secret gets useful error', async () => {
   const r = await run({ missing: true }); assert.equal(r.status, 400); assert.equal(r.calls.length, 0);
 });
-test('wrong bot and existing webhook stop discovery', async () => {
-  assert.equal((await run({ bot: 'other_bot' })).calls.length, 1);
-  const r = await run({ webhook: true }); assert.equal(r.status, 409); assert.equal(r.calls.length, 2);
+test('wrong bot stops sending', async () => {
+  const r = await run({ bot: 'other_bot', body: { action: 'test' } });
+  assert.equal(r.status, 400); assert.equal(r.calls.length, 1);
 });
-test('only addressed group commands returned, without consuming updates', async () => {
-  const msg = (id, type, text, title = 'Odina-Ish Jarayoni') => ({ message: { chat: { id, type, title }, text, date: 1789200000 } });
-  const r = await run({ updates: [
-    msg(-1001, 'supergroup', '/start@Odina_nazorat_bot'),
-    msg(-1001, 'supergroup', '/start@Odina_nazorat_bot'),
-    msg(12, 'private', '/start@Odina_nazorat_bot'),
-    msg(-22, 'group', 'private conversation text'),
-    msg(-33, 'group', '/start@another_bot'),
-  ] });
+test('inspection checks the fixed group without sending or consuming updates', async () => {
+  const r = await run();
   assert.equal(r.status, 200);
-  assert.deepEqual(r.data.groups.map(g => g.id), ['-1001']);
+  assert.deepEqual(r.data.groups.map(g => g.id), ['-5570444945']);
   assert.equal(r.data.notifications_enabled, false);
-  assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getWebhookInfo', 'getUpdates']);
-  assert.equal('offset' in r.calls[2].body, false);
-  assert.equal('allowed_updates' in r.calls[2].body, false);
+  assert.equal(r.data.test_sent, false);
+  assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat']);
+});
+test('test sends only fixed text to the owner-specified group', async () => {
+  const r = await run({ body: { action: 'test', chat_id: '-999', text: 'INJECTED FINANCIAL DATA' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.test_sent, true);
+  assert.equal(r.data.message_id, 123);
+  assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat', 'sendMessage']);
+  assert.equal(r.calls[2].body.chat_id, '-5570444945');
+  assert.equal(r.calls[2].body.text.includes('INJECTED'), false);
+});
+test('wrong group or private chat prevents sending', async () => {
+  for (const opts of [{ groupId: -999 }, { groupType: 'private' }]) {
+    const r = await run({ ...opts, body: { action: 'test' } });
+    assert.equal(r.status, 409);
+    assert.equal(r.calls.some(c => c.method === 'sendMessage'), false);
+  }
+});
+test('unknown action rejected without contacting Telegram', async () => {
+  const r = await run({ body: { action: 'send_all' } });
+  assert.equal(r.status, 400); assert.equal(r.calls.length, 0);
 });
 test('network errors cannot expose secret-bearing URLs', async () => {
   const r = await run({ fail: true }); assert.equal(r.status, 502);
