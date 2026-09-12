@@ -210,15 +210,40 @@ export default function POS() {
     return list;
   }, [products, activeCat, showFav, search]);
 
+  const queuedForCurrentShift = useMemo(
+    () => offlineSales.filter((record) => record.shift_id === shift?.id),
+    [offlineSales, shift?.id],
+  );
+  const queuedShiftTotal = useMemo(
+    () => queuedForCurrentShift.reduce((sum, record) => sum + Number(record.local_sale?.total || 0), 0),
+    [queuedForCurrentShift],
+  );
+  const queuedQuantityByProduct = useMemo(() => {
+    const quantities = {};
+    for (const record of queuedForCurrentShift) {
+      for (const item of record.request?.items || []) {
+        quantities[item.product_id] = Number(quantities[item.product_id] || 0) + Number(item.quantity || 0);
+      }
+    }
+    return quantities;
+  }, [queuedForCurrentShift]);
+  const productsById = useMemo(
+    () => Object.fromEntries(products.map((product) => [product.id, product])),
+    [products],
+  );
+
   const stockByProduct = useMemo(() => {
     const locationId = shift?.shop_id || user?.shop_id;
     if (!locationId) return {};
     return Object.fromEntries(
       productStock
         .filter((stock) => stock.location_id === locationId)
-        .map((stock) => [stock.product_id, Number(stock.quantity || 0)]),
+        .map((stock) => [
+          stock.product_id,
+          Number(stock.quantity || 0) - Number(queuedQuantityByProduct[stock.product_id] || 0),
+        ]),
     );
-  }, [productStock, shift?.shop_id, user?.shop_id]);
+  }, [productStock, queuedQuantityByProduct, shift?.shop_id, user?.shop_id]);
 
   const openCheckout = async () => {
     if (!shift) { setOpenShiftOpen(true); return; }
