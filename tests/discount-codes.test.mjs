@@ -160,6 +160,7 @@ function loadHandler(client) {
     Response,
     crypto: webcrypto,
     TextEncoder,
+    exports: {},
     console,
     structuredClone,
   });
