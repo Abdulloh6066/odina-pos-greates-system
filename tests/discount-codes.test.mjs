@@ -36,6 +36,7 @@ function fixture(percentage = 5) {
       bank_transfer_sales: 0,
       total_sales: 0,
       order_count: 0,
+      sale_request_keys: [],
       cash_removed: 0,
       refunds_total: 0,
     }],
@@ -91,6 +92,9 @@ function fixture(percentage = 5) {
       if ('$gte' in expected && !(actual >= expected.$gte)) return false;
       if ('$lte' in expected && !(actual <= expected.$lte)) return false;
       if ('$in' in expected && !expected.$in.includes(actual)) return false;
+      if ('$ne' in expected) {
+        if (Array.isArray(actual) ? actual.includes(expected.$ne) : actual === expected.$ne) return false;
+      }
       return true;
     }
     return actual === expected;
@@ -121,6 +125,13 @@ function fixture(percentage = 5) {
           Object.assign(row, clone(operation.$set || {}));
           for (const [key, value] of Object.entries(operation.$inc || {})) {
             row[key] = Number(row[key] || 0) + Number(value);
+          }
+          for (const [key, value] of Object.entries(operation.$push || {})) {
+            if (!Array.isArray(row[key])) row[key] = [];
+            row[key].push(clone(value));
+          }
+          for (const [key, value] of Object.entries(operation.$pull || {})) {
+            row[key] = (Array.isArray(row[key]) ? row[key] : []).filter((item) => item !== value);
           }
         }
         return { success: true, updated: rows.length };
@@ -356,6 +367,38 @@ test('same offline key cannot be reused for a different sale', async () => {
   assert.equal(f.db.Shift[0].order_count, 1);
 });
 
+test('simultaneous untracked offline retries still create one sale', async () => {
+  const f = fixture(5);
+  f.db.Product[0].track_stock = false;
+  const call = loadHandler(f.client);
+  const request = {
+    action: 'complete_sale',
+    shift_id: 'shift',
+    items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+    idempotency_key: 'pos-offline-race-00000001',
+    recorded_at: '2026-09-11T20:30:00.000Z',
+  };
+
+  const results = await Promise.all([
+    call(structuredClone(request)),
+    call(structuredClone(request)),
+  ]);
+  assert.ok(results.some((result) => result.status === 200), JSON.stringify(results));
+  assert.ok(results.every((result) => result.status === 200 || result.status === 503), JSON.stringify(results));
+
+  const retry = await call(structuredClone(request));
+  assert.equal(retry.status, 200, JSON.stringify(retry));
+  assert.equal(retry.data.already_processed, true);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.SaleItem.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.StockMovement.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+  assert.equal(f.db.Shift[0].order_count, 1);
+  assert.deepEqual(f.db.Shift[0].sale_request_keys, [request.idempotency_key]);
+});
+
 test('discount management hides used codes and creates one-time codes', () => {
   const source = readFileSync('src/pages/DiscountCodes.jsx', 'utf8');
   assert.match(source, /item\.active !== false/);
@@ -363,4 +406,4 @@ test('discount management hides used codes and creates one-time codes', () => {
   assert.match(source, /single_use: true/);
 });
 
-console.log('11 discount and idempotency regression tests passed. No live data was used.');
+console.log('12 discount and idempotency regression tests passed. No live data was used.');
