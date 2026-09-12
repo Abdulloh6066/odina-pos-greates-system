@@ -1,9 +1,13 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { num, classifyItem, summarizeCount, isApprovalComplete, canApprove } from "../../shared/stock-count-logic.ts";
+import { num, classifyItem, summarizeCount, isApprovalComplete, canApprove, validateCountedQuantity } from "../../shared/stock-count-logic.ts";
 import { userLabel, userRole, userShopId } from "../../shared/user-helpers.ts";
 
 const COUNT_ROLES = new Set(["admin", "manager", "cashier", "accountant"]);
 const MANAGE_ROLES = new Set(["admin", "manager"]);
+
+const itemKindOf = (item: any) => item?.item_kind === "ingredient" ? "ingredient" : "product";
+const itemIdOf = (item: any) => String(item?.item_id || item?.product_id || "");
+const itemNameOf = (item: any) => String(item?.item_name_snapshot || item?.product_name_snapshot || "Noma’lum");
 
 export default async function (req) {
   const base44 = createClientFromRequest(req);
@@ -37,17 +41,43 @@ export default async function (req) {
       if (!location || location.active === false) {
         return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
       }
-      const [stocks, products] = await Promise.all([
+      const [productStocks, products, ingredientStocks, ingredients] = await Promise.all([
         service.entities.ProductStock.filter({ location_id: locationId }, "-updated_at", 500),
         service.entities.Product.list("name", 500),
+        service.entities.IngredientStock.filter({ location_id: locationId }, "-updated_at", 500),
+        service.entities.Ingredient.list("name", 500),
       ]);
       const productMap = new Map((products || []).map((p: any) => [p.id, p]));
-      const validStocks = (stocks || [])
+      const ingredientMap = new Map((ingredients || []).map((i: any) => [i.id, i]));
+      const validProductStocks = (productStocks || [])
         .filter((s: any) => {
           const p = productMap.get(s.product_id);
           return p && p.active !== false && p.archived !== true && p.track_stock !== false;
         })
-        .sort((a: any, b: any) => String(a.product_name || "").localeCompare(String(b.product_name || "")));
+        .map((stock: any) => ({
+          kind: "product",
+          itemId: stock.product_id,
+          name: productMap.get(stock.product_id)?.name || stock.product_name,
+          unit: stock.unit || "piece",
+          stock,
+        }));
+      const validIngredientStocks = (ingredientStocks || [])
+        .filter((s: any) => {
+          const ingredient = ingredientMap.get(s.ingredient_id);
+          return ingredient && ingredient.active !== false;
+        })
+        .map((stock: any) => ({
+          kind: "ingredient",
+          itemId: stock.ingredient_id,
+          name: ingredientMap.get(stock.ingredient_id)?.name || stock.ingredient_name,
+          unit: stock.unit || ingredientMap.get(stock.ingredient_id)?.base_unit || "piece",
+          stock,
+        }));
+      const countRows = [...validProductStocks, ...validIngredientStocks]
+        .sort((a: any, b: any) => {
+          if (a.kind !== b.kind) return a.kind === "product" ? -1 : 1;
+          return String(a.name || "").localeCompare(String(b.name || ""));
+        });
 
       const now = new Date().toISOString();
       const countNumber = `OS-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 7).toUpperCase()}`;
@@ -56,7 +86,7 @@ export default async function (req) {
         location_id: location.id,
         location_name: location.name,
         status: "draft",
-        total_items: validStocks.length,
+        total_items: countRows.length,
         counted_items: 0,
         difference_items: 0,
         net_difference: 0,
@@ -66,18 +96,20 @@ export default async function (req) {
         notes: String(body?.notes || "").slice(0, 1000) || undefined,
       });
       const items: any[] = [];
-      for (let i = 0; i < validStocks.length; i++) {
-        const s = validStocks[i];
-        const p = productMap.get(s.product_id);
+      for (let i = 0; i < countRows.length; i++) {
+        const row = countRows[i];
         const item = await service.entities.StockCountItem.create({
           stock_count_id: count.id,
           count_number: countNumber,
           location_id: location.id,
-          product_id: s.product_id,
-          product_name_snapshot: p.name,
-          unit: s.unit || "piece",
-          system_quantity: num(s.quantity),
-          system_version: String(s.updated_date || s.updated_at || ""),
+          item_kind: row.kind,
+          item_id: row.itemId,
+          item_name_snapshot: row.name,
+          product_id: row.itemId,
+          product_name_snapshot: row.name,
+          unit: row.unit,
+          system_quantity: num(row.stock.quantity),
+          system_version: String(row.stock.updated_date || row.stock.updated_at || ""),
           counted_quantity: 0,
           was_counted: false,
           difference: 0,
@@ -119,11 +151,11 @@ export default async function (req) {
       for (const row of incoming) {
         const it = map.get(String(row.item_id));
         if (!it) continue;
-        const raw = row.counted_quantity;
-        const counted = (raw === null || raw === undefined || raw === "") ? null : num(raw);
-        if (counted !== null && (!Number.isFinite(counted) || counted < 0 || !Number.isSafeInteger(counted))) {
-          return Response.json({ error: "Sanalgan miqdor manfiy bo‘lmagan butun son bo‘lishi kerak." }, { status: 400 });
+        const checked = validateCountedQuantity(row.counted_quantity, it.unit);
+        if (checked.error) {
+          return Response.json({ error: `"${itemNameOf(it)}": ${checked.error}` }, { status: 400 });
         }
+        const counted = checked.value;
         const wasCounted = counted !== null;
         const diff = wasCounted ? counted - num(it.system_quantity) : 0;
         updates.push({
@@ -157,7 +189,7 @@ export default async function (req) {
       const items = await service.entities.StockCountItem.filter({ stock_count_id: countId }, "item_order", 500);
       for (const it of items) {
         if (it.was_counted && num(it.difference) !== 0 && !String(it.reason || "").trim()) {
-          return Response.json({ error: `"${it.product_name_snapshot}" uchun farq sababini kiriting.` }, { status: 400 });
+          return Response.json({ error: `"${itemNameOf(it)}" uchun farq sababini kiriting.` }, { status: 400 });
         }
       }
       const summary = summarizeCount(items);
@@ -192,12 +224,13 @@ export default async function (req) {
       const items = await service.entities.StockCountItem.filter({ stock_count_id: countId }, "item_order", 500);
       const pending = (items as any[]).filter((it: any) => it.was_counted && num(it.difference) !== 0 && !it.applied);
 
-      const productIds = [...new Set(pending.map((it: any) => it.product_id))];
-      const stocksByProduct = new Map<string, any>();
-      if (productIds.length) {
-        const allStocks = await service.entities.ProductStock.filter({ location_id: count.location_id }, "-updated_at", 500);
-        for (const s of allStocks || []) stocksByProduct.set(s.product_id, s);
-      }
+      const [productStocks, ingredientStocks] = await Promise.all([
+        service.entities.ProductStock.filter({ location_id: count.location_id }, "-updated_at", 500),
+        service.entities.IngredientStock.filter({ location_id: count.location_id }, "-updated_at", 500),
+      ]);
+      const stocksByKey = new Map<string, any>();
+      for (const stock of productStocks || []) stocksByKey.set(`product:${stock.product_id}`, stock);
+      for (const stock of ingredientStocks || []) stocksByKey.set(`ingredient:${stock.ingredient_id}`, stock);
 
       const now = new Date().toISOString();
       let applied = 0;
@@ -205,19 +238,23 @@ export default async function (req) {
       let stale = 0;
       const needRecount: string[] = [];
       for (const it of pending) {
-        const stock = stocksByProduct.get(it.product_id);
+        const kind = itemKindOf(it);
+        const itemId = itemIdOf(it);
+        const itemName = itemNameOf(it);
+        const stock = stocksByKey.get(`${kind}:${itemId}`);
+        const stockEntity = kind === "ingredient" ? service.entities.IngredientStock : service.entities.ProductStock;
         const cls = classifyItem(it, stock);
         if (cls.stale) {
           stale++;
           await service.entities.StockCountItem.update(it.id, { stale: true }).catch(() => {});
-          needRecount.push(it.product_name_snapshot);
+          needRecount.push(itemName);
           continue;
         }
         const before = cls.before;
         const after = cls.after;
         const change = cls.change;
         if (change === 0) { applied++; continue; }
-        const upd = await service.entities.ProductStock.updateMany(
+        const upd = await stockEntity.updateMany(
           { id: stock.id, quantity: before },
           { $set: { quantity: after, updated_at: now, updated_by: me.id, updated_by_name: userName } },
         );
@@ -226,9 +263,9 @@ export default async function (req) {
           movement_number: `ST-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
           location_id: count.location_id,
           location_name: count.location_name,
-          item_kind: "product",
-          item_id: it.product_id,
-          item_name: it.product_name_snapshot,
+          item_kind: kind,
+          item_id: itemId,
+          item_name: itemName,
           unit: it.unit,
           movement_type: "adjustment",
           quantity_change: change,
@@ -281,7 +318,7 @@ export default async function (req) {
         stale,
         needRecount,
         message: stale > 0
-          ? "Ayrim mahsulotlar qoldig‘i sanog‘dan keyin o‘zgargan. “Yangilash” tugmasini bosing va qayta sanang."
+          ? "Ayrim qoldiqlar sanog‘dan keyin o‘zgargan. “Yangilash” tugmasini bosing va qayta sanang."
           : "Ayrim tuzatishlar qo‘llanmadi. Qayta tasdiqlang.",
       });
     }
@@ -297,10 +334,15 @@ export default async function (req) {
         return Response.json({ error: "Faqat tasdiqlashga yuborilgan sanoq yangilanadi." }, { status: 409 });
       }
       const staleItems = await service.entities.StockCountItem.filter({ stock_count_id: countId, stale: true }, "item_order", 500);
-      const stocks = await service.entities.ProductStock.filter({ location_id: count.location_id }, "-updated_at", 500);
-      const stockMap = new Map((stocks || []).map((s: any) => [s.product_id, s]));
+      const [productStocks, ingredientStocks] = await Promise.all([
+        service.entities.ProductStock.filter({ location_id: count.location_id }, "-updated_at", 500),
+        service.entities.IngredientStock.filter({ location_id: count.location_id }, "-updated_at", 500),
+      ]);
+      const stockMap = new Map<string, any>();
+      for (const stock of productStocks || []) stockMap.set(`product:${stock.product_id}`, stock);
+      for (const stock of ingredientStocks || []) stockMap.set(`ingredient:${stock.ingredient_id}`, stock);
       for (const it of staleItems || []) {
-        const s = stockMap.get(it.product_id);
+        const s = stockMap.get(`${itemKindOf(it)}:${itemIdOf(it)}`);
         await service.entities.StockCountItem.update(it.id, {
           system_quantity: num(s?.quantity || 0),
           system_version: String(s?.updated_date || s?.updated_at || ""),
