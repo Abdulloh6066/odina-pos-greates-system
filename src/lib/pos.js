@@ -11,7 +11,7 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'orders', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  admin: ['dashboard', 'pos', 'orders', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
   cashier: ['pos', 'orders', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'warehouse', 'products', 'categories', 'reports', 'profit', 'discounts', 'sales', 'shifts'],
@@ -39,6 +39,7 @@ export const MENU_ITEMS = [
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },
   { key: 'profit', label: 'Tannarx va foyda', path: '/profit', icon: 'TrendingUp' },
+  { key: 'audit', label: 'Nazorat va eksport', path: '/audit', icon: 'ShieldCheck' },
   { key: 'discounts', label: 'Chegirma kodlari', path: '/discounts', icon: 'Ticket' },
   { key: 'sales', label: 'Savdolar tarixi', path: '/sales', icon: 'ReceiptText' },
   { key: 'shifts', label: 'Smenalar', path: '/shifts', icon: 'Clock' },
