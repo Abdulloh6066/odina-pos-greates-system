@@ -5,7 +5,6 @@ import { ClipboardCheck, Plus, Loader2, CheckCircle2, Clock, Send, XCircle } fro
 import { Button } from '@/components/ui/button';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { formatNum } from '@/lib/pos';
 import StockCountDraft from './StockCountDraft';
 
 const STATUS_META = {
@@ -66,7 +65,7 @@ export default function StockCountPanel({ user, location, locations }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Jismoniy ombor sanog‘i — qoldiq farqlarini xavfsiz tuzatish. Qoldiq faqat egasi tasdiqlagach o‘zgartiriladi.</p>
+        <p className="text-sm text-muted-foreground">Tayyor mahsulotlar, masalliqlar va qadoqlarni jismoniy sanash. Qoldiq faqat egasi tasdiqlagach o‘zgartiriladi.</p>
         {canCount && (
           <Button onClick={() => setShowNew(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong shrink-0">
             <Plus className="w-4 h-4 mr-1.5" /> Yangi sanoq
@@ -94,7 +93,6 @@ export default function StockCountPanel({ user, location, locations }) {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
-                  {c.status === 'approved' && <div className="text-sm font-semibold">Net {formatNum(c.net_difference || 0)} dona</div>}
                 </div>
               </button>
             );
@@ -117,7 +115,7 @@ export default function StockCountPanel({ user, location, locations }) {
             ) : (
               <div className="rounded-xl bg-secondary/60 p-3 text-sm">Sanog‘ sizning do‘koningizda boshlanadi: <b>{location?.name || user?.shop_name || user?.data?.shop_name || '—'}</b></div>
             )}
-            <p className="text-xs text-muted-foreground">Tizim hozirgi qoldiqlarni belgilaydi (surat oladi). Siz jismoniy sanalgan miqdorni kiritasiz. Qoralama saqlanadi va tasdiqlashga yuborilguncha qoldiq o‘zgartirmaydi.</p>
+            <p className="text-xs text-muted-foreground">Tizim tayyor mahsulot, masalliq va qadoqlarning hozirgi qoldig‘ini belgilaydi. Siz jismoniy sanalgan miqdorni kiritasiz. Qoralama egasi tasdiqlaguncha qoldiqni o‘zgartirmaydi.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)} disabled={starting}>Bekor</Button>
