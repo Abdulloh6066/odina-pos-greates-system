@@ -21,6 +21,10 @@ export default async function (req) {
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "list_counts");
 
+    if (!COUNT_ROLES.has(role)) {
+      return Response.json({ error: "Sizda ombor sanog‘idan foydalanish huquqi yo‘q." }, { status: 403 });
+    }
+
     if (action === "list_counts") {
       let counts = await service.entities.StockCount.list("-created_date", 500);
       counts = (counts || []).filter((c: any) => c.status !== "cancelled");
@@ -31,9 +35,6 @@ export default async function (req) {
     }
 
     if (action === "start_count") {
-      if (!COUNT_ROLES.has(role)) {
-        return Response.json({ error: "Sizda ombor sanog‘ini boshlash huquqi yo‘q." }, { status: 403 });
-      }
       const requestedLocationId = String(body?.location_id || "");
       const locationId = MANAGE_ROLES.has(role) ? requestedLocationId : shopId;
       if (!locationId) return Response.json({ error: "Do‘konni tanlang." }, { status: 400 });
