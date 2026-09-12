@@ -11,6 +11,23 @@
     "location_id": {
       "type": "string"
     },
+    "item_kind": {
+      "type": "string",
+      "enum": [
+        "product",
+        "ingredient"
+      ],
+      "default": "product",
+      "description": "Sanoq qatori tayyor mahsulotmi yoki masalliq/qadoqmi"
+    },
+    "item_id": {
+      "type": "string",
+      "description": "Mahsulot yoki masalliq IDsi"
+    },
+    "item_name_snapshot": {
+      "type": "string",
+      "description": "Sanoq boshlangan paytdagi nom"
+    },
     "product_id": {
       "type": "string"
     },
@@ -20,6 +37,8 @@
     "unit": {
       "type": "string",
       "enum": [
+        "g",
+        "ml",
         "piece",
         "sheet"
       ],
