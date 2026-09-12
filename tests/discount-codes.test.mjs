@@ -78,6 +78,10 @@ function fixture(percentage = 5) {
     BudgetBalance: [],
     BudgetTransaction: [],
     ShiftProductSnapshot: [],
+    SupplierReceipt: [],
+    SupplierReceiptItem: [],
+    Recipe: [],
+    RecipeItem: [],
   };
 
   let sequence = 0;
@@ -151,8 +155,8 @@ function loadHandler(client) {
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace(/import \{ loadIngredientCosts, computeProductCost \} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
     .replace(
-      /async function verifyOwnerPin\(service: any, pinValue: unknown\) \{[\s\S]*?\n\}\n\nexport default async function\(req\)/,
-      'async function verifyOwnerPin(_service, pinValue) { return String(pinValue || "") === "2468"; }\n\nexport default async function(req)',
+      /async function verifyOwnerPin\(service: any, pinValue: unknown\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
+      'async function verifyOwnerPin(_service, pinValue) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN',
     )
     .replace('export default async function(req)', 'async function handler(req)');
   source = sharedCode + '\n' + costCode + '\n' + source + '\nglobalThis.testHandler = handler;';
