@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { loadIngredientCosts, recipeCostFromMap } from "../../shared/cost-engine.ts";
+import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
 
 const RECIPE_ROLES = new Set(["admin", "accountant"]);
 const PRODUCTION_ROLES = new Set(["admin", "production"]);
@@ -152,6 +153,104 @@ export default async function(req) {
       } catch {}
 
       return Response.json({ recipe, items: createdItems });
+    }
+
+    if (action === "tomorrow_ingredient_forecast") {
+      if (!PRODUCTION_ROLES.has(user.role)) {
+        return Response.json({ error: "Bu prognozni faqat egasi yoki ishlab chiqarish xodimi ko‘ra oladi." }, { status: 403 });
+      }
+
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Tashkent",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      const parts = Object.fromEntries(
+        formatter.formatToParts(new Date()).map((part) => [part.type, part.value]),
+      );
+      const baseDate = new Date(Date.UTC(
+        Number(parts.year),
+        Number(parts.month) - 1,
+        Number(parts.day),
+      ));
+      const dateAtOffset = (days: number) => {
+        const value = new Date(baseDate.getTime());
+        value.setUTCDate(value.getUTCDate() + days);
+        return [
+          value.getUTCFullYear(),
+          String(value.getUTCMonth() + 1).padStart(2, "0"),
+          String(value.getUTCDate()).padStart(2, "0"),
+        ].join("-");
+      };
+      const todayDate = dateAtOffset(0);
+      const tomorrowDate = dateAtOffset(1);
+
+      const locations = (await service.entities.Shop.filter(
+        { location_type: "production" },
+        "name",
+        100,
+      ) || []).filter((row: any) => row.active !== false);
+
+      const requestedLocationId = String(body?.location_id || "");
+      let location: any = null;
+      if (user.role === "production") {
+        location = locations.find((row: any) => row.id === user.shop_id) || null;
+        if (!location) {
+          return Response.json({
+            error: "Siz faol markaziy ishlab chiqarish omboriga biriktirilmagansiz.",
+          }, { status: 403 });
+        }
+      } else if (requestedLocationId) {
+        location = locations.find((row: any) => row.id === requestedLocationId) || null;
+        if (!location) {
+          return Response.json({ error: "Faol ishlab chiqarish ombori topilmadi." }, { status: 400 });
+        }
+      } else {
+        location = locations.find((row: any) => row.is_main === true) || locations[0] || null;
+      }
+
+      if (!location) {
+        return Response.json({
+          error: "Markaziy ishlab chiqarish ombori yaratilmagan yoki faol emas.",
+        }, { status: 409 });
+      }
+
+      const [todayOrders, tomorrowOrders, products, recipes, recipeItems, ingredientStocks] =
+        await Promise.all([
+          service.entities.CustomerOrder.filter({ required_date: todayDate }, "-created_date", 5000),
+          service.entities.CustomerOrder.filter({ required_date: tomorrowDate }, "-created_date", 5000),
+          service.entities.Product.list("name", 5000),
+          service.entities.Recipe.filter({ active: true }, "-version", 5000),
+          service.entities.RecipeItem.list("position", 5000),
+          service.entities.IngredientStock.filter({ location_id: location.id }, "ingredient_name", 5000),
+        ]);
+
+      const orders = [...(todayOrders || []), ...(tomorrowOrders || [])];
+      const orderIds = new Set(orders.map((order: any) => String(order.id)));
+      const allOrderItems = orderIds.size
+        ? await service.entities.CustomerOrderItem.list("-created_date", 5000)
+        : [];
+      const orderItems = (allOrderItems || []).filter((item: any) =>
+        orderIds.has(String(item.order_id)),
+      );
+
+      const forecast = buildProductionIngredientForecast({
+        orders,
+        orderItems,
+        products,
+        recipes,
+        recipeItems,
+        ingredientStocks,
+        todayDate,
+        tomorrowDate,
+      });
+
+      return Response.json({
+        ...forecast,
+        location: { id: location.id, name: location.name },
+        generated_at: new Date().toISOString(),
+      });
     }
 
     if (action === "complete_production") {
