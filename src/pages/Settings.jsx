@@ -5,6 +5,7 @@ import { odinaAlert, odinaPrompt } from '@/lib/odina-dialog';
 import { Settings as SettingsIcon, Building2, Save } from 'lucide-react';
 import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
+import TelegramSetup from '@/components/TelegramSetup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -102,6 +103,7 @@ export default function Settings() {
   return (
     <div className="odina-page p-5 sm:p-8 max-w-3xl mx-auto animate-fade-in">
       <PageHeader title="Sozlamalar" subtitle="Do‘kon, chek va xavfsizlik sozlamalari" icon={SettingsIcon} />
+      <TelegramSetup user={user} />
       {loading ? (
         <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
