@@ -213,6 +213,8 @@ export default async function(req) {
   let discountChanged = false;
   let stockChanges: any[] = [];
   let stockMovementRecords: any[] = [];
+  let idempotencyClaimed = false;
+  let idempotencyShiftId = "";
 
   try {
     const authenticatedUser = await base44.auth.me();
@@ -1026,6 +1028,40 @@ export default async function(req) {
       ? normalizedPayments.map((payment) => payment.method).join(" + ")
       : "100% chegirma";
 
+    if (idempotencyKey) {
+      const claim = await service.entities.Shift.updateMany(
+        { id: shift.id, status: "open", sale_request_keys: { $ne: idempotencyKey } },
+        { $push: { sale_request_keys: idempotencyKey } },
+      );
+      if (!claim?.success || Number(claim.updated || 0) !== 1) {
+        const completedMatches = await service.entities.Sale.filter(
+          { idempotency_key: idempotencyKey },
+          "-created_date",
+          2,
+        );
+        const completedSale = completedMatches?.[0];
+        if (
+          completedSale
+          && completedSale.user_id === user.id
+          && completedSale.shift_id === shift.id
+          && (!completedSale.request_fingerprint || completedSale.request_fingerprint === requestFingerprint)
+        ) {
+          const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
+          return Response.json({
+            sale: completedSale,
+            shift: completedShift,
+            stock_updates: [],
+            already_processed: true,
+          });
+        }
+        return Response.json({
+          error: "Savdo serverda yakunlanmoqda. Bir ozdan so‘ng avtomatik qayta yuboriladi.",
+        }, { status: 503 });
+      }
+      idempotencyClaimed = true;
+      idempotencyShiftId = shift.id;
+    }
+
     if (claimedDiscount && claimedDiscount.single_use !== false) {
       const discountClaim = await service.entities.DiscountCode.updateMany(
         { id: claimedDiscount.id, active: true },
@@ -1263,6 +1299,16 @@ export default async function(req) {
       })),
     });
   } catch (error) {
+    if (idempotencyClaimed && idempotencyShiftId && idempotencyKey) {
+      try {
+        await base44.asServiceRole.entities.Shift.updateMany(
+          { id: idempotencyShiftId },
+          { $pull: { sale_request_keys: idempotencyKey } },
+        );
+      } catch {
+        // Preserve the original failure. A retry can be reviewed if the claim remains.
+      }
+    }
     for (const movement of stockMovementRecords) {
       try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch {}
     }
