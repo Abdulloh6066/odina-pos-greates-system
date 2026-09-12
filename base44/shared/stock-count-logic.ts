@@ -7,6 +7,20 @@ export const num = (value: unknown) => {
   return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : 0;
 };
 
+export function validateCountedQuantity(value: unknown, unit: string) {
+  if (value === null || value === undefined || value === "") {
+    return { value: null, error: "" };
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || Math.abs(parsed) > Number.MAX_SAFE_INTEGER) {
+    return { value: null, error: "Sanalgan miqdor 0 yoki undan katta son bo‘lishi kerak." };
+  }
+  if (["piece", "sheet"].includes(String(unit || "")) && !Number.isSafeInteger(parsed)) {
+    return { value: null, error: "Dona va list miqdori butun son bo‘lishi kerak." };
+  }
+  return { value: num(parsed), error: "" };
+}
+
 // Only the owner/admin may approve and apply stock adjustments.
 export const canApprove = (role: string) => String(role || "") === "admin";
 
