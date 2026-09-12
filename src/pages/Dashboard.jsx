@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { AlertTriangle, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
-import { formatUZS, formatNum, isSameDay, canAccess } from '@/lib/pos';
+import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey, canAccess } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 
 export default function Dashboard() {
@@ -35,7 +35,7 @@ export default function Dashboard() {
     return () => { active = false; };
   }, [role]);
 
-  const today = useMemo(() => sales.filter((s) => s.status !== 'refunded' && isSameDay(s.created_date, Date.now())), [sales]);
+  const today = useMemo(() => sales.filter((s) => s.status !== 'refunded' && saleBusinessDate(s) === tashkentDateKey()), [sales]);
   const todayTotal = today.reduce((sum, s) => sum + s.total, 0);
   const todayOrders = today.length;
   const avgOrder = todayOrders ? todayTotal / todayOrders : 0;
