@@ -52,7 +52,8 @@ const CSV_HEADERS = [
 ];
 
 export function tashkentDateKey(value = Date.now()) {
-  const date = value instanceof Date ? value : new Date(value);
+  const timestamp = typeof value === "string" ? Date.parse(value) : Number(value);
+  const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return "";
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Tashkent",
@@ -65,8 +66,9 @@ export function tashkentDateKey(value = Date.now()) {
 }
 
 export function defaultAuditFilters(value = Date.now()) {
-  const end = value instanceof Date ? value : new Date(value);
-  const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
+  const parsed = typeof value === "string" ? Date.parse(value) : Number(value);
+  const end = Number.isFinite(parsed) ? parsed : Date.now();
+  const start = end - 6 * 24 * 60 * 60 * 1000;
   return {
     date_from: tashkentDateKey(start),
     date_to: tashkentDateKey(end),
