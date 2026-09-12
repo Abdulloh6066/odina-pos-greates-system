@@ -235,14 +235,16 @@ export default function POS() {
   const stockByProduct = useMemo(() => {
     const locationId = shift?.shop_id || user?.shop_id;
     if (!locationId) return {};
-    return Object.fromEntries(
+
+    const quantities = Object.fromEntries(
       productStock
         .filter((stock) => stock.location_id === locationId)
-        .map((stock) => [
-          stock.product_id,
-          Number(stock.quantity || 0) - Number(queuedQuantityByProduct[stock.product_id] || 0),
-        ]),
+        .map((stock) => [stock.product_id, Number(stock.quantity || 0)]),
     );
+    for (const [productId, queuedQuantity] of Object.entries(queuedQuantityByProduct)) {
+      quantities[productId] = Number(quantities[productId] || 0) - Number(queuedQuantity || 0);
+    }
+    return quantities;
   }, [productStock, queuedQuantityByProduct, shift?.shop_id, user?.shop_id]);
 
   const confirmStockWarnings = async (shortages, allowNegativeStock) => {
