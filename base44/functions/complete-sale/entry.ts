@@ -1026,7 +1026,7 @@ export default async function(req) {
       ? normalizedPayments.map((payment) => payment.method).join(" + ")
       : "100% chegirma";
 
-    if (claimedDiscount?.single_use !== false) {
+    if (claimedDiscount && claimedDiscount.single_use !== false) {
       const discountClaim = await service.entities.DiscountCode.updateMany(
         { id: claimedDiscount.id, active: true },
         {
