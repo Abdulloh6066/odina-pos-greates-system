@@ -872,6 +872,47 @@ export default async function(req) {
     const requestedItems = Array.isArray(body?.items) ? body.items : [];
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
     const requestedDiscountCode = String(body?.discount_code || "").trim().toUpperCase();
+    const idempotencyKey = String(body?.idempotency_key || "").trim();
+
+    if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+      return Response.json({ error: "Savdo so‘rovining xavfsizlik kaliti noto‘g‘ri." }, { status: 400 });
+    }
+
+    const requestFingerprint = idempotencyKey
+      ? await saleRequestFingerprint(body)
+      : "";
+
+    if (idempotencyKey) {
+      const existingMatches = await service.entities.Sale.filter(
+        { idempotency_key: idempotencyKey },
+        "-created_date",
+        2,
+      );
+      if ((existingMatches || []).length > 1) {
+        return Response.json({
+          error: "Bu savdo kaliti bo‘yicha takroriy server yozuvlari topildi. OWNER tekshirishi kerak.",
+        }, { status: 409 });
+      }
+      const existingSale = existingMatches?.[0];
+      if (existingSale) {
+        if (
+          existingSale.user_id !== user.id
+          || existingSale.shift_id !== shiftId
+          || (existingSale.request_fingerprint && existingSale.request_fingerprint !== requestFingerprint)
+        ) {
+          return Response.json({
+            error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan.",
+          }, { status: 409 });
+        }
+        const existingShift = await service.entities.Shift.get(existingSale.shift_id).catch(() => null);
+        return Response.json({
+          sale: existingSale,
+          shift: existingShift,
+          stock_updates: [],
+          already_processed: true,
+        });
+      }
+    }
 
     if (!shiftId || requestedItems.length === 0) {
       return Response.json({ error: "Smena va mahsulotlar majburiy." }, { status: 400 });
