@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
-const COMPLETE_SALE_RUNTIME_VERSION = "discount-approval-v4-2026-09-10";
+const COMPLETE_SALE_RUNTIME_VERSION = "offline-sales-v1-2026-09-12";
 
 const PAYMENT_METHODS = new Set([
   "cash",
@@ -123,6 +123,84 @@ async function verifyOwnerPin(service: any, pinValue: unknown) {
     iterations,
   }, key, 256);
   return constantTimeEqual(hex(new Uint8Array(derived)), String(security.pin_hash));
+}
+
+const IDEMPOTENCY_KEY_PATTERN = /^[a-zA-Z0-9:_-]{16,128}$/;
+
+function tashkentBusinessDate(value: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Tashkent",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function saleNumberFor(idempotencyKey: string, soldAt: string) {
+  const day = tashkentBusinessDate(soldAt).replaceAll("-", "");
+  if (!idempotencyKey) {
+    return `OD-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  }
+  const suffix = idempotencyKey
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .slice(-8)
+    .toUpperCase()
+    .padStart(8, "0");
+  return `OD-${day}-${suffix}`;
+}
+
+function canonicalSaleRequest(body: any) {
+  const quantities = new Map<string, number>();
+  for (const item of Array.isArray(body?.items) ? body.items : []) {
+    const productId = String(item?.product_id || "");
+    const quantity = Math.floor(Number(item?.quantity));
+    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+  }
+  const items = Array.from(quantities.entries())
+    .map(([product_id, quantity]) => ({ product_id, quantity }))
+    .sort((left, right) => left.product_id.localeCompare(right.product_id));
+  const payments = (Array.isArray(body?.payments) ? body.payments : [])
+    .map((payment: any) => ({
+      method: String(payment?.method || ""),
+      amount: money(payment?.amount),
+      reference: String(payment?.reference || "").trim(),
+    }))
+    .sort((left: any, right: any) =>
+      `${left.method}:${left.amount}:${left.reference}`
+        .localeCompare(`${right.method}:${right.amount}:${right.reference}`));
+
+  return JSON.stringify({
+    shift_id: String(body?.shift_id || ""),
+    items,
+    discount_code: String(body?.discount_code || "").trim().toUpperCase(),
+    payments,
+    recorded_at: String(body?.recorded_at || ""),
+  });
+}
+
+async function saleRequestFingerprint(body: any) {
+  const bytes = new TextEncoder().encode(canonicalSaleRequest(body));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return hex(new Uint8Array(digest));
+}
+
+function resolveSoldAt(rawValue: unknown, shift: any, receivedAt: string) {
+  if (!rawValue) return receivedAt;
+  const timestamp = Date.parse(String(rawValue));
+  if (!Number.isFinite(timestamp)) {
+    throw httpError("Savdo vaqti noto‘g‘ri.", 400);
+  }
+  const receivedTimestamp = Date.parse(receivedAt);
+  if (timestamp > receivedTimestamp + 5 * 60 * 1000) {
+    throw httpError("Savdo vaqti kelajakda bo‘lishi mumkin emas.", 400);
+  }
+  const openedTimestamp = Date.parse(String(shift?.opened_at || shift?.created_date || ""));
+  if (Number.isFinite(openedTimestamp) && timestamp < openedTimestamp - 60 * 1000) {
+    throw httpError("Offline savdo smena ochilishidan oldin yozilgan.", 409);
+  }
+  return new Date(timestamp).toISOString();
 }
 
 export default async function(req) {
