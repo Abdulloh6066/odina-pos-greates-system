@@ -157,7 +157,7 @@ export default async function (req) {
         }
         const counted = checked.value;
         const wasCounted = counted !== null;
-        const diff = wasCounted ? counted - num(it.system_quantity) : 0;
+        const diff = wasCounted ? num(counted - num(it.system_quantity)) : 0;
         updates.push({
           id: it.id,
           was_counted: wasCounted,
@@ -259,31 +259,48 @@ export default async function (req) {
           { $set: { quantity: after, updated_at: now, updated_by: me.id, updated_by_name: userName } },
         );
         if (!upd?.success || Number(upd.updated || 0) !== 1) { failed++; continue; }
-        const movement = await service.entities.StockMovement.create({
-          movement_number: `ST-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-          location_id: count.location_id,
-          location_name: count.location_name,
-          item_kind: kind,
-          item_id: itemId,
-          item_name: itemName,
-          unit: it.unit,
-          movement_type: "adjustment",
-          quantity_change: change,
-          balance_before: before,
-          balance_after: after,
-          reason: `Ombor sanog‘i: ${count.count_number}${it.reason ? `. ${it.reason}` : ""}`,
-          reference_id: count.id,
-          reference_type: "stock_count",
-          user_id: me.id,
-          user_name: userName,
-          created_at: now,
-        }).catch(() => null);
+        let movement;
+        try {
+          movement = await service.entities.StockMovement.create({
+            movement_number: `ST-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+            location_id: count.location_id,
+            location_name: count.location_name,
+            item_kind: kind,
+            item_id: itemId,
+            item_name: itemName,
+            unit: it.unit,
+            movement_type: "adjustment",
+            quantity_change: change,
+            balance_before: before,
+            balance_after: after,
+            reason: `Ombor sanog‘i: ${count.count_number}${it.reason ? `. ${it.reason}` : ""}`,
+            reference_id: count.id,
+            reference_type: "stock_count",
+            user_id: me.id,
+            user_name: userName,
+            created_at: now,
+          });
+        } catch {
+          const rollbackAt = new Date().toISOString();
+          const rollback = await stockEntity.updateMany(
+            { id: stock.id, quantity: after },
+            { $set: { quantity: before, updated_at: rollbackAt, updated_by: me.id, updated_by_name: userName } },
+          );
+          if (!rollback?.success || Number(rollback.updated || 0) !== 1) {
+            throw new Error(`"${itemName}" qoldig‘i uchun tarix yozilmadi va avtomatik qaytarish bajarilmadi. Ombor tarixini tekshiring.`);
+          }
+          await service.entities.StockCountItem.update(it.id, { stale: true }).catch(() => {});
+          stale++;
+          failed++;
+          needRecount.push(itemName);
+          continue;
+        }
         await service.entities.StockCountItem.update(it.id, {
           applied: true,
           applied_at: now,
-          movement_id: movement?.id || undefined,
+          movement_id: movement.id,
           stale: false,
-        }).catch(() => {});
+        });
         applied++;
       }
 
