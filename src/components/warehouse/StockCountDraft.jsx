@@ -46,7 +46,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
   const computeDiff = (r) => {
     if (r.counted === '' || r.counted === null) return null;
     const c = Number(r.counted);
-    return Number.isFinite(c) ? c - r.system : null;
+    return Number.isFinite(c) ? Math.round((c - r.system) * 1000) / 1000 : null;
   };
 
   const buildPayload = () => rows.map((r) => ({
@@ -112,7 +112,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
   };
 
   const refreshStale = async () => {
-    const ok = await odinaConfirm("Eski qoldiqqa qaytib, o'zgargan mahsulotlarni qayta sanashga tayyormisiz? Sanoq qoralamaga qaytadi.", { title: 'Yangilash', confirmLabel: 'Yangilash' });
+    const ok = await odinaConfirm("Eski qoldiqqa qaytib, o'zgargan qoldiqlarni qayta sanashga tayyormisiz? Sanoq qoralamaga qaytadi.", { title: 'Yangilash', confirmLabel: 'Yangilash' });
     if (!ok) return;
     try {
       const res = await base44.functions.invoke('stock-count', { action: 'refresh_stale_items', count_id: count.id });
