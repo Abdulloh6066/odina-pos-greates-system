@@ -36,7 +36,7 @@ export function classifyItem(item: any, currentStock: any) {
   const curV = String(currentStock?.updated_date || currentStock?.updated_at || "");
   if (curQ !== sysQ || curV !== sysV) return { stale: true };
   const after = num(item?.counted_quantity);
-  return { stale: false, before: curQ, after, change: after - curQ };
+  return { stale: false, before: curQ, after, change: num(after - curQ) };
 }
 
 export function summarizeCount(items: any[]) {
