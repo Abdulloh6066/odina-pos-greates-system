@@ -1,0 +1,6 @@
+{
+  "name": "telegram-setup",
+  "entry": "entry.ts",
+  "description": "Odina Telegram boti va belgilangan ish guruhini xavfsiz tekshiradi; faqat egasi/admin uchun.",
+  "is_public": false
+}
