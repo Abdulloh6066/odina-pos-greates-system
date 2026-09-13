@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
 const NOW = Date.parse('2026-09-13T14:00:00Z');
-const source = ['base44/shared/production-forecast-logic.ts', 'base44/shared/telegram-alert-logic.ts', 'base44/functions/telegram-alerts/entry.ts']
+const source = ['base44/shared/user-helpers.ts', 'base44/shared/production-forecast-logic.ts', 'base44/shared/telegram-alert-logic.ts', 'base44/functions/telegram-alerts/entry.ts']
   .map(p => readFileSync(p, 'utf8').replace(/^import .*;$/gm, '').replace(/^export /gm, '')).join('\n');
 const js = ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None });
 const baseOrder = { id:'o1', order_number:'BO-001', order_status:'qabul_qilindi', required_date:'2026-09-13', required_time:'19:30', shop_name_snapshot:'Odina Main', total:987654321, remaining_balance:123456789, customer_phone:'SECRET_PHONE', notes:'SECRET_NOTES', customer_name:'SECRET_NAME' };
@@ -13,7 +13,7 @@ function fixture(opts = {}) {
   let handler, uuid = 0;
   const sent = [], writes = [];
   const db = {
-    User:[{ id:'owner', role:opts.role || 'admin', active: opts.active !== false }],
+    User:[{ id:'stored-owner', email:'owner@odinatort.uz', role:opts.role || 'admin', active: opts.active !== false }],
     TelegramControl:[{ id:'control', key:'odina-work-group', enabled:opts.enabled !== false, lock_until:0, lock_token:'' }],
     TelegramDelivery:[], CustomerOrder:opts.orders || [{...baseOrder}], Shop:[], Product:[], Recipe:[], RecipeItem:[], CustomerOrderItem:[], IngredientStock:[],
     ...opts.db,
@@ -46,8 +46,7 @@ function fixture(opts = {}) {
   }]));
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [opts.now || NOW])); } static now() { return opts.now || NOW; } }
   const context = { Response, AbortSignal, Date:Clock, crypto:{randomUUID:()=>String(++uuid)},
-    userRole:u=>u.role,
-    createClientFromRequest:()=>({auth:{me:async()=>opts.unauth ? null : ({id:'owner',role:'admin'})},asServiceRole:{entities}}),
+    createClientFromRequest:()=>({auth:{me:async()=>opts.unauth ? null : ({id:opts.authId || 'stored-owner',email:'owner@odinatort.uz',role:'admin'})},asServiceRole:{entities}}),
     Deno:{env:{get:()=>opts.missing ? undefined : 'PRIVATE_TOKEN'},serve:fn=>{handler=fn;}},
     fetch:async (url, init) => {
       const body=JSON.parse(init.body); sent.push(body);
@@ -68,6 +67,10 @@ test('stored non-admin and inactive admin cannot send', async()=>{
   for(const opts of [{role:'cashier'},{active:false},{unauth:true}]) {
     const f=fixture(opts); const r=await f.run(); assert.ok([401,403].includes(r.status)); assert.equal(f.sent.length,0); assert.equal(f.writes.length,0);
   }
+});
+test('auth ID mismatch resolves the stored admin by exact email', async()=>{
+  const f=fixture({authId:'different-auth-id'}); const r=await f.run({action:'preview'});
+  assert.equal(r.status,200); assert.equal(f.sent.length,0); assert.equal(f.writes.length,0);
 });
 test('preview has no mutations or external sends and strips financial/customer data',async()=>{
   const f=fixture(); const r=await f.run({action:'preview'}); assert.equal(r.status,200);
