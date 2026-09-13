@@ -443,7 +443,7 @@ export default function Warehouse() {
                   <div className="flex-1">
                     <p className="font-semibold">Retsept bo‘yicha mahsulot kiritish</p>
                     <p className="text-sm text-muted-foreground mt-0.5">
-                      Un, shakar va boshqa masalliqlar “Ishlab chiqarish” bo‘limida tayyor mahsulot kiritilganda avtomatik kamayadi. Qo‘lda qoldiq tuzatish masalliqlarni o‘zgartirmaydi.
+                      Un, shakar va boshqa masalliqlar tayyor mahsulot kiritilganda yoki buyurtmada “Tayyor bo‘ldi” tasdiqlanganda tex-karta bo‘yicha avtomatik kamayadi. Qo‘lda qoldiq tuzatish masalliqlarni o‘zgartirmaydi.
                     </p>
                   </div>
                   <Button type="button" onClick={() => changeTab('production')} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary-strong">
