@@ -85,7 +85,7 @@ test('paused setting and missing token prevent delivery', async()=>{
 });
 test('terminal, future and invalid-date orders excluded; overdue first',async()=>{
   const orders=['bekor_qilindi','yakunlandi','yuborildi_olib_ketildi'].map((order_status,i)=>({...baseOrder,id:'closed'+i,order_status}));
-  orders.push({...baseOrder,id:'future',required_time:'22:00'}, {...baseOrder,id:'invalid',required_date:'2026-02-31'},
+  orders.push({...baseOrder,id:'future',required_time:'22:01'}, {...baseOrder,id:'invalid',required_date:'2026-02-31'},
     {...baseOrder,id:'late',order_number:'LATE',required_time:'18:30'}, {...baseOrder});
   const f=fixture({orders});const r=await f.run({action:'preview'});
   assert.equal(r.data.pending,2);assert.ok(r.data.text.indexOf('LATE')<r.data.text.indexOf('BO-001'));
