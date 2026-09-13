@@ -5,6 +5,7 @@ import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, Clipb
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -547,7 +548,7 @@ function HistoryList({ movements }) {
               </p>
             </div>
             <div className="text-xs text-muted-foreground mt-2">
-              {formatNum(movement.balance_before)} → {formatNum(movement.balance_after)} · {movement.user_name} · {new Date(movement.created_at || movement.created_date).toLocaleString('uz-UZ')}
+              {formatNum(movement.balance_before)} → {formatNum(movement.balance_after)} · {movement.user_name} · {formatUzbekistanDateTime(movement.created_at || movement.created_date)}
             </div>
           </div>
         </div>
