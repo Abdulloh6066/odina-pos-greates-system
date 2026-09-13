@@ -1,5 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { userRole } from "../../shared/user-helpers.ts";
+import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
 import { TELEGRAM_GROUP_ID, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
 
@@ -13,7 +13,8 @@ Deno.serve(async (req) => {
     const auth = await client.auth.me();
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
     service = client.asServiceRole;
-    if (auth.active === false || auth.data?.active === false || userRole(auth) !== "admin") {
+    const stored = await resolveStoredAppUser(service, auth);
+    if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
