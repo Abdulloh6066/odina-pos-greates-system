@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading }) {
   const [shopId, setShopId] = useState('');
@@ -116,7 +117,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
             <div className="font-bold text-lg">ODINA SHOP</div>
             <div className="text-sm">SMENA HISOBOTI</div>
             <div className="text-xs">{shift?.shop_name} · {shift?.user_name}</div>
-            <div className="text-xs">{new Date().toLocaleString('en-GB')}</div>
+            <div className="text-xs">{formatUzbekistanDateTime(Date.now())}</div>
           </div>
 
           <section className="space-y-3">
