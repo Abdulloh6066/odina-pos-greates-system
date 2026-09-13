@@ -59,7 +59,9 @@ Deno.serve(async (req) => {
     });
     const candidates = orderCandidates(orders, started);
     const forecastKeys: string[] = [];
-    const locations = (await readAll(service.entities.Shop, { location_type: "production" })).filter((r: any) => r.active !== false);
+    const activeLocations = (await readAll(service.entities.Shop, { location_type: "production" }, "name")).filter((r: any) => r.active !== false);
+    const mainLocation = activeLocations.find((r: any) => r.is_main === true) || activeLocations[0];
+    const locations = mainLocation ? [mainLocation] : [];
     // Forecast calculation is only needed for the daily evening digest.
     if (clock.hour >= 18) {
       const previous = await readAll(service.entities.TelegramDelivery, { keys: { $in: locations.map((l: any) => "forecast:" + l.id + ":" + clock.tomorrow) } });
