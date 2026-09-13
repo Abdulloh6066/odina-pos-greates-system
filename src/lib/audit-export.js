@@ -1,3 +1,5 @@
+import { formatUzbekistanDateTime, uzbekistanDateKey } from './uzbekistan-time.js';
+
 export const AUDIT_CATEGORY_OPTIONS = [
   { value: "all", label: "Barcha bo‘limlar" },
   { value: "sale", label: "Savdo va qaytarish" },
@@ -52,17 +54,7 @@ const CSV_HEADERS = [
 ];
 
 export function tashkentDateKey(value = Date.now()) {
-  const timestamp = typeof value === "string" ? Date.parse(value) : Number(value);
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Tashkent",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return values.year + "-" + values.month + "-" + values.day;
+  return uzbekistanDateKey(value);
 }
 
 export function defaultAuditFilters(value = Date.now()) {
@@ -91,17 +83,7 @@ export function auditRequestFilters(filters) {
 }
 
 export function formatAuditDateTime(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("uz-UZ", {
-    timeZone: "Asia/Tashkent",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
+  return formatUzbekistanDateTime(value, { second: "2-digit" });
 }
 
 export function auditSourceLabel(source) {
