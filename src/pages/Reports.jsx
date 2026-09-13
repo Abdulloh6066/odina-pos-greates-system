@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey } from '@/lib/pos';
+import { formatUzbekistan } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 
 const PAY_COLORS = { cash: 'hsl(var(--primary))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
@@ -36,7 +37,7 @@ export default function Reports() {
       const dateKey = tashkentDateKey(day);
       const daySales = completedSales.filter((sale) => saleBusinessDate(sale) === dateKey);
       days.push({
-        date: day.toLocaleDateString('uz-UZ', { weekday: 'short', timeZone: 'Asia/Tashkent' }),
+        date: formatUzbekistan(day, { weekday: 'short' }),
         total: daySales.reduce((sum, sale) => sum + sale.total, 0),
         orders: daySales.length,
       });
