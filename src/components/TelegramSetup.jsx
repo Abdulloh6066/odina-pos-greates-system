@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
+import TelegramAlerts from '@/components/TelegramAlerts';
 
 export default function TelegramSetup({ user }) {
   const [busy, setBusy] = useState(false);
@@ -43,9 +44,10 @@ export default function TelegramSetup({ user }) {
               <p className="text-sm">Chat ID: <span className="font-mono select-all break-all">{group.id}</span></p>
             </div>
           )) : <p className="text-sm text-muted-foreground">Belgilangan guruh topilmadi. Bot shu guruhga qo‘shilganini tekshiring.</p>}
-          <p className="text-xs text-muted-foreground">Avtomatik ogohlantirishlar hali yoqilmagan. Sinov yuborilgach, Telegram guruhida xabarni tekshiring.</p>
+          <p className="text-xs text-muted-foreground">Sinov xabari faqat ulanishni tekshiradi. Avtomatik ogohlantirishlar holati quyidagi bo‘limda.</p>
         </>}
       </div>
+      <TelegramAlerts />
     </section>
   );
 }
