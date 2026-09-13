@@ -139,8 +139,8 @@ export default async function (req) {
     let expenses = (movements || []).filter(
       (m: any) => m.type === "withdrawal" && EXPENSE_CATEGORIES.has(m.expense_category),
     );
-    if (dateFrom) expenses = expenses.filter((m: any) => String(m.created_at || "").slice(0, 10) >= dateFrom);
-    if (dateTo) expenses = expenses.filter((m: any) => String(m.created_at || "").slice(0, 10) <= dateTo);
+    if (dateFrom) expenses = expenses.filter((m: any) => tashkentBusinessDate(m.created_at || m.created_date) >= dateFrom);
+    if (dateTo) expenses = expenses.filter((m: any) => tashkentBusinessDate(m.created_at || m.created_date) <= dateTo);
     if (shopId) expenses = expenses.filter((m: any) => m.shop_id === shopId);
     const expensesTotal = Math.round(expenses.reduce((s: number, m: any) => s + num(m.amount), 0));
 
