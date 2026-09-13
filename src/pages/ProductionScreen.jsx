@@ -251,7 +251,9 @@ function ProductionScreenInner() {
       if (data?.order) {
         toast({
           title: step === 'ready' ? 'Tayyor bo‘ldi' : 'Yuborildi',
-          description: data.order.order_number,
+          description: step === 'ready' && data.production_applied
+            ? `${data.order.order_number} · Masalliqlar ombordan kamaydi`
+            : data.order.order_number,
         });
         await load();
       } else {
@@ -401,7 +403,7 @@ function ProductionScreenInner() {
               </DialogTitle>
               <DialogDescription>
                 {confirm.step === 'ready'
-                  ? `${confirm.order.order_number} buyurtmasini tayyor deb belgilaysiz.`
+                  ? `${confirm.order.order_number} tayyor deb belgilanadi va tex-karta bo‘yicha masalliqlar markaziy ombordan avtomatik kamayadi.`
                   : `${confirm.order.order_number} buyurtmasini yuborilgan deb belgilaysiz.`}
               </DialogDescription>
             </DialogHeader>
