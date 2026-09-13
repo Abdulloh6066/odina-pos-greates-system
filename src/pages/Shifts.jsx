@@ -14,6 +14,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { formatUZS, formatNum, saleOccurredAt } from "@/lib/pos";
+import { formatUzbekistan, formatUzbekistanDateTime } from "@/lib/uzbekistan-time";
 import PageHeader from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -45,17 +46,9 @@ const EMPTY_DETAIL = {
   partial: false,
 };
 
-const dateTime = (value) => {
-  if (!value) return "—";
-  return new Date(value).toLocaleString("uz-UZ", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Tashkent",
-  });
-};
+const dateTime = (value) => value
+  ? formatUzbekistanDateTime(value, { month: "short" })
+  : "—";
 
 const errorText = (error) => (
   error?.response?.data?.error || error?.data?.error || error?.message || String(error || "Noma’lum xato")
@@ -190,7 +183,7 @@ export default function Shifts() {
 }
 
 function ShiftCard({ shift, onOpen }) {
-  const opened = new Date(shift.opened_at || shift.created_date);
+  const opened = shift.opened_at || shift.created_date;
   const diff = Number(shift.difference || 0);
   const plastic = Number(shift.uzcard_sales || 0) + Number(shift.humo_sales || 0);
 
@@ -215,12 +208,13 @@ function ShiftCard({ shift, onOpen }) {
       </div>
 
       <div className="text-xs text-muted-foreground mb-3">
-        {opened.toLocaleString("uz-UZ", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-        {shift.closed_at ? " → " + new Date(shift.closed_at).toLocaleString("uz-UZ", {
+        {formatUzbekistan(opened, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}
+        {shift.closed_at ? " → " + formatUzbekistan(shift.closed_at, {
           day: "2-digit",
           month: "short",
           hour: "2-digit",
           minute: "2-digit",
+          hourCycle: "h23",
         }) : ""}
       </div>
 
