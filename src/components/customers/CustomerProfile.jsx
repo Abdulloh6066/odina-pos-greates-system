@@ -28,27 +28,36 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
     const load = async () => {
       setLoading(true);
       try {
-        const [linkedOrders, byPhoneOrders, linkedSales] = await Promise.all([
+        const [linkedOrders, byPhoneOrders, linkedSales, byPhoneSales] = await Promise.all([
           base44.entities.CustomerOrder.filter({ customer_id: customer.id }, '-created_date', 200),
           customer.phone_normalized
             ? base44.entities.CustomerOrder.filter({ customer_phone: customer.phone }, '-created_date', 200)
             : Promise.resolve([]),
           base44.entities.Sale.filter({ customer_id: customer.id }, '-created_date', 200),
+          customer.phone
+            ? base44.entities.Sale.filter({ customer_phone_snapshot: customer.phone }, '-created_date', 200)
+            : Promise.resolve([]),
         ]);
         if (cancelled) return;
         const phoneNorm = customer.phone_normalized || normalizePhone(customer.phone);
-        const merged = new Map();
+        const orderMap = new Map();
         [...(linkedOrders || []), ...(byPhoneOrders || [])].forEach((o) => {
           const matches = o.customer_id === customer.id || normalizePhone(o.customer_phone) === phoneNorm;
-          if (matches) merged.set(o.id, o);
+          if (matches) orderMap.set(o.id, o);
         });
-        const allOrders = Array.from(merged.values()).sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+        const saleMap = new Map();
+        [...(linkedSales || []), ...(byPhoneSales || [])].forEach((s) => {
+          const matches = s.customer_id === customer.id || normalizePhone(s.customer_phone_snapshot) === phoneNorm;
+          if (matches) saleMap.set(s.id, s);
+        });
+        const allOrders = Array.from(orderMap.values()).sort((a, b) => String(b.created_date || '').localeCompare(String(a.created_date || '')));
+        const allSales = Array.from(saleMap.values()).sort((a, b) => String(b.created_date || b.sold_at || '').localeCompare(String(a.created_date || a.sold_at || '')));
         setOrders(allOrders);
-        setSales(linkedSales || []);
+        setSales(allSales);
         const orderSpend = allOrders
           .filter((o) => o.order_status !== 'bekor_qilindi')
           .reduce((s, o) => s + Number(o.total || 0), 0);
-        const saleSpend = (linkedSales || [])
+        const saleSpend = allSales
           .filter((s) => s.status === 'completed')
           .reduce((s, s2) => s + Number(s2.total || 0), 0);
         setLifetime(orderSpend + saleSpend);
@@ -124,12 +133,16 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
                 {sales.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Kassa savdolari topilmadi.</p>
                 ) : sales.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
+                  <div key={s.id} className={`flex items-center justify-between rounded-xl border px-3 py-2 ${s.status === 'refunded' ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'}`}>
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{s.sale_number}</div>
-                      <div className="text-xs text-muted-foreground">{uzbekistanDateKey(s.sold_at || s.created_date)} · {s.status === 'completed' ? 'Yakunlandi' : 'Qaytarilgan'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {uzbekistanDateKey(s.sold_at || s.created_date)} · {s.status === 'completed' ? 'Yakunlandi' : 'Qaytarilgan'}
+                        {s.sale_items_count ? ` · ${s.sale_items_count} ta` : ''}
+                        {s.payment_methods_summary ? ` · ${s.payment_methods_summary}` : ''}
+                      </div>
                     </div>
-                    <div className="text-sm font-semibold shrink-0">{formatUZS(s.total)}</div>
+                    <div className={`text-sm font-semibold shrink-0 ${s.status === 'refunded' ? 'text-destructive line-through' : ''}`}>{formatUZS(s.total)}</div>
                   </div>
                 ))}
               </div>
