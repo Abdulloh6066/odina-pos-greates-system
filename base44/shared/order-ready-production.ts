@@ -178,17 +178,7 @@ async function buildOrderProductionPlan(service: any, order: any) {
   }
 
   const ingredientPlans = Array.from(ingredientPlansById.values());
-  const shortages = [];
-
-  for (const ingredientPlan of ingredientPlans) {
-    const rows = await service.entities.IngredientStock.filter({
-      location_id: null,
-      ingredient_id: ingredientPlan.ingredientId,
-    });
-    ingredientPlan.unresolvedRows = rows;
-  }
-
-  return { productPlans, ingredientPlans, shortages };
+  return { productPlans, ingredientPlans };
 }
 
 async function attachLocationStocks(service: any, location: any, ingredientPlans: any[]) {
