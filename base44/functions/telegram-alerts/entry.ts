@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     // Prioritize the daily digest, then overdue and upcoming orders. One Telegram
     // message per run avoids group flooding; remaining candidates wait for next run.
     fresh.sort((a: any, b: any) => Number(forecastKeys.includes(b.key)) - Number(forecastKeys.includes(a.key)));
-    let text = "🍰 Odina — Ish jarayoni\n" + clock.today + " · Toshkent vaqti\n";
+    let text = "🍰 Odina — Ish jarayoni\n" + clock.today + "\n";
     const selected: any[] = [];
     for (const item of fresh) {
       if (selected.length >= 8 || text.length + item.text.length + 2 > 3400) break;
