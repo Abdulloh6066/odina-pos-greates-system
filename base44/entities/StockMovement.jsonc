@@ -62,6 +62,12 @@
     "reference_type": {
       "type": "string"
     },
+    "order_id": {
+      "type": "string"
+    },
+    "order_number_snapshot": {
+      "type": "string"
+    },
     "unit": {
       "enum": [
         "g",
