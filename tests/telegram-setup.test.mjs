@@ -7,15 +7,21 @@ import ts from 'typescript';
 async function run(opts = {}) {
   let handler;
   const calls = [];
-  const source = readFileSync('base44/functions/telegram-setup/entry.ts', 'utf8').replace(/^import .*;$/gm, '');
+  const source = ['base44/shared/user-helpers.ts', 'base44/functions/telegram-setup/entry.ts']
+    .map(p => readFileSync(p, 'utf8').replace(/^import .*;$/gm, '').replace(/^export /gm, '')).join('\n');
   const token = 'TEST_SECRET_DO_NOT_RETURN';
   const context = {
     Response, AbortSignal, Map, Date, Number,
-    createClientFromRequest: () => ({
-      auth: { me: async () => opts.auth === false ? null : ({ id: 'owner', role: 'admin' }) },
-      asServiceRole: { entities: { User: { get: async () => ({ role: opts.role || 'admin', active: opts.active !== false }) } } },
-    }),
-    userRole: u => u.role,
+    createClientFromRequest: () => {
+      const stored = { id: 'stored-owner', email: 'owner@odinatort.uz', role: opts.role || 'admin', active: opts.active !== false };
+      return {
+        auth: { me: async () => opts.auth === false ? null : ({ id: opts.authId || 'stored-owner', email: 'owner@odinatort.uz', role: 'admin' }) },
+        asServiceRole: { entities: { User: {
+          get: async id => opts.noStored || id !== stored.id ? null : stored,
+          filter: async query => !opts.noStored && query.email === stored.email ? [stored] : [],
+        } } },
+      };
+    },
     Deno: { env: { get: () => opts.missing ? undefined : token }, serve: fn => { handler = fn; } },
     fetch: async (url, init) => {
       const method = url.split('/').at(-1);
@@ -39,6 +45,13 @@ test('unauthenticated request never contacts Telegram', async () => {
 });
 test('stored cashier role overrides admin token claim', async () => {
   const r = await run({ role: 'cashier' }); assert.equal(r.status, 403); assert.equal(r.calls.length, 0);
+});
+test('auth ID mismatch resolves the stored admin by exact email', async () => {
+  const r = await run({ authId: 'different-auth-id' }); assert.equal(r.status, 200);
+  assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat']);
+});
+test('missing stored user fails closed even with admin token claim', async () => {
+  const r = await run({ noStored: true }); assert.equal(r.status, 403); assert.equal(r.calls.length, 0);
 });
 test('disabled admin rejected', async () => {
   const r = await run({ active: false }); assert.equal(r.status, 403); assert.equal(r.calls.length, 0);
