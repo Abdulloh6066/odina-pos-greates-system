@@ -5,7 +5,9 @@ import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 const GROUP_ID = "-5570444945";
 const TEST_TEXT = "✅ Odina POS bilan ulanish ishlayapti.\nBu sinov xabari. Avtomatik ogohlantirishlar hali yoqilmagan.";
 Deno.serve(async (req) => {
+  let phase = "boshlash";
   try {
+    phase = "foydalanuvchini tekshirish";
     const client = createClientFromRequest(req);
     const auth = await client.auth.me();
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
@@ -13,6 +15,7 @@ Deno.serve(async (req) => {
     if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
+    phase = "so‘rovni o‘qish";
     const body = await req.json().catch(() => ({}));
     const action = body.action || "inspect";
     if (!["inspect", "test"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
@@ -37,10 +40,12 @@ Deno.serve(async (req) => {
       }
       return data.result;
     };
+    phase = "Telegram botni tekshirish";
     const bot = await call("getMe");
     if (String(bot.username).toLowerCase() !== "odina_nazorat_bot") {
       return Response.json({ error: "Saqlangan token @Odina_nazorat_bot ga tegishli emas." }, { status: 400 });
     }
+    phase = "Telegram guruhini tekshirish";
     const group = await call("getChat", { chat_id: GROUP_ID });
     if (String(group.id) !== GROUP_ID || !["group", "supergroup"].includes(group.type)) {
       return Response.json({ error: "Tasdiqlangan Telegram guruhi mos kelmadi." }, { status: 409 });
@@ -49,6 +54,7 @@ Deno.serve(async (req) => {
     if (action === "test") {
       // Exactly one attempt. A timeout may mean Telegram accepted the message;
       // never automatically retry and risk posting a duplicate.
+      phase = "sinov xabarini yuborish";
       const sent = await call("sendMessage", { chat_id: GROUP_ID, text: TEST_TEXT });
       messageId = sent.message_id;
     }
@@ -68,7 +74,9 @@ Deno.serve(async (req) => {
       "Telegram so‘rovlar chegarasi. Birozdan keyin qayta urinib ko‘ring.",
       "Telegram bilan ulanishda xato.",
     ];
-    const message = error instanceof Error && known.includes(error.message) ? error.message : "Javob olinmadi. Sinov yuborgan bo‘lsangiz, qayta bosishdan oldin Telegram guruhini tekshiring.";
+    const message = error instanceof Error && known.includes(error.message)
+      ? error.message
+      : `Ulanishni ${phase} bosqichida tekshirib bo‘lmadi. Qayta bosishdan oldin Telegram guruhini tekshiring.`;
     return Response.json({ error: message }, { status: 502 });
   }
 });
