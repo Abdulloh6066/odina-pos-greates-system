@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 export default function Receipt({ open, sale, settings, onClose }) {
   const ref = useRef(null);
@@ -10,8 +11,7 @@ export default function Receipt({ open, sale, settings, onClose }) {
 
   const handlePrint = () => { window.print(); };
 
-  const date = new Date(sale.sold_at || sale.created_date || sale.created_at || Date.now());
-  const timeStr = date.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const timeStr = formatUzbekistanDateTime(sale.sold_at || sale.created_date || sale.created_at || Date.now());
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
