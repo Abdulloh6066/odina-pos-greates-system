@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useOutletContext } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Phone, Cake, UserCircle, Wallet } from 'lucide-react';
+import { Plus, Search, Loader2, Phone, Cake, UserCircle, Wallet, ShoppingBag } from 'lucide-react';
 import { fullName, formatPhone, birthdayDisplay, normalizePhone } from '@/lib/customers';
 import { formatUZS } from '@/lib/pos';
 import CustomerForm from '@/components/customers/CustomerForm';
@@ -23,6 +23,8 @@ export default function Customers() {
   const [editing, setEditing] = useState(null);
   const [profileCustomer, setProfileCustomer] = useState(null);
   const [spendMap, setSpendMap] = useState({});
+  const [countMap, setCountMap] = useState({});
+  const [sortMode, setSortMode] = useState('default');
 
   const load = async () => {
     setLoading(true);
@@ -42,7 +44,7 @@ export default function Customers() {
   useEffect(() => {
     let cancelled = false;
     const compute = async () => {
-      if (!customers.length) { setSpendMap({}); return; }
+      if (!customers.length) { setSpendMap({}); setCountMap({}); return; }
       try {
         const phoneNorms = customers.map((c) => c.phone_normalized || normalizePhone(c.phone)).filter(Boolean);
         const [ordersByPhone, ordersById, salesById] = await Promise.all([
@@ -52,6 +54,7 @@ export default function Customers() {
         ]);
         if (cancelled) return;
         const map = {};
+        const counts = {};
         const normByCustomer = {};
         customers.forEach((c) => { normByCustomer[c.id] = c.phone_normalized || normalizePhone(c.phone); });
         const addOrder = (o) => {
@@ -59,6 +62,7 @@ export default function Customers() {
           const cid = o.customer_id;
           if (cid && map[cid] === undefined) map[cid] = 0;
           if (cid) map[cid] = (map[cid] || 0) + Number(o.total || 0);
+          if (cid) counts[cid] = (counts[cid] || 0) + 1;
         };
         const addByPhone = (o) => {
           if (!o || o.order_status === 'bekor_qilindi') return;
@@ -66,6 +70,7 @@ export default function Customers() {
           for (const c of customers) {
             if ((c.phone_normalized || normalizePhone(c.phone)) === n) {
               map[c.id] = (map[c.id] || 0) + Number(o.total || 0);
+              counts[c.id] = (counts[c.id] || 0) + 1;
               break;
             }
           }
@@ -75,10 +80,12 @@ export default function Customers() {
         (salesById || []).forEach((s) => {
           if (!s || s.status !== 'completed') return;
           map[s.customer_id] = (map[s.customer_id] || 0) + Number(s.total || 0);
+          counts[s.customer_id] = (counts[s.customer_id] || 0) + 1;
         });
         setSpendMap(map);
+        setCountMap(counts);
       } catch {
-        if (!cancelled) setSpendMap({});
+        if (!cancelled) { setSpendMap({}); setCountMap({}); }
       }
     };
     compute();
@@ -87,11 +94,20 @@ export default function Customers() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return customers;
-    return customers.filter((c) => {
-      return fullName(c).toLowerCase().includes(q) || String(c.phone || '').replace(/\D/g, '').includes(q.replace(/\D/g, ''));
-    });
-  }, [customers, query]);
+    let list = customers;
+    if (q) {
+      list = customers.filter((c) => {
+        return fullName(c).toLowerCase().includes(q) || String(c.phone || '').replace(/\D/g, '').includes(q.replace(/\D/g, ''));
+      });
+    }
+    if (sortMode === 'mostBuys') {
+      return [...list].sort((a, b) => (countMap[b.id] || 0) - (countMap[a.id] || 0));
+    }
+    if (sortMode === 'mostSpends') {
+      return [...list].sort((a, b) => (spendMap[b.id] || 0) - (spendMap[a.id] || 0));
+    }
+    return list;
+  }, [customers, query, sortMode, countMap, spendMap]);
 
   const openProfile = (c) => setProfileCustomer(c);
   const openEdit = () => { setEditing(profileCustomer); setFormOpen(true); };
@@ -122,6 +138,23 @@ export default function Customers() {
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ism yoki telefon bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Button
+          variant={sortMode === 'mostBuys' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSortMode((m) => (m === 'mostBuys' ? 'default' : 'mostBuys'))}
+        >
+          <ShoppingBag className="w-4 h-4" /> Ko‘p xarid qiluvchi
+        </Button>
+        <Button
+          variant={sortMode === 'mostSpends' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSortMode((m) => (m === 'mostSpends' ? 'default' : 'mostSpends'))}
+        >
+          <Wallet className="w-4 h-4" /> Ko‘p pul sarflagan
+        </Button>
       </div>
 
       {loading ? (
