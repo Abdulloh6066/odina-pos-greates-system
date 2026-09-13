@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { ReceiptText, Search, Eye, RotateCcw } from 'lucide-react';
 import { formatUZS, formatNum, saleBusinessDate, saleOccurredAt } from '@/lib/pos';
+import { formatUzbekistan, formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -107,7 +108,7 @@ export default function SalesHistory() {
                   {s.status === 'refunded' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-destructive">Qaytarilgan</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(saleOccurredAt(s)).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tashkent' })}
+                  {formatUzbekistan(saleOccurredAt(s), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}
                   {role !== 'cashier' && ` · ${s.user_name || ''}`}
                   {s.shop_name && ` · ${s.shop_name}`}
                 </div>
@@ -142,7 +143,7 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
           <DialogTitle className="font-display text-xl">Savdo tafsilotlari</DialogTitle>
         </DialogHeader>
         <div className="text-xs text-muted-foreground mb-3">
-          {new Date(saleOccurredAt(sale)).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}
+          {formatUzbekistanDateTime(saleOccurredAt(sale), { second: '2-digit' })}
           {sale.shop_name && ` · ${sale.shop_name}`} · Kassir: {sale.user_name}
         </div>
         <div className="space-y-2 mb-3">
