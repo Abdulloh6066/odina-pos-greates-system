@@ -11,6 +11,7 @@ import {
   PlayCircle,
   ReceiptText,
   RotateCcw,
+  Search,
   WalletCards,
 } from "lucide-react";
 import { formatUZS, formatNum, saleOccurredAt } from "@/lib/pos";
@@ -18,6 +19,19 @@ import { formatUzbekistan, formatUzbekistanDateTime } from "@/lib/uzbekistan-tim
 import PageHeader from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  filterShiftHistory,
+  listShiftHistoryShops,
+  shiftHistoryStatusGroup,
+} from "@/lib/shift-history";
 
 const PAYMENT_LABELS = {
   cash: "Naqd pul",
@@ -63,6 +77,12 @@ export default function Shifts() {
   const [detail, setDetail] = useState(EMPTY_DETAIL);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [filters, setFilters] = useState({
+    query: "",
+    date: "",
+    shop_id: "all",
+    status: "all",
+  });
 
   const load = async () => {
     setLoading(true);
@@ -81,8 +101,24 @@ export default function Shifts() {
     return shifts;
   }, [shifts, role, user]);
 
-  const open = visible.filter((shift) => shift.status === "open");
-  const closed = visible.filter((shift) => shift.status === "closed");
+  const shops = useMemo(() => listShiftHistoryShops(visible), [visible]);
+  const filtered = useMemo(() => filterShiftHistory(visible, filters), [visible, filters]);
+  const open = filtered.filter((shift) => shiftHistoryStatusGroup(shift) === "open");
+  const closed = filtered.filter((shift) => shiftHistoryStatusGroup(shift) === "closed");
+  const hasFilters = Boolean(
+    filters.query.trim()
+    || filters.date
+    || filters.shop_id !== "all"
+    || filters.status !== "all",
+  );
+
+  const changeFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ query: "", date: "", shop_id: "all", status: "all" });
+  };
 
   const openDetails = async (shift) => {
     setSelectedShift(shift);
@@ -131,15 +167,102 @@ export default function Shifts() {
     <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
         title="Smenalar"
-        subtitle={role === "cashier" ? "Sizning smenalar tarixingiz" : "Barcha do‘kon smenalari"}
+        subtitle={role === "cashier"
+          ? `${formatNum(filtered.length)} ta smena · faqat sizniki`
+          : `${formatNum(filtered.length)} ta smena · barcha do‘konlar`}
         icon={Clock}
       />
+
+      <section
+        aria-label="Smenalar tarixini qidirish"
+        className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4 mb-5"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+          <FilterField label="Qidirish" className="sm:col-span-2 xl:col-span-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={filters.query}
+                onChange={(event) => changeFilter("query", event.target.value)}
+                placeholder="Kassir yoki do‘kon…"
+                aria-label="Kassir yoki do‘kon bo‘yicha qidirish"
+                className="h-11 rounded-xl pl-9"
+              />
+            </div>
+          </FilterField>
+
+          <FilterField label="Sana">
+            <Input
+              type="date"
+              value={filters.date}
+              onChange={(event) => changeFilter("date", event.target.value)}
+              aria-label="Smena sanasi"
+              className="h-11 rounded-xl"
+            />
+          </FilterField>
+
+          <FilterField label="Do‘kon">
+            <Select value={filters.shop_id} onValueChange={(value) => changeFilter("shop_id", value)}>
+              <SelectTrigger className="h-11 rounded-xl bg-card">
+                <SelectValue placeholder="Barcha do‘konlar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barcha do‘konlar</SelectItem>
+                {shops.map((shop) => (
+                  <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Holati">
+            <Select value={filters.status} onValueChange={(value) => changeFilter("status", value)}>
+              <SelectTrigger className="h-11 rounded-xl bg-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barcha smenalar</SelectItem>
+                <SelectItem value="open">Ochiq / yopilmoqda</SelectItem>
+                <SelectItem value="closed">Yopilgan</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <div className="flex items-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={clearFilters}
+              disabled={!hasFilters}
+              className="w-full min-h-11 rounded-xl"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Tozalash
+            </Button>
+          </div>
+        </div>
+        {hasFilters && (
+          <p className="text-xs text-muted-foreground mt-3">
+            {formatNum(filtered.length)} ta natija topildi.
+          </p>
+        )}
+      </section>
 
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="h-44 rounded-2xl bg-secondary animate-pulse" />
           ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border py-16 px-4 text-center">
+          <Search className="w-9 h-9 mx-auto text-muted-foreground/60 mb-3" />
+          <p className="font-medium">{hasFilters ? "Qidiruv bo‘yicha smena topilmadi." : "Hali smena tarixi yo‘q."}</p>
+          {hasFilters && (
+            <Button type="button" variant="ghost" onClick={clearFilters} className="mt-2 min-h-11 rounded-xl">
+              Filtrlarni tozalash
+            </Button>
+          )}
         </div>
       ) : (
         <>
@@ -160,7 +283,9 @@ export default function Shifts() {
             <CheckCircle2 className="w-4 h-4" /> Yopilgan
           </h2>
           {closed.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-10 text-center">Hali yopilgan smena yo‘q.</p>
+            <p className="text-sm text-muted-foreground py-10 text-center">
+              {hasFilters ? "Filtrga mos yopilgan smena yo‘q." : "Hali yopilgan smena yo‘q."}
+            </p>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {closed.map((shift) => (
@@ -199,11 +324,13 @@ function ShiftCard({ shift, onOpen }) {
           <div className="text-xs text-muted-foreground">{shift.user_name}</div>
         </div>
         <span className={"text-[11px] px-2 py-0.5 rounded-full font-medium " + (
-          shift.status === "open"
-            ? "bg-emerald-50 text-emerald-700"
-            : "bg-secondary text-muted-foreground"
+          shift.status === "closed"
+            ? "bg-secondary text-muted-foreground"
+            : shift.status === "closing"
+              ? "bg-amber-50 text-amber-800"
+              : "bg-emerald-50 text-emerald-700"
         )}>
-          {shift.status === "open" ? "Ochiq" : "Yopilgan"}
+          {shift.status === "closed" ? "Yopilgan" : shift.status === "closing" ? "Yopilmoqda" : "Ochiq"}
         </span>
       </div>
 
@@ -671,6 +798,15 @@ function EmptyText({ text }) {
     <div className="rounded-2xl border border-dashed border-border py-8 px-4 text-center text-sm text-muted-foreground">
       {text}
     </div>
+  );
+}
+
+function FilterField({ label, className = "", children }) {
+  return (
+    <label className={"block " + className}>
+      <span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>
+      {children}
+    </label>
   );
 }
 
