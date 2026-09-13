@@ -1,3 +1,5 @@
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
+
 export const WASTE_REASONS = [
   { value: 'expired', label: '3 kundan oshgan' },
   { value: 'damaged', label: 'Shikastlangan' },
@@ -9,13 +11,7 @@ export const wasteError = (error) => (
   error?.response?.data?.error || error?.data?.error || error?.message || 'Chiqitni saqlab bo‘lmadi.'
 );
 
-export const wasteDateTime = (value) => {
-  if (!value || !Number.isFinite(Date.parse(value))) return '—';
-  return new Date(value).toLocaleString('uz-UZ', {
-    timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-};
+export const wasteDateTime = (value) => formatUzbekistanDateTime(value);
 
 export function makeWasteRow(item, defaults = {}) {
   return {
