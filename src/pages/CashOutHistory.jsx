@@ -4,6 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 import { Banknote, CalendarDays, Search, Store, Tag, UserRound, WalletCards, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, formatNum } from '@/lib/pos';
+import { formatUzbekistanDate, formatUzbekistanDateTime, shiftDateKey, uzbekistanDateKey, uzbekistanDateParts, uzbekistanMonthKey } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,7 @@ export default function CashOutHistory() {
   const [search, setSearch] = useState('');
   const [period, setPeriod] = useState('today');
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(() => localMonthKey(new Date()));
+  const [selectedMonth, setSelectedMonth] = useState(() => uzbekistanMonthKey());
   const [selectedShop, setSelectedShop] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedRecipient, setSelectedRecipient] = useState('all');
@@ -67,27 +68,24 @@ export default function CashOutHistory() {
 
   const filtered = useMemo(() => {
     const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterdayStart = new Date(todayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    const weekStart = new Date(todayStart);
-    weekStart.setDate(weekStart.getDate() - 6);
+    const today = uzbekistanDateKey();
+    const yesterday = shiftDateKey(today, -1);
+    const weekStart = shiftDateKey(today, -6);
 
     return visible.filter((movement) => {
       const date = new Date(movement.created_at || movement.created_date);
+      const dateKey = uzbekistanDateKey(date);
+      const dateParts = uzbekistanDateParts(date) || { day: '', month: '', year: '' };
       const category = categoryOf(movement);
       if (selectedShop !== 'all' && movement.shop_id !== selectedShop) return false;
       if (selectedCategory !== 'all' && category !== selectedCategory) return false;
       if (selectedRecipient !== 'all' && movement.recipient_name_snapshot !== selectedRecipient) return false;
-      if (selectedDate && localDateKey(date) !== selectedDate) return false;
-      if (!selectedDate && period === 'today' && date < todayStart) return false;
-      if (!selectedDate && period === 'yesterday' && (date < yesterdayStart || date >= todayStart)) return false;
-      if (!selectedDate && period === 'week' && date < weekStart) return false;
-      if (!selectedDate && period === 'month' && localMonthKey(date) !== selectedMonth) return false;
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
+      if (selectedDate && dateKey !== selectedDate) return false;
+      if (!selectedDate && period === 'today' && dateKey !== today) return false;
+      if (!selectedDate && period === 'yesterday' && dateKey !== yesterday) return false;
+      if (!selectedDate && period === 'week' && dateKey < weekStart) return false;
+      if (!selectedDate && period === 'month' && dateKey.slice(0, 7) !== selectedMonth) return false;
+      const { day, month, year } = dateParts;
       const haystack = [
         shopNames[movement.shop_id],
         movement.employee_name,
@@ -98,7 +96,7 @@ export default function CashOutHistory() {
         movement.recipient_name_snapshot,
         `${day}.${month}.${year}`,
         `${day}/${month}/${year}`,
-        date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        formatUzbekistanDate(date),
       ].filter(Boolean).join(' ').toLowerCase();
       return terms.every((term) => haystack.includes(term));
     });
@@ -276,10 +274,7 @@ export default function CashOutHistory() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays className="w-3.5 h-3.5" />
-                        {date.toLocaleString('uz-UZ', {
-                          day: '2-digit', month: 'short', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
+                        {formatUzbekistanDateTime(date, { month: 'short' })}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <UserRound className="w-3.5 h-3.5" />{employee}
@@ -305,15 +300,3 @@ export default function CashOutHistory() {
   );
 }
 
-function localMonthKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
-
-function localDateKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
