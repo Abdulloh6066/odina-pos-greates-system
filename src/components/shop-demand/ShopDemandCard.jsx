@@ -5,14 +5,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { demandStatus, displayDate, remainingForItem, unitLabel } from '@/lib/shop-demand';
 import { formatNum } from '@/lib/pos';
+import { formatUzbekistanDateTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import ShopDemandSendDialog from '@/components/shop-demand/ShopDemandSendDialog';
 
 function urgencyBadge(request) {
   if (!request?.required_date) return null;
   const req = String(request.required_date).replace(/-/g, '');
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  const today = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const today = uzbekistanDateKey().replace(/-/g, '');
   if (req < today) {
     return <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 bg-rose-100 border border-rose-200 rounded-full px-2 py-0.5"><AlertTriangle className="w-3 h-3" /> Muddati o'tgan</span>;
   }
@@ -111,7 +110,7 @@ export default function ShopDemandCard({ request, user, actions }) {
       <div className="px-4 sm:px-5 pb-3 text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
         <span>Yaratdi: {request.creator_name || '—'}</span>
         {request.accepted_by_name && <span>Qabul: {request.accepted_by_name}</span>}
-        {request.sent_at && <span>Yuborildi: {new Date(request.sent_at).toLocaleString('uz-UZ')}</span>}
+        {request.sent_at && <span>Yuborildi: {formatUzbekistanDateTime(request.sent_at)}</span>}
       </div>
 
       <div className="border-t border-border bg-secondary/20 px-4 sm:px-5 py-3 flex flex-wrap gap-2">
