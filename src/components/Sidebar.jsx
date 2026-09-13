@@ -13,7 +13,7 @@ import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
-  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, ShieldCheck, Trash2, Monitor, TrendingUp,
+  ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, ShieldCheck, Trash2, Monitor, TrendingUp, Contact,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
