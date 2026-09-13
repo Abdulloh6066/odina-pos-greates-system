@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -121,7 +122,7 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat }) {
                           <span className="font-semibold">{formatUZS(pm.amount)}</span>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {new Date(pm.paid_at).toLocaleString('uz')} · {pm.employee_name}
+                          {formatUzbekistanDateTime(pm.paid_at)} · {pm.employee_name}
                           {pm.shift_id ? ` · smena` : ' · smenasiz'}
                         </div>
                       </div>
