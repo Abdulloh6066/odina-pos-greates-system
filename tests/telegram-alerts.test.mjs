@@ -46,7 +46,7 @@ function fixture(opts = {}) {
   }]));
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [opts.now || NOW])); } static now() { return opts.now || NOW; } }
   const context = { Response, AbortSignal, Date:Clock, crypto:{randomUUID:()=>String(++uuid)},
-    createClientFromRequest:()=>({auth:{me:async()=>opts.unauth ? null : ({id:opts.authId || 'stored-owner',email:'owner@odinatort.uz',role:opts.role || 'admin',active:opts.active !== false})},asServiceRole:{entities}}),
+    createClientFromRequest:()=>({auth:{me:async()=>opts.unauth ? null : ({id:opts.authId || 'stored-owner',email:'owner@odinatort.uz',role:'admin'})},asServiceRole:{entities}}),
     Deno:{env:{get:()=>opts.missing ? undefined : 'PRIVATE_TOKEN'},serve:fn=>{handler=fn;}},
     fetch:async (url, init) => {
       const body=JSON.parse(init.body); sent.push(body);
@@ -63,12 +63,12 @@ function fixture(opts = {}) {
   }};
 }
 
-test('authenticated non-admin and inactive admin cannot send', async()=>{
+test('stored non-admin and inactive admin cannot send', async()=>{
   for(const opts of [{role:'cashier'},{active:false},{unauth:true}]) {
     const f=fixture(opts); const r=await f.run(); assert.ok([401,403].includes(r.status)); assert.equal(f.sent.length,0); assert.equal(f.writes.length,0);
   }
 });
-test('admin preview does not depend on a matching User entity ID', async()=>{
+test('auth ID mismatch resolves the stored admin by exact email', async()=>{
   const f=fixture({authId:'different-auth-id'}); const r=await f.run({action:'preview'});
   assert.equal(r.status,200); assert.equal(f.sent.length,0); assert.equal(f.writes.length,0);
 });
