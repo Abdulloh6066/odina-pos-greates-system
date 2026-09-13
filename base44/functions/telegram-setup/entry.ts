@@ -1,5 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { userRole } from "../../shared/user-helpers.ts";
+import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 
 // Recipient explicitly supplied by the owner. Never accept a recipient or text from the browser.
 const GROUP_ID = "-5570444945";
@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
     const client = createClientFromRequest(req);
     const auth = await client.auth.me();
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
-    const stored = await client.asServiceRole.entities.User.get(auth.id);
+    const stored = await resolveStoredAppUser(client.asServiceRole, auth);
     if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
