@@ -106,6 +106,25 @@
       "type": "string",
       "format": "date-time"
     },
+    "ready_inventory_state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "completed"
+      ],
+      "default": "pending"
+    },
+    "ready_inventory_token": {
+      "type": "string"
+    },
+    "ready_inventory_location_id": {
+      "type": "string"
+    },
+    "ready_inventory_completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "shipped_at": {
       "type": "string",
       "format": "date-time"
