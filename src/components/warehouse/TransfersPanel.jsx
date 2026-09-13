@@ -16,6 +16,7 @@ import {
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -253,8 +254,8 @@ function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
         {group.notes && <p className="text-sm text-muted-foreground mt-3">Izoh: {group.notes}</p>}
 
         <div className="text-xs text-muted-foreground mt-3 space-y-1">
-          <p>Jo‘natdi: {group.created_by_name} · {new Date(group.sent_at).toLocaleString('uz-UZ')}</p>
-          {group.received_at && <p>Qabul qildi: {group.received_by_name} · {new Date(group.received_at).toLocaleString('uz-UZ')}</p>}
+          <p>Jo‘natdi: {group.created_by_name} · {formatUzbekistanDateTime(group.sent_at)}</p>
+          {group.received_at && <p>Qabul qildi: {group.received_by_name} · {formatUzbekistanDateTime(group.received_at)}</p>}
         </div>
 
         {canReceive && (
