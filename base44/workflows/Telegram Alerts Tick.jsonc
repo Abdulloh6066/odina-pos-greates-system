@@ -1,0 +1,47 @@
+{
+  "description": "Har 5 daqiqada telegram-alerts backend funksiyasini {action:'run'} bilan chaqiradi va buyurtma muddatlari bo\u2018yicha ogohlantirishlarni yuboradi.",
+  "name": "Telegram Alerts Tick",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/5 * * * *",
+      "one_time_date": null,
+      "timezone": "Asia/Tashkent",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "telegram_alerts_tick",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_alerts": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "telegram-alerts",
+            "args": {
+              "action": "run"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Telegram ogohlantirishlarni ishga tushirish",
+            "description": "Har 5 daqiqada muddat ogohlantirishlari"
+          }
+        }
+      }
+    ]
+  }
+}
