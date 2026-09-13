@@ -8,7 +8,8 @@ const dateKeyFormatter = new Intl.DateTimeFormat('en-CA', {
 });
 
 function validDate(value) {
-  const date = value instanceof Date ? value : new Date(value ?? Date.now());
+  if (value == null || value === '') return null;
+  const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
