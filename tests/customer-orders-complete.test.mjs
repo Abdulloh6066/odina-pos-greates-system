@@ -46,6 +46,7 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
       { id: 'ps-piece', location_id: 'shop-a', product_id: 'cake-piece', product_name: 'Kapykeyk', unit: 'piece', quantity: 50 },
     ],
     StockMovement: [],
+    ProductionBatch: [],
     Settings: [{ id: 's1', shop_name: 'Odina', allow_negative_stock: true }],
     CustomerOrder: [],
     CustomerOrderItem: [],
@@ -102,20 +103,32 @@ function harness(db) {
   };
 }
 
-function loadHandler(client) {
-  const sharedSrc = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, '');
-  const sharedCode = ts.transpileModule(sharedSrc, {
+function transpileScript(source) {
+  return ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
+}
+
+function loadHandler(client) {
+  const sharedCode = transpileScript(
+    readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, ''),
+  );
+  const costCode = transpileScript(
+    readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, ''),
+  );
+  const readyCode = transpileScript(
+    readFileSync('base44/shared/order-ready-production.ts', 'utf8')
+      .replace(/import \{[\s\S]*?\} from "\.\/cost-engine\.ts";/, '')
+      .replace(/export /g, ''),
+  );
   let source = readFileSync('base44/functions/customer-orders/entry.ts', 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
+    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/order-ready-production\.ts";/, '')
     .replace(/export default async function\(req[^{]*\{/, 'async function handler(req) {');
-  source = sharedCode + '\n' + source;
+  source = [sharedCode, costCode, readyCode, source].join('\n');
   source += '\nglobalThis.testHandler = handler;';
-  const code = ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
+  const code = transpileScript(source);
   const context = vm.createContext({
     client, Response, crypto: webcrypto, console, structuredClone,
     Date: makeClock(), __setClock: (v) => { clock = v; },
