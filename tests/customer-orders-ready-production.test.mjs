@@ -521,4 +521,29 @@ test('resale items remain regular shop stock while central products stay reserve
   assert.equal(saleMovements[0].item_id, 'resale');
 });
 
+test('legacy active orders without the new inventory state remain compatible', async () => {
+  const f = fixture();
+  delete f.db.CustomerOrder[0].ready_inventory_state;
+  const call = loadHandler(harness(f.db));
+
+  const result = await call(readyRequest);
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(f.db.CustomerOrder[0].order_status, 'tayyor');
+  assert.equal(f.db.CustomerOrder[0].ready_inventory_state, 'completed');
+  assert.equal(f.db.IngredientStock.find((row) => row.ingredient_id === 'flour').quantity, 8500);
+});
+
+test('simultaneous Ready requests cannot double-deduct stock', async () => {
+  const f = fixture();
+  const call = loadHandler(harness(f.db));
+
+  const results = await Promise.all([call(readyRequest), call(readyRequest)]);
+  assert.equal(results.some((result) => result.status === 200), true);
+  assert.equal(f.db.IngredientStock.find((row) => row.ingredient_id === 'flour').quantity, 8500);
+  assert.equal(f.db.IngredientStock.find((row) => row.ingredient_id === 'sugar').quantity, 4500);
+  assert.equal(f.db.IngredientStock.find((row) => row.ingredient_id === 'box').quantity, 90);
+  assert.equal(f.db.ProductionBatch.length, 2);
+  assert.equal(f.db.StockMovement.length, 4);
+});
+
 console.log('Customer order ready-production offline regression tests ready.');
