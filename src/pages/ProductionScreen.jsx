@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
+import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderDetail from '@/components/orders/OrderDetail';
@@ -53,10 +54,7 @@ function urgency(o) {
   return diffH <= URGENT_HOURS ? 'urgent' : '';
 }
 
-const shippedTime = (o) => {
-  const v = o.shipped_at || '';
-  return v.length >= 16 ? v.slice(11, 16) : '';
-};
+const shippedTime = (o) => o.shipped_at ? formatUzbekistanTime(o.shipped_at) : '';
 
 // Error boundary that catches render/effect crashes of the screen content,
 // so the page can never blank out (React otherwise tears down the whole root).
@@ -155,7 +153,7 @@ function ProductionScreenInner() {
       setActive(list.filter((o) => ACTIVE_STATUSES.includes(o.order_status)));
       const today = todayStr();
       setShippedToday(
-        list.filter((o) => o.order_status === 'yuborildi_olib_ketildi' && (o.shipped_at || '').slice(0, 10) === today),
+        list.filter((o) => o.order_status === 'yuborildi_olib_ketildi' && uzbekistanDateKey(o.shipped_at) === today),
       );
       return true;
     } catch (e) {
