@@ -15,7 +15,7 @@ async function run(opts = {}) {
     createClientFromRequest: () => {
       const stored = { id: 'stored-owner', email: 'owner@odinatort.uz', role: opts.role || 'admin', active: opts.active !== false };
       return {
-        auth: { me: async () => opts.auth === false ? null : ({ id: opts.authId || 'stored-owner', email: 'owner@odinatort.uz', role: 'admin' }) },
+        auth: { me: async () => opts.auth === false ? null : ({ id: opts.authId || 'stored-owner', email: 'owner@odinatort.uz', role: opts.role || 'admin', active: opts.active !== false }) },
         asServiceRole: { entities: { User: {
           get: async id => opts.noStored || id !== stored.id ? null : stored,
           filter: async query => !opts.noStored && query.email === stored.email ? [stored] : [],
@@ -43,15 +43,16 @@ async function run(opts = {}) {
 test('unauthenticated request never contacts Telegram', async () => {
   const r = await run({ auth: false }); assert.equal(r.status, 401); assert.equal(r.calls.length, 0);
 });
-test('stored cashier role overrides admin token claim', async () => {
+test('authenticated cashier role is rejected', async () => {
   const r = await run({ role: 'cashier' }); assert.equal(r.status, 403); assert.equal(r.calls.length, 0);
 });
 test('auth ID mismatch resolves the stored admin by exact email', async () => {
   const r = await run({ authId: 'different-auth-id' }); assert.equal(r.status, 200);
   assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat']);
 });
-test('missing stored user fails closed even with admin token claim', async () => {
-  const r = await run({ noStored: true }); assert.equal(r.status, 403); assert.equal(r.calls.length, 0);
+test('admin auth does not depend on a separate User entity lookup', async () => {
+  const r = await run({ noStored: true }); assert.equal(r.status, 200);
+  assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat']);
 });
 test('disabled admin rejected', async () => {
   const r = await run({ active: false }); assert.equal(r.status, 403); assert.equal(r.calls.length, 0);
