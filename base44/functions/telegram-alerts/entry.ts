@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     }
     const body = await req.json().catch(() => ({}));
     const action = body.action || "run";
-    if (!["status", "preview", "run", "toggle"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
+    if (!["status", "preview", "run", "toggle", "birthdays"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     const controls = await service.entities.TelegramControl.filter({ key: "odina-work-group" }, "created_date", 2);
     if (controls.length !== 1) return Response.json({ error: "Telegram sozlamasi topilmadi yoki takrorlangan. Admin tekshiruvi kerak." }, { status: 409 });
     control = controls[0];
@@ -33,6 +33,76 @@ Deno.serve(async (req) => {
       return Response.json({ enabled: control.enabled, last_run_at: control.last_run_at, last_result: control.last_result,
         recent: recent.map((r: any) => ({ id: r.id, status: r.status, sent_at: r.sent_at, created_date: r.created_date, error: r.error })) });
     }
+    if (action === "birthdays") {
+      if (control.enabled !== true) return Response.json({ paused: true });
+      const clock = localClock(Date.now());
+      const todayParts = clock.today.split("-").map(Number);
+      const tomorrowParts = clock.tomorrow.split("-").map(Number);
+      const readCustomers = async () => {
+        const rows: any[] = [];
+        for (let skip = 0; skip < 10000; skip += 500) {
+          const page = await service.entities.Customer.filter({}, "id", 500, skip);
+          rows.push(...page);
+          if (page.length < 500) return rows;
+        }
+        throw new Error("DATA_LIMIT");
+      };
+      const allCustomers = await readCustomers();
+      const matches = allCustomers.filter((c: any) => {
+        const bd = String(c?.birth_date || "");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(bd)) return false;
+        const [, mm, dd] = bd.split("-").map(Number);
+        const isToday = mm === todayParts[1] && dd === todayParts[2];
+        const isTomorrow = mm === tomorrowParts[1] && dd === tomorrowParts[2];
+        return isToday || isTomorrow;
+      });
+      const keys = matches.map((c: any) => "birthday:" + c.id + ":" + (String(c.birth_date).slice(5) === clock.today.slice(5) ? clock.today : clock.tomorrow));
+      if (!matches.length) return Response.json({ sent: false, pending: 0 });
+      const readDeliveries = async (query: any) => {
+        const rows: any[] = [];
+        for (let skip = 0; skip < 10000; skip += 500) {
+          const page = await service.entities.TelegramDelivery.filter(query, "id", 500, skip);
+          rows.push(...page);
+          if (page.length < 500) return rows;
+        }
+        return rows;
+      };
+      const existing = await readDeliveries({ keys: { $in: keys } });
+      const used = new Set(existing.flatMap((r: any) => r.keys || []));
+      const fresh = matches.filter((c: any) => {
+        const key = "birthday:" + c.id + ":" + (String(c.birth_date).slice(5) === clock.today.slice(5) ? clock.today : clock.tomorrow);
+        return !used.has(key);
+      });
+      if (!fresh.length) return Response.json({ sent: false, pending: 0 });
+      const lines = fresh.map((c: any) => {
+        const bd = String(c.birth_date);
+        const isToday = bd.slice(5) === clock.today.slice(5);
+        const name = cleanLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
+        const phone = cleanLabel(c.phone);
+        return (isToday ? "🎂 Bugun " : "📅 Ertaga ") + name + " tug'ilgan kuni! Telefon: " + (phone || "—");
+      });
+      const text = "🍰 Odina — Tug'ilgan kun eslatmasi\n" + clock.today + "\n\n" + lines.join("\n");
+      const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+      if (!token) return Response.json({ error: "TELEGRAM_BOT_TOKEN topilmadi." }, { status: 400 });
+      const reservation = await service.entities.TelegramDelivery.create({ keys: fresh.map((c: any) => "birthday:" + c.id + ":" + (String(c.birth_date).slice(5) === clock.today.slice(5) ? clock.today : clock.tomorrow)), status: "reserved", text });
+      try {
+        const response = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: TELEGRAM_GROUP_ID, text }), signal: AbortSignal.timeout(12000),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          await service.entities.TelegramDelivery.update(reservation.id, { status: "rejected", error: "Telegram xabarni qabul qilmadi." }).catch(() => {});
+          return Response.json({ error: "Telegram xabarni qabul qilmadi." }, { status: 502 });
+        }
+        await service.entities.TelegramDelivery.update(reservation.id, { status: "sent", message_id: data.result.message_id, sent_at: new Date().toISOString() });
+        return Response.json({ sent: true, count: fresh.length });
+      } catch {
+        await service.entities.TelegramDelivery.update(reservation.id, { status: "uncertain", error: "Yetkazilish noaniq." }).catch(() => {});
+        return Response.json({ error: "Tug'ilgan kun xabarini yuborib bo'lmadi." }, { status: 502 });
+      }
+    }
+
     if (action === "run" && control.enabled !== true) return Response.json({ paused: true });
     const started = Date.now();
     if (action === "run") {

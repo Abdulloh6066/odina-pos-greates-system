@@ -4,6 +4,7 @@ import {
   completeOrderReadyProduction,
   reservedOrderProductionPieces,
 } from "../../shared/order-ready-production.ts";
+import { ensureCustomer } from "../../shared/customer-helpers.ts";
 
 const ORDER_RUNTIME_VERSION = "customer-orders-v3-2026-09-13";
 
@@ -234,6 +235,12 @@ export default async function(req: Request): Promise<Response> {
         return Response.json({ error: "Yetkazib berish turi noto‘g‘ri." }, { status: 400 });
       }
 
+      const { customer_id: resolvedCustomerId } = await ensureCustomer(service, {
+        customer_id: String(body?.customer_id || ""),
+        name: customerName,
+        phone: customerPhone,
+      });
+
       let shopId = String(body?.shop_id || "");
       if (user.role === "cashier") {
         if (!user.shop_id) {
@@ -316,6 +323,7 @@ export default async function(req: Request): Promise<Response> {
           order_type: orderType,
           shop_id: shop.id,
           shop_name_snapshot: shop.name,
+          customer_id: resolvedCustomerId || undefined,
           customer_name: customerName,
           customer_phone: customerPhone,
           required_date: requiredDate,

@@ -1,0 +1,47 @@
+{
+  "description": "Har kuni ertalab (09:00 Asia/Tashkent) bugun va ertagi tug'ilgan kunli mijozlarni telegram-alerts funksiyasiga yuboradi.",
+  "name": "Birthday Telegram",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 9 * * *",
+      "one_time_date": null,
+      "timezone": "Asia/Tashkent",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "birthday_telegram",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_birthdays": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "telegram-alerts",
+            "args": {
+              "action": "birthdays"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Tug'ilgan kun eslatmasini yuborish",
+            "description": "Har kuni 09:00 da tug'ilgan kunli mijozlar haqida ogohlantirish"
+          }
+        }
+      }
+    ]
+  }
+}

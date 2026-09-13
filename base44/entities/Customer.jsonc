@@ -1,0 +1,103 @@
+{
+  "name": "Customer",
+  "type": "object",
+  "properties": {
+    "first_name": {
+      "type": "string",
+      "description": "Mijoz ismi"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "Mijoz familiyasi"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Mijoz telefoni (ko'rsatish uchun)"
+    },
+    "phone_normalized": {
+      "type": "string",
+      "description": "Telefon raqamni qidiruv uchun normallashtirilgan ko'rinishi (faqat raqamlar)"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Tug'ilgan kun sanasi (Telegram eslatma uchun)"
+    },
+    "label": {
+      "type": "string",
+      "description": "Teg/yorliq (masalan: vip, doimiy, korporativ)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Izohlar va eslatmalar"
+    }
+  },
+  "required": [
+    "first_name",
+    "phone"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "production"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

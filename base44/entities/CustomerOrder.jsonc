@@ -18,6 +18,10 @@
     "shop_name_snapshot": {
       "type": "string"
     },
+    "customer_id": {
+      "type": "string",
+      "description": "Bog'langan mijoz (Customer) yozuvi IDsi"
+    },
     "customer_name": {
       "type": "string"
     },

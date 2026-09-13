@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
-  Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown,
-  Circle, Clock, ClipboardList, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
+  Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown, Circle, Clock,
+  ClipboardList, Contact, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, ShieldCheck, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp, ClipboardCheck,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';

@@ -47,6 +47,16 @@
     "shop_name": {
       "type": "string"
     },
+    "customer_id": {
+      "type": "string",
+      "description": "Bog'langan mijoz (Customer) yozuvi IDsi"
+    },
+    "customer_name_snapshot": {
+      "type": "string"
+    },
+    "customer_phone_snapshot": {
+      "type": "string"
+    },
     "items": {
       "type": "array",
       "items": {

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { ensureCustomer } from "../../shared/customer-helpers.ts";
 
 const PAYMENT_METHODS = new Set([
   "cash",
@@ -1062,6 +1063,12 @@ export default async function(req) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
+    const { customer_id: resolvedCustomerId, customer: resolvedCustomer } = await ensureCustomer(service, {
+      customer_id: String(body?.customer_id || ""),
+      name: String(body?.customer_name || ""),
+      phone: String(body?.customer_phone || ""),
+    });
+
     const normalizedItems = await normalizeSaleItems(service, requestedItems);
     const allowNegativeStock = await stockPolicy(service);
     const { plans: stockPlans, shortages: stockWarnings } =
@@ -1167,6 +1174,9 @@ export default async function(req) {
       user_name: user.full_name || user.email,
       shop_id: shift.shop_id,
       shop_name: shift.shop_name,
+      customer_id: resolvedCustomerId || undefined,
+      customer_name_snapshot: resolvedCustomer ? `${resolvedCustomer.first_name || ""} ${resolvedCustomer.last_name || ""}`.trim() : (String(body?.customer_name || "") || undefined),
+      customer_phone_snapshot: resolvedCustomer?.phone || String(body?.customer_phone || "") || undefined,
       items: normalizedItems,
       subtotal,
       discount_code: discountCode || undefined,
