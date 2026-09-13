@@ -16,6 +16,7 @@ import { useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { odinaAlert } from "@/lib/odina-dialog";
 import { formatUZS } from "@/lib/pos";
+import { formatUzbekistanDateTime } from "@/lib/uzbekistan-time";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,7 +206,7 @@ export default function Budget() {
                     </div>
                     <p className="text-sm mt-2">{transaction.description}</p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {transaction.performed_by_name || "Noma’lum"} · {new Date(transaction.created_at || transaction.created_date).toLocaleString("uz-UZ")}
+                      {transaction.performed_by_name || "Noma’lum"} · {formatUzbekistanDateTime(transaction.created_at || transaction.created_date)}
                       {transaction.shop_name ? ` · ${transaction.shop_name}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
