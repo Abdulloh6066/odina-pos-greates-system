@@ -17,10 +17,9 @@ export const userShopId = (user: any) => String(user?.shop_id || user?.data?.sho
 
 export const userShopName = (user: any) => String(user?.shop_name || user?.data?.shop_name || "");
 
-// Resolve the full app user (with role + shop_id) from the authenticated token by
-// reading the stored User record. Used by backend functions that need the user's
-// assigned shop and reliable role. `service` is base44.asServiceRole.
-export const resolveAppUser = async (service: any, authenticatedUser: any) => {
+// Resolve the stored app User record from the authenticated identity. Auth and
+// entity IDs may differ, so fall back to an exact normalized email match.
+export const resolveStoredAppUser = async (service: any, authenticatedUser: any) => {
   let storedUser: any = null;
   const authenticatedId = String(authenticatedUser?.id || "");
   const email = String(authenticatedUser?.email || "").trim().toLowerCase();
@@ -34,6 +33,14 @@ export const resolveAppUser = async (service: any, authenticatedUser: any) => {
       (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === email,
     ) || null;
   }
+  return storedUser;
+};
+
+// Resolve the full app user (with role + shop_id) from the authenticated token by
+// reading the stored User record. Used by backend functions that need the user's
+// assigned shop and reliable role. `service` is base44.asServiceRole.
+export const resolveAppUser = async (service: any, authenticatedUser: any) => {
+  const storedUser = await resolveStoredAppUser(service, authenticatedUser);
 
   const storedRole = userRole(storedUser);
   return {
