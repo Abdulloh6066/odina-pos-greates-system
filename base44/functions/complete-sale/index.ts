@@ -1,5 +1,10 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { ensureCustomer } from "../../shared/customer-helpers.ts";
+import {
+  prepareSaleIngredientDeduction,
+  applySaleIngredientDeduction,
+  restoreSaleIngredientsOnRefund,
+} from "../../shared/sale-ingredient-flow.ts";
 
 const PAYMENT_METHODS = new Set([
   "cash",
@@ -306,6 +311,9 @@ async function normalizeSaleItems(service: any, requestedItems: any[]) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
     }
     const unitPrice = money(product.price);
+    const isShopPrepared = String(product.source_type || "central_produced") === "shop_prepared";
+    // Shop-prepared drinks deduct their tech-card ingredients instead of finished ProductStock.
+    const stockTracked = !isShopPrepared && product.track_stock !== false;
     normalizedItems.push({
       product_id: product.id,
       product_name: product.name,
@@ -314,9 +322,9 @@ async function normalizeSaleItems(service: any, requestedItems: any[]) {
       quantity,
       subtotal: unitPrice * quantity,
       source_type: product.source_type || "central_produced",
-      stock_tracked: product.track_stock !== false,
+      stock_tracked: stockTracked,
       stock_location_id: "",
-      stock_quantity_change: product.track_stock === false ? 0 : -quantity,
+      stock_quantity_change: stockTracked ? -quantity : 0,
     });
   }
   return normalizedItems;
@@ -402,6 +410,9 @@ export default async function(req) {
   let claimedDiscount: any = null;
   let stockChanges: any[] = [];
   let stockMovementRecords: any[] = [];
+  let ingredientPlans: any[] = [];
+  let ingredientApplied: any[] = [];
+  let ingredientMovementRecords: any[] = [];
 
   try {
     const authenticatedUser = await base44.auth.me();
@@ -782,14 +793,30 @@ export default async function(req) {
       const normalizedItems = await normalizeSaleItems(service, requestedItems);
       const allowNegativeStock = await stockPolicy(service);
       const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
+      const ingredientPrep = await prepareSaleIngredientDeduction(service, shift.shop_id, normalizedItems);
+      const ingredientShortages = ingredientPrep.shortages;
       if (shortages.length && !allowNegativeStock) {
         return Response.json({
           error: "Omborda mahsulot yetarli emas. Qoldiqsiz sotuv bloklangan.",
           shortages,
+          ingredient_shortages: ingredientShortages,
           allow_negative_stock: false,
         }, { status: 409 });
       }
-      return Response.json({ shortages, allow_negative_stock: allowNegativeStock });
+      if (ingredientShortages.length && !allowNegativeStock) {
+        return Response.json({
+          error: "Masalliq omborida zaxira yetarli emas. Qoldiqsiz sotuv bloklangan.",
+          shortages,
+          ingredient_shortages: ingredientShortages,
+          allow_negative_stock: false,
+          ingredient_shortage: true,
+        }, { status: 409 });
+      }
+      return Response.json({
+        shortages,
+        ingredient_shortages: ingredientShortages,
+        allow_negative_stock: allowNegativeStock,
+      });
     }
 
     if (action === "refund_sale") {
@@ -843,6 +870,8 @@ export default async function(req) {
       let shiftAdjusted = false;
       const restocks: any[] = [];
       const refundMovements: any[] = [];
+      let ingredientRestores: any[] = [];
+      let ingredientRefundMovements: any[] = [];
 
       try {
         refund = await service.entities.Refund.create({
@@ -962,6 +991,38 @@ export default async function(req) {
           refundMovements.push(movement);
         }
 
+        // Shop-prepared drinks: restore their previously-deducted ingredients exactly once.
+        try {
+          const restore = await restoreSaleIngredientsOnRefund(service, {
+            shopId: original.shop_id,
+            shopName: original.shop_name || refundShift.shop_name,
+            saleId: original.id,
+            saleNumber: original.sale_number,
+            refundId: refund.id,
+            userId: user.id,
+            userName: user.full_name || user.email,
+            now,
+          });
+          ingredientRestores = restore.restocks;
+          ingredientRefundMovements = restore.movements;
+        } catch (restoreError) {
+          // Roll back the ingredient restocks already applied before propagating the failure.
+          for (const movement of ingredientRefundMovements) {
+            try { await service.entities.StockMovement.delete(movement.id); } catch {}
+          }
+          for (const restock of ingredientRestores) {
+            try {
+              await service.entities.IngredientStock.updateMany(
+                { id: restock.stockRecord.id },
+                { $inc: { quantity: -restock.quantity } },
+              );
+            } catch {}
+          }
+          ingredientRestores = [];
+          ingredientRefundMovements = [];
+          throw restoreError;
+        }
+
         try {
           await service.entities.ActionHistory.create({
             user_id: user.id,
@@ -986,6 +1047,17 @@ export default async function(req) {
           })),
         });
       } catch (error) {
+        for (const movement of ingredientRefundMovements) {
+          try { await service.entities.StockMovement.delete(movement.id); } catch {}
+        }
+        for (const restock of ingredientRestores) {
+          try {
+            await service.entities.IngredientStock.updateMany(
+              { id: restock.stockRecord.id },
+              { $inc: { quantity: -restock.quantity } },
+            );
+          } catch {}
+        }
         for (const movement of refundMovements) {
           try { await service.entities.StockMovement.delete(movement.id); } catch {}
         }
@@ -1063,6 +1135,24 @@ export default async function(req) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
+    const idempotencyKey = String(body?.idempotency_key || "").trim().slice(0, 128);
+    if (idempotencyKey) {
+      const existing = await service.entities.Sale.filter({ idempotency_key: idempotencyKey }, "-created_date", 5);
+      const prior = (existing || []).find((row: any) => row.idempotency_key === idempotencyKey);
+      if (prior) {
+        return Response.json({
+          sale: prior,
+          sale_items: [],
+          payments: [],
+          shift,
+          stock_warnings: [],
+          allow_negative_stock: await stockPolicy(service),
+          idempotent_replay: true,
+          stock_updates: [],
+        });
+      }
+    }
+
     const { customer_id: resolvedCustomerId, customer: resolvedCustomer } = await ensureCustomer(service, {
       customer_id: String(body?.customer_id || ""),
       name: String(body?.customer_name || ""),
@@ -1078,6 +1168,18 @@ export default async function(req) {
         error: "Omborda mahsulot yetarli emas. Qoldiqsiz sotuv bloklangan.",
         shortages: stockWarnings,
         allow_negative_stock: false,
+      }, { status: 409 });
+    }
+
+    // Shop-prepared drinks: validate active tech-card and plan ingredient deductions.
+    const ingredientPrep = await prepareSaleIngredientDeduction(service, shift.shop_id, normalizedItems);
+    ingredientPlans = ingredientPrep.plans;
+    if (ingredientPrep.shortages.length && !allowNegativeStock) {
+      return Response.json({
+        error: "Masalliq omborida zaxira yetarli emas. Qoldiqsiz sotuv bloklangan.",
+        shortages: ingredientPrep.shortages,
+        allow_negative_stock: false,
+        ingredient_shortage: true,
       }, { status: 409 });
     }
 
@@ -1167,6 +1269,9 @@ export default async function(req) {
 
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
+      idempotency_key: idempotencyKey || undefined,
+      sold_at: String(body?.recorded_at || now),
+      business_date: (String(body?.recorded_at || now)).slice(0, 10),
       financial_records_version: 2,
       sale_items_count: normalizedItems.length,
       shift_id: shift.id,
@@ -1252,6 +1357,23 @@ export default async function(req) {
       stockMovementRecords.push(movement);
     }
 
+    // Shop-prepared drinks: deduct tech-card ingredients now that the sale is finalized.
+    if (ingredientPlans.length) {
+      const result = await applySaleIngredientDeduction(service, {
+        shopId: shift.shop_id,
+        shopName: shift.shop_name,
+        saleId: sale.id,
+        saleNumber,
+        userId: user.id,
+        userName: user.full_name || user.email,
+        now,
+        plans: ingredientPlans,
+        lines: ingredientPrep.lines,
+      });
+      ingredientMovementRecords = result.movements;
+      ingredientApplied = result.applied;
+    }
+
     if (claimedDiscount) {
       await service.entities.DiscountCode.update(claimedDiscount.id, {
         usage_count: Number(claimedDiscount.usage_count || 0) + 1,
@@ -1326,6 +1448,7 @@ export default async function(req) {
       payments: paymentRecords,
       shift: updatedShift,
       stock_warnings: stockWarnings,
+      ingredient_warnings: ingredientPrep.shortages,
       allow_negative_stock: allowNegativeStock,
       stock_updates: stockChanges.map((change) => ({
         product_id: change.item.product_id,
@@ -1333,6 +1456,17 @@ export default async function(req) {
       })),
     });
   } catch (error) {
+    for (const movement of ingredientMovementRecords) {
+      try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch {}
+    }
+    for (const applied of ingredientApplied) {
+      try {
+        await base44.asServiceRole.entities.IngredientStock.updateMany(
+          { id: applied.stockId },
+          { $inc: { quantity: applied.quantity } },
+        );
+      } catch {}
+    }
     for (const movement of stockMovementRecords) {
       try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch {}
     }
