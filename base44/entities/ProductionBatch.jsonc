@@ -17,6 +17,27 @@
     "product_name_snapshot": {
       "type": "string"
     },
+    "order_id": {
+      "type": "string"
+    },
+    "order_number_snapshot": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "output_disposition": {
+      "type": "string",
+      "enum": [
+        "stock",
+        "customer_order"
+      ],
+      "default": "stock"
+    },
+    "reserved_pieces": {
+      "type": "number",
+      "default": 0
+    },
     "recipe_id": {
       "type": "string"
     },
