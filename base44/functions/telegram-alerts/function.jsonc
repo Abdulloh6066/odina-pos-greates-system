@@ -1,0 +1,6 @@
+{
+  "name": "telegram-alerts",
+  "entry": "entry.ts",
+  "description": "Buyurtma muddatlari va ertangi masalliq kamomadini belgilangan Telegram guruhiga xavfsiz yuboradi; faqat egasi/admin uchun.",
+  "is_public": false
+}
