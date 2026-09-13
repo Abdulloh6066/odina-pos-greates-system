@@ -126,3 +126,26 @@ test('evening forecast reuses recipes and only sends once per date',async()=>{
   const f=fixture({db,orders});await f.run();await f.run();
   assert.equal(f.sent.length,1);assert.match(f.sent[0].text,/150 g yetishmaydi/);assert.match(f.sent[0].text,/2026-09-14/);
 });
+
+test('3h then 1h then overdue each sent once across repeated checks', async()=>{
+  const due=Date.parse('2026-09-13T14:30:00Z');
+  const opts={now:due-3*3600000-1};
+  const f=fixture(opts);
+  await f.run();assert.equal(f.sent.length,0);
+  opts.now=due-3*3600000;await f.run();await f.run();
+  assert.equal(f.sent.length,1);assert.match(f.sent[0].text,/3 soat/);
+  opts.now=due-3600000;await f.run();await f.run();
+  assert.equal(f.sent.length,2);assert.match(f.sent[1].text,/Shoshiling/);
+  assert.match(f.db.TelegramDelivery[1].keys[0],/:due_soon$/);
+  opts.now=due+1;await f.run();await f.run();
+  assert.equal(f.sent.length,3);assert.match(f.sent[2].text,/kechikdi/);
+});
+test('late first check skips stale 3h alert and prioritizes urgent orders',async()=>{
+  const f=fixture({orders:[{...baseOrder,id:'three',order_number:'THREE',required_time:'22:00'}, {...baseOrder,id:'soon',order_number:'SOON'}, {...baseOrder,id:'late',order_number:'LATE',required_time:'18:00'}]});
+  await f.run();const text=f.sent[0].text;
+  assert.ok(text.indexOf('LATE')<text.indexOf('SOON'));
+  assert.ok(text.indexOf('SOON')<text.indexOf('THREE'));
+  const keys=f.db.TelegramDelivery[0].keys;
+  assert.equal(keys.filter(k=>k.includes(':soon:')).length,1);
+  assert.ok(keys.find(k=>k.includes(':soon:')).endsWith(':due_soon'));
+});
