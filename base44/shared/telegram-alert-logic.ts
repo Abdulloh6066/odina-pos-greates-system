@@ -12,16 +12,17 @@ export function orderCandidates(orders: any[], now: number) {
     const [h, m] = order.required_time.split(":").map(Number);
     if (h > 23 || m > 59) continue;
     const due = Date.parse(order.required_date + "T" + String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":00+05:00");
-    if (!Number.isFinite(due) || localClock(due).today !== order.required_date || due - now > 3600000) continue;
-    const kind = due < now ? "overdue" : "due_soon";
+    if (!Number.isFinite(due) || localClock(due).today !== order.required_date || due - now > 3 * 3600000) continue;
+    const kind = due < now ? "overdue" : due - now <= 3600000 ? "due_soon" : "due_3h";
     candidates.push({
       key: ["order", order.id, due, kind].join(":"),
       kind, due,
-      text: (kind === "overdue" ? "🔴 Kechikdi" : "🟠 1 soat yoki kam qoldi") + " · " + cleanLabel(order.order_number) +
+      text: (kind === "overdue" ? "🔴 Buyurtma kechikdi!" : kind === "due_soon" ? "🟠 Shoshiling — topshirishga 1 soat yoki kam qoldi!" : "🟡 Vaqt oz qoldi — topshirishga 3 soat yoki kam qoldi. Buyurtmani tayyorlashni rejalashtiring.") + " · " + cleanLabel(order.order_number) +
         "\n" + cleanLabel(order.shop_name_snapshot) + " · " + order.required_date + " " + cleanLabel(order.required_time),
     });
   }
-  return candidates.sort((a, b) => (a.kind === b.kind ? a.due - b.due : a.kind === "overdue" ? -1 : 1));
+  const rank: Record<string, number> = { overdue: 0, due_soon: 1, due_3h: 2 };
+  return candidates.sort((a, b) => rank[a.kind] - rank[b.kind] || a.due - b.due);
 }
 export function forecastCandidate(forecast: any, location: any, date: string) {
   const shortages = forecast.shortages || [];

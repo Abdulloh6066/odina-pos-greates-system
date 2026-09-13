@@ -1,0 +1,52 @@
+{
+  "name": "TelegramControl",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "lock_token": {
+      "type": "string",
+      "default": ""
+    },
+    "lock_until": {
+      "type": "number",
+      "default": 0
+    },
+    "last_run_at": {
+      "type": "string"
+    },
+    "last_result": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
