@@ -1,7 +1,11 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { money, httpError, resolveAppUser, stockNumber } from "../../shared/shift-close-helpers.ts";
+import {
+  completeOrderReadyProduction,
+  reservedOrderProductionPieces,
+} from "../../shared/order-ready-production.ts";
 
-const ORDER_RUNTIME_VERSION = "customer-orders-v2-2026-09-10";
+const ORDER_RUNTIME_VERSION = "customer-orders-v3-2026-09-13";
 
 const PAYMENT_METHODS = new Set([
   "cash", "uzcard", "humo", "click", "payme", "bank_transfer", "other",
@@ -331,6 +335,7 @@ export default async function(req: Request): Promise<Response> {
           remaining_balance: remainingBalance,
           payment_status: paymentStatus,
           order_status: "qabul_qilindi",
+          ready_inventory_state: "pending",
           creator_id: user.id,
           creator_name: userName,
           creator_role: user.role,
@@ -559,31 +564,35 @@ export default async function(req: Request): Promise<Response> {
       if (!order) {
         return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
       }
-      const prev = String(order.order_status || "qabul_qilindi");
-      let nextStatus = "";
-      let stampField = "";
+
       if (step === "ready") {
-        if (prev !== "qabul_qilindi" && prev !== "tayyorlanmoqda") {
-          return Response.json({ error: "Tayyor bo‘lish uchun buyurtma yangi bo‘lishi kerak." }, { status: 409 });
-        }
-        nextStatus = "tayyor";
-        stampField = "ready_at";
-      } else if (step === "shipped") {
-        if (prev !== "tayyor") {
-          return Response.json({ error: "Yuborish uchun avval Tayyor bo‘lishi kerak." }, { status: 409 });
-        }
-        nextStatus = "yuborildi_olib_ketildi";
-        stampField = "shipped_at";
-      } else {
+        const result = await completeOrderReadyProduction({
+          service,
+          user,
+          order,
+          readyStamp: tashkentStamp(),
+        });
+        return Response.json({
+          ...result,
+          runtime_version: ORDER_RUNTIME_VERSION,
+        });
+      }
+      if (step !== "shipped") {
         return Response.json({ error: "Noto‘g‘ri amal." }, { status: 400 });
       }
+
+      const prev = String(order.order_status || "qabul_qilindi");
+      if (prev !== "tayyor") {
+        return Response.json({ error: "Yuborish uchun avval Tayyor bo‘lishi kerak." }, { status: 409 });
+      }
+      const nextStatus = "yuborildi_olib_ketildi";
       const stamp = tashkentStamp();
       const claim = await service.entities.CustomerOrder.updateMany(
         { id: order.id, order_status: prev },
         {
           $set: {
             order_status: nextStatus,
-            [stampField]: stamp,
+            shipped_at: stamp,
             updated_at: new Date().toISOString(),
           },
         },
@@ -599,7 +608,7 @@ export default async function(req: Request): Promise<Response> {
         details: `${order.order_number} · ${prev} → ${nextStatus} · ${userName} · ${stamp}`,
       }).catch(() => {});
       return Response.json({
-        order: { ...order, order_status: nextStatus, [stampField]: stamp },
+        order: { ...order, order_status: nextStatus, shipped_at: stamp },
         previous_status: prev,
         runtime_version: ORDER_RUNTIME_VERSION,
       });
@@ -675,6 +684,17 @@ export default async function(req: Request): Promise<Response> {
             productName: String(item.product_name_snapshot || product.name || ""),
             pieces,
           });
+        }
+      }
+      const reservedPiecesByProduct = await reservedOrderProductionPieces(service, order.id);
+      for (const [productId, deduction] of deductionMap.entries()) {
+        const reservedPieces = stockNumber(reservedPiecesByProduct.get(productId) || 0);
+        if (reservedPieces <= 0) continue;
+        const uncoveredPieces = Math.max(0, stockNumber(deduction.pieces - reservedPieces));
+        if (uncoveredPieces <= 0) {
+          deductionMap.delete(productId);
+        } else {
+          deduction.pieces = uncoveredPieces;
         }
       }
       const deductionItems = Array.from(deductionMap.values());
@@ -898,8 +918,12 @@ export default async function(req: Request): Promise<Response> {
 
     return Response.json({ error: "Noto‘g‘ri amal." }, { status: 400 });
   } catch (error) {
-    return Response.json({
+    const payload: Record<string, unknown> = {
       error: error instanceof Error ? error.message : "Buyurtma amali bajarilmadi.",
-    }, { status: Number((error as any)?.status || 500) });
+    };
+    if (Array.isArray((error as any)?.shortages)) {
+      payload.shortages = (error as any).shortages;
+    }
+    return Response.json(payload, { status: Number((error as any)?.status || 500) });
   }
 }
