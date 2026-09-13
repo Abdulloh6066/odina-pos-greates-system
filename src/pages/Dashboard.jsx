@@ -3,6 +3,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { AlertTriangle, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
 import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey, canAccess } from '@/lib/pos';
+import { formatUzbekistanDate } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 
 export default function Dashboard() {
@@ -58,7 +59,7 @@ export default function Dashboard() {
 
   return (
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
-      <PageHeader title="Bosh sahifa" subtitle={new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
+      <PageHeader title="Bosh sahifa" subtitle={formatUzbekistanDate(Date.now(), { weekday: 'long', day: 'numeric', month: 'long', year: undefined })} icon={LayoutDashboard} />
 
       {expiredItems.length > 0 && (
         <button
