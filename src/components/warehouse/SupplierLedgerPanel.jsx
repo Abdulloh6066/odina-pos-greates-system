@@ -17,6 +17,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { odinaAlert } from "@/lib/odina-dialog";
 import { formatNum, formatUZS } from "@/lib/pos";
+import { formatUzbekistanDateTime, uzbekistanDateKey, uzbekistanMonthStartKey } from "@/lib/uzbekistan-time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,20 +38,6 @@ const STATUS_STYLES = {
   paid: "bg-emerald-50 text-emerald-700",
   cancelling: "bg-red-50 text-destructive",
   cancelled: "bg-red-50 text-destructive",
-};
-
-const localDateKey = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return year + "-" + month + "-" + day;
-};
-
-const monthStartKey = () => {
-  const now = new Date();
-  return localDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
 };
 
 const errorText = (error) => (
@@ -82,8 +69,8 @@ export default function SupplierLedgerPanel({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState(monthStartKey);
-  const [dateTo, setDateTo] = useState(() => localDateKey(new Date()));
+  const [dateFrom, setDateFrom] = useState(uzbekistanMonthStartKey);
+  const [dateTo, setDateTo] = useState(() => uzbekistanDateKey());
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -136,7 +123,7 @@ export default function SupplierLedgerPanel({
   const visible = useMemo(() => {
     const query = search.toLowerCase().trim();
     return locationReceipts.filter((receipt) => {
-      const date = localDateKey(receipt.received_at || receipt.created_date);
+      const date = uzbekistanDateKey(receipt.received_at || receipt.created_date);
       if (supplierFilter !== "all" && receipt.supplier_id !== supplierFilter) return false;
       if (dateFrom && date < dateFrom) return false;
       if (dateTo && date > dateTo) return false;
@@ -212,8 +199,8 @@ export default function SupplierLedgerPanel({
   }, [selectedSupplierId, locationReceipts, payments, receiptItems]);
 
   const showThisMonth = () => {
-    setDateFrom(monthStartKey());
-    setDateTo(localDateKey(new Date()));
+    setDateFrom(uzbekistanMonthStartKey());
+    setDateTo(uzbekistanDateKey());
   };
 
   const showAll = () => {
@@ -469,9 +456,9 @@ function ReceiptCard({ receipt, items, payments, onView }) {
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {receipt.receipt_number} · {receipt.location_name_snapshot} · {new Date(
+            {receipt.receipt_number} · {receipt.location_name_snapshot} · {formatUzbekistanDateTime(
               receipt.received_at || receipt.created_date,
-            ).toLocaleString("uz-UZ")}
+            )}
           </p>
           {items.length > 0 && (
             <p className="text-sm mt-3 line-clamp-2">
@@ -527,9 +514,9 @@ function PaymentCard({ payment }) {
           {payment.payment_number} · {payment.receipt_number_snapshot}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          {payment.shop_name_snapshot} · {payment.user_name} · {new Date(
+          {payment.shop_name_snapshot} · {payment.user_name} · {formatUzbekistanDateTime(
             payment.paid_at || payment.created_date,
-          ).toLocaleString("uz-UZ")}
+          )}
         </p>
         {payment.notes && <p className="text-xs mt-1.5">{payment.notes}</p>}
       </div>
@@ -565,7 +552,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
 
         <div className="rounded-2xl border border-border divide-y divide-border overflow-hidden">
           <DetailRow label="Ombor" value={receipt.location_name_snapshot} />
-          <DetailRow label="Kirim sanasi" value={new Date(receipt.received_at || receipt.created_date).toLocaleString("uz-UZ")} />
+          <DetailRow label="Kirim sanasi" value={formatUzbekistanDateTime(receipt.received_at || receipt.created_date)} />
           <DetailRow label="Kirim qilgan xodim" value={receipt.created_by_name || "—"} />
           <DetailRow label="Hisob-faktura" value={receipt.invoice_reference || "—"} />
           <DetailRow label="Izoh" value={receipt.notes || "—"} />
@@ -609,7 +596,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
             <p className="mt-1">{receipt.cancellation_reason || "Sabab ko‘rsatilmagan"}</p>
             {receipt.cancelled_by_name && (
               <p className="text-xs mt-1.5">
-                {receipt.cancelled_by_name} · {receipt.cancelled_at ? new Date(receipt.cancelled_at).toLocaleString("uz-UZ") : ""}
+                {receipt.cancelled_by_name} · {receipt.cancelled_at ? formatUzbekistanDateTime(receipt.cancelled_at) : ""}
               </p>
             )}
           </div>
@@ -681,7 +668,7 @@ function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, 
                     {receipt.receipt_number}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(receipt.received_at || receipt.created_date).toLocaleString("uz-UZ")}
+                    {formatUzbekistanDateTime(receipt.received_at || receipt.created_date)}
                     {" · "}{STATUS_LABELS[receipt.status] || receipt.status}
                   </p>
                 </div>
