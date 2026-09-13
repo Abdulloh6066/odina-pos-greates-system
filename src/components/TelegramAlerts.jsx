@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 export default function TelegramAlerts() {
   const [busy, setBusy] = useState(false);
@@ -24,11 +25,11 @@ export default function TelegramAlerts() {
       setNotice(e?.response?.data?.error || 'Natija olinmadi. Qayta yuborishdan oldin Telegram guruhini tekshiring.');
     } finally { setBusy(false); }
   };
-  const formatTime = value => value ? new Date(value).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' }) : 'Hali ishlamagan';
+  const formatTime = value => value ? formatUzbekistanDateTime(value) : 'Hali ishlamagan';
   const labels = { sent: 'Yuborildi', reserved: 'Yuborish boshlangan — natijani tekshiring', uncertain: 'Yetkazilish noaniq — guruhni tekshiring', rejected: 'Telegram qabul qilmadi' };
   return <div className="border-t border-border pt-4 mt-4 space-y-3">
     <h3 className="font-semibold">Avtomatik ogohlantirishlar</h3>
-    <p className="text-sm text-muted-foreground">Buyurtmaga 3 soat qolganda, 1 soat qolganda va muddati o‘tganda — har bosqichda bir martadan. Ertangi masalliq kamomadi — Toshkent vaqti bilan 18:00 dan keyin kuniga bir marta. Guruhga moliyaviy ma’lumotlar yuborilmaydi.</p>
+    <p className="text-sm text-muted-foreground">Buyurtmaga 3 soat qolganda, 1 soat qolganda va muddati o‘tganda — har bosqichda bir martadan. Ertangi masalliq kamomadi — 18:00 dan keyin kuniga bir marta. Guruhga moliyaviy ma’lumotlar yuborilmaydi.</p>
     <div className="rounded-xl bg-secondary p-3 text-sm space-y-1">
       <p className="font-medium">Server jadvalini Base44’da bir marta yoqing</p>
       <p>Funksiya: <code>telegram-alerts</code> · har 5 daqiqa · egasi/admin akkauntidan.</p>
