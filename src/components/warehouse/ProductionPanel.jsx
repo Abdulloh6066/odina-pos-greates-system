@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -298,7 +299,7 @@ export default function ProductionPanel({
                     <span className="font-semibold text-emerald-700 shrink-0">+{formatNum(batch.produced_quantity)} {UNIT_LABELS[batch.unit] || "dona"}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    {new Date(batch.completed_at || batch.created_at).toLocaleString('uz-UZ')} · {batch.user_name}
+                    {formatUzbekistanDateTime(batch.completed_at || batch.created_at)} · {batch.user_name}
                   </p>
                 </div>
               ))}
