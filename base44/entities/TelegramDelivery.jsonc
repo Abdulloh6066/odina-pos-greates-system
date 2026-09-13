@@ -1,0 +1,59 @@
+{
+  "name": "TelegramDelivery",
+  "properties": {
+    "error": {
+      "type": "string"
+    },
+    "keys": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "message_id": {
+      "type": "number"
+    },
+    "sent_at": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "reserved",
+        "sent",
+        "uncertain",
+        "rejected"
+      ],
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "keys",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  },
+  "type": "object"
+}
