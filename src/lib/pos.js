@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { uzbekistanDateKey } from '@/lib/uzbekistan-time';
 
 export const PAYMENT_METHODS = [
   { id: 'cash', label: 'Naqd pul', short: 'Naqd pul', group: 'cash' },
@@ -80,16 +81,7 @@ export function todayISO() {
 }
 
 export function tashkentDateKey(value = Date.now()) {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Tashkent',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return uzbekistanDateKey(value);
 }
 
 export function saleOccurredAt(sale) {
