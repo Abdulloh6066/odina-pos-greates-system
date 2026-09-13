@@ -1,5 +1,5 @@
 import { base44 } from '@/api/base44Client';
-import { uzbekistanDateKey } from '@/lib/uzbekistan-time';
+import { uzbekistanDateKey } from './uzbekistan-time.js';
 
 export const PAYMENT_METHODS = [
   { id: 'cash', label: 'Naqd pul', short: 'Naqd pul', group: 'cash' },
