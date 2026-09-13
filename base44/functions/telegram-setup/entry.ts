@@ -12,17 +12,8 @@ Deno.serve(async (req) => {
     phase = "sessiyani o‘qish";
     const auth = await client.auth.me();
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
-    const authEmail = String(auth.email || "").trim();
-    phase = "User yozuvini qidirish";
-    const storedMatches = authEmail
-      ? await client.asServiceRole.entities.User.filter({ email: authEmail }, "-updated_date", 5)
-      : [];
     phase = "rolni tekshirish";
-    const normalizedEmail = authEmail.toLowerCase();
-    const stored = (storedMatches || []).find(
-      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === normalizedEmail,
-    ) || null;
-    if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
+    if (auth.active === false || auth.data?.active === false || userRole(auth) !== "admin") {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
     phase = "so‘rovni o‘qish";
