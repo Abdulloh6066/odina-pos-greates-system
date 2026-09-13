@@ -268,7 +268,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
           <div className="rounded-xl border border-border bg-secondary/20 p-3 flex items-center gap-2.5 text-sm">
             <Lock className="w-4 h-4 text-brand-olive shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-muted-foreground">Qabul qilingan vaqt (avtomatik · Asia/Tashkent)</div>
+              <div className="text-xs text-muted-foreground">Qabul qilingan vaqt (avtomatik)</div>
               <div className="font-medium truncate">{acceptanceStamp || '—'}</div>
             </div>
           </div>
