@@ -358,7 +358,6 @@ export default function AuditExport() {
               {rangeStart + "–" + rangeEnd + " / " + formatNum(data.total || 0)}
             </p>
           </div>
-          <p className="text-xs text-muted-foreground">Vaqt: Asia/Tashkent</p>
         </div>
 
         {loading ? (
