@@ -13,15 +13,7 @@ Deno.serve(async (req) => {
     const auth = await client.auth.me();
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
     service = client.asServiceRole;
-    const authEmail = String(auth.email || "").trim();
-    const storedMatches = authEmail
-      ? await service.entities.User.filter({ email: authEmail }, "-updated_date", 5)
-      : [];
-    const normalizedEmail = authEmail.toLowerCase();
-    const stored = (storedMatches || []).find(
-      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === normalizedEmail,
-    ) || null;
-    if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
+    if (auth.active === false || auth.data?.active === false || userRole(auth) !== "admin") {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
