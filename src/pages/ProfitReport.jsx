@@ -3,20 +3,15 @@ import { Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatUZS } from '@/lib/pos';
+import { uzbekistanDateKey, uzbekistanMonthStartKey } from '@/lib/uzbekistan-time';
 import { Button } from '@/components/ui/button';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Image } from '@/components/ui/image';
 import { TrendingUp, Filter, Loader2, Receipt, Wallet, Percent, PiggyBank, Coins, ChevronRight, AlertTriangle } from 'lucide-react';
 import ProductBreakdownDialog from '@/components/profit/ProductBreakdownDialog';
 
-function firstOfMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-}
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+const firstOfMonth = () => uzbekistanMonthStartKey();
+const todayISO = () => uzbekistanDateKey();
 
 export default function ProfitReport() {
   const { user } = useAuth();
