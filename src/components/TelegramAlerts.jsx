@@ -28,7 +28,7 @@ export default function TelegramAlerts() {
   const labels = { sent: 'Yuborildi', reserved: 'Yuborish boshlangan — natijani tekshiring', uncertain: 'Yetkazilish noaniq — guruhni tekshiring', rejected: 'Telegram qabul qilmadi' };
   return <div className="border-t border-border pt-4 mt-4 space-y-3">
     <h3 className="font-semibold">Avtomatik ogohlantirishlar</h3>
-    <p className="text-sm text-muted-foreground">Buyurtma muddati yaqinlashganda va kechikkanda bir martadan. Ertangi masalliq kamomadi — Toshkent vaqti bilan 18:00 dan keyin kuniga bir marta. Guruhga moliyaviy ma’lumotlar yuborilmaydi.</p>
+    <p className="text-sm text-muted-foreground">Buyurtmaga 3 soat qolganda, 1 soat qolganda va muddati o‘tganda — har bosqichda bir martadan. Ertangi masalliq kamomadi — Toshkent vaqti bilan 18:00 dan keyin kuniga bir marta. Guruhga moliyaviy ma’lumotlar yuborilmaydi.</p>
     <div className="rounded-xl bg-secondary p-3 text-sm space-y-1">
       <p className="font-medium">Server jadvalini Base44’da bir marta yoqing</p>
       <p>Funksiya: <code>telegram-alerts</code> · har 5 daqiqa · egasi/admin akkauntidan.</p>
