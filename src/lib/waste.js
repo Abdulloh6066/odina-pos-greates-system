@@ -1,4 +1,4 @@
-import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
+import { formatUzbekistanDateTime } from './uzbekistan-time.js';
 
 export const WASTE_REASONS = [
   { value: 'expired', label: '3 kundan oshgan' },
