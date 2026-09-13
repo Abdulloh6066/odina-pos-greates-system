@@ -7,14 +7,17 @@ const TEST_TEXT = "✅ Odina POS bilan ulanish ishlayapti.\nBu sinov xabari. Avt
 Deno.serve(async (req) => {
   let phase = "boshlash";
   try {
-    phase = "foydalanuvchini tekshirish";
+    phase = "Base44 mijozini yaratish";
     const client = createClientFromRequest(req);
+    phase = "sessiyani o‘qish";
     const auth = await client.auth.me();
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
     const authEmail = String(auth.email || "").trim();
+    phase = "User yozuvini qidirish";
     const storedMatches = authEmail
       ? await client.asServiceRole.entities.User.filter({ email: authEmail }, "-updated_date", 5)
       : [];
+    phase = "rolni tekshirish";
     const normalizedEmail = authEmail.toLowerCase();
     const stored = (storedMatches || []).find(
       (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === normalizedEmail,
