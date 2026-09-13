@@ -14,6 +14,12 @@
     "product_id": {
       "type": "string"
     },
+    "order_id": {
+      "type": "string"
+    },
+    "order_number_snapshot": {
+      "type": "string"
+    },
     "ingredient_id": {
       "type": "string"
     },
