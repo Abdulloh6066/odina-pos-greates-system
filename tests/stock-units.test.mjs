@@ -66,10 +66,27 @@ function fixture() {
 
 function loadHandler(name, client) {
   const path = 'base44/functions/' + name + '/entry.ts';
+  let helpers = '';
+  if (name === 'stock-transfer') {
+    helpers = [
+      'const APP_ROLES = new Set(["admin","manager","cashier","accountant","production","warehouse"]);',
+      'const userLabel = (user) => user?.full_name || user?.email || "Noma’lum xodim";',
+      'const userRole = (user) => { const root = String(user?.role || ""); const nested = String(user?.data?.role || ""); return APP_ROLES.has(root) ? root : (APP_ROLES.has(nested) ? nested : (root || nested)); };',
+      'const userShopId = (user) => String(user?.shop_id || user?.data?.shop_id || "");',
+      'const userShopName = (user) => String(user?.shop_name || user?.data?.shop_name || "");',
+    ].join('\n');
+  } else if (name === 'production-run') {
+    const cost = readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, '');
+    const forecast = readFileSync('base44/shared/production-forecast-logic.ts', 'utf8').replace(/export /g, '');
+    helpers = cost + '\n' + forecast;
+  }
   let source = readFileSync(path, 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
+    .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/user-helpers\.ts";/, '')
+    .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
+    .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/production-forecast-logic\.ts";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
-  source += '\nglobalThis.testHandler = handler;';
+  source = helpers + '\n' + source + '\nglobalThis.testHandler = handler;';
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
   const context = vm.createContext({ client, Response, crypto: webcrypto, console, structuredClone, exports: {} });
   vm.runInContext(code, context);
