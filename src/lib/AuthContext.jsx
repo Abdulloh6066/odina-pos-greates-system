@@ -141,7 +141,19 @@ export const AuthProvider = ({ children }) => {
         console.warn('Staff assignment check failed:', assignmentError);
       }
 
-      setUser(await hydrateAppUser(currentUser));
+      const hydrated = await hydrateAppUser(currentUser);
+      // A staff account the owner deactivated must be locked out of the app
+      // immediately — backend functions already reject inactive users, but the
+      // frontend should not render the app shell for them.
+      if (hydrated?.active === false) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError({ type: 'user_disabled', message: 'Hisob o‘chirilgan' });
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+        return;
+      }
+      setUser(hydrated);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);

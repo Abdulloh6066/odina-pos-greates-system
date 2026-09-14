@@ -35,6 +35,7 @@ import Budget from '@/pages/Budget';
 import ProductionScreen from '@/pages/ProductionScreen';
 import ProfitReport from '@/pages/ProfitReport';
 import AuditExport from '@/pages/AuditExport';
+import Security from '@/pages/Security';
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -50,6 +51,18 @@ const AuthGate = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
+    } else if (authError.type === 'user_disabled') {
+      return (
+        <div className="fixed inset-0 flex items-center justify-center p-6">
+          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow-lg p-6 max-w-sm text-center space-y-3">
+            <h2 className="font-display text-xl font-bold">Hisob o‘chirilgan</h2>
+            <p className="text-sm text-muted-foreground">Tizimga kirish vaqtincha to‘xtatilgan. Administrator bilan bog‘laning.</p>
+            <button onClick={() => navigateToLogin()} className="odina-button odina-button-primary inline-flex items-center justify-center rounded-xl px-4 h-11 text-sm font-semibold">
+              Tizimdan chiqish
+            </button>
+          </div>
+        </div>
+      );
     } else if (authError.type === 'auth_required') {
       navigateToLogin();
       return null;
@@ -93,6 +106,7 @@ function App() {
                 <Route path="/budget" element={<RoleRoute pageKey="budget"><Budget /></RoleRoute>} />
                 <Route path="/profit" element={<RoleRoute pageKey="profit"><ProfitReport /></RoleRoute>} />
                 <Route path="/audit" element={<RoleRoute pageKey="audit"><AuditExport /></RoleRoute>} />
+                <Route path="/security" element={<RoleRoute pageKey="security"><Security /></RoleRoute>} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />
