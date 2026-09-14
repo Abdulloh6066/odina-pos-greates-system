@@ -41,6 +41,7 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
       cash_sales: 0, uzcard_sales: 0, humo_sales: 0, online_sales: 0, bank_transfer_sales: 0,
       total_sales: 0, order_count: 0,
     }],
+    Customer: [],
     CustomerOrder: [],
     CustomerOrderItem: [],
     OrderPayment: [],
@@ -116,12 +117,16 @@ function loadHandler(client) {
       .replace(/import \{[\s\S]*?\} from "\.\/cost-engine\.ts";/, '')
       .replace(/export /g, ''),
   );
+  const customerCode = transpileScript(
+    readFileSync('base44/shared/customer-helpers.ts', 'utf8').replace(/export /g, ''),
+  );
   let source = readFileSync('base44/functions/customer-orders/entry.ts', 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/order-ready-production\.ts";/, '')
+    .replace(/import \{ ensureCustomer \} from "\.\.\/\.\.\/shared\/customer-helpers\.ts";/, '')
     .replace(/export default async function\(req[^{]*\{/, 'async function handler(req) {');
-  source = [sharedCode, costCode, readyCode, source].join('\n');
+  source = [sharedCode, costCode, readyCode, customerCode, source].join('\n');
   source += '\nglobalThis.testHandler = handler;';
   const code = transpileScript(source);
   const context = vm.createContext({
