@@ -30,7 +30,7 @@ export function birthdayDisplay(month: number, day: number): string {
   return `${day} ${MONTHS_UZ[month - 1] || ""}`.trim();
 }
 
-export function cleanLabel(value: unknown, max = 80): string {
+export function cleanBirthdayLabel(value: unknown, max = 80): string {
   return String(value ?? "").replace(/[\r\n\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, " ").slice(0, max);
 }
 
@@ -143,8 +143,8 @@ export function buildBirthdayMessage(
       const status = f?.contact_status || "hali_aloqa_qilinmadi";
       const statusLabel = BIRTHDAY_STATUS_LABELS[status] || status;
       sections.push(
-        idx + ". Mijoz: " + cleanLabel(m.customer_name),
-        "   Telefon: " + cleanLabel(m.phone || "—"),
+        idx + ". Mijoz: " + cleanBirthdayLabel(m.customer_name),
+        "   Telefon: " + cleanBirthdayLabel(m.phone || "—"),
         "   Tug'ilgan kuni: " + birthdayDisplay(m.birthday_month, m.birthday_day),
         "   Holati: " + statusLabel,
         "",
