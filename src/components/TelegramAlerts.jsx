@@ -19,6 +19,10 @@ export default function TelegramAlerts() {
         setPreview(null);
         setNotice(data.sent ? data.count + ' ta ogohlantirish yuborildi.' : data.busy ? 'Boshqa tekshiruv ishlayapti.' : data.paused ? 'Yuborish to‘xtatilgan.' : 'Yangi ogohlantirish yo‘q.');
       }
+      if (action === 'birthdays') {
+        setPreview(null);
+        setNotice(data.sent ? data.count + ' ta tug‘ilgan kun eslatmasi yuborildi.' : data.paused ? 'Yuborish to‘xtatilgan.' : '3 kun qolgan yangi tug‘ilgan kun eslatmasi yo‘q.');
+      }
       const response = await base44.functions.invoke('telegram-alerts', { action: 'status' });
       setStatus(response.data);
     } catch (e) {
@@ -40,6 +44,7 @@ export default function TelegramAlerts() {
       <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('status')}>Holatni yangilash</Button>
       <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('preview')}>Xabarni oldindan ko‘rish</Button>
       <Button className="min-h-11" disabled={busy || status?.enabled === false} onClick={() => request('run')}>Hozir tekshirish va yuborish</Button>
+      <Button variant="outline" className="min-h-11" disabled={busy || status?.enabled === false} onClick={() => request('birthdays')}>Tug‘ilgan kunlarni hozir tekshirish</Button>
       {status && <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('toggle', { enabled: !status.enabled })}>
         {status.enabled ? 'Yuborishni to‘xtatish' : 'Yuborishga ruxsat berish'}
       </Button>}
