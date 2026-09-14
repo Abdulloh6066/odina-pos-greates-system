@@ -5,9 +5,23 @@ const STAFF_ROLES = ["admin", "manager", "cashier", "accountant", "production", 
 const WINDOW_MS = 60_000;
 const MAX_CHECKS_PER_WINDOW = 10;
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+// In-memory per-IP rate limiter. Replaces the previous service-role ActionHistory
+// write, which the security scanner flagged as an unauthenticated database write.
+// This endpoint is intentionally public (pre-auth allowlist gate for login/register),
+// so it cannot require a logged-in user; IP-based throttling mitigates abuse instead.
+const ipHits = new Map<string, number[]>();
+
+function rateLimited(source: string): boolean {
+  const now = Date.now();
+  const cutoff = now - WINDOW_MS;
+  const hits = (ipHits.get(source) || []).filter((t) => t > cutoff);
+  if (hits.length >= MAX_CHECKS_PER_WINDOW) {
+    ipHits.set(source, hits);
+    return false;
+  }
+  hits.push(now);
+  ipHits.set(source, hits);
+  return true;
 }
 
 Deno.serve(async (req) => {
@@ -17,27 +31,13 @@ Deno.serve(async (req) => {
   try {
     const forwarded = String(req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
     const source = forwarded || String(req.headers.get("cf-connecting-ip") || "unknown");
-    const sourceKey = "public-email-check:" + (await sha256Hex(source)).slice(0, 24);
-    const since = new Date(Date.now() - WINDOW_MS).toISOString();
-    const recent = await service.entities.ActionHistory.filter({
-      user_id: sourceKey,
-      action: "public_email_check",
-      created_date: { $gte: since },
-    }, "-created_date", MAX_CHECKS_PER_WINDOW + 1);
 
-    if ((recent || []).length >= MAX_CHECKS_PER_WINDOW) {
+    if (!rateLimited(source)) {
       return Response.json({
         allowed: false,
         error: "Juda ko‘p urinish. Bir daqiqadan keyin qayta urinib ko‘ring.",
       }, { status: 429 });
     }
-
-    await service.entities.ActionHistory.create({
-      user_id: sourceKey,
-      user_name: "Ro‘yxatdan o‘tish tekshiruvi",
-      action: "public_email_check",
-      details: "Email taklifi tekshirildi; email qiymati jurnalga yozilmadi.",
-    });
 
     const body = await req.json().catch(() => ({}));
     const email = normalizeEmail(body?.email);
