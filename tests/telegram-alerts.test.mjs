@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { readFileSync } from 'node:fs';
 const NOW = Date.parse('2026-09-13T14:00:00Z');
-const source = ['base44/shared/user-helpers.ts', 'base44/shared/production-forecast-logic.ts', 'base44/shared/telegram-alert-logic.ts', 'base44/functions/telegram-alerts/entry.ts']
+const source = ['base44/shared/user-helpers.ts', 'base44/shared/production-forecast-logic.ts', 'base44/shared/telegram-alert-logic.ts', 'base44/shared/birthday-logic.ts', 'base44/functions/telegram-alerts/entry.ts']
   .map(p => readFileSync(p, 'utf8').replace(/^import .*;$/gm, '').replace(/^export /gm, '')).join('\n');
 const js = ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None });
 const baseOrder = { id:'o1', order_number:'BO-001', order_status:'qabul_qilindi', required_date:'2026-09-13', required_time:'19:30', shop_name_snapshot:'Odina Main', total:987654321, remaining_balance:123456789, customer_phone:'SECRET_PHONE', notes:'SECRET_NOTES', customer_name:'SECRET_NAME' };
