@@ -1,0 +1,6 @@
+{
+  "name": "security-admin",
+  "entry": "entry.ts",
+  "description": "Xavfsizlik sahifasi holati va xodim kirish boshqaruvi; faqat faol Egasi/Admin uchun.",
+  "is_public": false
+}
