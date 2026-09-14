@@ -1,0 +1,6 @@
+{
+  "name": "cleanup-test-business-data",
+  "entry": "entry.ts",
+  "description": "Faol Admin tasdig‘i bilan test biznes ma’lumotlarini bir martalik tozalash.",
+  "is_public": false
+}
