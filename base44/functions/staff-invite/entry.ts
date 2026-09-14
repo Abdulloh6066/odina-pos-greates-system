@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 
 const STAFF_ROLES = ["manager", "cashier", "accountant", "production", "warehouse"];
 
@@ -95,8 +96,9 @@ Deno.serve(async (req) => {
     }
 
     if (action === "invite") {
-      if (currentUser.role !== "admin") {
-        return Response.json({ error: "Faqat egasi xodim taklif qila oladi." }, { status: 403 });
+      const admin = await resolveStoredAppUser(base44.asServiceRole, currentUser);
+      if (!admin || userRole(admin) !== "admin" || admin.active === false || admin.data?.active === false) {
+        return Response.json({ error: "Faqat faol Egasi/Admin xodim taklif qila oladi." }, { status: 403 });
       }
 
       const email = String(body?.email || "").trim().toLowerCase();
@@ -135,8 +137,8 @@ Deno.serve(async (req) => {
         shop_id: desiredRole === "admin" ? "" : shopId,
         shop_name: desiredRole === "admin" ? "" : shopName,
         status: "pending",
-        invited_by_id: currentUser.id,
-        invited_by_name: currentUser.full_name || currentUser.email,
+        invited_by_id: admin.id,
+        invited_by_name: admin.full_name || currentUser.full_name || currentUser.email,
         invited_at: now,
         error_message: "",
       };
@@ -157,8 +159,8 @@ Deno.serve(async (req) => {
       }
 
       await base44.asServiceRole.entities.ActionHistory.create({
-        user_id: currentUser.id,
-        user_name: currentUser.full_name || currentUser.email,
+        user_id: admin.id,
+        user_name: admin.full_name || currentUser.full_name || currentUser.email,
         action: "user_invited",
         details: `${email}: ${desiredRole}${shopName ? ` · ${shopName}` : ""}`,
       }).catch(() => {});
