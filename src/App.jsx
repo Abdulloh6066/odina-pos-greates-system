@@ -36,6 +36,7 @@ import ProductionScreen from '@/pages/ProductionScreen';
 import ProfitReport from '@/pages/ProfitReport';
 import AuditExport from '@/pages/AuditExport';
 import Security from '@/pages/Security';
+import DailyExport from '@/pages/DailyExport';
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -107,6 +108,7 @@ function App() {
                 <Route path="/profit" element={<RoleRoute pageKey="profit"><ProfitReport /></RoleRoute>} />
                 <Route path="/audit" element={<RoleRoute pageKey="audit"><AuditExport /></RoleRoute>} />
                 <Route path="/security" element={<RoleRoute pageKey="security"><Security /></RoleRoute>} />
+                <Route path="/daily-export" element={<RoleRoute pageKey="dailyexport"><DailyExport /></RoleRoute>} />
               </Route>
             </Route>
             <Route path="*" element={<PageNotFound />} />

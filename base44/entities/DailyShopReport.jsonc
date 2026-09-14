@@ -1,0 +1,142 @@
+{
+  "name": "DailyShopReport",
+  "type": "object",
+  "properties": {
+    "business_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Asia/Tashkent bo'yicha savdo kuni (YYYY-MM-DD)"
+    },
+    "shop_id": {
+      "type": "string"
+    },
+    "shop_name": {
+      "type": "string"
+    },
+    "total_revenue": {
+      "type": "number",
+      "default": 0
+    },
+    "total_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Sotilgan mahsulot tannarxi"
+    },
+    "real_profit": {
+      "type": "number",
+      "default": 0,
+      "description": "Tushum - tannarx"
+    },
+    "sale_count": {
+      "type": "number",
+      "default": 0
+    },
+    "refund_count": {
+      "type": "number",
+      "default": 0
+    },
+    "cash_total": {
+      "type": "number",
+      "default": 0
+    },
+    "uzcard_total": {
+      "type": "number",
+      "default": 0
+    },
+    "humo_total": {
+      "type": "number",
+      "default": 0
+    },
+    "online_total": {
+      "type": "number",
+      "default": 0
+    },
+    "bank_transfer_total": {
+      "type": "number",
+      "default": 0
+    },
+    "sheet_appended": {
+      "type": "boolean",
+      "default": false
+    },
+    "sheet_append_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "email_sent": {
+      "type": "boolean",
+      "default": false
+    },
+    "email_sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sent_by_id": {
+      "type": "string"
+    },
+    "sent_by_name": {
+      "type": "string"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "auto",
+        "shift_close"
+      ],
+      "default": "manual"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "business_date",
+    "shop_id",
+    "shop_name",
+    "total_revenue",
+    "total_cost",
+    "real_profit"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

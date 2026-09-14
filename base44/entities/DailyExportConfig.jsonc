@@ -1,0 +1,70 @@
+{
+  "name": "DailyExportConfig",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "default": "daily-export"
+    },
+    "google_sheet_id": {
+      "type": "string"
+    },
+    "google_sheet_url": {
+      "type": "string"
+    },
+    "recipient_email": {
+      "type": "string"
+    },
+    "auto_send_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "reminder_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "sheet_created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "key"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "*/15 23,0 * * *",
+      "one_time_date": null,
+      "timezone": "Asia/Tashkent",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "Daily Sales Export",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "daily_sales_export",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "auto_send": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "daily-sales-export",
+            "args": {
+              "action": "autoSend"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Kunlik hisobotni yuborish",
+            "description": "Yopilgan smenali do'konlar uchun"
+          }
+        }
+      }
+    ]
+  },
+  "description": "Har ish kuni 23:00 dan keyin (har 15 daq) yopilgan smenali do'konlar uchun kunlik hisobotni Google Sheet va emailga yuboradi."
+}

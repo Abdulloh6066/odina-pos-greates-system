@@ -1,0 +1,5 @@
+{
+  "name": "daily-sales-export",
+  "entry": "entry.ts",
+  "description": "Kunlik savdo hisobotini har do'kon uchun hisoblab, Google Sheet va emailga yuboradi (avtomatik smena yopilganda yoki qo'lda). CSV yuklab olish uchun ma'lumot qaytaradi."
+}
