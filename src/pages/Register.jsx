@@ -37,10 +37,11 @@ export default function Register() {
           setLoading(false);
           return;
         }
-      } catch (checkErr) {
-        console.warn("Staff email check failed", checkErr);
+      } catch {
+        setError("Email ruxsatini tekshirib bo‘lmadi. Xavfsizlik uchun ro‘yxatdan o‘tish to‘xtatildi; keyinroq qayta urinib ko‘ring.");
+        return;
       }
-      await base44.auth.register({ email, password });
+      await base44.auth.register({ email: email.trim().toLowerCase(), password });
       setShowOtp(true);
     } catch (err) {
       setError(err.message || "Ro‘yxatdan o‘tib bo‘lmadi.");
