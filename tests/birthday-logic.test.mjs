@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+
+const source = readFileSync(new URL('../base44/shared/birthday-logic.ts', import.meta.url), 'utf8');
+const compiled = ts.transpileModule(source, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
+}).outputText;
+const {
   birthdayWindowMatches,
   buildBirthdayMessage,
   buildBirthdayKeyboard,
@@ -8,7 +15,7 @@ import {
   birthdayDisplay,
   birthdayDedupKey,
   BIRTHDAY_STATUS_LABELS,
-} from '../base44/shared/birthday-logic.ts';
+} = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
 const mk = (id, first, mm, dd, yy = 1990, phone = '+998900000000', last = '') => ({
   id, first_name: first, last_name: last, phone, birth_date: `${yy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`,
