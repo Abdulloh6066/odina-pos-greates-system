@@ -16,23 +16,23 @@ export default function Security() {
   const [pinSet, setPinSet] = useState(false);
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [u, sec, ah] = await Promise.all([
-        base44.entities.User.list(),
-        base44.entities.SecuritySettings.list().catch(() => []),
-        base44.entities.ActionHistory.list('-created_date', 30),
-      ]);
-      setUsers(u || []);
-      setPinSet(Boolean((sec || []).some((s) => s.pin_hash)));
-      setAudit(ah || []);
+      const response = await base44.functions.invoke('security-admin', { action: 'status' });
+      const data = response?.data || response;
+      setUsers(data?.users || []);
+      setPinSet(Boolean(data?.pin_set));
+      setAudit(data?.audit || []);
+      setLoadError('');
     } catch {
-      /* admin-only reads; surface empty state on failure */
+      setLoadError('Xavfsizlik holatini yuklab bo‘lmadi. Yangilab qayta urinib ko‘ring.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [reloadKey, load]);
@@ -50,6 +50,11 @@ export default function Security() {
           </Button>
         )}
       />
+      {loadError && (
+        <div role="alert" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {loadError}
+        </div>
+      )}
       {loading ? (
         <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
@@ -57,7 +62,7 @@ export default function Security() {
           <SecurityPosture users={users} pinSet={pinSet} />
           <RoleMatrix />
           <div className="grid lg:grid-cols-2 gap-5">
-            <PinManager user={user} onSaved={() => setReloadKey((k) => k + 1)} />
+            <PinManager onSaved={() => setReloadKey((k) => k + 1)} />
             <StaffAccessPanel users={users} currentUser={user} onChanged={() => setReloadKey((k) => k + 1)} />
           </div>
           <SecurityAuditFeed entries={audit} />
