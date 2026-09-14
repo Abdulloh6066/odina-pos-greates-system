@@ -334,6 +334,7 @@ function loadHandler(client) {
     crypto: webcrypto,
     console,
     structuredClone,
+    exports: {},
     Date: makeClock(),
   });
   vm.runInContext(transpileScript(source), context);
