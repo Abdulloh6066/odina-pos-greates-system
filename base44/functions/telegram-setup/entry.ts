@@ -3,7 +3,14 @@ import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 
 // Recipient explicitly supplied by the owner. Never accept a recipient or text from the browser.
 const GROUP_ID = "-5570444945";
+const WEBHOOK_URL = "https://odina-pos-suite.base44.app/functions/telegram-webhook";
 const TEST_TEXT = "✅ Odina POS bilan ulanish ishlayapti.\nBu sinov xabari. Avtomatik ogohlantirishlar hali yoqilmagan.";
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req) => {
   let phase = "boshlash";
   try {
@@ -21,7 +28,7 @@ Deno.serve(async (req) => {
     phase = "so‘rovni o‘qish";
     const body = await req.json().catch(() => ({}));
     const action = body.action || "inspect";
-    if (!["inspect", "test"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
+    if (!["inspect", "test", "setWebhook"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) return Response.json({ error: "Base44 Secrets ichida TELEGRAM_BOT_TOKEN topilmadi." }, { status: 400 });
     const call = async (method: string, body = {}) => {
@@ -60,6 +67,19 @@ Deno.serve(async (req) => {
       phase = "sinov xabarini yuborish";
       const sent = await call("sendMessage", { chat_id: GROUP_ID, text: TEST_TEXT });
       messageId = sent.message_id;
+    }
+    if (action === "setWebhook") {
+      // Register the callback handler so inline buttons under birthday messages work.
+      // secret_token is derived from the bot token so the webhook can verify callers.
+      phase = "webhookni ulash";
+      const secret = (await sha256Hex(token)).slice(0, 32);
+      await call("setWebhook", { url: WEBHOOK_URL, secret_token: secret, allowed_updates: ["callback_query"] });
+      const info = await call("getWebhookInfo");
+      return Response.json({
+        webhook_url: info.url,
+        has_secret: Boolean(info.has_secret_token),
+        pending_update_count: info.pending_update_count || 0,
+      });
     }
     return Response.json({
       bot_username: bot.username,

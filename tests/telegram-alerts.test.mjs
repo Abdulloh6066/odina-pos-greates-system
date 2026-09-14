@@ -177,6 +177,14 @@ test('birthday reminder includes 0-3 day window, excludes aloqa_chiqildi, dedups
   // Follow-ups were created with default status
   assert.equal(f.db.BirthdayFollowup.length,4);
   assert.equal(f.db.BirthdayFollowup[0].contact_status,'hali_aloqa_qilinmadi');
+  // Inline keyboard attached: one row per customer, callback_data encodes followup id + action
+  const kb = f.sent[0].reply_markup?.inline_keyboard;
+  assert.ok(Array.isArray(kb) && kb.length === 4);
+  assert.equal(kb[0].length, 2);
+  assert.match(kb[0][0].callback_data, /^bd:new-\d+:no$/);
+  assert.match(kb[0][1].callback_data, /^bd:new-\d+:ok$/);
+  assert.match(kb[0][0].text, /Javob yo'q/);
+  assert.match(kb[0][1].text, /Aloqa/);
 });
 
 test('birthday send excludes aloqa_chiqildi and includes hali + qongiroq', async()=>{

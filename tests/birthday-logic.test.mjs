@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   birthdayWindowMatches,
   buildBirthdayMessage,
+  buildBirthdayKeyboard,
   addDaysToDateKey,
   birthdayDisplay,
   birthdayDedupKey,
@@ -154,4 +155,27 @@ test('status labels cover all three statuses', () => {
   assert.equal(BIRTHDAY_STATUS_LABELS.hali_aloqa_qilinmadi, "Hali aloqa qilinmadi");
   assert.equal(BIRTHDAY_STATUS_LABELS.qongiroq_javob_bolmadi, "Qo'ng'iroq qilindi, javob bo'lmadi");
   assert.equal(BIRTHDAY_STATUS_LABELS.aloqa_chiqildi, "Aloqaga chiqildi");
+});
+
+test('buildBirthdayKeyboard emits one numbered row per eligible customer with callback data', () => {
+  const matches = birthdayWindowMatches([
+    mk('a','Ali',9,13), mk('b','B',9,14), mk('c','C',9,15),
+  ], '2026-09-13');
+  const fu = new Map([
+    ['a', { id: 'fu-a', contact_status: 'hali_aloqa_qilinmadi' }],
+    ['b', { id: 'fu-b', contact_status: 'hali_aloqa_qilinmadi' }],
+    ['c', { id: 'fu-c', contact_status: 'aloqa_chiqildi' }],
+  ]);
+  const kb = buildBirthdayKeyboard(matches, fu);
+  assert.ok(kb);
+  // "c" excluded (aloqa_chiqildi); numbering 1,2 matches message order
+  assert.equal(kb.inline_keyboard.length, 2);
+  assert.equal(kb.inline_keyboard[0][0].text, '1. ❌ Javob yo'q');
+  assert.equal(kb.inline_keyboard[0][1].callback_data, 'bd:fu-a:ok');
+  assert.equal(kb.inline_keyboard[1][0].callback_data, 'bd:fu-b:no');
+});
+
+test('buildBirthdayKeyboard returns null when no followup ids are present', () => {
+  const matches = birthdayWindowMatches([mk('a','Ali',9,13)], '2026-09-13');
+  assert.equal(buildBirthdayKeyboard(matches, new Map()), null);
 });

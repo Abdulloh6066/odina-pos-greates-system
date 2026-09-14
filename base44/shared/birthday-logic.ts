@@ -104,42 +104,76 @@ const GROUP_HEADERS: Record<number, string> = {
   3: "🔴 3 kun qoldi",
 };
 
+// Eligible matches (excludes "aloqa_chiqildi"), ordered by days remaining so the
+// message and the inline keyboard share the same numbering.
+function orderedEligible(matches: BirthdayMatch[], followupByCustomer: Map<string, any>): BirthdayMatch[] {
+  const eligible = matches.filter((m) => {
+    const f = followupByCustomer.get(m.customer_id);
+    const status = f?.contact_status || "hali_aloqa_qilinmadi";
+    return status !== "aloqa_chiqildi";
+  });
+  const byOffset: Record<number, BirthdayMatch[]> = { 0: [], 1: [], 2: [], 3: [] };
+  for (const m of eligible) byOffset[m.days_remaining].push(m);
+  const ordered: BirthdayMatch[] = [];
+  for (let offset = 0; offset <= 3; offset++) ordered.push(...byOffset[offset]);
+  return ordered;
+}
+
 // Build a consolidated Telegram message from eligible matches, grouped by days remaining.
 // followupByCustomer: Map<customer_id, {contact_status}>. "aloqa_chiqildi" is excluded.
 export function buildBirthdayMessage(
   matches: BirthdayMatch[],
   followupByCustomer: Map<string, any>,
 ): string {
-  const eligible = matches.filter((m) => {
-    const f = followupByCustomer.get(m.customer_id);
-    const status = f?.contact_status || "hali_aloqa_qilinmadi";
-    return status !== "aloqa_chiqildi";
-  });
-  if (!eligible.length) return "";
+  const ordered = orderedEligible(matches, followupByCustomer);
+  if (!ordered.length) return "";
 
   const byOffset: Record<number, BirthdayMatch[]> = { 0: [], 1: [], 2: [], 3: [] };
-  for (const m of eligible) byOffset[m.days_remaining].push(m);
+  for (const m of ordered) byOffset[m.days_remaining].push(m);
 
   const sections: string[] = ["🎂 YAQINLASHAYOTGAN TUG'ILGAN KUNLAR", ""];
+  let idx = 0;
   for (let offset = 0; offset <= 3; offset++) {
     const group = byOffset[offset];
     if (!group.length) continue;
     sections.push(GROUP_HEADERS[offset]);
     for (const m of group) {
+      idx++;
       const f = followupByCustomer.get(m.customer_id);
       const status = f?.contact_status || "hali_aloqa_qilinmadi";
       const statusLabel = BIRTHDAY_STATUS_LABELS[status] || status;
       sections.push(
-        "Mijoz: " + cleanLabel(m.customer_name),
-        "Telefon: " + cleanLabel(m.phone || "—"),
-        "Tug'ilgan kuni: " + birthdayDisplay(m.birthday_month, m.birthday_day),
-        "Holati: " + statusLabel,
+        idx + ". Mijoz: " + cleanLabel(m.customer_name),
+        "   Telefon: " + cleanLabel(m.phone || "—"),
+        "   Tug'ilgan kuni: " + birthdayDisplay(m.birthday_month, m.birthday_day),
+        "   Holati: " + statusLabel,
         "",
       );
     }
   }
-  sections.push("Jami bog'lanish kerak: " + eligible.length);
+  sections.push("Jami bog'lanish kerak: " + ordered.length);
   return sections.join("\n").trim();
+}
+
+// Inline keyboard for the birthday message: one row per customer with two callback
+// buttons ("Javob yo'q" / "Aloqa"). callback_data = "bd:<followup_id>:no|ok".
+// Numbering matches the message so the recipient can tell rows apart.
+export function buildBirthdayKeyboard(
+  matches: BirthdayMatch[],
+  followupByCustomer: Map<string, any>,
+): { inline_keyboard: any[][] } | null {
+  const ordered = orderedEligible(matches, followupByCustomer);
+  const rows: any[][] = [];
+  ordered.forEach((m, i) => {
+    const f = followupByCustomer.get(m.customer_id);
+    if (!f?.id) return;
+    const n = i + 1 + ".";
+    rows.push([
+      { text: n + " ❌ Javob yo'q", callback_data: "bd:" + f.id + ":no" },
+      { text: n + " ✅ Aloqa", callback_data: "bd:" + f.id + ":ok" },
+    ]);
+  });
+  return rows.length ? { inline_keyboard: rows } : null;
 }
 
 // Daily dedup key for a customer's birthday occurrence.

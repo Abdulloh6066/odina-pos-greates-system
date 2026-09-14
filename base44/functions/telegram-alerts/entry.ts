@@ -2,7 +2,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
 import { TELEGRAM_GROUP_ID, cleanLabel, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
-import { birthdayWindowMatches, buildBirthdayMessage, birthdayDedupKey, birthdayDisplay } from "../../shared/birthday-logic.ts";
+import { birthdayWindowMatches, buildBirthdayMessage, buildBirthdayKeyboard, birthdayDedupKey, birthdayDisplay } from "../../shared/birthday-logic.ts";
 
 // Birthday follow-up: load all customers / followups / deliveries with pagination.
 async function readAll(service: any, entityName: string, query: any = {}): Promise<any[]> {
@@ -203,6 +203,7 @@ async function handleBirthdaySend(service: any, opts: { manual: boolean }): Prom
   if (!text) {
     return Response.json({ sent: false, pending: 0, message: NO_ELIGIBLE_MESSAGE });
   }
+  const keyboard = buildBirthdayKeyboard(fresh, followupByCustomer);
 
   const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
   if (!token) {
@@ -215,10 +216,12 @@ async function handleBirthdaySend(service: any, opts: { manual: boolean }): Prom
     text,
   });
   try {
+    const payload: any = { chat_id: TELEGRAM_GROUP_ID, text };
+    if (keyboard) payload.reply_markup = keyboard;
     const response = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TELEGRAM_GROUP_ID, text }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(12000),
     });
     const data = await response.json();

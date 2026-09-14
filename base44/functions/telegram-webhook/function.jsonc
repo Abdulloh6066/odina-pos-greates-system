@@ -1,0 +1,6 @@
+{
+  "name": "telegram-webhook",
+  "entry": "entry.ts",
+  "description": "Telegram bot tugmalari (callback_query) ni qabul qiladi va tug'ilgan kun aloqa holatini yangilaydi. Telegram tomonidan chaqiriladi.",
+  "is_public": true
+}

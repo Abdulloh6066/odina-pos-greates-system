@@ -8,6 +8,7 @@ export default function TelegramAlerts() {
   const [status, setStatus] = useState(null);
   const [preview, setPreview] = useState(null);
   const [notice, setNotice] = useState('');
+  const [whipStatus, setWhipStatus] = useState(null);
   const request = async (action, extra = {}) => {
     if (busy) return;
     setBusy(true);
@@ -33,6 +34,18 @@ export default function TelegramAlerts() {
       setNotice(e?.response?.data?.error || 'Natija olinmadi. Qayta yuborishdan oldin Telegram guruhini tekshiring.');
     } finally { setBusy(false); }
   };
+  const connectWebhook = async () => {
+    if (busy) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      const { data } = await base44.functions.invoke('telegram-setup', { action: 'setWebhook' });
+      setWhipStatus(data);
+      setNotice('Tugmalar ulandi — endi xabar ostidagi tugmalarni bosib holatni belgilash mumkin.');
+    } catch (e) {
+      setNotice(e?.response?.data?.error || 'Webhook ulanmadi. Telegram bot tokenini tekshiring.');
+    } finally { setBusy(false); }
+  };
   const formatTime = value => value ? formatUzbekistanDateTime(value) : 'Hali ishlamagan';
   const labels = { sent: 'Yuborildi', reserved: 'Yuborish boshlangan — natijani tekshiring', uncertain: 'Yetkazilish noaniq — guruhni tekshiring', rejected: 'Telegram qabul qilmadi' };
   return <div className="border-t border-border pt-4 mt-4 space-y-3">
@@ -48,6 +61,7 @@ export default function TelegramAlerts() {
       <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('status')}>Holatni yangilash</Button>
       <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('preview')}>Xabarni oldindan ko‘rish</Button>
       <Button className="min-h-11" disabled={busy || status?.enabled === false} onClick={() => request('run')}>Hozir tekshirish va yuborish</Button>
+      <Button variant="outline" className="min-h-11" disabled={busy} onClick={connectWebhook}>Tugmalarni ulash (webhook)</Button>
       <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('birthdaySend')}>Tug‘ilgan kunlarni tekshirish va Telegramga yuborish</Button>
       {status && <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => request('toggle', { enabled: !status.enabled })}>
         {status.enabled ? 'Yuborishni to‘xtatish' : 'Yuborishga ruxsat berish'}
