@@ -31,12 +31,11 @@ export default function Login() {
           setLoading(false);
           return;
         }
-      } catch (checkErr) {
-        // Tekshiruv vaqtincha ishlamasa — platformaning “user_not_registered”
-        // darvozasi baribir himoya qiladi; ro‘yxatdan o‘tgan xodimni bloklamaymiz.
-        console.warn("Staff email check failed", checkErr);
+      } catch {
+        setError("Email ruxsatini tekshirib bo‘lmadi. Xavfsizlik uchun kirish to‘xtatildi; keyinroq qayta urinib ko‘ring.");
+        return;
       }
-      await base44.auth.loginViaEmailPassword(email, password);
+      await base44.auth.loginViaEmailPassword(email.trim().toLowerCase(), password);
       window.location.href = returnTo;
     } catch (err) {
       setError(err.message || "Email yoki parol noto‘g‘ri.");
