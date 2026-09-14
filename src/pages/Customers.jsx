@@ -8,6 +8,7 @@ import { fullName, formatPhone, birthdayDisplay, normalizePhone } from '@/lib/cu
 import { formatUZS } from '@/lib/pos';
 import CustomerForm from '@/components/customers/CustomerForm';
 import CustomerProfile from '@/components/customers/CustomerProfile';
+import BirthdayFollowupPanel from '@/components/customers/BirthdayFollowupPanel';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Customers() {
@@ -134,6 +135,8 @@ export default function Customers() {
           </Button>
         )}
       </div>
+
+      <BirthdayFollowupPanel user={user} />
 
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

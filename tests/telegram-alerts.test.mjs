@@ -15,7 +15,7 @@ function fixture(opts = {}) {
   const db = {
     User:[{ id:'stored-owner', email:'owner@odinatort.uz', role:opts.role || 'admin', active: opts.active !== false }],
     TelegramControl:[{ id:'control', key:'odina-work-group', enabled:opts.enabled !== false, lock_until:0, lock_token:'' }],
-    TelegramDelivery:[], CustomerOrder:opts.orders || [{...baseOrder}], Customer:[], Shop:[], Product:[], Recipe:[], RecipeItem:[], CustomerOrderItem:[], IngredientStock:[],
+    TelegramDelivery:[], CustomerOrder:opts.orders || [{...baseOrder}], Customer:[], BirthdayFollowup:[], Shop:[], Product:[], Recipe:[], RecipeItem:[], CustomerOrderItem:[], IngredientStock:[],
     ...opts.db,
   };
   const matches = (row, query) => Object.entries(query).every(([key, value]) => {
@@ -153,28 +153,112 @@ test('late first check skips stale 3h alert and prioritizes urgent orders',async
   assert.ok(keys.find(k=>k.includes(':soon:')).endsWith(':due_soon'));
 });
 
-test('birthday reminder sends exactly three days before and only once', async()=>{
+test('birthday reminder includes 0-3 day window, excludes aloqa_chiqildi, dedups per day', async()=>{
   const customers=[
-    {id:'target',first_name:'Dilnoza',last_name:'Test',phone:'+998900000001',birth_date:'1990-09-16'},
-    {id:'tomorrow',first_name:'Ertaga',phone:'+998900000002',birth_date:'1992-09-14'},
-    {id:'later',first_name:'Keyin',phone:'+998900000003',birth_date:'1994-09-17'},
+    {id:'today',first_name:'Bugun',last_name:'Kun',phone:'+998900000001',birth_date:'1990-09-13'},
+    {id:'tomorrow',first_name:'Ertaga',last_name:'Kun',phone:'+998900000002',birth_date:'1992-09-14'},
+    {id:'twoDays',first_name:'Ikki',phone:'+998900000003',birth_date:'1994-09-15'},
+    {id:'threeDays',first_name:'Dilnoza',last_name:'Test',phone:'+998900000004',birth_date:'1990-09-16'},
+    {id:'fourDays',first_name:'Keyin',phone:'+998900000005',birth_date:'1994-09-17'},
   ];
   const f=fixture({db:{Customer:customers}});
   await f.run({action:'birthdays'});
   await f.run({action:'birthdays'});
   assert.equal(f.sent.length,1);
   assert.equal(f.sent[0].chat_id,'-5570444945');
-  assert.match(f.sent[0].text,/Dilnoza Test tug'ilgan kuniga 3 kun qoldi/);
-  assert.equal(f.sent[0].text.includes('Ertaga'),false);
+  assert.match(f.sent[0].text,/Bugun Kun/);
+  assert.match(f.sent[0].text,/Ertaga Kun/);
+  assert.match(f.sent[0].text,/Ikki/);
+  assert.match(f.sent[0].text,/Dilnoza Test/);
   assert.equal(f.sent[0].text.includes('Keyin'),false);
-  assert.deepEqual(f.db.TelegramDelivery[0].keys,['birthday:target:2026-09-16']);
+  assert.match(f.sent[0].text,/Jami bog'lanish kerak: 4/);
+  assert.deepEqual(f.db.TelegramDelivery[0].keys.sort(),
+    ['birthday:today:2026-09-13','birthday:tomorrow:2026-09-14','birthday:twoDays:2026-09-15','birthday:threeDays:2026-09-16'].sort());
+  // Follow-ups were created with default status
+  assert.equal(f.db.BirthdayFollowup.length,4);
+  assert.equal(f.db.BirthdayFollowup[0].contact_status,'hali_aloqa_qilinmadi');
 });
 
-test('birthday workflow stays daily at 09:00 and UI has a manual check button',()=>{
+test('birthday send excludes aloqa_chiqildi and includes hali + qongiroq', async()=>{
+  const customers=[
+    {id:'a',first_name:'Ali',phone:'+998900000001',birth_date:'1990-09-13'},
+    {id:'b',first_name:'B',phone:'+998900000002',birth_date:'1990-09-13'},
+  ];
+  const f=fixture({db:{Customer:customers, BirthdayFollowup:[
+    {id:'fu1',customer_id:'a',campaign_year:2026,contact_status:'aloqa_chiqildi',contacted_at:'2026-09-13T10:00:00Z',contacted_by_name:'Owner'},
+    {id:'fu2',customer_id:'b',campaign_year:2026,contact_status:'qongiroq_javob_bolmadi',contacted_at:'2026-09-13T10:00:00Z',contacted_by_name:'Owner'},
+  ]}});
+  await f.run({action:'birthdays'});
+  assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].text.includes('Ali'),false);
+  assert.match(f.sent[0].text,/B/);
+  assert.match(f.sent[0].text,/Qo'ng'iroq qilindi, javob bo'lmadi/);
+  assert.match(f.sent[0].text,/Jami bog'lanish kerak: 1/);
+});
+
+test('birthday no eligible customers returns non-error message', async()=>{
+  const f=fixture({db:{Customer:[{id:'far',first_name:'Far',phone:'+998900',birth_date:'1990-09-20'}]}});
+  const r=await f.run({action:'birthdays'});
+  assert.equal(r.status,200);
+  assert.equal(f.sent.length,0);
+  assert.equal(r.data.sent,false);
+  assert.match(r.data.message,/Yaqin 3 kun ichida bog'lanish kerak bo'lgan mijoz topilmadi/);
+});
+
+test('birthday telegram failure returns safe error without secrets', async()=>{
+  const f=fixture({reject:true});
+  f.db.Customer=[{id:'a',first_name:'Ali',phone:'+998900',birth_date:'1990-09-13'}];
+  const r=await f.run({action:'birthdaySend'});
+  assert.equal(r.status,502);
+  assert.equal(JSON.stringify(r.data).includes('PRIVATE_TOKEN'),false);
+  assert.equal(r.data.error.includes('chat_id'),false);
+  assert.equal(r.data.error.includes('-5570444945'),false);
+});
+
+test('birthdayList creates followups and returns counters', async()=>{
+  const customers=[
+    {id:'a',first_name:'Ali',phone:'+998900000001',birth_date:'1990-09-13'},
+    {id:'b',first_name:'B',phone:'+998900000002',birth_date:'1990-09-14'},
+  ];
+  const f=fixture({db:{Customer:customers}});
+  const r=await f.run({action:'birthdayList'});
+  assert.equal(r.status,200);
+  assert.equal(r.data.counters.total,2);
+  assert.equal(r.data.counters.need_contact,2);
+  assert.equal(f.db.BirthdayFollowup.length,2);
+});
+
+test('birthdayContact admin-only upserts status and records who/when', async()=>{
+  const customers=[{id:'a',first_name:'Ali',phone:'+998900000001',birth_date:'1990-09-13'}];
+  const f=fixture({db:{Customer:customers}});
+  const r=await f.run({action:'birthdayContact',customer_id:'a',campaign_year:2026,contact_status:'aloqa_chiqildi'});
+  assert.equal(r.status,200);
+  assert.equal(f.db.BirthdayFollowup[0].contact_status,'aloqa_chiqildi');
+  assert.equal(f.db.BirthdayFollowup[0].contacted_by_id,'stored-owner');
+  assert.ok(f.db.BirthdayFollowup[0].contacted_at);
+});
+
+test('birthdayContact is rejected for non-admin', async()=>{
+  const f=fixture({role:'cashier'});
+  f.db.Customer=[{id:'a',first_name:'Ali',phone:'+998900',birth_date:'1990-09-13'}];
+  const r=await f.run({action:'birthdayContact',customer_id:'a',campaign_year:2026,contact_status:'aloqa_chiqildi'});
+  assert.equal(r.status,403);
+  assert.equal(f.db.BirthdayFollowup.length,0);
+});
+
+test('existing order and production alerts remain unchanged', async()=>{
+  const f=fixture();
+  const r=await f.run({action:'preview'});
+  assert.equal(r.status,200);
+  assert.match(r.data.text,/BO-001/);
+  assert.equal(f.sent.length,0);
+});
+
+test('birthday workflow stays daily at 09:00 and UI has the renamed manual send button',()=>{
   const workflow=JSON.parse(readFileSync('base44/workflows/Birthday Telegram.jsonc','utf8'));
   assert.equal(workflow.trigger.config.cron_expression,'0 9 * * *');
   assert.equal(workflow.trigger.config.timezone,'Asia/Tashkent');
   const ui=readFileSync('src/components/TelegramAlerts.jsx','utf8');
-  assert.match(ui,/request\('birthdays'\)/);
-  assert.match(ui,/Tug‘ilgan kunlarni hozir tekshirish/);
+  assert.match(ui,/request\('birthdaySend'\)/);
+  assert.match(ui,/Tug‘ilgan kunlarni tekshirish va Telegramga yuborish/);
 });

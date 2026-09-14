@@ -1,0 +1,103 @@
+{
+  "name": "BirthdayFollowup",
+  "type": "object",
+  "properties": {
+    "customer_id": {
+      "type": "string",
+      "description": "Bog'langan Customer yozuvi IDsi"
+    },
+    "customer_name_snapshot": {
+      "type": "string"
+    },
+    "phone_snapshot": {
+      "type": "string"
+    },
+    "birthday_month": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12
+    },
+    "birthday_day": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 31
+    },
+    "birth_year": {
+      "type": "integer",
+      "description": "Mijozning haqiqiy tug'ilgan yili (faqat ma'lumot uchun)"
+    },
+    "campaign_year": {
+      "type": "integer",
+      "description": "Shu yilgi tug'ilgan kun kampaniyasi yili (har yili yangilanadi)"
+    },
+    "contact_status": {
+      "type": "string",
+      "enum": [
+        "hali_aloqa_qilinmadi",
+        "qongiroq_javob_bolmadi",
+        "aloqa_chiqildi"
+      ],
+      "default": "hali_aloqa_qilinmadi"
+    },
+    "contacted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "contacted_by_id": {
+      "type": "string"
+    },
+    "contacted_by_name": {
+      "type": "string"
+    },
+    "last_telegram_alert_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "customer_id",
+    "campaign_year",
+    "contact_status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "cashier"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

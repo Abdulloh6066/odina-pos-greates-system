@@ -2,6 +2,250 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
 import { TELEGRAM_GROUP_ID, cleanLabel, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
+import { birthdayWindowMatches, buildBirthdayMessage, birthdayDedupKey, birthdayDisplay } from "../../shared/birthday-logic.ts";
+
+// Birthday follow-up: load all customers / followups / deliveries with pagination.
+async function readAll(service: any, entityName: string, query: any = {}): Promise<any[]> {
+  const rows: any[] = [];
+  for (let skip = 0; skip < 10000; skip += 500) {
+    const page = await service.entities[entityName].filter(query, "id", 500, skip);
+    rows.push(...page);
+    if (page.length < 500) return rows;
+  }
+  return rows;
+}
+
+// Ensure a BirthdayFollowup record exists for each window match (per customer + campaign year).
+// New follow-ups default to "hali_aloqa_qilinmadi". Returns Map<"customer_id:campaign_year", record>.
+async function ensureBirthdayFollowups(
+  service: any,
+  matches: any[],
+): Promise<Map<string, any>> {
+  const byKey = new Map<string, any>();
+  if (!matches.length) return byKey;
+  const customerIds = Array.from(new Set(matches.map((m: any) => m.customer_id)));
+  const existing = await readAll(service, "BirthdayFollowup", { customer_id: { $in: customerIds } });
+  for (const f of existing || []) {
+    byKey.set(`${f.customer_id}:${f.campaign_year}`, f);
+  }
+  for (const m of matches) {
+    const key = `${m.customer_id}:${m.campaign_year}`;
+    if (byKey.has(key)) continue;
+    const created = await service.entities.BirthdayFollowup.create({
+      customer_id: m.customer_id,
+      customer_name_snapshot: m.customer_name,
+      phone_snapshot: m.phone,
+      birthday_month: m.birthday_month,
+      birthday_day: m.birthday_day,
+      birth_year: m.birth_year,
+      campaign_year: m.campaign_year,
+      contact_status: "hali_aloqa_qilinmadi",
+      contacted_at: "",
+      contacted_by_id: "",
+      contacted_by_name: "",
+      last_telegram_alert_date: "",
+    });
+    byKey.set(key, created);
+  }
+  return byKey;
+}
+
+// Read-only list for the CRM birthday panel. Creates follow-ups if missing.
+async function handleBirthdayList(service: any): Promise<Response> {
+  const clock = localClock(Date.now());
+  const todayKey = clock.today;
+  const customers = await readAll(service, "Customer");
+  const matches = birthdayWindowMatches(customers, todayKey);
+  const byKey = await ensureBirthdayFollowups(service, matches);
+
+  const dedupKeys = matches.map((m: any) => birthdayDedupKey(m.customer_id, m.birthday_date));
+  const sentKeys = new Set<string>();
+  if (dedupKeys.length) {
+    const deliveries = await readAll(service, "TelegramDelivery", { keys: { $in: dedupKeys } });
+    for (const d of deliveries || []) {
+      if (d.status === "sent" || d.status === "reserved") {
+        (d.keys || []).forEach((k: string) => sentKeys.add(k));
+      }
+    }
+  }
+
+  const items = matches.map((m: any) => {
+    const f = byKey.get(`${m.customer_id}:${m.campaign_year}`);
+    const status = f?.contact_status || "hali_aloqa_qilinmadi";
+    const sentKey = birthdayDedupKey(m.customer_id, m.birthday_date);
+    return {
+      customer_id: m.customer_id,
+      customer_name: m.customer_name,
+      phone: m.phone,
+      birth_date: m.birth_date,
+      birthday_display: birthdayDisplay(m.birthday_month, m.birthday_day),
+      days_remaining: m.days_remaining,
+      label: m.label,
+      campaign_year: m.campaign_year,
+      contact_status: status,
+      contacted_at: f?.contacted_at || "",
+      contacted_by_name: f?.contacted_by_name || "",
+      already_sent_today: sentKeys.has(sentKey),
+    };
+  });
+
+  const counters = {
+    need_contact: items.filter((i: any) => i.contact_status === "hali_aloqa_qilinmadi").length,
+    no_answer: items.filter((i: any) => i.contact_status === "qongiroq_javob_bolmadi").length,
+    reached: items.filter((i: any) => i.contact_status === "aloqa_chiqildi").length,
+    total: items.length,
+  };
+  return Response.json({
+    items,
+    counters,
+    today: todayKey,
+    already_sent_today: items.some((i: any) => i.already_sent_today),
+  });
+}
+
+// Owner/admin updates a follow-up contact status. Idempotent upsert; preserves who/when.
+async function handleBirthdayContact(service: any, body: any, ctx: { userId: string; userName: string }): Promise<Response> {
+  const customerId = String(body?.customer_id || "");
+  const campaignYear = Number(body?.campaign_year);
+  const status = String(body?.contact_status || "");
+  if (!customerId || !Number.isFinite(campaignYear)) {
+    return Response.json({ error: "Ma’lumot yetishmayapti." }, { status: 400 });
+  }
+  if (!["hali_aloqa_qilinmadi", "qongiroq_javob_bolmadi", "aloqa_chiqildi"].includes(status)) {
+    return Response.json({ error: "Noma’lum holat." }, { status: 400 });
+  }
+  const existing = await service.entities.BirthdayFollowup.filter(
+    { customer_id: customerId, campaign_year: campaignYear }, "id", 50,
+  );
+  const now = new Date().toISOString();
+  let record: any = null;
+  if (existing && existing.length) {
+    record = await service.entities.BirthdayFollowup.update(existing[0].id, {
+      contact_status: status,
+      contacted_at: now,
+      contacted_by_id: ctx.userId,
+      contacted_by_name: ctx.userName,
+    });
+  } else {
+    const customer = await service.entities.Customer.get(customerId).catch(() => null);
+    if (!customer) return Response.json({ error: "Mijoz topilmadi." }, { status: 404 });
+    const parsed = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(customer.birth_date || ""));
+    record = await service.entities.BirthdayFollowup.create({
+      customer_id: customerId,
+      customer_name_snapshot: [customer.first_name, customer.last_name].filter(Boolean).join(" ").trim(),
+      phone_snapshot: String(customer.phone || ""),
+      birthday_month: parsed ? Number(parsed[2]) : 0,
+      birthday_day: parsed ? Number(parsed[3]) : 0,
+      birth_year: parsed ? Number(parsed[1]) : 0,
+      campaign_year: campaignYear,
+      contact_status: status,
+      contacted_at: now,
+      contacted_by_id: ctx.userId,
+      contacted_by_name: ctx.userName,
+      last_telegram_alert_date: "",
+    });
+  }
+  return Response.json({
+    ok: true,
+    followup: {
+      id: record.id,
+      contact_status: status,
+      contacted_at: now,
+      contacted_by_name: ctx.userName,
+    },
+  });
+}
+
+// Consolidated birthday Telegram send (used by both automatic and manual triggers).
+// Excludes "aloqa_chiqildi"; dedups per customer per birthday date so the same
+// occurrence is never sent twice on the same calendar day.
+const NO_ELIGIBLE_MESSAGE = "Yaqin 3 kun ichida bog‘lanish kerak bo‘lgan mijoz topilmadi.";
+
+async function handleBirthdaySend(service: any, opts: { manual: boolean }): Promise<Response> {
+  const clock = localClock(Date.now());
+  const todayKey = clock.today;
+  const customers = await readAll(service, "Customer");
+  const matches = birthdayWindowMatches(customers, todayKey);
+  if (!matches.length) {
+    return Response.json({ sent: false, pending: 0, message: NO_ELIGIBLE_MESSAGE });
+  }
+  const byKey = await ensureBirthdayFollowups(service, matches);
+  const eligible = matches.filter((m: any) => {
+    const f = byKey.get(`${m.customer_id}:${m.campaign_year}`);
+    return (f?.contact_status || "hali_aloqa_qilinmadi") !== "aloqa_chiqildi";
+  });
+  if (!eligible.length) {
+    return Response.json({ sent: false, pending: 0, message: NO_ELIGIBLE_MESSAGE });
+  }
+
+  const dedupKeys = eligible.map((m: any) => birthdayDedupKey(m.customer_id, m.birthday_date));
+  const existing = await readAll(service, "TelegramDelivery", { keys: { $in: dedupKeys } });
+  const used = new Set<string>();
+  for (const d of existing || []) {
+    if (d.status === "sent" || d.status === "reserved") {
+      (d.keys || []).forEach((k: string) => used.add(k));
+    }
+  }
+  const fresh = eligible.filter((m: any) => !used.has(birthdayDedupKey(m.customer_id, m.birthday_date)));
+  if (!fresh.length) {
+    return Response.json({
+      sent: false,
+      pending: 0,
+      message: opts.manual ? "Bugun bu ro‘yxat allaqachon yuborilgan." : NO_ELIGIBLE_MESSAGE,
+    });
+  }
+
+  const followupByCustomer = new Map<string, any>();
+  for (const m of fresh) {
+    followupByCustomer.set(m.customer_id, byKey.get(`${m.customer_id}:${m.campaign_year}`));
+  }
+  const text = buildBirthdayMessage(fresh, followupByCustomer);
+  if (!text) {
+    return Response.json({ sent: false, pending: 0, message: NO_ELIGIBLE_MESSAGE });
+  }
+
+  const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  if (!token) {
+    return Response.json({ error: "Telegram sozlamasi to‘g‘ridan to‘g‘ri emas. Admin bilan bog‘laning." }, { status: 400 });
+  }
+
+  const reservation = await service.entities.TelegramDelivery.create({
+    keys: fresh.map((m: any) => birthdayDedupKey(m.customer_id, m.birthday_date)),
+    status: "reserved",
+    text,
+  });
+  try {
+    const response = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: TELEGRAM_GROUP_ID, text }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      await service.entities.TelegramDelivery.update(reservation.id, { status: "rejected", error: "Telegram xabarni qabul qilmadi." }).catch(() => {});
+      return Response.json({ error: "Telegram xabar yuborilmadi. Internet yoki guruh sozlamasini tekshiring." }, { status: 502 });
+    }
+    await service.entities.TelegramDelivery.update(reservation.id, {
+      status: "sent",
+      message_id: data.result.message_id,
+      sent_at: new Date().toISOString(),
+    });
+    const now = new Date().toISOString();
+    for (const m of fresh) {
+      const f = byKey.get(`${m.customer_id}:${m.campaign_year}`);
+      if (f) await service.entities.BirthdayFollowup.update(f.id, { last_telegram_alert_date: now }).catch(() => {});
+    }
+    return Response.json({
+      sent: true,
+      count: fresh.length,
+      message: fresh.length + " ta mijoz uchun tug‘ilgan kun eslatmasi yuborildi.",
+    });
+  } catch {
+    await service.entities.TelegramDelivery.update(reservation.id, { status: "uncertain", error: "Yetkazilish noaniq." }).catch(() => {});
+    return Response.json({ error: "Telegram xabar yuborilmadi. Internetni tekshiring va guruhda xabar paydo bo‘lganini tasdiqlang." }, { status: 502 });
+  }
+}
 
 // Scheduled invocations must retain the creating admin's authenticated identity.
 // No public webhook, browser token, or authentication bypass is accepted.
@@ -14,12 +258,37 @@ Deno.serve(async (req) => {
     if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
     service = client.asServiceRole;
     const stored = await resolveStoredAppUser(service, auth);
-    if (!stored || stored.active === false || stored.data?.active === false || userRole(stored) !== "admin") {
+    if (!stored || stored.active === false || stored.data?.active === false) {
       return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
     const action = body.action || "run";
-    if (!["status", "preview", "run", "toggle", "birthdays"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
+    const BIRTHDAY_ACTIONS = ["birthdays", "birthdayList", "birthdayContact", "birthdaySend"];
+    if (!["status", "preview", "run", "toggle", ...BIRTHDAY_ACTIONS].includes(action)) {
+      return Response.json({ error: "Noma’lum amal." }, { status: 400 });
+    }
+    const role = userRole(stored);
+    const userName = String(stored.full_name || auth.full_name || auth.email || "Egasi");
+    const userId = String(stored.id || auth.id || "");
+    if (BIRTHDAY_ACTIONS.includes(action)) {
+      if (action === "birthdayList") {
+        if (!["admin", "manager", "cashier", "accountant"].includes(role)) {
+          return Response.json({ error: "Mijozlar ma’lumotiga ruxsat yo‘q." }, { status: 403 });
+        }
+        return await handleBirthdayList(service);
+      }
+      if (action === "birthdayContact") {
+        if (role !== "admin") return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
+        return await handleBirthdayContact(service, body, { userId, userName });
+      }
+      if (action === "birthdaySend") {
+        if (role !== "admin") return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
+        return await handleBirthdaySend(service, { manual: true });
+      }
+      // "birthdays" — automatic workflow path, requires admin + enabled control
+    } else if (role !== "admin") {
+      return Response.json({ error: "Faqat egasi/admin uchun." }, { status: 403 });
+    }
     const controls = await service.entities.TelegramControl.filter({ key: "odina-work-group" }, "created_date", 2);
     if (controls.length !== 1) return Response.json({ error: "Telegram sozlamasi topilmadi yoki takrorlangan. Admin tekshiruvi kerak." }, { status: 409 });
     control = controls[0];
@@ -35,68 +304,7 @@ Deno.serve(async (req) => {
     }
     if (action === "birthdays") {
       if (control.enabled !== true) return Response.json({ paused: true });
-      const clock = localClock(Date.now());
-      const reminderDate = new Date(Date.parse(clock.today + "T00:00:00Z") + 3 * 86400000).toISOString().slice(0, 10);
-      const [, reminderMonth, reminderDay] = reminderDate.split("-").map(Number);
-      const readCustomers = async () => {
-        const rows: any[] = [];
-        for (let skip = 0; skip < 10000; skip += 500) {
-          const page = await service.entities.Customer.filter({}, "id", 500, skip);
-          rows.push(...page);
-          if (page.length < 500) return rows;
-        }
-        throw new Error("DATA_LIMIT");
-      };
-      const allCustomers = await readCustomers();
-      const matches = allCustomers.filter((c: any) => {
-        const bd = String(c?.birth_date || "");
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(bd)) return false;
-        const [, mm, dd] = bd.split("-").map(Number);
-        return mm === reminderMonth && dd === reminderDay;
-      });
-      const keys = matches.map((c: any) => "birthday:" + c.id + ":" + reminderDate);
-      if (!matches.length) return Response.json({ sent: false, pending: 0 });
-      const readDeliveries = async (query: any) => {
-        const rows: any[] = [];
-        for (let skip = 0; skip < 10000; skip += 500) {
-          const page = await service.entities.TelegramDelivery.filter(query, "id", 500, skip);
-          rows.push(...page);
-          if (page.length < 500) return rows;
-        }
-        return rows;
-      };
-      const existing = await readDeliveries({ keys: { $in: keys } });
-      const used = new Set(existing.flatMap((r: any) => r.keys || []));
-      const fresh = matches.filter((c: any) => {
-        const key = "birthday:" + c.id + ":" + reminderDate;
-        return !used.has(key);
-      });
-      if (!fresh.length) return Response.json({ sent: false, pending: 0 });
-      const lines = fresh.map((c: any) => {
-        const name = cleanLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
-        const phone = cleanLabel(c.phone);
-        return "📅 " + name + " tug'ilgan kuniga 3 kun qoldi! Telefon: " + (phone || "—");
-      });
-      const text = "🍰 Odina — Tug'ilgan kun eslatmasi\n" + clock.today + "\n\n" + lines.join("\n");
-      const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
-      if (!token) return Response.json({ error: "TELEGRAM_BOT_TOKEN topilmadi." }, { status: 400 });
-      const reservation = await service.entities.TelegramDelivery.create({ keys: fresh.map((c: any) => "birthday:" + c.id + ":" + reminderDate), status: "reserved", text });
-      try {
-        const response = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: TELEGRAM_GROUP_ID, text }), signal: AbortSignal.timeout(12000),
-        });
-        const data = await response.json();
-        if (!response.ok || !data.ok) {
-          await service.entities.TelegramDelivery.update(reservation.id, { status: "rejected", error: "Telegram xabarni qabul qilmadi." }).catch(() => {});
-          return Response.json({ error: "Telegram xabarni qabul qilmadi." }, { status: 502 });
-        }
-        await service.entities.TelegramDelivery.update(reservation.id, { status: "sent", message_id: data.result.message_id, sent_at: new Date().toISOString() });
-        return Response.json({ sent: true, count: fresh.length });
-      } catch {
-        await service.entities.TelegramDelivery.update(reservation.id, { status: "uncertain", error: "Yetkazilish noaniq." }).catch(() => {});
-        return Response.json({ error: "Tug'ilgan kun xabarini yuborib bo'lmadi." }, { status: 502 });
-      }
+      return await handleBirthdaySend(service, { manual: false });
     }
 
     if (action === "run" && control.enabled !== true) return Response.json({ paused: true });
