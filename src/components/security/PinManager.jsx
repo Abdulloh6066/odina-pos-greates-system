@@ -5,7 +5,6 @@ import { KeyRound, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { logAction } from '@/lib/pos';
 
 export default function PinManager({ user, onSaved }) {
   const [pin, setPin] = useState('');
@@ -13,18 +12,17 @@ export default function PinManager({ user, onSaved }) {
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    if (!/^\d{4,8}$/.test(pin)) return void odinaAlert('PIN kod 4–8 ta raqamdan iborat bo‘lishi kerak.');
+    if (!/^\d{6,8}$/.test(pin)) return void odinaAlert('Yangi PIN kod 6–8 ta raqamdan iborat bo‘lishi kerak.');
     if (pin !== confirm) return void odinaAlert('PIN kodlar bir xil emas.');
     setSaving(true);
     try {
       await base44.functions.invoke('set-owner-pin', { pin });
-      await logAction(user, 'owner_pin_updated', 'PIN updated from Security page');
       setPin('');
       setConfirm('');
       void odinaAlert('Egasi tasdiqlash PIN kodi xavfsiz saqlandi.');
       onSaved?.();
     } catch (e) {
-      void odinaAlert('PIN kodni saqlashda xato: ' + (e?.response?.data?.error || e?.message || e));
+      void odinaAlert(e?.response?.data?.error || 'PIN kodni xavfsiz saqlab bo‘lmadi.');
     } finally {
       setSaving(false);
     }
@@ -39,7 +37,7 @@ export default function PinManager({ user, onSaved }) {
       <p className="text-xs text-muted-foreground">Qaytarish va himoyalangan kassa amallarida ishlatiladi. PIN kodning o'zi saqlanmaydi — faqat PBKDF2 xeshi (210 000 iteratsiya).</p>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs mb-1.5 block">Yangi PIN (4–8 raqam)</Label>
+          <Label className="text-xs mb-1.5 block">Yangi PIN (6–8 raqam)</Label>
           <Input type="password" inputMode="numeric" autoComplete="new-password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} />
         </div>
         <div>
