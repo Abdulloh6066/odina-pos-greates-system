@@ -5,7 +5,6 @@ import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Users as UsersIcon, ArrowUpRight } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { logAction } from '@/lib/pos';
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Boshqaruvchi', cashier: 'Kassir', accountant: 'Hisobchi', production: 'Ishlab chiq.', warehouse: 'Omborchi' };
 
@@ -22,8 +21,11 @@ export default function StaffAccessPanel({ users, currentUser, onChanged }) {
     }
     setBusy(u.id);
     try {
-      await base44.entities.User.update(u.id, { active: nextActive });
-      await logAction(currentUser, 'user_active_toggled', `${u.full_name || u.email} → ${nextActive ? 'faol' : "o'chirilgan"}`);
+      await base44.functions.invoke('security-admin', {
+        action: 'update_user_access',
+        target_user_id: u.id,
+        active: nextActive,
+      });
       onChanged?.();
     } catch (e) {
       void odinaAlert("Yangilab bo'lmadi: " + (e?.response?.data?.error || e?.message || e));
