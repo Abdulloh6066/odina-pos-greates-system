@@ -3,6 +3,10 @@ import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-he
 
 const STAFF_ROLES = new Set(["manager", "cashier", "accountant", "production", "warehouse"]);
 
+// Hisob egasi — boshqa adminlar tomonidan o'chirilishi yoki o'zgartirilishi mumkin emas.
+const OWNER_EMAIL = "dota26066@gmail.com";
+const isOwner = (email: string) => Boolean(email) && String(email).trim().toLowerCase() === OWNER_EMAIL;
+
 const safeUser = (user: any) => ({
   id: String(user?.id || ""),
   full_name: String(user?.full_name || ""),
@@ -67,6 +71,9 @@ Deno.serve(async (req) => {
     const target = await service.entities.User.get(targetId).catch(() => null);
     if (!target) {
       return Response.json({ error: "Xodim topilmadi." }, { status: 404 });
+    }
+    if (isOwner(String(target.email || ""))) {
+      return Response.json({ error: "Hisob egasi himoyalangan — uni o‘zgartirish yoki o‘chirish mumkin emas." }, { status: 403 });
     }
     if (userRole(target) === "admin") {
       return Response.json({ error: "Boshqa Admin hisobini bu sahifadan o‘zgartirish mumkin emas." }, { status: 403 });

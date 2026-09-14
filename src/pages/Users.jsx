@@ -31,6 +31,10 @@ const ROLE_LABELS = {
   warehouse: 'Omborchi',
 };
 
+// Hisob egasi — boshqa adminlar tomonidan o'chirilishi/o'zgartirilishi mumkin emas.
+const OWNER_EMAIL = 'dota26066@gmail.com';
+const isOwnerEmail = (email) => Boolean(email) && String(email).trim().toLowerCase() === OWNER_EMAIL;
+
 export default function Users() {
   const { user } = useOutletContext();
   const [users, setUsers] = useState([]);
@@ -124,7 +128,12 @@ export default function Users() {
                   <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                 </div>
               </div>
-              {u.id !== user.id ? (
+              {isOwnerEmail(u.email) ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Shield className="w-4 h-4 text-brand-olive" />
+                  Himoyalangan hisob — o‘chirilishi yoki o‘zgartirilishi mumkin emas.
+                </div>
+              ) : u.id !== user.id ? (
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 w-full min-w-0">
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ruxsat darajasi</span>
