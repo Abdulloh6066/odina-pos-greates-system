@@ -38,6 +38,7 @@ test('staff access changes use an active stored admin backend and no direct brow
   const users = read('src/pages/Users.jsx');
   const backend = read('base44/functions/security-admin/entry.ts');
   const invite = read('base44/functions/staff-invite/entry.ts');
+  const inviteConfig = JSON.parse(read('base44/functions/staff-invite/function.jsonc'));
 
   assert.doesNotMatch(panel, /entities\.User\.update/);
   assert.doesNotMatch(users, /entities\.User\.update/);
@@ -48,6 +49,7 @@ test('staff access changes use an active stored admin backend and no direct brow
   assert.match(backend, /admin\.active === false/);
   assert.match(invite, /resolveStoredAppUser/);
   assert.match(invite, /userRole\(admin\) !== ["']admin["']/);
+  assert.equal(inviteConfig.is_public, false);
 });
 
 test('email/password login and registration fail closed and allow exact invited or active staff email only', () => {
