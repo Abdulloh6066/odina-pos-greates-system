@@ -114,6 +114,27 @@ Deno.serve(async (req) => {
     }
 
     const updated = await service.entities.User.update(target.id, patch);
+
+    // When an admin disables a user, also cancel any pending invite for the
+    // same email. Otherwise the pre-login staff-email-check would still see a
+    // pending invite and let a deactivated account straight back in.
+    if (hasActive && body.active === false) {
+      const targetEmail = String(target.email || "").trim().toLowerCase();
+      if (targetEmail) {
+        const invites = await service.entities.PendingStaffInvite.filter(
+          { email: targetEmail, status: "pending" },
+          "-created_date",
+          20,
+        ).catch(() => []);
+        for (const inv of invites || []) {
+          await service.entities.PendingStaffInvite.update(inv.id, {
+            status: "cancelled",
+            error_message: "Hisob o‘chirilgan (admin).",
+          }).catch(() => {});
+        }
+      }
+    }
+
     const adminName = String(admin.full_name || auth.full_name || auth.email || "Egasi");
     await service.entities.ActionHistory.create({
       user_id: String(admin.id || auth.id),

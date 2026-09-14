@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { logAction } from '@/lib/pos';
+import { odinaConfirm } from '@/lib/odina-dialog';
+import { Trash2, RotateCcw } from 'lucide-react';
 
 const ROLE_COLORS = {
   admin: 'bg-red-50 text-red-700',
@@ -69,6 +71,30 @@ export default function Users() {
     await updateAccess({ target_user_id: id, shop_id: shopId });
   };
 
+  const toggleActive = async (u) => {
+    const next = u.active === false;
+    const confirmed = await odinaConfirm({
+      title: next ? 'Xodimni yoqish' : 'Xodimni o‘chirish',
+      description: next
+        ? `${u.full_name || u.email} tizimga kirishini qayta yoqmoqchimisiz?`
+        : `${u.full_name || u.email} hisobini o‘chirmoqchimisiz? Ular tizimga kira olmaydi.`,
+      confirmLabel: next ? 'Yoqish' : 'O‘chirish',
+      tone: next ? 'info' : 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      await base44.functions.invoke('security-admin', {
+        action: 'update_user_access',
+        target_user_id: u.id,
+        active: next,
+      });
+      await logAction(user, next ? 'staff_reenabled' : 'staff_disabled', `${u.full_name || u.email}`);
+      await load();
+    } catch (error) {
+      void odinaAlert(error?.response?.data?.error || "Xodim holatini o‘zgartirib bo‘lmadi.");
+    }
+  };
+
   return (
     <div className="odina-page p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
       <PageHeader
@@ -88,12 +114,17 @@ export default function Users() {
                   {(u.full_name || u.email || '?').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{u.full_name || 'Nomsiz xodim'}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">{u.full_name || 'Nomsiz xodim'}</span>
+                    {u.active === false && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-semibold shrink-0">O‘chirilgan</span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                 </div>
               </div>
               {u.id !== user.id ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full min-w-0">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 w-full min-w-0">
                   <OdinaSelect value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
                     <option value="admin" disabled>Egasi / Admin</option>
                     <option value="manager">Boshqaruvchi</option>
@@ -106,6 +137,16 @@ export default function Users() {
                     <option value="">Joy biriktirilmagan</option>
                     {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
                   </OdinaSelect>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => toggleActive(u)}
+                    title={u.active === false ? 'Yoqish' : 'O‘chirish'}
+                  >
+                    {u.active === false ? <RotateCcw className="w-4 h-4" /> : <Trash2 className="w-4 h-4 text-destructive" />}
+                  </Button>
                 </div>
               ) : (
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-secondary'} flex items-center gap-1 w-fit`}>
