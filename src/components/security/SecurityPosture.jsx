@@ -5,8 +5,8 @@ export default function SecurityPosture({ users, pinSet }) {
   const active = users.filter((u) => u.active !== false).length;
   const inactive = users.length - active;
   const cards = [
-    { icon: Lock, label: "Ma'lumotlar himoyasi", value: 'RLS yoqilgan', note: 'Barcha jadvallar qator-darajasida himoyalangan', ok: true },
-    { icon: ShieldCheck, label: 'Rol asosli kirish', value: 'Faol', note: "Har sahifa ro'lga bog'langan", ok: true },
+    { icon: Lock, label: "Ma'lumotlar himoyasi", value: 'RLS siyosatlari', note: 'Muhim jadvallar rol va do‘kon bo‘yicha cheklangan', ok: true },
+    { icon: ShieldCheck, label: 'Rol asosli kirish', value: 'Frontend + backend', note: 'Sahifa va muhim amallar alohida tekshiriladi', ok: true },
     { icon: KeyRound, label: 'Egasi PIN kodi', value: pinSet ? "O'rnatilgan" : "O'rnatilmagan", note: pinSet ? 'Tasdiqlash PIN xavfsiz saqlangan' : "Himoyalangan amallar uchun PIN o'rnating", ok: pinSet },
     { icon: Users, label: 'Xodimlar holati', value: active + ' ta faol', note: inactive ? inactive + " ta o'chirilgan" : 'Barchasi faol', ok: true },
   ];
