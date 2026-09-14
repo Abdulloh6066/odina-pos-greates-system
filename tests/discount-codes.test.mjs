@@ -166,8 +166,8 @@ function loadHandler(client) {
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace(/import \{ loadIngredientCosts, computeProductCost \} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
     .replace(
-      /async function verifyOwnerPin\(service: any, pinValue: unknown\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
-      'async function verifyOwnerPin(_service, pinValue) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN',
+      /async function verifyOwnerPin\(service: any, pinValue: unknown, actor: any\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
+      'async function verifyOwnerPin(_service, pinValue, _actor) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN',
     )
     .replace('export default async function(req)', 'async function handler(req)')
     .replace(
