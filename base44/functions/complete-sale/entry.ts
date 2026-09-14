@@ -100,9 +100,45 @@ const constantTimeEqual = (left: string, right: string) => {
   return difference === 0;
 };
 
-async function verifyOwnerPin(service: any, pinValue: unknown) {
+const PIN_FAILURE_LIMIT = 5;
+const PIN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+
+async function recentPinFailureCount(service: any, actorKey: string) {
+  const events = await service.entities.ActionHistory.filter(
+    { user_id: actorKey },
+    "-created_date",
+    20,
+  );
+  const cutoff = Date.now() - PIN_FAILURE_WINDOW_MS;
+  let failures = 0;
+  for (const event of events || []) {
+    const occurredAt = Date.parse(String(event.created_date || event.created_at || ""));
+    if (!Number.isFinite(occurredAt) || occurredAt < cutoff) break;
+    if (event.action === "owner_pin_verified" || event.action === "owner_pin_updated") break;
+    if (event.action === "owner_pin_failed") failures += 1;
+  }
+  return failures;
+}
+
+async function recordPinAttempt(service: any, actor: any, ok: boolean) {
+  await service.entities.ActionHistory.create({
+    user_id: String(actor?.id || actor?.email || "unknown"),
+    user_name: String(actor?.full_name || actor?.email || "Noma’lum xodim"),
+    action: ok ? "owner_pin_verified" : "owner_pin_failed",
+    details: ok ? "Himoyalangan amal uchun PIN tasdiqlandi." : "Noto‘g‘ri PIN urinishi bloklandi.",
+  });
+}
+
+async function verifyOwnerPin(service: any, pinValue: unknown, actor: any) {
+  const actorKey = String(actor?.id || actor?.email || "");
+  if (!actorKey) return false;
+  if (await recentPinFailureCount(service, actorKey) >= PIN_FAILURE_LIMIT) return false;
+
   const pin = String(pinValue || "");
-  if (!/^\d{4,8}$/.test(pin)) return false;
+  if (!/^\d{4,8}$/.test(pin)) {
+    await recordPinAttempt(service, actor, false);
+    return false;
+  }
   const records = await service.entities.SecuritySettings.filter({ key: "owner_approval_pin" });
   const security = records?.[0];
   if (
@@ -122,7 +158,9 @@ async function verifyOwnerPin(service: any, pinValue: unknown) {
     salt: new TextEncoder().encode(security.pin_salt),
     iterations,
   }, key, 256);
-  return constantTimeEqual(hex(new Uint8Array(derived)), String(security.pin_hash));
+  const verified = constantTimeEqual(hex(new Uint8Array(derived)), String(security.pin_hash));
+  await recordPinAttempt(service, actor, verified);
+  return verified;
 }
 
 const IDEMPOTENCY_KEY_PATTERN = /^[a-zA-Z0-9:_-]{16,128}$/;
@@ -508,7 +546,7 @@ export default async function(req) {
         return Response.json({ error: "Chegirma foizi noto‘g‘ri." }, { status: 409 });
       }
       const requiresOwnerPin = user.role === "cashier" && percentage === 100;
-      if (requiresOwnerPin && !(await verifyOwnerPin(service, body?.owner_pin))) {
+      if (requiresOwnerPin && !(await verifyOwnerPin(service, body?.owner_pin, user))) {
         return Response.json({
           error: "100% chegirma uchun OWNER PIN noto‘g‘ri yoki kiritilmagan.",
           requires_owner_pin: true,
@@ -623,7 +661,7 @@ export default async function(req) {
     }
 
     if (action === "refund_sale") {
-      if (!(await verifyOwnerPin(service, body?.owner_pin))) {
+      if (!(await verifyOwnerPin(service, body?.owner_pin, user))) {
         return Response.json({ error: "Egasi PIN kodi noto‘g‘ri." }, { status: 403 });
       }
       const saleId = String(body?.sale_id || "");
@@ -985,7 +1023,7 @@ export default async function(req) {
       if (
         user.role === "cashier" &&
         discountPercentage === 100 &&
-        !(await verifyOwnerPin(service, body?.owner_pin))
+        !(await verifyOwnerPin(service, body?.owner_pin, user))
       ) {
         return Response.json({
           error: "100% chegirma bilan savdoni yakunlash uchun OWNER PIN kerak.",
