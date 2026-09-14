@@ -1,7 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
-import { TELEGRAM_GROUP_ID, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
+import { TELEGRAM_GROUP_ID, cleanLabel, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
 
 // Scheduled invocations must retain the creating admin's authenticated identity.
 // No public webhook, browser token, or authentication bypass is accepted.
@@ -36,8 +36,8 @@ Deno.serve(async (req) => {
     if (action === "birthdays") {
       if (control.enabled !== true) return Response.json({ paused: true });
       const clock = localClock(Date.now());
-      const todayParts = clock.today.split("-").map(Number);
-      const tomorrowParts = clock.tomorrow.split("-").map(Number);
+      const reminderDate = new Date(Date.parse(clock.today + "T00:00:00Z") + 3 * 86400000).toISOString().slice(0, 10);
+      const [, reminderMonth, reminderDay] = reminderDate.split("-").map(Number);
       const readCustomers = async () => {
         const rows: any[] = [];
         for (let skip = 0; skip < 10000; skip += 500) {
@@ -52,11 +52,9 @@ Deno.serve(async (req) => {
         const bd = String(c?.birth_date || "");
         if (!/^\d{4}-\d{2}-\d{2}$/.test(bd)) return false;
         const [, mm, dd] = bd.split("-").map(Number);
-        const isToday = mm === todayParts[1] && dd === todayParts[2];
-        const isTomorrow = mm === tomorrowParts[1] && dd === tomorrowParts[2];
-        return isToday || isTomorrow;
+        return mm === reminderMonth && dd === reminderDay;
       });
-      const keys = matches.map((c: any) => "birthday:" + c.id + ":" + (String(c.birth_date).slice(5) === clock.today.slice(5) ? clock.today : clock.tomorrow));
+      const keys = matches.map((c: any) => "birthday:" + c.id + ":" + reminderDate);
       if (!matches.length) return Response.json({ sent: false, pending: 0 });
       const readDeliveries = async (query: any) => {
         const rows: any[] = [];
@@ -70,21 +68,19 @@ Deno.serve(async (req) => {
       const existing = await readDeliveries({ keys: { $in: keys } });
       const used = new Set(existing.flatMap((r: any) => r.keys || []));
       const fresh = matches.filter((c: any) => {
-        const key = "birthday:" + c.id + ":" + (String(c.birth_date).slice(5) === clock.today.slice(5) ? clock.today : clock.tomorrow);
+        const key = "birthday:" + c.id + ":" + reminderDate;
         return !used.has(key);
       });
       if (!fresh.length) return Response.json({ sent: false, pending: 0 });
       const lines = fresh.map((c: any) => {
-        const bd = String(c.birth_date);
-        const isToday = bd.slice(5) === clock.today.slice(5);
         const name = cleanLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
         const phone = cleanLabel(c.phone);
-        return (isToday ? "🎂 Bugun " : "📅 Ertaga ") + name + " tug'ilgan kuni! Telefon: " + (phone || "—");
+        return "📅 " + name + " tug'ilgan kuniga 3 kun qoldi! Telefon: " + (phone || "—");
       });
       const text = "🍰 Odina — Tug'ilgan kun eslatmasi\n" + clock.today + "\n\n" + lines.join("\n");
       const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
       if (!token) return Response.json({ error: "TELEGRAM_BOT_TOKEN topilmadi." }, { status: 400 });
-      const reservation = await service.entities.TelegramDelivery.create({ keys: fresh.map((c: any) => "birthday:" + c.id + ":" + (String(c.birth_date).slice(5) === clock.today.slice(5) ? clock.today : clock.tomorrow)), status: "reserved", text });
+      const reservation = await service.entities.TelegramDelivery.create({ keys: fresh.map((c: any) => "birthday:" + c.id + ":" + reminderDate), status: "reserved", text });
       try {
         const response = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
           method: "POST", headers: { "Content-Type": "application/json" },
