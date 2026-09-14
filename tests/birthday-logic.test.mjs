@@ -170,7 +170,7 @@ test('buildBirthdayKeyboard emits one numbered row per eligible customer with ca
   assert.ok(kb);
   // "c" excluded (aloqa_chiqildi); numbering 1,2 matches message order
   assert.equal(kb.inline_keyboard.length, 2);
-  assert.equal(kb.inline_keyboard[0][0].text, '1. ❌ Javob yo'q');
+  assert.equal(kb.inline_keyboard[0][0].text, "1. ❌ Javob yo'q");
   assert.equal(kb.inline_keyboard[0][1].callback_data, 'bd:fu-a:ok');
   assert.equal(kb.inline_keyboard[1][0].callback_data, 'bd:fu-b:no');
 });
