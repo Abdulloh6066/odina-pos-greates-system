@@ -121,6 +121,16 @@
           "data.location_id": "{{user.data.shop_id}}"
         }
       ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
     }
   },
   "type": "object"
