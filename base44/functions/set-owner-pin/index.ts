@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 
 const ITERATIONS = 210000;
 const hex = (bytes: Uint8Array) =>
@@ -7,16 +8,18 @@ const hex = (bytes: Uint8Array) =>
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Authentication required." }, { status: 401 });
-    if (user.role !== "admin") {
-      return Response.json({ error: "Only Owner/Admin can set the approval PIN." }, { status: 403 });
+    const auth = await base44.auth.me();
+    if (!auth?.id) return Response.json({ error: "Avval tizimga kiring." }, { status: 401 });
+    const service = base44.asServiceRole;
+    const user = await resolveStoredAppUser(service, auth);
+    if (!user || userRole(user) !== "admin" || user.active === false || user.data?.active === false) {
+      return Response.json({ error: "Faqat faol Egasi/Admin PIN kodni o‘zgartira oladi." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
     const pin = String(body?.pin || "");
-    if (!/^\d{4,8}$/.test(pin)) {
-      return Response.json({ error: "PIN must contain 4 to 8 digits." }, { status: 400 });
+    if (!/^\d{6,8}$/.test(pin)) {
+      return Response.json({ error: "Yangi PIN kod 6–8 ta raqamdan iborat bo‘lishi kerak." }, { status: 400 });
     }
 
     const saltBytes = crypto.getRandomValues(new Uint8Array(24));
@@ -42,24 +45,23 @@ Deno.serve(async (req) => {
       pin_algorithm: "PBKDF2-SHA256",
       pin_iterations: ITERATIONS,
       pin_updated_at: new Date().toISOString(),
-      pin_updated_by: user.id,
+      pin_updated_by: user.id || auth.id,
     };
-    const service = base44.asServiceRole;
     const matches = await service.entities.SecuritySettings.filter({ key: payload.key });
     if (matches?.[0]) await service.entities.SecuritySettings.update(matches[0].id, payload);
     else await service.entities.SecuritySettings.create(payload);
 
     await service.entities.ActionHistory.create({
-      user_id: user.id,
-      user_name: user.full_name || user.email,
+      user_id: user.id || auth.id,
+      user_name: user.full_name || auth.full_name || auth.email,
       action: "owner_pin_updated",
       details: "Owner approval PIN was securely replaced.",
     }).catch(() => {});
 
     return Response.json({ success: true });
-  } catch (error) {
+  } catch {
     return Response.json({
-      error: error instanceof Error ? error.message : "Could not set owner PIN.",
+      error: "PIN kodni xavfsiz saqlab bo‘lmadi.",
     }, { status: 500 });
   }
 });
