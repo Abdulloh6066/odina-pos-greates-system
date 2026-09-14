@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { TELEGRAM_GROUP_ID } from "../../shared/telegram-alert-logic.ts";
 
 // Receives Telegram callback_query updates fired when a staff member taps an inline
 // button under the birthday reminder. callback_data format: "bd:<followup_id>:no|ok".
@@ -34,7 +35,12 @@ Deno.serve(async (req) => {
   const cb = update?.callback_query;
   if (!cb?.id || !cb?.data) return ok();
 
-  const m = /^bd:(.+):(no|ok)$/.exec(String(cb.data));
+  if (String(cb.message?.chat?.id || "") !== String(TELEGRAM_GROUP_ID)) {
+    await answerCallbackQuery(token, cb.id, "Bu tugma faqat Odina ish guruhida ishlaydi.").catch(() => {});
+    return ok();
+  }
+
+  const m = /^bd:([A-Za-z0-9_-]{1,128}):(no|ok)$/.exec(String(cb.data));
   if (!m) {
     await answerCallbackQuery(token, cb.id, "Noma’lum tugma.").catch(() => {});
     return ok();
@@ -50,12 +56,34 @@ Deno.serve(async (req) => {
       await answerCallbackQuery(token, cb.id, "Yozuv topilmadi.").catch(() => {});
       return ok();
     }
+    if (f.contact_status === "aloqa_chiqildi") {
+      await answerCallbackQuery(token, cb.id, "Bu mijoz bilan allaqachon aloqa qilingan.").catch(() => {});
+      return ok();
+    }
+    if (f.contact_status === status) {
+      await answerCallbackQuery(token, cb.id, "Bu holat avval saqlangan.").catch(() => {});
+      return ok();
+    }
+
+    const telegramUserId = String(cb.from?.id || "telegram");
+    const telegramUserName = [
+      String(cb.from?.first_name || ""),
+      String(cb.from?.last_name || ""),
+    ].filter(Boolean).join(" ").trim() || String(cb.from?.username || "Telegram");
+    const contactedAt = new Date().toISOString();
+
     await service.entities.BirthdayFollowup.update(f.id, {
       contact_status: status,
-      contacted_at: new Date().toISOString(),
-      contacted_by_id: "telegram",
-      contacted_by_name: "Telegram",
+      contacted_at: contactedAt,
+      contacted_by_id: telegramUserId,
+      contacted_by_name: telegramUserName,
     });
+    await service.entities.ActionHistory.create({
+      user_id: telegramUserId,
+      user_name: telegramUserName,
+      action: "birthday_contact_updated",
+      details: String(f.customer_name_snapshot || f.customer_id || "Mijoz") + " · " + STATUS_LABEL[status],
+    }).catch(() => {});
     await answerCallbackQuery(token, cb.id, "✅ " + STATUS_LABEL[status]).catch(() => {});
     // Refresh the message text so the team sees the updated status inline.
     if (cb.message?.chat?.id && cb.message?.message_id) {
