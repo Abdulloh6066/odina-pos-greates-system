@@ -176,6 +176,7 @@ function fixture(role = 'admin', assignedLocation = '') {
         quantity: 20,
       },
     ],
+    Customer: [],
     CustomerOrder: [{
       id: 'order-1',
       order_number: 'BO-TEST-001',
@@ -313,6 +314,9 @@ function loadHandler(client) {
       .replace(/import \{[\s\S]*?\} from "\.\/cost-engine\.ts";/, '')
       .replace(/export /g, ''),
   );
+  const customerCode = transpileScript(
+    readFileSync('base44/shared/customer-helpers.ts', 'utf8').replace(/export /g, ''),
+  );
   let source = readFileSync('base44/functions/customer-orders/entry.ts', 'utf8')
     .replace(
       /import \{ createClientFromRequest \} from "npm:@base44\/sdk";/,
@@ -326,8 +330,9 @@ function loadHandler(client) {
       /import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/order-ready-production\.ts";/,
       '',
     )
+    .replace(/import \{ ensureCustomer \} from "\.\.\/\.\.\/shared\/customer-helpers\.ts";/, '')
     .replace(/export default async function\(req[^{]*\{/, 'async function handler(req) {');
-  source = [helperCode, costCode, readyCode, source, 'globalThis.testHandler = handler;'].join('\n');
+  source = [helperCode, costCode, readyCode, customerCode, source, 'globalThis.testHandler = handler;'].join('\n');
   const context = vm.createContext({
     client,
     Response,
