@@ -186,12 +186,16 @@ async function handleBirthdaySend(service: any, opts: { manual: boolean }): Prom
       (d.keys || []).forEach((k: string) => used.add(k));
     }
   }
-  const fresh = eligible.filter((m: any) => !used.has(birthdayDedupKey(m.customer_id, m.birthday_date)));
+  // Manual admin trigger may force a fresh send (e.g. to attach the interactive
+  // keyboard) even if the automatic workflow already sent the day's message.
+  const fresh = opts.manual
+    ? eligible
+    : eligible.filter((m: any) => !used.has(birthdayDedupKey(m.customer_id, m.birthday_date)));
   if (!fresh.length) {
     return Response.json({
       sent: false,
       pending: 0,
-      message: opts.manual ? "Bugun bu ro‘yxat allaqachon yuborilgan." : NO_ELIGIBLE_MESSAGE,
+      message: opts.manual ? "Yuboriladigan mijoz topilmadi." : NO_ELIGIBLE_MESSAGE,
     });
   }
 
