@@ -125,7 +125,7 @@ function loadHandler(client) {
   source += '\nglobalThis.testHandler = handler;';
   const code = transpileScript(source);
   const context = vm.createContext({
-    client, Response, crypto: webcrypto, console, structuredClone,
+    client, Response, crypto: webcrypto, console, structuredClone, exports: {},
     Date: makeClock(), __setClock: (v) => { clock = v; },
   });
   vm.runInContext(code, context);
