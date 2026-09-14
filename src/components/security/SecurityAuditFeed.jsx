@@ -3,11 +3,29 @@ import { Activity, ShieldAlert } from 'lucide-react';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 const SENSITIVE = new Set([
-  'owner_pin_updated', 'user_role_changed', 'user_active_toggled', 'staff_invite_requested',
-  'sale_refunded', 'refund_issued', 'shift_closed', 'cash_out', 'settings_updated',
+  'owner_pin_updated', 'owner_pin_failed', 'user_access_updated', 'user_role_changed',
+  'user_active_toggled', 'staff_invite_requested', 'sale_refunded', 'refund_issued',
+  'shift_closed', 'cash_out', 'settings_updated', 'birthday_contact_updated',
 ]);
 
-const humanAction = (action) => String(action || '').replace(/_/g, ' ');
+const ACTION_LABELS = {
+  owner_pin_updated: 'Egasi PIN kodi yangilandi',
+  owner_pin_failed: 'Noto‘g‘ri PIN urinishi',
+  owner_pin_verified: 'Egasi PIN kodi tasdiqlandi',
+  user_access_updated: 'Xodim ruxsati yangilandi',
+  user_role_changed: 'Xodim lavozimi yangilandi',
+  user_active_toggled: 'Xodim kirishi o‘zgartirildi',
+  staff_invite_requested: 'Xodim taklif qilindi',
+  sale_refunded: 'Savdo qaytarildi',
+  refund_issued: 'Qaytarish bajarildi',
+  shift_closed: 'Smena yopildi',
+  cash_out: 'Kassadan pul olindi',
+  settings_updated: 'Sozlamalar yangilandi',
+  birthday_contact_updated: 'Tug‘ilgan kun aloqasi yangilandi',
+  public_email_check: 'Email taklifi tekshirildi',
+};
+
+const humanAction = (action) => ACTION_LABELS[action] || String(action || '').replace(/_/g, ' ');
 
 export default function SecurityAuditFeed({ entries }) {
   return (
