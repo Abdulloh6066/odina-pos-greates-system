@@ -15,7 +15,7 @@ function fixture(opts = {}) {
   const db = {
     User:[{ id:'stored-owner', email:'owner@odinatort.uz', role:opts.role || 'admin', active: opts.active !== false }],
     TelegramControl:[{ id:'control', key:'odina-work-group', enabled:opts.enabled !== false, lock_until:0, lock_token:'' }],
-    TelegramDelivery:[], CustomerOrder:opts.orders || [{...baseOrder}], Shop:[], Product:[], Recipe:[], RecipeItem:[], CustomerOrderItem:[], IngredientStock:[],
+    TelegramDelivery:[], CustomerOrder:opts.orders || [{...baseOrder}], Customer:[], Shop:[], Product:[], Recipe:[], RecipeItem:[], CustomerOrderItem:[], IngredientStock:[],
     ...opts.db,
   };
   const matches = (row, query) => Object.entries(query).every(([key, value]) => {
@@ -151,4 +151,30 @@ test('late first check skips stale 3h alert and prioritizes urgent orders',async
   const keys=f.db.TelegramDelivery[0].keys;
   assert.equal(keys.filter(k=>k.includes(':soon:')).length,1);
   assert.ok(keys.find(k=>k.includes(':soon:')).endsWith(':due_soon'));
+});
+
+test('birthday reminder sends exactly three days before and only once', async()=>{
+  const customers=[
+    {id:'target',first_name:'Dilnoza',last_name:'Test',phone:'+998900000001',birth_date:'1990-09-16'},
+    {id:'tomorrow',first_name:'Ertaga',phone:'+998900000002',birth_date:'1992-09-14'},
+    {id:'later',first_name:'Keyin',phone:'+998900000003',birth_date:'1994-09-17'},
+  ];
+  const f=fixture({db:{Customer:customers}});
+  await f.run({action:'birthdays'});
+  await f.run({action:'birthdays'});
+  assert.equal(f.sent.length,1);
+  assert.equal(f.sent[0].chat_id,'-5570444945');
+  assert.match(f.sent[0].text,/Dilnoza Test tug'ilgan kuniga 3 kun qoldi/);
+  assert.equal(f.sent[0].text.includes('Ertaga'),false);
+  assert.equal(f.sent[0].text.includes('Keyin'),false);
+  assert.deepEqual(f.db.TelegramDelivery[0].keys,['birthday:target:2026-09-16']);
+});
+
+test('birthday workflow stays daily at 09:00 and UI has a manual check button',()=>{
+  const workflow=JSON.parse(readFileSync('base44/workflows/Birthday Telegram.jsonc','utf8'));
+  assert.equal(workflow.trigger.config.cron_expression,'0 9 * * *');
+  assert.equal(workflow.trigger.config.timezone,'Asia/Tashkent');
+  const ui=readFileSync('src/components/TelegramAlerts.jsx','utf8');
+  assert.match(ui,/request\('birthdays'\)/);
+  assert.match(ui,/Tug‘ilgan kunlarni hozir tekshirish/);
 });
