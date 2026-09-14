@@ -100,6 +100,9 @@
   .odina-auth-icon { display:flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:14px; background:var(--odina-soft); color:var(--odina-olive); margin-bottom:20px; }
   .odina-auth-card { border:1px solid var(--odina-line); background:var(--odina-surface); border-radius:24px; padding:26px; box-shadow:var(--odina-shadow); }
   .odina-auth-footer { text-align:center; margin-top:24px; color:var(--odina-muted); font-size:13px; line-height:1.7; }
+  .odina-auth-credit { text-align:center; margin-top:14px; color:var(--odina-muted); font-size:12px; }
+  .odina-auth-credit a { color:var(--odina-olive); font-weight:600; text-decoration:none; }
+  .odina-auth-credit a:hover { text-decoration:underline; }
 }
 @media screen and (min-width:640px) {
   .odina-page-header { align-items:flex-end; }

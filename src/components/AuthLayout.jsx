@@ -24,6 +24,9 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
           </div>
           <div className="odina-auth-card">{children}</div>
           {footer && <p className="odina-auth-footer">{footer}</p>}
+          <p className="odina-auth-credit">
+            <a href="https://t.me/Abdulloh1100" target="_blank" rel="noreferrer">@Abdulloh1100</a> tomonidan yaratilgan
+          </p>
         </div>
       </div>
     </div>

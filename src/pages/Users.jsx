@@ -103,17 +103,7 @@ export default function Users() {
         icon={UsersIcon}
         actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
-      <div className="odina-panel rounded-2xl bg-brand-olive/10 border border-brand-olive/25 p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-        <Shield className="w-5 h-5 text-brand-olive shrink-0" />
-        <div className="text-sm leading-relaxed">
-          <span className="font-medium text-foreground">Tizimga kirish ruxsati.</span>{' '}
-          <span className="text-muted-foreground">
-            Yangi xodim faqat e-mail orqali taklif qilinadi. Ruxsat yoki yordam uchun dastur muallifi bilan bog‘laning:
-          </span>{' '}
-          <a href="https://t.me/Abdulloh1100" target="_blank" rel="noreferrer" className="font-semibold text-brand-olive hover:underline">@Abdulloh1100</a>
-          <span className="text-muted-foreground"> (Telegram).</span>
-        </div>
-      </div>
+
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
