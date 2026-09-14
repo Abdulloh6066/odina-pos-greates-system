@@ -1,0 +1,6 @@
+{
+  "name": "staff-invite",
+  "entry": "entry.ts",
+  "description": "Xodim taklifini yaratish yoki taklif qilingan hisobni biriktirish; autentifikatsiya talab qilinadi.",
+  "is_public": false
+}
