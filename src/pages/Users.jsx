@@ -135,29 +135,47 @@ export default function Users() {
                 </div>
               </div>
               {u.id !== user.id ? (
-                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 w-full min-w-0">
-                  <OdinaSelect value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                    <option value="admin" disabled>Egasi / Admin</option>
-                    <option value="manager">Boshqaruvchi</option>
-                    <option value="cashier">Kassir</option>
-                    <option value="accountant">Hisobchi</option>
-                    <option value="production">Ishlab chiqarish xodimi</option>
-                    <option value="warehouse">Omborchi</option>
-                  </OdinaSelect>
-                  <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                    <option value="">Joy biriktirilmagan</option>
-                    {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
-                  </OdinaSelect>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => toggleActive(u)}
-                    title={u.active === false ? 'Yoqish' : 'O‘chirish'}
-                  >
-                    {u.active === false ? <RotateCcw className="w-4 h-4" /> : <Trash2 className="w-4 h-4 text-destructive" />}
-                  </Button>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 w-full min-w-0">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ruxsat darajasi</span>
+                    <OdinaSelect value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
+                      <option value="admin" disabled>Egasi / Admin</option>
+                      <option value="manager">Boshqaruvchi</option>
+                      <option value="cashier">Kassir</option>
+                      <option value="accountant">Hisobchi</option>
+                      <option value="production">Ishlab chiqarish xodimi</option>
+                      <option value="warehouse">Omborchi</option>
+                    </OdinaSelect>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ish joyi</span>
+                    <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
+                      <option value="">Joy biriktirilmagan</option>
+                      {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
+                    </OdinaSelect>
+                  </div>
+                  <div className="flex gap-2 sm:col-span-2">
+                    {u.active === false ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => toggleActive(u)}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1.5" /> Tasdiqlash (yoqish)
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => toggleActive(u)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1.5" /> O‘chirish
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-secondary'} flex items-center gap-1 w-fit`}>
