@@ -1,5 +1,5 @@
 {
-  "description": "Har kuni ertalab (09:00 Asia/Tashkent) bugun va ertagi tug'ilgan kunli mijozlarni telegram-alerts funksiyasiga yuboradi.",
+  "description": "Har kuni ertalab (09:00 Asia/Tashkent) tug'ilgan kuniga 3 kun qolgan mijozlarni telegram-alerts funksiyasiga yuboradi.",
   "name": "Birthday Telegram",
   "trigger": {
     "condition": null,
@@ -38,7 +38,7 @@
           "then": "end",
           "x-base44": {
             "title": "Tug'ilgan kun eslatmasini yuborish",
-            "description": "Har kuni 09:00 da tug'ilgan kunli mijozlar haqida ogohlantirish"
+            "description": "Har kuni 09:00 da tug'ilgan kuniga 3 kun qolgan mijozlar haqida ogohlantirish"
           }
         }
       }
