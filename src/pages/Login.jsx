@@ -23,6 +23,19 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
+      try {
+        const res = await base44.functions.invoke("staff-email-check", { email });
+        const data = res?.data || res;
+        if (!data?.allowed) {
+          setError("Bu email xodimlar ro‘yxatida yo‘q. Administrator “Xodim qo‘shish” orqali sizni taklif qilmagunicha tizimga kira olmaysiz.");
+          setLoading(false);
+          return;
+        }
+      } catch (checkErr) {
+        // Tekshiruv vaqtincha ishlamasa — platformaning “user_not_registered”
+        // darvozasi baribir himoya qiladi; ro‘yxatdan o‘tgan xodimni bloklamaymiz.
+        console.warn("Staff email check failed", checkErr);
+      }
       await base44.auth.loginViaEmailPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {

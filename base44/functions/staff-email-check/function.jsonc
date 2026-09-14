@@ -1,0 +1,6 @@
+{
+  "name": "staff-email-check",
+  "entry": "entry.ts",
+  "description": "Ro'yxatdan o'tish/kirish oldidan email xodimlar ro'yxati (PendingStaffInvite yoki faol User)da bor-yo'qligini tekshiradi. Ochiq (autentifikatsiyasiz) endpoint.",
+  "is_public": true
+}

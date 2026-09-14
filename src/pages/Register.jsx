@@ -29,6 +29,17 @@ export default function Register() {
     }
     setLoading(true);
     try {
+      try {
+        const res = await base44.functions.invoke("staff-email-check", { email });
+        const data = res?.data || res;
+        if (!data?.allowed) {
+          setError("Bu email xodimlar ro‘yxatida yo‘q. Administrator “Xodim qo‘shish” orqali sizni taklif qilmagunicha ro‘yxatdan o‘ta olmaysiz.");
+          setLoading(false);
+          return;
+        }
+      } catch (checkErr) {
+        console.warn("Staff email check failed", checkErr);
+      }
       await base44.auth.register({ email, password });
       setShowOtp(true);
     } catch (err) {
