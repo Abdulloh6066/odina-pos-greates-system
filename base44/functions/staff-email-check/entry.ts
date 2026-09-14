@@ -2,6 +2,8 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 
 const normalizeEmail = (value: unknown) => String(value || "").trim().toLowerCase();
 
+const STAFF_ROLES = ["admin", "manager", "cashier", "accountant", "production", "warehouse"];
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
@@ -22,10 +24,15 @@ Deno.serve(async (req) => {
       return Response.json({ allowed: true, reason: "invite" });
     }
 
-    // 2) Ilovada allaqachon mavjud bo'lgan faol xodim
+    // 2) Ilovada allaqachon mavjud bo'lgan faol xodim. O'z-o'zidan ro'yxatdan
+    // o'tgan (role="user") hisoblar xodimlar ro'yxatida ko'rinmaydi va ruxsat
+    // berilmaydi — faqat haqiqiy xodim lavozimi hisobga olinadi.
     const users = await base44.asServiceRole.entities.User.list("-created_date", 500);
     const known = (users || []).find(
-      (u) => normalizeEmail(u.email) === email && u.active !== false,
+      (u) =>
+        normalizeEmail(u.email) === email &&
+        u.active !== false &&
+        STAFF_ROLES.includes(String(u.role || "")),
     );
     if (known) {
       return Response.json({ allowed: true, reason: "user" });

@@ -142,6 +142,16 @@ export const AuthProvider = ({ children }) => {
       }
 
       const hydrated = await hydrateAppUser(currentUser);
+      // O'z-o'zidan ro'yxatdan o'tgan (role="user") yoki lavozimi xodimlarga
+      // kirmaydigan hisoblar xodimlar ro'yxatida yo'q — ularga ilova ochilmaydi.
+      if (!APP_ROLES.has(hydrated?.role)) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError({ type: 'user_not_registered', message: 'Xodim lavozimi yo‘q' });
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+        return;
+      }
       // A staff account the owner deactivated must be locked out of the app
       // immediately — backend functions already reject inactive users, but the
       // frontend should not render the app shell for them.
