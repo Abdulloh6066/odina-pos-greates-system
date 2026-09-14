@@ -210,7 +210,7 @@ test('birthday no eligible customers returns non-error message', async()=>{
   assert.equal(r.status,200);
   assert.equal(f.sent.length,0);
   assert.equal(r.data.sent,false);
-  assert.match(r.data.message,/Yaqin 3 kun ichida bog'lanish kerak bo'lgan mijoz topilmadi/);
+  assert.match(r.data.message,/Yaqin 3 kun ichida bog‘lanish kerak bo‘lgan mijoz topilmadi/);
 });
 
 test('birthday telegram failure returns safe error without secrets', async()=>{
