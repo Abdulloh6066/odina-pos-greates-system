@@ -71,7 +71,7 @@ function loadHandler(name, client) {
     .replace('export default async function(req)', 'async function handler(req)');
   source += '\nglobalThis.testHandler = handler;';
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-  const context = vm.createContext({ client, Response, crypto: webcrypto, console, structuredClone });
+  const context = vm.createContext({ client, Response, crypto: webcrypto, console, structuredClone, exports: {} });
   vm.runInContext(code, context);
   return async (body) => {
     const response = await context.testHandler({ json: async () => body });
