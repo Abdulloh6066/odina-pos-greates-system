@@ -6,6 +6,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey } from '@/lib/pos';
 import { formatUzbekistan } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
+import RealProfitDashboard from '@/components/reports/RealProfitDashboard';
 
 const PAY_COLORS = { cash: 'hsl(var(--primary))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
 const PAY_LABELS = { cash: 'Naqd pul', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
@@ -64,6 +65,8 @@ export default function Reports() {
   return (
     <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader title="Hisobotlar" subtitle={`${formatNum(sales.length)} ta savdo · jami ${formatUZS(totalRev)}`} icon={BarChart3} />
+
+      <RealProfitDashboard />
 
       {loading ? (
         <div className="grid lg:grid-cols-2 gap-5">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-64 rounded-2xl bg-secondary animate-pulse" />)}</div>

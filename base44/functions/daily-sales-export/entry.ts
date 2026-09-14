@@ -71,6 +71,108 @@ async function computeReportsForDate(service: any, businessDate: string) {
   return reports;
 }
 
+// Compute per-shop, per-day metrics across a date range (for the real-profit dashboard).
+async function computeReportsForRange(service: any, dateFrom: string, dateTo: string) {
+  const allShops = await readAll(service.entities.Shop, {}, "name");
+  const shops = allShops.filter((s: any) => s.active !== false);
+  let f = dateFrom;
+  let t = dateTo;
+  if (f > t) {
+    const tmp = f;
+    f = t;
+    t = tmp;
+  }
+  const sales = await readAll(
+    service.entities.Sale,
+    { business_date: { $gte: f, $lte: t } },
+    "business_date",
+  );
+  const saleIds = sales.map((s: any) => s.id).filter(Boolean);
+  const saleItems = saleIds.length
+    ? await readAll(service.entities.SaleItem, { sale_id: { $in: saleIds } }, "id")
+    : [];
+  const itemsBySale = new Map<string, any[]>();
+  for (const it of saleItems) {
+    if (!itemsBySale.has(it.sale_id)) itemsBySale.set(it.sale_id, []);
+    itemsBySale.get(it.sale_id)!.push(it);
+  }
+
+  const dateSet = new Set<string>();
+  const salesByDate = new Map<string, any[]>();
+  for (const s of sales) {
+    const d = s.business_date;
+    dateSet.add(d);
+    if (!salesByDate.has(d)) salesByDate.set(d, []);
+    salesByDate.get(d)!.push(s);
+  }
+  const dates = Array.from(dateSet).sort();
+
+  const shopsOut = shops.map((shop: any) => {
+    const dayRows: any[] = [];
+    let revenue = 0;
+    let cost = 0;
+    let profit = 0;
+    let salesCount = 0;
+    let refunds = 0;
+    for (const date of dates) {
+      const ds = (salesByDate.get(date) || []).filter((s: any) => s.shop_id === shop.id);
+      const m = computeShopReport(ds, itemsBySale);
+      dayRows.push({
+        date,
+        revenue: m.revenue,
+        cost: m.cost,
+        profit: m.realProfit,
+        sales: m.saleCount,
+        refunds: m.refundCount,
+      });
+      revenue += m.revenue;
+      cost += m.cost;
+      profit += m.realProfit;
+      salesCount += m.saleCount;
+      refunds += m.refundCount;
+    }
+    return {
+      shop_id: shop.id,
+      shop_name: shop.name,
+      totals: { revenue, cost, profit, sales: salesCount, refunds },
+      days: dayRows,
+    };
+  });
+
+  const byDay = dates.map((date: string) => {
+    const ds = salesByDate.get(date) || [];
+    const m = computeShopReport(ds, itemsBySale);
+    return {
+      date,
+      revenue: m.revenue,
+      cost: m.cost,
+      profit: m.realProfit,
+      sales: m.saleCount,
+      refunds: m.refundCount,
+    };
+  });
+  const grand = byDay.reduce(
+    (a: any, d: any) => ({
+      revenue: a.revenue + d.revenue,
+      cost: a.cost + d.cost,
+      profit: a.profit + d.profit,
+      sales: a.sales + d.sales,
+      refunds: a.refunds + d.refunds,
+    }),
+    { revenue: 0, cost: 0, profit: 0, sales: 0, refunds: 0 },
+  );
+
+  return { date_from: f, date_to: t, dates, shops: shopsOut, byDay, grand };
+}
+
+async function handleRange(service: any, body: any) {
+  const clock = localClock(Date.now());
+  const dateFrom = String(body.date_from || clock.today);
+  const dateTo = String(body.date_to || dateFrom);
+  const data = await computeReportsForRange(service, dateFrom, dateTo);
+  return Response.json(data);
+}
+
 async function upsertReport(service: any, r: any) {
   const existing = await service.entities.DailyShopReport.filter(
     { business_date: r.business_date, shop_id: r.shop_id },
@@ -411,15 +513,16 @@ export default async function(req: Request): Promise<Response> {
       userName: String(stored.full_name || auth.full_name || auth.email || "Egasi"),
     };
 
-    if (!["getConfig", "saveConfig", "preview", "send", "autoSend", "reminder"].includes(action)) {
+    if (!["getConfig", "saveConfig", "preview", "range", "send", "autoSend", "reminder"].includes(action)) {
       return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     }
 
     // Read-only / preview actions: admin, manager, accountant.
-    if (action === "preview" || action === "getConfig") {
+    if (action === "preview" || action === "getConfig" || action === "range") {
       if (!VIEW_ROLES.includes(role))
         return Response.json({ error: "Ruxsat yo‘q." }, { status: 403 });
       if (action === "getConfig") return await handleGetConfig(service);
+      if (action === "range") return await handleRange(service, body);
       return await handlePreview(service, String(body.business_date || localClock(Date.now()).today));
     }
 
