@@ -4,7 +4,6 @@ import { useOutletContext, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { Users as UsersIcon, UserPlus, Shield } from 'lucide-react';
-import { logAction } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,16 +48,24 @@ export default function Users() {
 
   if (user?.role !== 'admin') return <Navigate to="/" replace />;
 
+  const updateAccess = async (payload) => {
+    try {
+      await base44.functions.invoke('security-admin', {
+        action: 'update_user_access',
+        ...payload,
+      });
+      await load();
+    } catch (error) {
+      void odinaAlert(error?.response?.data?.error || "Xodim ruxsatini yangilab bo‘lmadi.");
+    }
+  };
+
   const updateRole = async (id, role) => {
-    await base44.entities.User.update(id, { role });
-    await logAction(user, 'user_role_changed', `Role set to ${role}`);
-    load();
+    await updateAccess({ target_user_id: id, role });
   };
 
   const updateShop = async (id, shopId) => {
-    const shop = shops.find((s) => s.id === shopId);
-    await base44.entities.User.update(id, { shop_id: shopId || undefined, shop_name: shop?.name });
-    load();
+    await updateAccess({ target_user_id: id, shop_id: shopId });
   };
 
   return (
