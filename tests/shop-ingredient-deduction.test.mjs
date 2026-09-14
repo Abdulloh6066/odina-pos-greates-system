@@ -129,7 +129,7 @@ test('7. missing tech card blocks the sale before mutations', () => {
   const map = new Map([['p-smoothie', null]]);
   const { lines, missing } = M.shopPreparedLines(items, map);
   assert.equal(lines.length, 0);
-  assert.deepEqual(missing, ['Smuzi']);
+  assert.deepEqual(Array.from(missing), ['Smuzi']);
 });
 
 test('8. insufficient stock follows the negative-stock setting', () => {
