@@ -135,7 +135,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
               >
                 <div className="w-11 h-11 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
                   {p.image_url ? (
-                    <Image src={p.image_url} fittingType="fill" className="w-full h-full" />
+                    <Image src={p.image_url} alt={p.name || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" />
                   ) : (
                     <span className="text-base font-medium">{(p.name || '')[0]}</span>
                   )}
