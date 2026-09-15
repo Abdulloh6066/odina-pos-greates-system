@@ -212,7 +212,7 @@ export default function ProfitReport() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <span className="w-9 h-9 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
-                          {p.image_url ? <Image src={p.image_url} fittingType="fill" className="w-full h-full" /> : <span className="text-xs font-medium text-muted-foreground">{(p.name || '?')[0]}</span>}
+                          {p.image_url ? <Image src={p.image_url} alt={p.name || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" /> : <span className="text-xs font-medium text-muted-foreground">{(p.name || '?')[0]}</span>}
                         </span>
                         <div className="min-w-0">
                           <div className="font-medium truncate">{p.name}</div>
