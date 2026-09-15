@@ -24,18 +24,6 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      try {
-        const res = await base44.functions.invoke("staff-email-check", { email });
-        const data = res?.data || res;
-        if (!data?.allowed) {
-          setError("Bu email xodimlar ro‘yxatida yo‘q. Administrator “Xodim qo‘shish” orqali sizni taklif qilmagunicha tizimga kira olmaysiz.");
-          setLoading(false);
-          return;
-        }
-      } catch {
-        setError("Email ruxsatini tekshirib bo‘lmadi. Xavfsizlik uchun kirish to‘xtatildi; keyinroq qayta urinib ko‘ring.");
-        return;
-      }
       await base44.auth.loginViaEmailPassword(email.trim().toLowerCase(), password);
       window.location.href = returnTo;
     } catch (err) {
@@ -47,22 +35,11 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setError("");
-    if (!email.trim()) {
-      setError("Davom etishdan oldin emailingizni kiriting — faqat taklif qilingan yoki tasdiqlangan email tizimga kira oladi.");
-      return;
-    }
     setGoogleLoading(true);
     try {
-      const res = await base44.functions.invoke("staff-email-check", { email });
-      const data = res?.data || res;
-      if (!data?.allowed) {
-        setError("Bu email xodimlar ro‘yxatida yo‘q. Administrator “Xodim qo‘shish” orqali sizni taklif qilmagunicha tizimga kira olmaysiz.");
-        return;
-      }
       base44.auth.loginWithProvider("google", returnTo);
-    } catch {
-      setError("Email ruxsatini tekshirib bo‘lmadi. Xavfsizlik uchun kirish to‘xtatildi; keyinroq qayta urinib ko‘ring.");
-    } finally {
+    } catch (err) {
+      setError(err.message || "Google orqali kirib bo‘lmadi.");
       setGoogleLoading(false);
     }
   };
