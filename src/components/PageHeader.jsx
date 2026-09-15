@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function PageHeader({ title, subtitle, actions, icon: Icon, eyebrow }) {
+export default function PageHeader({ title, subtitle = null, actions = null, icon: Icon = null, eyebrow = null }) {
   return (
     <div className="odina-page-header flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
       <div className="flex min-w-0 items-start gap-3">
