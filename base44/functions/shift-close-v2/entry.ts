@@ -4,7 +4,85 @@ import {
   cleanupShiftStockSnapshots, creditBudgetBalance, rollbackBudgetBalance,
 } from "../../shared/shift-close-helpers.ts";
 
-const SHIFT_CLOSE_V2_RUNTIME_VERSION = "shift-close-v2-2026-09-09";
+const SHIFT_CLOSE_V2_RUNTIME_VERSION = "shift-close-v2-2026-09-15-telegram";
+const SHIFT_TELEGRAM_GROUP_ID = "-5570444945";
+
+const formatUzs = (value: unknown) => `${money(value).toLocaleString("en-US")} UZS`;
+
+function formatTashkentDateTime(value: unknown): string {
+  const date = new Date(String(value || ""));
+  if (!Number.isFinite(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("uz-UZ", {
+    timeZone: "Asia/Tashkent",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function buildShiftTelegramText(shift: any, opts: {
+  userName: string;
+  actualCash: number;
+  budgetCashSubmitted: number;
+  cashLeftForNextShift: number;
+  testMode: boolean;
+}): string {
+  const title = opts.testMode ? "🧪 TEST · Smena yopildi" : "✅ Smena yopildi";
+  const expectedCash = money(shift.expected_cash);
+  const difference = opts.actualCash - expectedCash;
+  const lines = [
+    title,
+    `🏪 ${String(shift.shop_name || "Do‘kon")}`,
+    `👤 ${String(shift.user_name || opts.userName || "Xodim")}`,
+    `🕐 ${formatTashkentDateTime(shift.opened_at)} → ${formatTashkentDateTime(shift.closed_at)}`,
+    "",
+    `🛒 Savdolar: ${Number(shift.order_count || 0)} ta · ${formatUzs(shift.total_sales)}`,
+    `💵 Naqd: ${formatUzs(shift.cash_sales)}`,
+    `💳 Uzcard: ${formatUzs(shift.uzcard_sales)}`,
+    `💳 Humo: ${formatUzs(shift.humo_sales)}`,
+    `📱 Online: ${formatUzs(shift.online_sales)}`,
+    `🏦 Bank: ${formatUzs(shift.bank_transfer_sales)}`,
+    `↩️ Qaytarish: ${formatUzs(shift.refunds_total)}`,
+    `📤 Kassadan chiqim: ${formatUzs(shift.cash_removed)}`,
+    "",
+    `🧮 Kutilgan naqd: ${formatUzs(expectedCash)}`,
+    `✅ Sanalgan naqd: ${formatUzs(opts.actualCash)}`,
+    `➗ Farq: ${formatUzs(difference)}`,
+    `🏦 Budgetga topshirildi: ${formatUzs(opts.budgetCashSubmitted)}`,
+    `💼 Keyingi smenaga qoldi: ${formatUzs(opts.cashLeftForNextShift)}`,
+  ];
+  return lines.join("\n");
+}
+
+async function sendShiftTelegram(shift: any, opts: {
+  userName: string;
+  actualCash: number;
+  budgetCashSubmitted: number;
+  cashLeftForNextShift: number;
+  testMode: boolean;
+}): Promise<{ sent: boolean; message_id?: number; reason?: string }> {
+  const token = (globalThis as any)?.Deno?.env?.get?.("TELEGRAM_BOT_TOKEN") || "";
+  if (!token) return { sent: false, reason: "missing_token" };
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: SHIFT_TELEGRAM_GROUP_ID,
+        text: buildShiftTelegramText(shift, opts),
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) return { sent: false, reason: "telegram_rejected" };
+    return { sent: true, message_id: Number(data?.result?.message_id || 0) || undefined };
+  } catch {
+    return { sent: false, reason: "network_error" };
+  }
+}
 
 export default async function(req) {
   const base44 = createClientFromRequest(req);
@@ -223,6 +301,23 @@ export default async function(req) {
         action: "shift_closed",
         details: `${closingShift.shop_name} · Budgetga ${budgetCashSubmitted} UZS naqd · qoldirildi ${cashLeftForNextShift} UZS · pul farqi ${actualCash - expected} UZS · tizim qoldig‘i ${stockSnapshotSucceeded ? `${stockSnapshotPayloads.length} tur` : "saqlanmadi"} · backend ${SHIFT_CLOSE_V2_RUNTIME_VERSION}`,
       }).catch(() => {});
+
+      const telegramNotification = await sendShiftTelegram(updated, {
+        userName,
+        actualCash,
+        budgetCashSubmitted,
+        cashLeftForNextShift,
+        testMode: body?.test_mode === true,
+      });
+      await service.entities.ActionHistory.create({
+        user_id: user.id,
+        user_name: userName,
+        action: telegramNotification.sent ? "shift_telegram_sent" : "shift_telegram_failed",
+        details: telegramNotification.sent
+          ? `${closingShift.shop_name} · Telegram message ${telegramNotification.message_id || "ok"}`
+          : `${closingShift.shop_name} · Telegram yuborilmadi · ${telegramNotification.reason || "unknown"}`,
+      }).catch(() => {});
+
       return Response.json({
         runtime_version: SHIFT_CLOSE_V2_RUNTIME_VERSION,
         shift: updated,
@@ -231,6 +326,7 @@ export default async function(req) {
           rows: stockSnapshotPayloads,
         },
         budget_transactions: budgetTransactions,
+        telegram_notification: telegramNotification,
         print_report_required: true,
       });
     } catch (error) {
