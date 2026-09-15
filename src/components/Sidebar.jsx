@@ -91,38 +91,28 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
     );
   };
 
-  const renderGroup = ({ item, children, active, open, setOpen, ParentIcon }) => (
+  const renderCollapsibleGroup = ({ item, children, active, open, setOpen, ParentIcon }) => (
     <div key={item.key}>
       <div data-active={active} className={`odina-nav-group flex items-center rounded-xl border transition-colors ${active ? 'bg-brand-olive/20 border-brand-olive/35 text-foreground' : 'border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
-        <NavLink
-          to={item.path}
+        <button
+          type="button"
           onClick={() => {
-            if (children.length > 0) {
-              if (collapsed) {
-                onToggle();
-                setOpen(true);
-              } else {
-                setOpen((current) => !current);
-              }
-            }
-            onClose();
+            if (collapsed) { onToggle(); setOpen(true); }
+            else setOpen((current) => !current);
           }}
           title={collapsed ? item.label : undefined}
           aria-label={item.label}
-          aria-expanded={children.length > 0 ? open : undefined}
-          className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D0B17F] focus-visible:ring-inset ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}
+          aria-expanded={open}
+          className={`flex min-h-11 w-full min-w-0 items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-2.5 text-sm font-semibold cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D0B17F] focus-visible:ring-inset ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}
         >
           <ParentIcon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />
           <span className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
           {children.length > 0 && (
-            <span
-              aria-hidden="true"
-              className={`ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${collapsed ? 'lg:hidden' : ''}`}
-            >
+            <span aria-hidden="true" className={`ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${collapsed ? 'lg:hidden' : ''}`}>
               <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
             </span>
           )}
-        </NavLink>
+        </button>
       </div>
       {open && children.length > 0 && (
         <div className={`odina-nav-children ml-5 mt-1 mb-2 pl-2 border-l-2 border-brand-sand/60 space-y-1 ${collapsed ? 'lg:hidden' : ''}`}>
@@ -156,22 +146,25 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         <p className={`odina-nav-label ${collapsed ? 'lg:hidden' : ''}`}>ISH MAYDONI</p>
         {topItems.map((item) => {
           if (item.key === 'pos') {
-            return renderGroup({
+            return renderCollapsibleGroup({
               item,
               active: kassaActive,
               open: kassaOpen,
               setOpen: setKassaOpen,
               ParentIcon: ShoppingCart,
-              children: kassaChildren.map((child) => ({
-                ...child,
-                icon: ICONS[child.icon] || Circle,
-                active: location.pathname === child.path,
-              })),
+              children: [
+                { key: 'kassa-pos', label: 'Kassa', path: '/pos', icon: ShoppingCart, active: location.pathname === '/pos' },
+                ...kassaChildren.map((child) => ({
+                  ...child,
+                  icon: ICONS[child.icon] || Circle,
+                  active: location.pathname === child.path,
+                })),
+              ],
             });
           }
 
           if (item.key === 'warehouse') {
-            return renderGroup({
+            return renderCollapsibleGroup({
               item: { ...item, path: '/warehouse?tab=ingredients' },
               active: warehouseActive,
               open: warehouseOpen,
