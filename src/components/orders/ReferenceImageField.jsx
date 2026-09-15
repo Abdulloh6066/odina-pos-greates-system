@@ -75,7 +75,7 @@ export default function ReferenceImageField({ value, onChange, disabled }) {
       {value ? (
         <div className="rounded-xl border border-border bg-secondary/30 p-2 w-full max-w-[240px] space-y-2">
           <div className="relative rounded-lg overflow-hidden bg-secondary">
-            <Image src={value} fittingType="fill" className="w-full aspect-video" />
+            <Image src={value} alt="Buyurtma namuna rasmi" fittingType="fill" className="w-full aspect-video" />
           </div>
           <div className="flex gap-2">
             {mode === 'gallery' ? (
