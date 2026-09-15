@@ -1,10 +1,9 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
-import { TELEGRAM_GROUP_ID, TELEGRAM_WEBHOOK_URL } from "../../shared/telegram-alert-logic.ts";
 
 // Recipient explicitly supplied by the owner. Never accept a recipient or text from the browser.
-const GROUP_ID = TELEGRAM_GROUP_ID;
-const WEBHOOK_URL = TELEGRAM_WEBHOOK_URL;
+const GROUP_ID = "-5570444945";
+const WEBHOOK_URL = "https://odina-pos-suite.base44.app/api/functions/telegram-webhook";
 const TEST_TEXT = "✅ Odina POS bilan ulanish ishlayapti.\nBu sinov xabari. Avtomatik ogohlantirishlar hali yoqilmagan.";
 
 async function sha256Hex(s: string): Promise<string> {
