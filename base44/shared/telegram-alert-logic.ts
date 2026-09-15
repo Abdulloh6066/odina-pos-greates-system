@@ -1,4 +1,5 @@
 export const TELEGRAM_GROUP_ID = "-5570444945";
+export const TELEGRAM_WEBHOOK_URL = "https://odina-pos-suite.base44.app/api/functions/telegram-webhook";
 export const cleanLabel = (value: unknown, max = 80) => String(value ?? "").replace(/[\r\n\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, " ").slice(0, max);
 export function localClock(now: number) {
   const local = new Date(now + 5 * 3600000);
