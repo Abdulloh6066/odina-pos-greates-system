@@ -109,7 +109,7 @@ function sharedDbHarness(db) {
   return client;
 }
 
-function loadHandler(client) {
+function loadHandler(client, options = {}) {
   const sharedSrc = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, '');
   const sharedCode = ts.transpileModule(sharedSrc, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
@@ -124,7 +124,19 @@ function loadHandler(client) {
   const code = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
-  const context = vm.createContext({ client, Response, crypto: webcrypto, console, structuredClone });
+  const context = vm.createContext({
+    client,
+    Response,
+    crypto: webcrypto,
+    console,
+    structuredClone,
+    AbortSignal,
+    Deno: { env: { get: (key) => key === 'TELEGRAM_BOT_TOKEN' ? (options.telegramToken || '') : '' } },
+    fetch: options.fetchImpl || (async () => new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })),
+  });
   vm.runInContext(code, context);
   return async (body) => {
     const response = await context.testHandler({ json: async () => body });
@@ -147,7 +159,7 @@ test('zero-sale shift saves exactly one snapshot with closing quantity 6', async
   const response = await call(closeBody());
 
   assert.equal(response.status, 200, JSON.stringify(response));
-  assert.equal(response.data.runtime_version, 'shift-close-v2-2026-09-09');
+  assert.equal(response.data.runtime_version, 'shift-close-v2-2026-09-15-telegram');
   assert.equal(f.db.Shift[0].status, 'closed');
   assert.equal(f.db.Shift[0].stock_count_completed, true);
   assert.equal(f.db.Shift[0].stock_snapshot_count, 1);
@@ -177,7 +189,7 @@ test('runtime_status reports the new backend version', async () => {
   const response = await call({ action: 'runtime_status' });
 
   assert.equal(response.status, 200, JSON.stringify(response));
-  assert.equal(response.data.runtime_version, 'shift-close-v2-2026-09-09');
+  assert.equal(response.data.runtime_version, 'shift-close-v2-2026-09-15-telegram');
 });
 
 test('snapshot is immutable — later stock change does not alter the saved row', async () => {
@@ -200,7 +212,7 @@ test('shift_closed ActionHistory records the new backend marker', async () => {
   assert.equal(response.status, 200, JSON.stringify(response));
   const closed = f.db.ActionHistory.find((row) => row.action === 'shift_closed');
   assert.ok(closed, 'shift_closed audit row was created');
-  assert.ok(closed.details.includes('backend shift-close-v2-2026-09-09'), closed.details);
+  assert.ok(closed.details.includes('backend shift-close-v2-2026-09-15-telegram'), closed.details);
 });
 
 console.log('4 shift-close-v2 regression tests passed. No live data was used.');
