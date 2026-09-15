@@ -49,7 +49,15 @@ function fixture(opts = {}) {
     createClientFromRequest:()=>({auth:{me:async()=>opts.unauth ? null : ({id:opts.authId || 'stored-owner',email:'owner@odinatort.uz',role:'admin'})},asServiceRole:{entities}}),
     Deno:{env:{get:()=>opts.missing ? undefined : 'PRIVATE_TOKEN'},serve:fn=>{handler=fn;}},
     fetch:async (url, init) => {
-      const body=JSON.parse(init.body); sent.push(body);
+      const method=url.split('/').at(-1);
+      const body=JSON.parse(init.body);
+      if (method === 'getWebhookInfo') {
+        return { ok:true, json:async()=>({ok:true,result:{url:'https://odina-pos-suite.base44.app/api/functions/telegram-webhook'}}) };
+      }
+      if (method === 'setWebhook') {
+        return { ok:true, json:async()=>({ok:true,result:true}) };
+      }
+      sent.push(body);
       if(opts.failSend) throw new Error(url);
       return { ok:!opts.reject, json:async()=>opts.reject ? ({ok:false}) : ({ok:true,result:{message_id:77}}) };
     },
