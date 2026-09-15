@@ -41,7 +41,7 @@ export default function Cart({
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-card overflow-hidden shrink-0 border border-border/60">
                   {item.image_url ? (
-                    <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                    <img src={item.image_url} alt={item.product_name || 'Mahsulot rasmi'} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center font-display text-lg text-brand-ink">{item.product_name.charAt(0)}</div>
                   )}
