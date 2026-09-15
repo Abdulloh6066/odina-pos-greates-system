@@ -99,9 +99,11 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
                 onChange={(e) => updatePayment(idx, 'method', e.target.value)}
                 className="h-10 rounded-lg border border-input bg-card px-2 text-sm font-medium flex-1 min-w-0"
               >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
+                {PAYMENT_METHODS
+                  .filter((m) => m.id === p.method || !payments.some((other, otherIdx) => otherIdx !== idx && other.method === m.id))
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
               </OdinaSelect>
               <Input
                 type="number"
@@ -119,19 +121,67 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           ))}
         </div>
 
-        <div className={total <= 0 ? 'hidden' : 'flex items-center justify-between mt-3 text-sm'}>
-          <button onClick={addRow} disabled={remaining <= 0 && payments.length >= PAYMENT_METHODS.length} className="text-brand-ink font-medium flex items-center gap-1 disabled:opacity-40">
-            <Plus className="w-4 h-4" /> To‘lov usuli qo‘shish
-          </button>
-          <div className="text-right">
-            {remaining > 0 ? (
-              <span className="text-destructive font-medium">Qoldi: {formatUZS(remaining)}</span>
-            ) : overpay > 0 ? (
-              <span className="text-brand-ink font-medium">Qaytim: {formatUZS(overpay)}</span>
-            ) : (
-              <span className="text-emerald-600 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> To‘liq</span>
-            )}
+        <div className={total <= 0 ? 'hidden' : 'mt-3'}>
+          <div className="flex items-center justify-between text-sm gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMethodPicker((prev) => !prev)}
+              disabled={availableMethods.length === 0}
+              className="min-h-11 rounded-xl px-2 -ml-2 text-brand-ink font-medium flex items-center gap-1.5 disabled:opacity-40"
+              aria-expanded={showMethodPicker}
+            >
+              <Plus className="w-4 h-4" /> To‘lov usuli qo‘shish
+            </button>
+            <div className="text-right shrink-0">
+              {remaining > 0 ? (
+                <span className="text-destructive font-medium">Qoldi: {formatUZS(remaining)}</span>
+              ) : overpay > 0 ? (
+                <span className="text-brand-ink font-medium">Qaytim: {formatUZS(overpay)}</span>
+              ) : (
+                <span className="text-emerald-600 font-medium flex items-center gap-1"><Check className="w-4 h-4" /> To‘liq</span>
+              )}
+            </div>
           </div>
+
+          {showMethodPicker && availableMethods.length > 0 && (
+            <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <p className="font-semibold text-sm text-foreground">To‘lov usulini tanlang</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {remaining > 0 ? `Qolgan summa: ${formatUZS(remaining)}` : 'Yangi usul uchun summani keyin kiriting'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMethodPicker(false)}
+                  className="w-9 h-9 rounded-xl border border-border bg-card flex items-center justify-center text-muted-foreground"
+                  aria-label="To‘lov usullarini yopish"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {availableMethods.map((method) => {
+                  const MethodIcon = methodIcon(method);
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => addPaymentMethod(method.id)}
+                      className="min-h-14 rounded-xl border border-border bg-card px-3 py-2.5 flex items-center gap-2.5 text-left font-semibold text-sm hover:bg-primary/10 hover:border-primary/40 active:scale-[0.98] transition"
+                    >
+                      <span className="w-9 h-9 rounded-lg bg-primary/10 text-brand-ink flex items-center justify-center shrink-0">
+                        <MethodIcon className="w-4.5 h-4.5" />
+                      </span>
+                      <span className="leading-tight">{method.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {error && <p className="text-sm text-destructive mt-2">{error}</p>}
