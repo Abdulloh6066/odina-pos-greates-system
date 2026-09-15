@@ -141,6 +141,30 @@ export const AuthProvider = ({ children }) => {
         console.warn('Staff assignment check failed:', assignmentError);
       }
 
+      // Server-side self check: the backend ignores caller-supplied emails and
+      // verifies only the authenticated account. This prevents public email
+      // enumeration while keeping the staff allowlist enforced after auth.
+      try {
+        const accessResponse = await base44.functions.invoke('staff-email-check', {});
+        const access = accessResponse?.data || accessResponse;
+        if (!access?.allowed) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setAuthError({ type: 'user_not_registered', message: 'Xodim ruxsati yo‘q' });
+          setIsLoadingAuth(false);
+          setAuthChecked(true);
+          return;
+        }
+      } catch (accessError) {
+        console.warn('Staff access verification failed:', accessError);
+        setUser(null);
+        setIsAuthenticated(false);
+        setAuthError({ type: 'user_not_registered', message: 'Xodim ruxsatini tekshirib bo‘lmadi' });
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+        return;
+      }
+
       const hydrated = await hydrateAppUser(currentUser);
       // O'z-o'zidan ro'yxatdan o'tgan (role="user") yoki lavozimi xodimlarga
       // kirmaydigan hisoblar xodimlar ro'yxatida yo'q — ularga ilova ochilmaydi.
