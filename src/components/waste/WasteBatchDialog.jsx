@@ -219,7 +219,7 @@ export default function WasteBatchDialog({ open, initial, shops, stockItems, onC
                     <label className="flex min-h-11 items-center gap-3 cursor-pointer">
                       <Checkbox aria-label={item.product_name + 'ni tanlash'} checked={Boolean(row)}
                         onCheckedChange={(checked) => toggle(item, checked === true)} disabled={saving} className="h-5 w-5 shrink-0" />
-                      {item.image_url && <img src={item.image_url} alt="" className="w-11 h-11 rounded-lg object-contain bg-secondary shrink-0" />}
+                      {item.image_url && <img src={item.image_url} alt={item.product_name || 'Mahsulot rasmi'} className="w-11 h-11 rounded-lg object-contain bg-secondary shrink-0" />}
                       <span className="min-w-0">
                         <span className="block font-semibold break-words">{item.product_name}</span>
                         <span className="block text-xs text-muted-foreground mt-0.5">
