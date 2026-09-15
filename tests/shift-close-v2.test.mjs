@@ -215,4 +215,47 @@ test('shift_closed ActionHistory records the new backend marker', async () => {
   assert.ok(closed.details.includes('backend shift-close-v2-2026-09-15-telegram'), closed.details);
 });
 
-console.log('4 shift-close-v2 regression tests passed. No live data was used.');
+test('successful shift close sends a TEST-labelled Telegram summary', async () => {
+  const f = zeroSaleFixture();
+  const client = sharedDbHarness(f.db);
+  const sent = [];
+  const call = loadHandler(client, {
+    telegramToken: 'offline-test-token',
+    fetchImpl: async (url, init) => {
+      sent.push({ url, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 777 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+  const response = await call({ ...closeBody(), test_mode: true });
+
+  assert.equal(response.status, 200, JSON.stringify(response));
+  assert.equal(response.data.telegram_notification.sent, true);
+  assert.equal(response.data.telegram_notification.message_id, 777);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].body.chat_id, '-5570444945');
+  assert.match(sent[0].body.text, /🧪 TEST · Smena yopildi/);
+  assert.match(sent[0].body.text, /Odina Branch/);
+  assert.match(sent[0].body.text, /Test cashier/);
+  assert.ok(f.db.ActionHistory.some((row) => row.action === 'shift_telegram_sent'));
+});
+
+test('Telegram failure never rolls back an otherwise successful shift close', async () => {
+  const f = zeroSaleFixture();
+  const client = sharedDbHarness(f.db);
+  const call = loadHandler(client, {
+    telegramToken: 'offline-test-token',
+    fetchImpl: async () => { throw new Error('offline network failure'); },
+  });
+  const response = await call({ ...closeBody(), test_mode: true });
+
+  assert.equal(response.status, 200, JSON.stringify(response));
+  assert.equal(f.db.Shift[0].status, 'closed');
+  assert.equal(response.data.telegram_notification.sent, false);
+  assert.equal(response.data.telegram_notification.reason, 'network_error');
+  assert.ok(f.db.ActionHistory.some((row) => row.action === 'shift_telegram_failed'));
+});
+
+console.log('6 shift-close-v2 regression tests passed. No live data was used.');
