@@ -355,6 +355,53 @@ Deno.serve(async (req) => {
       if (webhookToken) await ensureTelegramWebhook(webhookToken).catch(() => {});
     }
     const started = Date.now();
+    // One-time controlled shift notification test. Only an exact TEST marker is eligible.
+    if (action === "run") {
+      const testRows = await service.entities.Shift.filter({ status: "closed", user_name: "🧪 TEST Telegram" }, "-closed_at", 5);
+      const testShift = (testRows || []).find((row: any) => String(row.budget_settlement_reference || "").startsWith("TEST-TELEGRAM-ARMED-"));
+      if (testShift) {
+        const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
+        if (!token) {
+          finalResult = "TEST smena: TELEGRAM_BOT_TOKEN topilmadi.";
+          await service.entities.Shift.delete(testShift.id).catch(() => {});
+          return Response.json({ sent: false, test_shift: true, cleaned: true, error: finalResult }, { status: 400 });
+        }
+        const formatMoney = (value: unknown) => `${Math.round(Number(value || 0)).toLocaleString("en-US")} UZS`;
+        const text = [
+          "🧪 TEST · Smena yopildi",
+          `🏪 ${cleanLabel(testShift.shop_name || "Do‘kon", 80)}`,
+          `👤 ${cleanLabel(testShift.user_name || "Xodim", 80)}`,
+          "",
+          `🛒 Savdolar: ${Number(testShift.order_count || 0)} ta · ${formatMoney(testShift.total_sales)}`,
+          `💵 Naqd: ${formatMoney(testShift.cash_sales)}`,
+          `💳 Uzcard: ${formatMoney(testShift.uzcard_sales)}`,
+          `💳 Humo: ${formatMoney(testShift.humo_sales)}`,
+          `📱 Online: ${formatMoney(testShift.online_sales)}`,
+          `🏦 Bank: ${formatMoney(testShift.bank_transfer_sales)}`,
+          `↩️ Qaytarish: ${formatMoney(testShift.refunds_total)}`,
+          `📤 Kassadan chiqim: ${formatMoney(testShift.cash_removed)}`,
+          "",
+          `🧮 Kutilgan naqd: ${formatMoney(testShift.expected_cash)}`,
+          `✅ Sanalgan naqd: ${formatMoney(testShift.actual_cash)}`,
+          `➗ Farq: ${formatMoney(testShift.difference)}`,
+          `🏦 Budgetga topshirildi: ${formatMoney(testShift.budget_cash_submitted)}`,
+          `💼 Keyingi smenaga qoldi: ${formatMoney(testShift.cash_left_for_next_shift)}`,
+        ].join("\n");
+        const response = await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: TELEGRAM_GROUP_ID, text }),
+          signal: AbortSignal.timeout(12000),
+        });
+        const data = await response.json().catch(() => ({}));
+        const sent = Boolean(response.ok && data?.ok);
+        finalResult = sent
+          ? `TEST smena Telegramga yuborildi · message_id ${Number(data?.result?.message_id || 0)}`
+          : "TEST smena Telegram tomonidan rad etildi.";
+        await service.entities.Shift.delete(testShift.id).catch(() => {});
+        return Response.json({ sent, test_shift: true, cleaned: true, message_id: Number(data?.result?.message_id || 0), error: sent ? "" : finalResult }, { status: sent ? 200 : 502 });
+      }
+    }
     if (action === "run") {
       lease = crypto.randomUUID();
       const claimed = await service.entities.TelegramControl.updateMany(
