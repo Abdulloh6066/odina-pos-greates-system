@@ -348,7 +348,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
                   <div key={i.product_id} className="border border-border rounded-xl p-3 bg-secondary/30">
                     <div className="flex items-start gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
-                        {i.image_url ? <Image src={i.image_url} fittingType="fill" className="w-full h-full" /> : <span className="text-lg">{i.name?.[0]}</span>}
+                        {i.image_url ? <Image src={i.image_url} alt={i.name || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" /> : <span className="text-lg">{i.name?.[0]}</span>}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{i.name}</div>
