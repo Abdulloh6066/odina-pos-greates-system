@@ -1,8 +1,8 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Outlet, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import OdinaDialogProvider from '@/components/ui/odina-dialog-provider';
@@ -38,6 +38,44 @@ const ProfitReport = lazy(() => import('@/pages/ProfitReport'));
 const AuditExport = lazy(() => import('@/pages/AuditExport'));
 const Security = lazy(() => import('@/pages/Security'));
 const DailyExport = lazy(() => import('@/pages/DailyExport'));
+
+const ROUTE_TITLES = {
+  '/': 'Bosh sahifa',
+  '/login': 'Kirish',
+  '/register': 'Ro‘yxatdan o‘tish',
+  '/forgot-password': 'Parolni tiklash',
+  '/reset-password': 'Yangi parol',
+  '/pos': 'Kassa',
+  '/orders': 'Buyurtmalar',
+  '/customers': 'Mijozlar',
+  '/products': 'Mahsulotlar',
+  '/categories': 'Kategoriyalar',
+  '/users': 'Xodimlar',
+  '/reports': 'Hisobotlar',
+  '/discounts': 'Chegirmalar',
+  '/settings': 'Sozlamalar',
+  '/sales': 'Savdolar tarixi',
+  '/shifts': 'Smenalar',
+  '/cash-outs': 'Kassadan pul olish',
+  '/cash-recipients': 'Qabul qiluvchilar',
+  '/warehouse': 'Ombor',
+  '/waste': 'Chiqitlar',
+  '/budget': 'Budjet',
+  '/production-screen': 'Ishlab chiqarish',
+  '/profit': 'Tannarx va foyda',
+  '/audit': 'Nazorat va eksport',
+  '/security': 'Xavfsizlik',
+  '/daily-export': 'Kunlik eksport',
+};
+
+function RouteTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const pageTitle = ROUTE_TITLES[pathname];
+    document.title = pageTitle ? `${pageTitle} · Odina POS` : 'Odina POS';
+  }, [pathname]);
+  return null;
+}
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -80,6 +118,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <OdinaDialogProvider>
         <Router>
+          <RouteTitle />
           <ScrollToTop />
           <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-secondary border-t-primary rounded-full animate-spin" /></div>}>
           <Routes>
