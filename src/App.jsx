@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -13,30 +14,30 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
-// App pages
+// App shell stays eager; feature pages load only when their route is opened.
 import Layout from '@/components/Layout';
-import Dashboard from '@/pages/Dashboard';
-import POS from '@/pages/POS';
-import Orders from '@/pages/Orders';
-import Customers from '@/pages/Customers';
-import Products from '@/pages/Products';
-import Categories from '@/pages/Categories';
-import Users from '@/pages/Users';
-import Reports from '@/pages/Reports';
-import DiscountCodes from '@/pages/DiscountCodes';
-import Settings from '@/pages/Settings';
-import SalesHistory from '@/pages/SalesHistory';
-import Shifts from '@/pages/Shifts';
-import CashOutHistory from '@/pages/CashOutHistory';
-import CashRecipients from '@/pages/CashRecipients';
-import Warehouse from '@/pages/Warehouse';
-import Waste from '@/pages/Waste';
-import Budget from '@/pages/Budget';
-import ProductionScreen from '@/pages/ProductionScreen';
-import ProfitReport from '@/pages/ProfitReport';
-import AuditExport from '@/pages/AuditExport';
-import Security from '@/pages/Security';
-import DailyExport from '@/pages/DailyExport';
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const POS = lazy(() => import('@/pages/POS'));
+const Orders = lazy(() => import('@/pages/Orders'));
+const Customers = lazy(() => import('@/pages/Customers'));
+const Products = lazy(() => import('@/pages/Products'));
+const Categories = lazy(() => import('@/pages/Categories'));
+const Users = lazy(() => import('@/pages/Users'));
+const Reports = lazy(() => import('@/pages/Reports'));
+const DiscountCodes = lazy(() => import('@/pages/DiscountCodes'));
+const Settings = lazy(() => import('@/pages/Settings'));
+const SalesHistory = lazy(() => import('@/pages/SalesHistory'));
+const Shifts = lazy(() => import('@/pages/Shifts'));
+const CashOutHistory = lazy(() => import('@/pages/CashOutHistory'));
+const CashRecipients = lazy(() => import('@/pages/CashRecipients'));
+const Warehouse = lazy(() => import('@/pages/Warehouse'));
+const Waste = lazy(() => import('@/pages/Waste'));
+const Budget = lazy(() => import('@/pages/Budget'));
+const ProductionScreen = lazy(() => import('@/pages/ProductionScreen'));
+const ProfitReport = lazy(() => import('@/pages/ProfitReport'));
+const AuditExport = lazy(() => import('@/pages/AuditExport'));
+const Security = lazy(() => import('@/pages/Security'));
+const DailyExport = lazy(() => import('@/pages/DailyExport'));
 
 const AuthGate = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
