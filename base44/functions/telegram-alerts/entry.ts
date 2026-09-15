@@ -1,7 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
-import { TELEGRAM_GROUP_ID, cleanLabel, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
+import { TELEGRAM_GROUP_ID, TELEGRAM_WEBHOOK_URL, cleanLabel, localClock, orderCandidates, forecastCandidate } from "../../shared/telegram-alert-logic.ts";
 import { birthdayWindowMatches, buildBirthdayMessage, buildBirthdayKeyboard, birthdayDedupKey, birthdayDisplay } from "../../shared/birthday-logic.ts";
 
 // Birthday follow-up: load all customers / followups / deliveries with pagination.
@@ -13,6 +13,36 @@ async function readAll(service: any, entityName: string, query: any = {}): Promi
     if (page.length < 500) return rows;
   }
   return rows;
+}
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function telegramApi(token: string, method: string, body: Record<string, unknown> = {}): Promise<any> {
+  const response = await fetch("https://api.telegram.org/bot" + token + "/" + method, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12000),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error("TELEGRAM_API_FAILED");
+  return data.result;
+}
+
+async function ensureTelegramWebhook(token: string): Promise<void> {
+  const info = await telegramApi(token, "getWebhookInfo");
+  if (String(info?.url || "") === TELEGRAM_WEBHOOK_URL) return;
+  const secret = (await sha256Hex(token)).slice(0, 32);
+  await telegramApi(token, "setWebhook", {
+    url: TELEGRAM_WEBHOOK_URL,
+    secret_token: secret,
+    allowed_updates: ["callback_query"],
+  });
+  const verified = await telegramApi(token, "getWebhookInfo");
+  if (String(verified?.url || "") !== TELEGRAM_WEBHOOK_URL) throw new Error("TELEGRAM_WEBHOOK_NOT_VERIFIED");
 }
 
 // Ensure a BirthdayFollowup record exists for each window match (per customer + campaign year).
@@ -213,6 +243,11 @@ async function handleBirthdaySend(service: any, opts: { manual: boolean }): Prom
   if (!token) {
     return Response.json({ error: "Telegram sozlamasi to‘g‘ridan to‘g‘ri emas. Admin bilan bog‘laning." }, { status: 400 });
   }
+  try {
+    await ensureTelegramWebhook(token);
+  } catch {
+    return Response.json({ error: "Telegram tugmalari ulanmagan. Webhookni qayta ulab ko‘ring." }, { status: 502 });
+  }
 
   const reservation = await service.entities.TelegramDelivery.create({
     keys: fresh.map((m: any) => birthdayDedupKey(m.customer_id, m.birthday_date)),
@@ -315,6 +350,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "run" && control.enabled !== true) return Response.json({ paused: true });
+    if (action === "run") {
+      const webhookToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
+      if (webhookToken) await ensureTelegramWebhook(webhookToken).catch(() => {});
+    }
     const started = Date.now();
     if (action === "run") {
       lease = crypto.randomUUID();
