@@ -77,7 +77,7 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat }) {
                 {items.map((it) => (
                   <div key={it.id} className="flex items-center gap-3 border border-border rounded-xl p-2.5 bg-card">
                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
-                      {it.product_image_snapshot ? <Image src={it.product_image_snapshot} fittingType="fill" className="w-full h-full" /> : <span>{it.product_name_snapshot?.[0]}</span>}
+                      {it.product_image_snapshot ? <Image src={it.product_image_snapshot} alt={it.product_name_snapshot || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" /> : <span>{it.product_name_snapshot?.[0]}</span>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{it.product_name_snapshot}</div>
