@@ -193,7 +193,7 @@ export default function AuditExport() {
   const summary = data.summary || {};
 
   return (
-    <div className="odina-page p-4 sm:p-6 lg:p-8 max-w-[1500px] mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-[1500px] mx-auto">
       <PageHeader
         title="Nazorat va eksport"
         subtitle={formatNum(data.total || 0) + " ta yozuv · faqat Egasi / Admin"}
