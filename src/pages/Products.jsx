@@ -47,6 +47,15 @@ export default function Products() {
 
   const onSaved = () => { setOpen(false); load(); };
 
+  const localizedCategoryName = (name) => ({
+    Cakes: 'Tortlar',
+    Pastries: 'Pishiriqlar',
+    Cookies: 'Pechenyelar',
+    Drinks: 'Ichimliklar',
+    Cupcakes: 'Kapkeyklar',
+    Desserts: 'Desertlar',
+  }[name] || name || 'Kategoriyasiz');
+
   const setAvailability = async (product) => {
     try {
       const result = await base44.functions.invoke('set-product-availability', {
@@ -100,24 +109,37 @@ export default function Products() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {filtered.map((p) => (
-            <div key={p.id} className="odina-panel group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg">
-              <div className="relative aspect-square bg-secondary overflow-hidden">
-                {p.image_url ? <Image src={p.image_url} alt={p.name} fittingType="fill" className="w-full h-full" /> : <div className="w-full h-full flex items-center justify-center text-3xl font-display text-muted-foreground/40">{p.name.charAt(0)}</div>}
+            <div key={p.id} className={`odina-panel group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg ${p.active === false ? 'opacity-90' : ''}`}>
+              <div className="relative aspect-square bg-secondary/70 overflow-hidden">
+                {p.image_url ? (
+                  <Image src={p.image_url} alt={p.name} fittingType="fill" className="w-full h-full" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/35">
+                    <Cake className="w-8 h-8" />
+                    <span className="text-[10px] font-medium tracking-wide uppercase">Rasm yo‘q</span>
+                  </div>
+                )}
                 {p.is_favorite && <Star className="absolute top-2 left-2 w-4 h-4 fill-primary text-primary" />}
-                {!p.active && <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center text-white text-xs font-semibold">Mavjud emas</div>}
+                {p.active === false && (
+                  <div className="absolute left-2 bottom-2 rounded-full border border-border bg-card/95 px-2 py-1 text-[10px] font-semibold text-muted-foreground shadow-sm backdrop-blur">
+                    Sotuvda emas
+                  </div>
+                )}
                 {canManageCatalog && (
-                  <button onClick={() => openEdit(p)} className="absolute top-2 right-2 w-10 h-10 rounded-full bg-card/95 backdrop-blur flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow touch-manipulation">
+                  <button onClick={() => openEdit(p)} className="absolute top-2 right-2 w-10 h-10 rounded-full bg-card/95 backdrop-blur flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow touch-manipulation" aria-label={`${p.name} mahsulotini tahrirlash`}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
-              <div className="p-3">
-                <div className="text-sm font-semibold truncate">{p.name}</div>
-                <div className="text-xs text-muted-foreground">{p.category_name || 'Kategoriyasiz'}</div>
-                <div className="text-[15px] font-bold text-brand-ink mt-1">{formatUZS(p.price)}</div>
+              <div className="p-3.5">
+                <div className="text-sm font-semibold leading-snug whitespace-normal break-words min-h-10">{p.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{localizedCategoryName(p.category_name)}</div>
+                <div className={`text-sm font-semibold mt-2 ${Number(p.price) === 0 ? 'text-muted-foreground' : 'text-brand-ink'}`}>
+                  {Number(p.price) === 0 ? '0 so‘m' : formatUZS(p.price)}
+                </div>
                 {(role === 'production' || canManageCatalog) && (
-                  <Button variant="outline" size="sm" className="w-full mt-2 min-h-11 h-auto rounded-xl px-2 py-2 text-xs leading-tight text-center whitespace-normal touch-manipulation" onClick={() => setAvailability(p)}>
-                    {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan vaqtincha olish'}
+                  <Button variant="outline" size="sm" className="w-full mt-3 h-9 rounded-lg px-2 text-[11px] font-semibold whitespace-nowrap touch-manipulation" onClick={() => setAvailability(p)}>
+                    {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
                   </Button>
                 )}
               </div>
