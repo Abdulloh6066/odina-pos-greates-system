@@ -245,7 +245,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
         <div className="space-y-4">
           <div className="flex gap-4">
             <div className="w-28 h-28 rounded-2xl bg-secondary overflow-hidden border border-border shrink-0">
-              {imageUrl ? <img src={imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40"><Cake className="w-8 h-8" /></div>}
+              {imageUrl ? <img src={imageUrl} alt={name ? `${name} rasmi` : 'Mahsulot rasmi'} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40"><Cake className="w-8 h-8" /></div>}
             </div>
             <div className="flex-1 space-y-2">
               <Label className="text-xs">Mahsulot rasmi</Label>
