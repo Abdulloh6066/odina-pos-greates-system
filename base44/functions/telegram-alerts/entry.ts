@@ -350,6 +350,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "run" && control.enabled !== true) return Response.json({ paused: true });
+    if (action === "run") {
+      const webhookToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
+      if (webhookToken) await ensureTelegramWebhook(webhookToken).catch(() => {});
+    }
     const started = Date.now();
     if (action === "run") {
       lease = crypto.randomUUID();
