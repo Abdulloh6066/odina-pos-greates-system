@@ -81,6 +81,7 @@ function App() {
         <OdinaDialogProvider>
         <Router>
           <ScrollToTop />
+          <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-secondary border-t-primary rounded-full animate-spin" /></div>}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -114,6 +115,7 @@ function App() {
             </Route>
             <Route path="*" element={<PageNotFound />} />
           </Routes>
+          </Suspense>
         </Router>
         <Toaster />
         </OdinaDialogProvider>
