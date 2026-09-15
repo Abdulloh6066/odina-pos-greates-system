@@ -101,13 +101,13 @@ export default function Products() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
           {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-52 rounded-2xl bg-secondary animate-pulse" />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20"><div className="text-5xl mb-3">🍰</div><p className="text-sm text-muted-foreground">Mahsulot topilmadi.</p></div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
           {filtered.map((p) => (
             <div key={p.id} className={`odina-panel group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg ${p.active === false ? 'opacity-90' : ''}`}>
               <div className="relative aspect-square bg-secondary/70 overflow-hidden">
