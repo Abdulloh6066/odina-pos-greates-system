@@ -116,7 +116,7 @@ export default function Products() {
                 <div className="text-xs text-muted-foreground">{p.category_name || 'Kategoriyasiz'}</div>
                 <div className="text-[15px] font-bold text-brand-ink mt-1">{formatUZS(p.price)}</div>
                 {(role === 'production' || canManageCatalog) && (
-                  <Button variant="outline" size="sm" className="w-full mt-2 min-h-10 rounded-xl text-xs touch-manipulation" onClick={() => setAvailability(p)}>
+                  <Button variant="outline" size="sm" className="w-full mt-2 min-h-11 h-auto rounded-xl px-2 py-2 text-xs leading-tight text-center whitespace-normal touch-manipulation" onClick={() => setAvailability(p)}>
                     {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan vaqtincha olish'}
                   </Button>
                 )}
