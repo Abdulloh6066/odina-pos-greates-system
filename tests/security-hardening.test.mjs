@@ -52,24 +52,31 @@ test('staff access changes use an active stored admin backend and no direct brow
   assert.equal(inviteConfig.is_public, false);
 });
 
-test('email/password login and registration fail closed and allow exact invited or active staff email only', () => {
+test('staff allowlist check is private, self-only, and enforced after authentication', () => {
   const login = read('src/pages/Login.jsx');
   const register = read('src/pages/Register.jsx');
   const check = read('base44/functions/staff-email-check/entry.ts');
+  const config = JSON.parse(read('base44/functions/staff-email-check/function.jsonc'));
   const auth = read('src/lib/AuthContext.jsx');
 
+  // Login/register must not expose an anonymous email-membership oracle.
   for (const page of [login, register]) {
-    assert.match(page, /functions\.invoke\(["']staff-email-check["']/);
-    assert.match(page, /Xavfsizlik uchun/);
-    assert.match(page, /if \(!data\?\.allowed\)/);
+    assert.doesNotMatch(page, /functions\.invoke\(["']staff-email-check["']/);
   }
+  assert.equal(config.is_public, false);
+
+  // Backend only verifies the authenticated caller's own account/email.
+  assert.match(check, /base44\.auth\.me\(\)/);
+  assert.match(check, /service\.entities\.User\.get\(currentUser\.id\)/);
+  assert.match(check, /normalizeEmail\(currentUser\.email\)/);
   assert.match(check, /\{ email, status: ["']pending["'] \}/);
-  assert.match(check, /normalizeEmail\(user\.email\) === email/);
-  assert.match(check, /user\.active !== false/);
-  assert.match(check, /STAFF_ROLES\.includes/);
-  assert.match(check, /MAX_CHECKS_PER_WINDOW = 10/);
-  assert.match(check, /catch \{[\s\S]*allowed: false/);
-  assert.doesNotMatch(check, /reason:/);
+  assert.match(check, /STAFF_ROLES\.has\(role\)/);
+  assert.doesNotMatch(check, /req\.json\(/);
+  assert.doesNotMatch(check, /x-forwarded-for|cf-connecting-ip|ipHits|MAX_CHECKS_PER_WINDOW/);
+
+  // The private self-check is performed only after auth and still fails closed.
+  assert.match(auth, /functions\.invoke\(['"]staff-email-check['"], \{\}\)/);
+  assert.match(auth, /if \(!access\?\.allowed\)/);
   assert.match(auth, /if \(!APP_ROLES\.has\(hydrated\?\.role\)\)/);
   assert.match(auth, /hydrated\?\.active === false/);
 });
