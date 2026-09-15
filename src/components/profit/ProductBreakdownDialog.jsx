@@ -12,7 +12,7 @@ export default function ProductBreakdownDialog({ open, onClose, loading, data })
           <DialogTitle className="flex items-center gap-2">
             {data?.image_url && (
               <span className="w-8 h-8 rounded-lg overflow-hidden bg-secondary shrink-0">
-                <Image src={data.image_url} fittingType="fill" className="w-full h-full" />
+                <Image src={data.image_url} alt={data.product_name || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" />
               </span>
             )}
             <span>{data?.product_name || 'Mahsulot tannarxi'}</span>
