@@ -23,7 +23,7 @@ function formatTashkentDateTime(value: unknown): string {
   }).format(date);
 }
 
-function buildShiftTelegramText(shift: any, opts: {
+export function buildShiftTelegramText(shift: any, opts: {
   userName: string;
   actualCash: number;
   budgetCashSubmitted: number;
@@ -57,7 +57,7 @@ function buildShiftTelegramText(shift: any, opts: {
   return lines.join("\n");
 }
 
-async function sendShiftTelegram(shift: any, opts: {
+export async function sendShiftTelegram(shift: any, opts: {
   userName: string;
   actualCash: number;
   budgetCashSubmitted: number;
