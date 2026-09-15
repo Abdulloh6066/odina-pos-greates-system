@@ -3,17 +3,19 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, X, Check } from 'lucide-react';
+import { Plus, X, Check, CreditCard, Smartphone, Landmark, Banknote } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
 export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
+  const [showMethodPicker, setShowMethodPicker] = useState(false);
 
   useEffect(() => {
     if (open) {
       setPayments(total > 0 ? [{ method: 'cash', amount: total }] : []);
       setError('');
+      setShowMethodPicker(false);
     }
   }, [open, total]);
 
@@ -25,11 +27,26 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: field === 'method' ? value : (value === '' ? '' : Number(value)) } : p));
   };
 
-  const addRow = () => {
-    if (payments.length >= PAYMENT_METHODS.length) return;
-    const used = payments.map((p) => p.method);
-    const next = PAYMENT_METHODS.find((m) => !used.includes(m.id));
-    setPayments([...payments, { method: next?.id || 'cash', amount: remaining }]);
+  const addPaymentMethod = (methodId) => {
+    if (!methodId || payments.some((p) => p.method === methodId)) return;
+    setPayments((prev) => [
+      ...prev,
+      { method: methodId, amount: remaining > 0 ? remaining : '' },
+    ]);
+    setShowMethodPicker(false);
+    setError('');
+  };
+
+  const availableMethods = PAYMENT_METHODS.filter(
+    (method) => !payments.some((payment) => payment.method === method.id),
+  );
+
+  const methodIcon = (method) => {
+    if (method.id === 'cash') return Banknote;
+    if (method.group === 'card') return CreditCard;
+    if (method.group === 'online') return Smartphone;
+    if (method.group === 'bank') return Landmark;
+    return CreditCard;
   };
 
   const removeRow = (idx) => setPayments((prev) => prev.filter((_, i) => i !== idx));
