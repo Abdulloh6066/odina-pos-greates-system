@@ -432,7 +432,7 @@ function ProductionScreenInner() {
           </DialogHeader>
           {preview ? (
             <div className="rounded-xl overflow-hidden bg-secondary">
-              <Image src={preview} fittingType="fit" className="w-full max-h-[70vh] object-contain" />
+              <Image src={preview} alt="Buyurtma namuna rasmi" fittingType="fit" className="w-full max-h-[70vh] object-contain" />
             </div>
           ) : null}
         </DialogContent>
@@ -493,7 +493,7 @@ function ProductionPlanSummary({ orders, itemsByOrder }) {
         {groups.map((g) => (
           <div key={g.name} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
-              {g.image ? <Image src={g.image} fittingType="fill" className="w-full h-full" /> : <span className="text-sm font-medium text-muted-foreground">{g.name[0]}</span>}
+              {g.image ? <Image src={g.image} alt={g.name || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" /> : <span className="text-sm font-medium text-muted-foreground">{g.name[0]}</span>}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium truncate">{g.name}</div>
@@ -609,6 +609,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
             >
               <Image
                 src={order.reference_image}
+                alt={`${order.order_number || 'Buyurtma'} namuna rasmi`}
                 fittingType="fit"
                 className="w-full h-full object-contain"
               />
@@ -630,7 +631,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
                   <li key={it.id} className="flex items-start gap-2.5">
                     <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
                       {it.product_image_snapshot ? (
-                        <Image src={it.product_image_snapshot} fittingType="fill" className="w-full h-full" />
+                        <Image src={it.product_image_snapshot} alt={it.product_name_snapshot || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" />
                       ) : (
                         <span className="text-sm font-medium text-muted-foreground">{(it.product_name_snapshot || '?')[0]}</span>
                       )}
