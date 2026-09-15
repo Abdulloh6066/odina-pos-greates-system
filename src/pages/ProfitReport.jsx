@@ -99,7 +99,7 @@ export default function ProfitReport() {
   const productsRows = report?.products || [];
 
   return (
-    <div className="p-4 lg:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
           <TrendingUp className="w-6 h-6 text-brand-olive" /> Tannarx va foyda
