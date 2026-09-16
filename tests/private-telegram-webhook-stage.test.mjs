@@ -77,9 +77,13 @@ test('no sender from forwarded/group messages may leak data and staged code has 
   assert.equal((await f.run(forged)).kind,'ignore');assert.equal(f.reads.length,0);
   assert.doesNotMatch(stageSource,/\b(?:fetch|Deno\.serve|setWebhook|sendMessage)\s*\(/);
   const webhook=readFileSync('base44/functions/telegram-webhook/entry.ts','utf8');
-  assert.doesNotMatch(webhook,/private-telegram-webhook-stage|preparePrivateTelegramReply/);
+  assert.match(webhook,/preparePrivateTelegramReply/);
+  assert.match(webhook,/if \(privateChat\)/);
+  assert.match(webhook,/String\(cb\.message\?\.chat\?\.id \|\| ""\) !== String\(TELEGRAM_GROUP_ID\)/);
   const setup=readFileSync('base44/functions/telegram-setup/entry.ts','utf8');
-  assert.match(setup,/allowed_updates: \["callback_query"\]/);
+  assert.match(setup,/allowed_updates: \["callback_query", "message"\]/);
+  const alerts=readFileSync('base44/functions/telegram-alerts/entry.ts','utf8');
+  assert.match(alerts,/allowed_updates: \["callback_query", "message"\]/);
 });
 test('/id reveals only the requester own numeric ID in a private chat, never authorizes reports',async()=>{
   const f=fixture();
