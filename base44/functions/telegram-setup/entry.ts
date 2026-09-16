@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     phase = "so‘rovni o‘qish";
     const body = await req.json().catch(() => ({}));
     const action = body.action || "inspect";
-    if (!["inspect", "test", "setWebhook"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
+    if (!["inspect", "test", "setWebhook", "webhookStatus"].includes(action)) return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) return Response.json({ error: "Base44 Secrets ichida TELEGRAM_BOT_TOKEN topilmadi." }, { status: 400 });
     const call = async (method: string, body = {}) => {
@@ -59,6 +59,21 @@ Deno.serve(async (req) => {
     const group = await call("getChat", { chat_id: GROUP_ID });
     if (String(group.id) !== GROUP_ID || !["group", "supergroup"].includes(group.type)) {
       return Response.json({ error: "Tasdiqlangan Telegram guruhi mos kelmadi." }, { status: 409 });
+    }
+    if (action === "webhookStatus") {
+      // Read-only, admin-authenticated diagnostics. Never expose the token, provider
+      // errors or a potentially sensitive third-party webhook URL to the browser.
+      const info = await call("getWebhookInfo");
+      const updates = Array.isArray(info.allowed_updates) ? info.allowed_updates : [];
+      return Response.json({
+        webhook_ok: String(info.url || "") === WEBHOOK_URL,
+        message_enabled: updates.includes("message"),
+        callbacks_enabled: updates.includes("callback_query"),
+        pending_update_count: Number(info.pending_update_count || 0),
+        last_error_date: Number(info.last_error_date || 0) || null,
+        // Do not return last_error_message: it can contain infrastructure details.
+        delivery_error: Boolean(info.last_error_date),
+      });
     }
     let messageId = null;
     if (action === "test") {
