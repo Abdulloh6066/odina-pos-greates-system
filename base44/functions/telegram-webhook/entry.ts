@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { TELEGRAM_GROUP_ID } from "../../shared/telegram-alert-logic.ts";
-import { preparePrivateTelegramReply } from "../../shared/private-telegram-webhook-stage.ts";
+import { preparePrivateIdentityReply, preparePrivateTelegramReply } from "../../shared/private-telegram-webhook-stage.ts";
 
 // Receives Telegram callback_query updates fired when a staff member taps an inline
 // button under the birthday reminder. callback_data format: "bd:<followup_id>:no|ok".
@@ -39,7 +39,19 @@ Deno.serve(async (req) => {
   // Missing/invalid owner ID fails closed for reports; /id only reveals the sender's own ID.
   if (privateChat) {
     try {
+      // /id must work on the public Telegram webhook even without a Base44 user
+      // session. Do not construct the SDK client or read any business data for /id.
+      const identityReply = preparePrivateIdentityReply(update);
+      if (identityReply.kind === "message") {
+        await telegramPost(token, "sendMessage", { chat_id: identityReply.chatId, text: identityReply.text });
+        return ok();
+      }
       const ownerId = Deno.env.get("TELEGRAM_OWNER_USER_ID") || "";
+      // Fail closed before constructing an authenticated service client or reading DB.
+      const sender = cb ? cb.from : update?.message?.from;
+      const chat = cb ? cb.message?.chat : update?.message?.chat;
+      if (!/^[1-9][0-9]{0,19}$/.test(ownerId) || String(sender?.id || "") !== ownerId
+          || String(chat?.id || "") !== ownerId || sender?.is_bot === true) return ok();
       const client = createClientFromRequest(req);
       const reply = await preparePrivateTelegramReply(update, {
         ownerId,
@@ -56,7 +68,8 @@ Deno.serve(async (req) => {
         await answerCallbackQuery(token, cb.id, "Ruxsat yo‘q yoki tugma eskirgan.").catch(() => {});
       }
     } catch {
-      // No financial details, token, provider error or exception is sent to Telegram.
+      // Keep provider errors, bot token, user IDs and financial data out of logs.
+      console.error("ODINA_TELEGRAM_PRIVATE_HANDLER_FAILED");
       if (cb?.id) await answerCallbackQuery(token, cb.id, "Hisobotni hozir yuklab bo‘lmadi.").catch(() => {});
     }
     return ok();
