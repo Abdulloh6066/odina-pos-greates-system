@@ -36,7 +36,18 @@ function fixture({owner='',staffIds='',sdkThrows=false,sendFails=false,secretHea
     },
   };
   load('base44/functions/telegram-webhook/entry.ts',{
-    'npm:@base44/sdk':{createClientFromRequest:()=>{sdkCalls++;if(sdkThrows) throw Error('No Base44 session');return {asServiceRole:{entities:{Shop:{filter:async()=>[]},BirthdayFollowup:{get:async()=>({id:'followup-1',customer_name_snapshot:'Customer',contact_status:'hali_aloqa_qilinmadi'}),update:async(id,data)=>{updates.push({id,data});return {id,...data};}},ActionHistory:{create:async(data)=>{updates.push({audit:data});}}}}}};}}, 
+    'npm:@base44/sdk': { createClientFromRequest: () => {
+      sdkCalls++;
+      if (sdkThrows) throw Error('No Base44 session');
+      return { asServiceRole: { entities: {
+        Shop: { filter: async () => [] },
+        BirthdayFollowup: {
+          get: async () => ({ id:'followup-1', customer_name_snapshot:'Customer', contact_status:'hali_aloqa_qilinmadi' }),
+          update: async (id,data) => { updates.push({id,data}); return {id,...data}; },
+        },
+        ActionHistory: { create: async (data) => { updates.push({audit:data}); } },
+      } } };
+    } },
     '../../shared/telegram-alert-logic.ts':telegramLogic,
     '../../shared/private-telegram-webhook-stage.ts':stage,
   },globals);
