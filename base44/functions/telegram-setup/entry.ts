@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       // secret_token is derived from the bot token so the webhook can verify callers.
       phase = "webhookni ulash";
       const secret = (await sha256Hex(token)).slice(0, 32);
-      await call("setWebhook", { url: WEBHOOK_URL, secret_token: secret, allowed_updates: ["callback_query"] });
+      await call("setWebhook", { url: WEBHOOK_URL, secret_token: secret, allowed_updates: ["callback_query", "message"] });
       const info = await call("getWebhookInfo");
       return Response.json({
         webhook_url: info.url,
