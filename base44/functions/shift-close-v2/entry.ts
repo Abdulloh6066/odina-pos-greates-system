@@ -31,28 +31,14 @@ function buildShiftTelegramText(shift: any, opts: {
   testMode: boolean;
 }): string {
   const title = opts.testMode ? "🧪 TEST · Smena yopildi" : "✅ Smena yopildi";
-  const expectedCash = money(shift.expected_cash);
-  const difference = opts.actualCash - expectedCash;
+  // The group receives an operational notification only. Financial figures stay
+  // in the access-controlled POS and the owner's private Telegram report.
   const lines = [
     title,
     `🏪 ${String(shift.shop_name || "Do‘kon")}`,
     `👤 ${String(shift.user_name || opts.userName || "Xodim")}`,
     `🕐 ${formatTashkentDateTime(shift.opened_at)} → ${formatTashkentDateTime(shift.closed_at)}`,
-    "",
-    `🛒 Savdolar: ${Number(shift.order_count || 0)} ta · ${formatUzs(shift.total_sales)}`,
-    `💵 Naqd: ${formatUzs(shift.cash_sales)}`,
-    `💳 Uzcard: ${formatUzs(shift.uzcard_sales)}`,
-    `💳 Humo: ${formatUzs(shift.humo_sales)}`,
-    `📱 Online: ${formatUzs(shift.online_sales)}`,
-    `🏦 Bank: ${formatUzs(shift.bank_transfer_sales)}`,
-    `↩️ Qaytarish: ${formatUzs(shift.refunds_total)}`,
-    `📤 Kassadan chiqim: ${formatUzs(shift.cash_removed)}`,
-    "",
-    `🧮 Kutilgan naqd: ${formatUzs(expectedCash)}`,
-    `✅ Sanalgan naqd: ${formatUzs(opts.actualCash)}`,
-    `➗ Farq: ${formatUzs(difference)}`,
-    `🏦 Budgetga topshirildi: ${formatUzs(opts.budgetCashSubmitted)}`,
-    `💼 Keyingi smenaga qoldi: ${formatUzs(opts.cashLeftForNextShift)}`,
+    "📊 Batafsil moliyaviy hisobot: faqat Odina POS yoki egasining shaxsiy Telegram botida.",
   ];
   return lines.join("\n");
 }
