@@ -40,9 +40,24 @@ async function readAll(entity: any, query: any = {}): Promise<any[]> {
   throw Error("Report data limit reached");
 }
 
+// /id only returns the requester's own Telegram numeric ID to their own private chat.
+// It NEVER binds/authorizes the requester or reads business records. The POS admin
+// must independently approve/configure that ID before reports can be accessed.
+export function preparePrivateIdentityReply(update: any): Reply {
+  const message = update?.message;
+  const id = approvedOwnerId(message?.from?.id);
+  if (!id || message?.chat?.type !== "private" || String(message?.chat?.id ?? "") !== id
+      || message?.from?.is_bot === true || !/^\/id(?:@[A-Za-z0-9_]{5,32})?\s*$/i.test(String(message?.text || ""))) {
+    return { kind: "ignore" };
+  }
+  return { kind: "message", chatId: id, text: `Sizning Telegram User ID: ${id}\nBu raqam sizga hisobot ruxsatini avtomatik bermaydi. Uni faqat Odina POS admin sozlamasida tasdiqlang.` };
+}
+
 // Produces a reply, never performs Telegram network calls, changes settings, or
 // writes business records. A separately approved integration can deliver replies.
 export async function preparePrivateTelegramReply(update: any, deps: Dependencies): Promise<Reply> {
+  const identityReply = preparePrivateIdentityReply(update);
+  if (identityReply.kind !== "ignore") return identityReply;
   if (!isOwnerPrivate(update, deps.ownerId)) return { kind: "ignore" };
   const cb = update?.callback_query;
   const command = cb ? String(cb.data || "") : String(update?.message?.text || "");
