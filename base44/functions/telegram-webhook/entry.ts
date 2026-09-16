@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { TELEGRAM_GROUP_ID } from "../../shared/telegram-alert-logic.ts";
+import { preparePrivateTelegramReply } from "../../shared/private-telegram-webhook-stage.ts";
 
 // Receives Telegram callback_query updates fired when a staff member taps an inline
 // button under the birthday reminder. callback_data format: "bd:<followup_id>:no|ok".
@@ -33,6 +34,33 @@ Deno.serve(async (req) => {
 
   const update = await req.json().catch(() => ({}));
   const cb = update?.callback_query;
+  const privateChat = (cb ? cb.message?.chat : update?.message?.chat)?.type === "private";
+  // Keep private reports and ID discovery entirely separate from group birthday actions.
+  // Missing/invalid owner ID fails closed for reports; /id only reveals the sender's own ID.
+  if (privateChat) {
+    try {
+      const ownerId = Deno.env.get("TELEGRAM_OWNER_USER_ID") || "";
+      const client = createClientFromRequest(req);
+      const reply = await preparePrivateTelegramReply(update, {
+        ownerId,
+        service: client.asServiceRole,
+        now: Date.now(),
+      });
+      if (reply.kind === "message") {
+        // Only the validated private chat returned by the router may receive a response.
+        const body: Record<string, unknown> = { chat_id: reply.chatId, text: reply.text };
+        if (reply.replyMarkup) body.reply_markup = reply.replyMarkup;
+        await telegramPost(token, "sendMessage", body);
+        if (reply.callbackId) await answerCallbackQuery(token, reply.callbackId, "Tayyor").catch(() => {});
+      } else if (cb?.id) {
+        await answerCallbackQuery(token, cb.id, "Ruxsat yo‘q yoki tugma eskirgan.").catch(() => {});
+      }
+    } catch {
+      // No financial details, token, provider error or exception is sent to Telegram.
+      if (cb?.id) await answerCallbackQuery(token, cb.id, "Hisobotni hozir yuklab bo‘lmadi.").catch(() => {});
+    }
+    return ok();
+  }
   if (!cb?.id || !cb?.data) return ok();
 
   if (String(cb.message?.chat?.id || "") !== String(TELEGRAM_GROUP_ID)) {
@@ -105,6 +133,16 @@ Deno.serve(async (req) => {
   }
   return ok();
 });
+
+async function telegramPost(token: string, method: string, body: Record<string, unknown>): Promise<void> {
+  const response = await fetch("https://api.telegram.org/bot" + token + "/" + method, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!response.ok) throw new Error("Telegram delivery failed");
+}
 
 async function answerCallbackQuery(token: string, id: string, text: string): Promise<void> {
   await fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery", {
