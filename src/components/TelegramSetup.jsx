@@ -53,7 +53,19 @@ export default function TelegramSetup({ user }) {
         <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => inspect('setWebhook')}>
           {busy ? 'Ulanmoqda…' : 'Webhookni ulash (shaxsiy buyruqlar)'}
         </Button>
-        {result && typeof result.webhook_ok === 'boolean' && (
+        <Button variant="outline" className="min-h-11 rounded-xl ml-0 sm:ml-2" disabled={busy} onClick={() => inspect('webhookStatus')}>
+          {busy ? 'Tekshirilmoqda…' : 'Webhook diagnostikasi (faqat o‘qish)'}
+        </Button>
+        {result && typeof result.message_enabled === 'boolean' && (
+          <div role="status" className="text-sm rounded-lg border border-border p-3 space-y-1">
+            <p>Webhook manzili: {result.webhook_ok ? 'To‘g‘ri' : 'Noto‘g‘ri'}</p>
+            <p>Shaxsiy xabarlar: {result.message_enabled ? 'Yoqilgan' : 'O‘chiq'}</p>
+            <p>Tugmalar: {result.callbacks_enabled ? 'Yoqilgan' : 'O‘chiq'}</p>
+            <p>Navbatdagi xabarlar: {result.pending_update_count}</p>
+            <p>Oxirgi yetkazish xatosi: {result.last_error_date ? new Date(result.last_error_date * 1000).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' }) : 'Aniqlanmadi'}</p>
+          </div>
+        )}
+        {result && typeof result.webhook_ok === 'boolean' && typeof result.message_enabled !== 'boolean' && (
           <p role="status" className={`text-sm ${result.webhook_ok ? 'text-emerald-700' : 'text-destructive'}`}>
             {result.webhook_ok ? 'Webhook ulandi: xabarlar va tugmalar yoqilgan.' : 'Webhook hali tasdiqlanmadi. Sozlamani tekshiring.'}
           </p>
