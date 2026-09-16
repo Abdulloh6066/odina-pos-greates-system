@@ -39,7 +39,7 @@ async function ensureTelegramWebhook(token: string): Promise<void> {
   await telegramApi(token, "setWebhook", {
     url: TELEGRAM_WEBHOOK_URL,
     secret_token: secret,
-    allowed_updates: ["callback_query"],
+    allowed_updates: ["callback_query", "message"],
   });
   const verified = await telegramApi(token, "getWebhookInfo");
   if (String(verified?.url || "") !== TELEGRAM_WEBHOOK_URL) throw new Error("TELEGRAM_WEBHOOK_NOT_VERIFIED");
