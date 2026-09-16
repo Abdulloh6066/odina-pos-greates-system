@@ -7,8 +7,6 @@ import {
 const SHIFT_CLOSE_V2_RUNTIME_VERSION = "shift-close-v2-2026-09-15-telegram";
 const SHIFT_TELEGRAM_GROUP_ID = "-5570444945";
 
-const formatUzs = (value: unknown) => `${money(value).toLocaleString("en-US")} UZS`;
-
 function formatTashkentDateTime(value: unknown): string {
   const date = new Date(String(value || ""));
   if (!Number.isFinite(date.getTime())) return "-";
@@ -25,9 +23,6 @@ function formatTashkentDateTime(value: unknown): string {
 
 function buildShiftTelegramText(shift: any, opts: {
   userName: string;
-  actualCash: number;
-  budgetCashSubmitted: number;
-  cashLeftForNextShift: number;
   testMode: boolean;
 }): string {
   const title = opts.testMode ? "🧪 TEST · Smena yopildi" : "✅ Smena yopildi";
@@ -45,9 +40,6 @@ function buildShiftTelegramText(shift: any, opts: {
 
 async function sendShiftTelegram(shift: any, opts: {
   userName: string;
-  actualCash: number;
-  budgetCashSubmitted: number;
-  cashLeftForNextShift: number;
   testMode: boolean;
 }): Promise<{ sent: boolean; message_id?: number; reason?: string }> {
   const token = (globalThis as any)?.Deno?.env?.get?.("TELEGRAM_BOT_TOKEN") || "";
@@ -290,9 +282,6 @@ export default async function(req) {
 
       const telegramNotification = await sendShiftTelegram(updated, {
         userName,
-        actualCash,
-        budgetCashSubmitted,
-        cashLeftForNextShift,
         testMode: body?.test_mode === true,
       });
       await service.entities.ActionHistory.create({
