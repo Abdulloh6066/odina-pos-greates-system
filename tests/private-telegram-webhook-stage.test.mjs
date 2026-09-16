@@ -42,7 +42,7 @@ function fixture() {
 const message=(id=owner,chat=id,type='private',text='/hisobot')=>({message:{from:{id},chat:{id:chat,type},text}});
 const callback=(data,id=owner,chat=id,type='private')=>({callback_query:{id:'callback-1',data,from:{id},message:{chat:{id:chat,type}}}});
 test('missing owner binding, group and foreign user do not even read shops',async()=>{
-  for(const [update,id] of [[message(),undefined],[message(owner,'-5','supergroup'),owner],[message('888'),owner],[callback('pr:p:central:today',owner,'-5','group'),owner],[message(owner,'111'),owner]]) {
+  for(const [update,id] of [[message(),null],[message(owner,'-5','supergroup'),owner],[message('888'),owner],[callback('pr:p:central:today',owner,'-5','group'),owner],[message(owner,'111'),owner]]) {
     const f=fixture(); assert.equal((await f.run(update,id)).kind,'ignore'); assert.equal(f.reads.length,0); assert.equal(f.writes.length,0);
   }
 });
