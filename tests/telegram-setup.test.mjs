@@ -29,6 +29,11 @@ async function run(opts = {}) {
       if (opts.fail) throw new Error(url);
       const result = method === 'getMe' ? { username: opts.bot || 'Odina_nazorat_bot' }
         : method === 'getChat' ? { id: opts.groupId || -5570444945, type: opts.groupType || 'group', title: 'Odina-Ish Jarayoni' }
+        : method === 'getWebhookInfo' ? {
+          url: 'https://odina-pos-suite.base44.app/api/functions/telegram-webhook',
+          allowed_updates: ['callback_query', 'message'], pending_update_count: 3,
+          last_error_date: 1789560000, last_error_message: 'PRIVATE_INFRASTRUCTURE_ERROR',
+        }
         : { message_id: 123 };
       return { ok: true, json: async () => ({ ok: true, result }) };
     },
@@ -71,6 +76,20 @@ test('inspection checks the fixed group without sending or consuming updates', a
   assert.equal(r.data.test_sent, false);
   assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat']);
 });
+test('admin read-only webhook diagnostics exposes only safe delivery status', async () => {
+  const r = await run({ body: { action: 'webhookStatus' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.calls.map(c => c.method), ['getMe', 'getChat', 'getWebhookInfo']);
+  assert.equal(r.calls.some(c => c.method === 'sendMessage' || c.method === 'setWebhook'), false);
+  assert.equal(r.data.webhook_ok, true);
+  assert.equal(r.data.message_enabled, true);
+  assert.equal(r.data.callbacks_enabled, true);
+  assert.equal(r.data.pending_update_count, 3);
+  assert.equal(r.data.delivery_error, true);
+  assert.equal(JSON.stringify(r.data).includes('PRIVATE_INFRASTRUCTURE_ERROR'), false);
+  assert.equal(JSON.stringify(r.data).includes('OFFLINE_SECRET_TOKEN_NOT_TO_EXPOSE'), false);
+});
+
 test('test sends only fixed text to the owner-specified group', async () => {
   const r = await run({ body: { action: 'test', chat_id: '-999', text: 'INJECTED FINANCIAL DATA' } });
   assert.equal(r.status, 200);
