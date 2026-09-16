@@ -215,8 +215,13 @@ test('shift_closed ActionHistory records the new backend marker', async () => {
   assert.ok(closed.details.includes('backend shift-close-v2-2026-09-15-telegram'), closed.details);
 });
 
-test('successful shift close sends a TEST-labelled Telegram summary', async () => {
+test('successful shift close sends only a TEST-labelled nonfinancial group notice', async () => {
   const f = zeroSaleFixture();
+  // Deliberately distinctive values ensure no financial number leaks into the group.
+  Object.assign(f.db.Shift[0], { total_sales: 987654321, cash_sales: 12345678,
+    uzcard_sales: 23456789, humo_sales: 34567890, online_sales: 45678901,
+    bank_transfer_sales: 56789012, refunds_total: 67890123, cash_removed: 78901234,
+    expected_cash: 89012345 });
   const client = sharedDbHarness(f.db);
   const sent = [];
   const call = loadHandler(client, {
@@ -239,6 +244,12 @@ test('successful shift close sends a TEST-labelled Telegram summary', async () =
   assert.match(sent[0].body.text, /🧪 TEST · Smena yopildi/);
   assert.match(sent[0].body.text, /Odina Branch/);
   assert.match(sent[0].body.text, /Test cashier/);
+  assert.match(sent[0].body.text, /Batafsil moliyaviy hisobot/);
+  for (const forbidden of ['987,654,321','12,345,678','23,456,789','34,567,890',
+    '45,678,901','56,789,012','67,890,123','78,901,234','89,012,345',
+    'Naqd:', 'Uzcard:', 'Humo:', 'Budgetga topshirildi:', 'Kutilgan naqd:', 'JAMI:']) {
+    assert.equal(sent[0].body.text.includes(forbidden), false, 'Group message leaked: '+forbidden);
+  }
   assert.ok(f.db.ActionHistory.some((row) => row.action === 'shift_telegram_sent'));
 });
 
