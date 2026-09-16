@@ -47,6 +47,18 @@ export default function TelegramSetup({ user }) {
           <p className="text-xs text-muted-foreground">Sinov xabari faqat ulanishni tekshiradi. Avtomatik ogohlantirishlar holati quyidagi bo‘limda.</p>
         </>}
       </div>
+      <div className="rounded-xl border border-border p-3 space-y-2">
+        <p className="text-sm font-semibold">Shaxsiy hisobotlar uchun webhook</p>
+        <p className="text-xs text-muted-foreground">Faqat admin: bu amal botning mavjud webhook manzilini saqlagan holda xabar (/id, /hisobot) va tugma hodisalarini birgalikda yoqadi. Guruh bildirishnomalari saqlanadi. Hisobotlar faqat tasdiqlangan Telegram User ID ga ochiladi.</p>
+        <Button variant="outline" className="min-h-11 rounded-xl" disabled={busy} onClick={() => inspect('setWebhook')}>
+          {busy ? 'Ulanmoqda…' : 'Webhookni ulash (shaxsiy buyruqlar)'}
+        </Button>
+        {result && typeof result.webhook_ok === 'boolean' && (
+          <p role="status" className={`text-sm ${result.webhook_ok ? 'text-emerald-700' : 'text-destructive'}`}>
+            {result.webhook_ok ? 'Webhook ulandi: xabarlar va tugmalar yoqilgan.' : 'Webhook hali tasdiqlanmadi. Sozlamani tekshiring.'}
+          </p>
+        )}
+      </div>
       <TelegramAlerts />
     </section>
   );
