@@ -1,0 +1,50 @@
+{
+  "name": "TelegramReportAccess",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    },
+    "owner_telegram_id": {
+      "type": "string",
+      "default": ""
+    },
+    "pending_code_hash": {
+      "type": "string",
+      "default": ""
+    },
+    "pending_expires_at": {
+      "type": "string",
+      "default": ""
+    },
+    "linked_at": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "required": [
+    "key"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
