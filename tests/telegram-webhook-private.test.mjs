@@ -23,11 +23,11 @@ const token='OFFLINE_SECRET_TOKEN_NOT_TO_EXPOSE';
 const secret=Array.from(new Uint8Array(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,32);
 const id='123456789';
 const incoming=(text='/id',sender=id,chat=sender,type='private')=>({message:{text,from:{id:sender},chat:{id:chat,type}}});
-function fixture({owner='',sdkThrows=false,sendFails=false,secretHeader=secret}={}) {
+function fixture({owner='',staffIds='',sdkThrows=false,sendFails=false,secretHeader=secret}={}) {
   let handler;let sdkCalls=0;
-  const calls=[]; const logs=[];
+  const calls=[]; const logs=[]; const updates=[];
   const globals={Response,AbortSignal,Date,TextEncoder,crypto:webcrypto,console:{error:(...args)=>logs.push(args)},
-    Deno:{env:{get:key=>key==='TELEGRAM_BOT_TOKEN'?token:key==='TELEGRAM_OWNER_USER_ID'?owner:undefined},serve:fn=>{handler=fn;}},
+    Deno:{env:{get:key=>key==='TELEGRAM_BOT_TOKEN'?token:key==='TELEGRAM_OWNER_USER_ID'?owner:key==='TELEGRAM_BIRTHDAY_STAFF_IDS'?staffIds:undefined},serve:fn=>{handler=fn;}},
     fetch:async(url,init)=>{
       const method=url.split('/').at(-1);const data=JSON.parse(init.body);
       calls.push({method,data});
@@ -36,11 +36,11 @@ function fixture({owner='',sdkThrows=false,sendFails=false,secretHeader=secret}=
     },
   };
   load('base44/functions/telegram-webhook/entry.ts',{
-    'npm:@base44/sdk':{createClientFromRequest:()=>{sdkCalls++;if(sdkThrows) throw Error('No Base44 session');return {asServiceRole:{entities:{Shop:{filter:async()=>[]}}}};}},
+    'npm:@base44/sdk':{createClientFromRequest:()=>{sdkCalls++;if(sdkThrows) throw Error('No Base44 session');return {asServiceRole:{entities:{Shop:{filter:async()=>[]},BirthdayFollowup:{get:async()=>({id:'followup-1',customer_name_snapshot:'Customer',contact_status:'hali_aloqa_qilinmadi'}),update:async(id,data)=>{updates.push({id,data});return {id,...data};}},ActionHistory:{create:async(data)=>{updates.push({audit:data});}}}}}};}}, 
     '../../shared/telegram-alert-logic.ts':telegramLogic,
     '../../shared/private-telegram-webhook-stage.ts':stage,
   },globals);
-  return {calls,logs,get sdkCalls(){return sdkCalls;},async run(update,header=secretHeader){
+  return {calls,logs,updates,get sdkCalls(){return sdkCalls;},async run(update,header=secretHeader){
     const response=await handler({headers:{get:()=>header},json:async()=>update});
     assert.equal(response.status,200);
     return response;
@@ -67,6 +67,29 @@ test('unbound /hisobot never opens SDK or sends; owner bound can show menu',asyn
   const bound=fixture({owner:id});await bound.run(incoming('/hisobot'));
   assert.equal(bound.sdkCalls,1);assert.equal(bound.calls.length,1);
   assert.match(bound.calls[0].data.text,/do‘konni tanlang/);
+});
+const birthday=(sender,chat=telegramLogic.TELEGRAM_GROUP_ID)=>({callback_query:{id:'callback-1',data:'bd:followup-1:ok',from:{id:sender,first_name:'Staff'},message:{chat:{id:chat,type:'supergroup'},message_id:42,text:'Birthday reminder'}}});
+test('birthday group button refuses unauthorized users before DB read/write',async()=>{
+  const f=fixture({owner:id,staffIds:'555, 666'});
+  await f.run(birthday('999'));
+  assert.equal(f.sdkCalls,0);assert.equal(f.updates.length,0);
+  assert.equal(f.calls[0].method,'answerCallbackQuery');
+  assert.match(f.calls[0].data.text,/ruxsat berilmagan/);
+});
+test('birthday group button allows verified owner and approved staff only',async()=>{
+  for(const sender of [id,'555','666']) {
+    const f=fixture({owner:id,staffIds:'555, 666, bad, 0'});
+    await f.run(birthday(sender));
+    assert.equal(f.sdkCalls,1);
+    assert.equal(f.updates.filter(x=>x.id==='followup-1').length,1);
+    assert.equal(f.updates.find(x=>x.id==='followup-1').data.contacted_by_id,sender);
+  }
+});
+test('birthday button fails closed when no IDs, wrong group or bot sender',async()=>{
+  const f=fixture();await f.run(birthday(id));assert.equal(f.sdkCalls,0);assert.equal(f.updates.length,0);
+  const outside=fixture({owner:id});await outside.run(birthday(id,'-999'));assert.equal(outside.sdkCalls,0);
+  const bot=fixture({owner:id});const update=birthday(id);update.callback_query.from.is_bot=true;
+  await bot.run(update);assert.equal(bot.sdkCalls,0);assert.equal(bot.updates.length,0);
 });
 test('send failure logged as fixed error code only; never exposes bot token',async()=>{
   const f=fixture({sendFails:true,sdkThrows:true});await f.run(incoming());
