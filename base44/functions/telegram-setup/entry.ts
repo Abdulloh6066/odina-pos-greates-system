@@ -77,7 +77,8 @@ Deno.serve(async (req) => {
       const info = await call("getWebhookInfo");
       return Response.json({
         webhook_url: info.url,
-        webhook_ok: String(info.url || "") === WEBHOOK_URL,
+        webhook_ok: String(info.url || "") === WEBHOOK_URL
+          && ["callback_query", "message"].every((kind) => (info.allowed_updates || []).includes(kind)),
         pending_update_count: info.pending_update_count || 0,
         last_error_message: String(info.last_error_message || ""),
       });
