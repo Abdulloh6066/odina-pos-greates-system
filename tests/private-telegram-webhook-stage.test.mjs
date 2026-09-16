@@ -81,3 +81,14 @@ test('no sender from forwarded/group messages may leak data and staged code has 
   const setup=readFileSync('base44/functions/telegram-setup/entry.ts','utf8');
   assert.match(setup,/allowed_updates: \["callback_query"\]/);
 });
+test('/id reveals only the requester own numeric ID in a private chat, never authorizes reports',async()=>{
+  const f=fixture();
+  const r=await f.run(message('888','888','private','/id'),null);
+  assert.equal(r.kind,'message');assert.equal(r.chatId,'888');assert.match(r.text,/User ID: 888/);
+  assert.doesNotMatch(r.text,/Odina Central|Tushum|150,000/);
+  assert.equal(f.reads.length,0);assert.equal(f.writes.length,0);
+  assert.equal((await f.run(message('888','-5','group','/id'),null)).kind,'ignore');
+  assert.equal((await f.run(message('888','999','private','/id'),null)).kind,'ignore');
+  assert.equal((await f.run({message:{chat:{id:'888',type:'private'},text:'/id'}},null)).kind,'ignore');
+  assert.equal((await f.run(message('888','888','private','/hisobot'),null)).kind,'ignore');
+});
