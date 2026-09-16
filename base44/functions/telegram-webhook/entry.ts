@@ -86,6 +86,19 @@ Deno.serve(async (req) => {
     await answerCallbackQuery(token, cb.id, "Noma’lum tugma.").catch(() => {});
     return ok();
   }
+  // Group membership is NOT authorization. Permit the verified owner and only
+  // explicitly approved staff Telegram numeric IDs configured in Base44 Secrets.
+  // Never authorize usernames, forwarded messages, or the entire group implicitly.
+  const senderId = String(cb.from?.id ?? "");
+  const ownerId = String(Deno.env.get("TELEGRAM_OWNER_USER_ID") || "").trim();
+  const staffIds = String(Deno.env.get("TELEGRAM_BIRTHDAY_STAFF_IDS") || "")
+    .split(",").map((id) => id.trim()).filter((id) => /^[1-9][0-9]{0,19}$/.test(id));
+  const authorizedIds = new Set([ownerId, ...staffIds].filter((id) => /^[1-9][0-9]{0,19}$/.test(id)));
+  if (cb.from?.is_bot === true || !authorizedIds.has(senderId)) {
+    await answerCallbackQuery(token, cb.id, "Bu amal uchun ruxsat berilmagan.").catch(() => {});
+    return ok();
+  }
+
   const followupId = m[1];
   const status = STATUS_CODE[m[2]];
 
