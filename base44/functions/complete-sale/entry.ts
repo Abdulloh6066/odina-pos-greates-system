@@ -1051,8 +1051,9 @@ export default async function(req) {
           || !Number.isSafeInteger(subtotal) || !Number.isSafeInteger(target) || target <= 0
           || (manualRequested && (typeof manualAmount !== "number" || !Number.isSafeInteger(manualAmount)))
           || (roundingRequested && (typeof body.rounding_total !== "number" || target !== expectedRoundedTotal))
-          || reduction <= 0 || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
-        return Response.json({ error: "Chegirma noto‘g‘ri: kupon bilan qo‘shilmaydi, yaxlitlash avtomatik, limit esa 5 000 so‘m yoki 10%." }, { status: 400 });
+          || reduction <= 0
+          || (roundingRequested && reduction > Math.min(5000, Math.floor(subtotal * 0.1)))) {
+        return Response.json({ error: "Chegirma noto‘g‘ri: kupon bilan qo‘shilmaydi, yakuniy summa kamida 1 so‘m; avtomatik yaxlitlash uchun 5 000 so‘m yoki 10% limit amal qiladi." }, { status: 400 });
       }
       discountAmount = reduction;
       discountCode = manualRequested ? "QAYTIB_BERISH" : "YAXLITLASH";
