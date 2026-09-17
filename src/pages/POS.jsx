@@ -157,13 +157,13 @@ export default function POS() {
   };
 
   const applyManualDiscount = (input) => {
-    // The cashier types a negative adjustment such as -2000, never a new product price.
+    // Accept both 2000 and -2000 as a deduction; never change the product price.
     const raw = String(input).trim();
-    if (!/^-\d+$/.test(raw)) {
-      setRoundingError('Masalan, -2000 ko‘rinishida kiriting.');
+    if (!/^-?\d+$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+      setRoundingError('Masalan, 2000 yoki -2000 ko‘rinishida kiriting.');
       return false;
     }
-    return applyAdjustment(subtotal + Number(raw), 'manual');
+    return applyAdjustment(subtotal - Math.abs(Number(raw)), 'manual');
   };
 
   const applyRounding = () => {
