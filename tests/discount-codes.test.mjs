@@ -458,6 +458,7 @@ test('63k and 64k may round to 60k; limits and coupon stacking fail without muta
 
 test('rounding idempotency key is tied to requested target', async () => {
   const f = fixture();
+  f.db.Product[0].price = 99000;
   const call = loadHandler(f.client);
   const request = { action:'complete_sale', shift_id:'shift',
     items:[{product_id:'cake',quantity:1}], rounding_total:95000,
@@ -477,9 +478,11 @@ test('rounding UI requires online checkout; existing offline queue remains unmod
   const source = readFileSync('src/pages/POS.jsx','utf8');
   assert.match(source,/discountCode \|\| roundingTarget !== null/);
   assert.match(source,/!discountCode && roundingTarget === null/);
-  assert.match(source,/rounding_total: roundingTarget \?\? undefined/);
+  assert.match(source,/rounding_total: adjustmentMode === 'rounding'/);
+  assert.match(source,/manual_discount_amount: adjustmentMode === 'manual'/);
   const cart = readFileSync('src/components/pos/Cart.jsx','utf8');
-  assert.match(cart,/Summani yaxlitlash/);
+  assert.match(cart,/Qaytib berish/);
+  assert.match(cart,/Yaxlitlash/);
   assert.match(cart,/onRemoveRounding/);
 });
 
