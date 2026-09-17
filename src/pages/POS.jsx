@@ -144,8 +144,10 @@ export default function POS() {
     const reduction = subtotal - target;
     if (discountCode) { setRoundingError('Kupon bilan birga qo‘llab bo‘lmaydi.'); return false; }
     if (!Number.isSafeInteger(target) || target <= 0 || !Number.isSafeInteger(subtotal)
-      || reduction <= 0 || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
-      setRoundingError('Chegirma 5 000 so‘m yoki 10% limitidan oshmasin.');
+      || reduction <= 0 || (mode === 'rounding' && reduction > Math.min(5000, Math.floor(subtotal * 0.1)))) {
+      setRoundingError(mode === 'manual'
+        ? 'Chegirma musbat bo‘lsin va yakuniy summa kamida 1 so‘m qolsin.'
+        : 'Yaxlitlash 5 000 so‘m yoki 10% limitidan oshmasin.');
       return false;
     }
     setRoundingTarget(target);
