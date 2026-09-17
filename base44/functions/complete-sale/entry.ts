@@ -213,7 +213,8 @@ function canonicalSaleRequest(body: any) {
     shift_id: String(body?.shift_id || ""),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
-    rounding_total: body?.rounding_total ?? null,
+    ...(body?.rounding_total !== undefined && body?.rounding_total !== null
+      ? { rounding_total: body.rounding_total } : {}),
     payments,
     recorded_at: String(body?.recorded_at || ""),
   });
