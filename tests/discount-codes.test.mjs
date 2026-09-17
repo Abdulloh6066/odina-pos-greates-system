@@ -406,4 +406,81 @@ test('discount management hides used codes and creates one-time codes', () => {
   assert.match(source, /single_use: true/);
 });
 
-console.log('12 discount and idempotency regression tests passed. No live data was used.');
+test('86,000 cake rounds to 85,000 with immutable original price and matching accounting', async () => {
+  const f = fixture();
+  f.db.Product[0].price = 86000;
+  const response = await loadHandler(f.client)({
+    action: 'complete_sale', shift_id: 'shift',
+    items: [{ product_id: 'cake', quantity: 1 }],
+    rounding_total: 85000,
+    payments: [{ method: 'cash', amount: 85000 }],
+  });
+  assert.equal(response.status, 200, JSON.stringify(response));
+  assert.equal(response.data.sale.subtotal, 86000);
+  assert.equal(response.data.sale.discount_amount, 1000);
+  assert.equal(response.data.sale.discount_code, 'YAXLITLASH');
+  assert.equal(response.data.sale.total, 85000);
+  assert.equal(f.db.Product[0].price, 86000);
+  assert.equal(f.db.SaleItem[0].unit_price, 86000);
+  assert.equal(f.db.SaleItem[0].discount_amount, 1000);
+  assert.equal(f.db.SaleItem[0].line_total, 85000);
+  assert.equal(f.db.Payment[0].amount, 85000);
+  assert.equal(f.db.Shift[0].total_sales, 85000);
+});
+
+test('63k and 64k may round to 60k; limits and coupon stacking fail without mutations', async () => {
+  for (const price of [63000, 64000]) {
+    const f = fixture(); f.db.Product[0].price = price;
+    const call = loadHandler(f.client);
+    const body = { action:'complete_sale', shift_id:'shift', items:[{product_id:'cake', quantity:1}],
+      rounding_total:60000, payments:[{method:'cash',amount:60000}] };
+    const ok = await call(body);
+    assert.equal(ok.status, 200, JSON.stringify(ok));
+    assert.equal(ok.data.sale.discount_amount, price - 60000);
+    assert.equal(ok.data.sale.total, 60000);
+  }
+  for (const target of [0, -1, 94000, 90000, 100001, 95000.5, '95000', null]) {
+    const f = fixture();
+    const result = await loadHandler(f.client)({ action:'complete_sale', shift_id:'shift',
+      items:[{product_id:'cake',quantity:1}], rounding_total:target,
+      payments:[{method:'cash',amount:Number(target)||1}] });
+    assert.notEqual(result.status, 200, `invalid rounding accepted: ${target}`);
+    assert.equal(f.db.Sale.length, 0);
+    assert.equal(f.db.ProductStock[0].quantity, 10);
+  }
+  const f = fixture();
+  const combined = await loadHandler(f.client)({ ...saleBody(f.code, 5),
+    rounding_total:95000 });
+  assert.equal(combined.status, 400, JSON.stringify(combined));
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.DiscountCode[0].usage_count, 0);
+});
+
+test('rounding idempotency key is tied to requested target', async () => {
+  const f = fixture();
+  const call = loadHandler(f.client);
+  const request = { action:'complete_sale', shift_id:'shift',
+    items:[{product_id:'cake',quantity:1}], rounding_total:95000,
+    payments:[{method:'cash',amount:95000}],
+    idempotency_key:'pos-rounding-test-00001', recorded_at:'2026-09-11T20:30:00.000Z' };
+  const first = await call(request);
+  const duplicate = await call({...request});
+  const altered = await call({...request,rounding_total:96000});
+  assert.equal(first.status,200,JSON.stringify(first));
+  assert.equal(duplicate.status,200,JSON.stringify(duplicate));
+  assert.equal(duplicate.data.already_processed,true);
+  assert.equal(altered.status,409,JSON.stringify(altered));
+  assert.equal(f.db.Sale.length,1);
+});
+
+test('rounding UI requires online checkout; existing offline queue remains unmodified', () => {
+  const source = readFileSync('src/pages/POS.jsx','utf8');
+  assert.match(source,/discountCode \|\| roundingTarget !== null/);
+  assert.match(source,/!discountCode && roundingTarget === null/);
+  assert.match(source,/rounding_total: roundingTarget \?\? undefined/);
+  const cart = readFileSync('src/components/pos/Cart.jsx','utf8');
+  assert.match(cart,/Summani yaxlitlash/);
+  assert.match(cart,/onRemoveRounding/);
+});
+
+console.log('Discount, rounding and idempotency regression tests passed. No live data was used.');
