@@ -215,6 +215,8 @@ function canonicalSaleRequest(body: any) {
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
     ...(body?.rounding_total !== undefined && body?.rounding_total !== null
       ? { rounding_total: body.rounding_total } : {}),
+    ...(body?.manual_discount_amount !== undefined && body?.manual_discount_amount !== null
+      ? { manual_discount_amount: body.manual_discount_amount } : {}),
     payments,
     recorded_at: String(body?.recorded_at || ""),
   });
@@ -915,6 +917,7 @@ export default async function(req) {
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
     const requestedDiscountCode = String(body?.discount_code || "").trim().toUpperCase();
     const roundingRequested = body?.rounding_total !== undefined && body?.rounding_total !== null;
+    const manualRequested = body?.manual_discount_amount !== undefined && body?.manual_discount_amount !== null;
     const idempotencyKey = String(body?.idempotency_key || "").trim();
 
     if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
@@ -1036,18 +1039,23 @@ export default async function(req) {
     }
 
     let discountAmount = money(subtotal * discountPercentage / 100);
-    if (roundingRequested) {
-      // Only a strictly bounded, explicit reduction of the server-calculated cart is allowed.
-      // No coupon stacking, price edits, free orders or offline implicit rounding.
-      const target = body.rounding_total;
+    if (roundingRequested || manualRequested) {
+      // Recalculate against authoritative product prices; never change catalogue prices.
+      // A cashier can apply exactly one capped adjustment, never stacked with a coupon.
+      const step = subtotal >= 10000 ? 5000 : subtotal >= 1000 ? 1000 : 100;
+      const expectedRoundedTotal = Math.floor(subtotal / step) * step;
+      const manualAmount = body.manual_discount_amount;
+      const target = manualRequested ? subtotal - manualAmount : body.rounding_total;
       const reduction = subtotal - target;
-      if (requestedDiscountCode || typeof target !== "number" || !Number.isSafeInteger(target)
-          || target <= 0 || !Number.isSafeInteger(subtotal)
+      if (requestedDiscountCode || (roundingRequested && manualRequested)
+          || !Number.isSafeInteger(subtotal) || !Number.isSafeInteger(target) || target <= 0
+          || (manualRequested && (typeof manualAmount !== "number" || !Number.isSafeInteger(manualAmount)))
+          || (roundingRequested && (typeof body.rounding_total !== "number" || target !== expectedRoundedTotal))
           || reduction <= 0 || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
-        return Response.json({ error: "Yaxlitlash noto‘g‘ri: kupon bilan qo‘shilmaydi, 5 000 so‘m yoki 10% limitdan oshmasligi kerak." }, { status: 400 });
+        return Response.json({ error: "Chegirma noto‘g‘ri: kupon bilan qo‘shilmaydi, yaxlitlash avtomatik, limit esa 5 000 so‘m yoki 10%." }, { status: 400 });
       }
       discountAmount = reduction;
-      discountCode = "YAXLITLASH";
+      discountCode = manualRequested ? "QAYTIB_BERISH" : "YAXLITLASH";
     }
     const total = Math.max(0, subtotal - discountAmount);
 
