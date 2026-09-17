@@ -486,4 +486,32 @@ test('rounding UI requires online checkout; existing offline queue remains unmod
   assert.match(cart,/onRemoveRounding/);
 });
 
-console.log('Discount, rounding and idempotency regression tests passed. No live data was used.');
+test('manual discount of 2000 preserves original price and records 80000 paid', async () => {
+  const f = fixture();
+  f.db.Product[0].price = 82000;
+  const result = await loadHandler(f.client)({ action:'complete_sale', shift_id:'shift',
+    items:[{ product_id:'cake',quantity:1 }], manual_discount_amount:2000,
+    payments:[{ method:'cash',amount:80000 }] });
+  assert.equal(result.status,200,JSON.stringify(result));
+  assert.equal(result.data.sale.discount_code,'QAYTIB_BERISH');
+  assert.equal(result.data.sale.discount_amount,2000);
+  assert.equal(result.data.sale.total,80000);
+  assert.equal(f.db.Product[0].price,82000);
+  assert.equal(f.db.SaleItem[0].unit_price,82000);
+  assert.equal(f.db.SaleItem[0].line_total,80000);
+  assert.equal(f.db.Shift[0].total_sales,80000);
+});
+
+test('automatic rounding matches all three cashier examples', async () => {
+  for (const [price,target] of [[15500,15000],[84000,80000],[86000,85000]]) {
+    const f = fixture(); f.db.Product[0].price = price;
+    const result = await loadHandler(f.client)({ action:'complete_sale', shift_id:'shift',
+      items:[{product_id:'cake',quantity:1}], rounding_total:target,
+      payments:[{method:'cash',amount:target}] });
+    assert.equal(result.status,200,JSON.stringify(result));
+    assert.equal(result.data.sale.total,target);
+    assert.equal(result.data.sale.discount_amount,price-target);
+  }
+});
+
+console.log('Discount, manual adjustment, rounding and idempotency tests passed. No live data was used.');
