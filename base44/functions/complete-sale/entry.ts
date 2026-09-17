@@ -213,6 +213,7 @@ function canonicalSaleRequest(body: any) {
     shift_id: String(body?.shift_id || ""),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
+    rounding_total: body?.rounding_total ?? null,
     payments,
     recorded_at: String(body?.recorded_at || ""),
   });
@@ -912,6 +913,7 @@ export default async function(req) {
     const requestedItems = Array.isArray(body?.items) ? body.items : [];
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
     const requestedDiscountCode = String(body?.discount_code || "").trim().toUpperCase();
+    const roundingRequested = body?.rounding_total !== undefined && body?.rounding_total !== null;
     const idempotencyKey = String(body?.idempotency_key || "").trim();
 
     if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
@@ -1032,7 +1034,20 @@ export default async function(req) {
       }
     }
 
-    const discountAmount = money(subtotal * discountPercentage / 100);
+    let discountAmount = money(subtotal * discountPercentage / 100);
+    if (roundingRequested) {
+      // Only a strictly bounded, explicit reduction of the server-calculated cart is allowed.
+      // No coupon stacking, price edits, free orders or offline implicit rounding.
+      const target = body.rounding_total;
+      const reduction = subtotal - target;
+      if (requestedDiscountCode || typeof target !== "number" || !Number.isSafeInteger(target)
+          || target <= 0 || !Number.isSafeInteger(subtotal)
+          || reduction <= 0 || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
+        return Response.json({ error: "Yaxlitlash noto‘g‘ri: kupon bilan qo‘shilmaydi, 5 000 so‘m yoki 10% limitdan oshmasligi kerak." }, { status: 400 });
+      }
+      discountAmount = reduction;
+      discountCode = "YAXLITLASH";
+    }
     const total = Math.max(0, subtotal - discountAmount);
 
     const normalizedPayments = requestedPayments.map((payment) => ({
