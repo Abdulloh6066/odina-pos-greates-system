@@ -728,7 +728,7 @@ export default function POS() {
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
-            subtotal={subtotal} discount={discount} discountCode={discountCode}
+            subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
             roundingTarget={roundingTarget} roundingError={roundingError} onApplyRounding={applyRounding}
             onRemoveRounding={() => { setRoundingTarget(null); setRoundingError(''); }}
@@ -750,7 +750,7 @@ export default function POS() {
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
-            subtotal={subtotal} discount={discount} discountCode={discountCode}
+            subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
             roundingTarget={roundingTarget} roundingError={roundingError} onApplyRounding={applyRounding}
             onRemoveRounding={() => { setRoundingTarget(null); setRoundingError(''); }}
