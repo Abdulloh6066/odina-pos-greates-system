@@ -45,6 +45,8 @@ export default function POS() {
   const [discountPct, setDiscountPct] = useState(0);
   const [discountError, setDiscountError] = useState('');
   const [discountOwnerPin, setDiscountOwnerPin] = useState('');
+  const [roundingTarget, setRoundingTarget] = useState(null);
+  const [roundingError, setRoundingError] = useState('');
 
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -129,8 +131,28 @@ export default function POS() {
   }, [user?.id]);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.subtotal, 0), [cart]);
-  const discount = useMemo(() => Math.round(subtotal * discountPct / 100), [subtotal, discountPct]);
-  const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+  const couponDiscount = useMemo(() => Math.round(subtotal * discountPct / 100), [subtotal, discountPct]);
+  const roundingDiscount = roundingTarget !== null && !discountCode ? subtotal - roundingTarget : 0;
+  const discount = couponDiscount + roundingDiscount;
+  const total = Math.max(0, subtotal - discount);
+
+  // A rounding decision never carries over when products or quantities change.
+  useEffect(() => { setRoundingTarget(null); setRoundingError(''); }, [cart]);
+
+  const applyRounding = (rawTarget) => {
+    const target = Number(rawTarget);
+    const reduction = subtotal - target;
+    if (discountCode) { setRoundingError('Kupon bilan yaxlitlashni birga ishlatib bo‘lmaydi.'); return false; }
+    if (!/^\d+$/.test(String(rawTarget).trim()) || !Number.isSafeInteger(target) || target <= 0
+      || !Number.isSafeInteger(subtotal) || reduction <= 0
+      || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
+      setRoundingError('Yakuniy summa asl summadan kam bo‘lsin; chegirma 5 000 so‘m yoki 10% limitidan oshmasin.');
+      return false;
+    }
+    setRoundingTarget(target);
+    setRoundingError('');
+    return true;
+  };
 
   const addToCart = (product) => {
     setCart((prev) => {
@@ -149,7 +171,7 @@ export default function POS() {
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
   }));
   const removeItem = (item) => setCart((p) => p.filter((i) => i.product_id !== item.product_id));
-  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); };
+  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setRoundingError(''); };
 
   const validateDiscount = async (code, ownerPin = '') => {
     setDiscountLoading(true);
@@ -164,6 +186,8 @@ export default function POS() {
       const percentage = Number(dc.percentage);
       setDiscountPct(percentage);
       setDiscountCode(dc.code);
+      setRoundingTarget(null);
+      setRoundingError('');
       setDiscountOwnerPin(user?.role === 'cashier' && percentage === 100 ? ownerPin : '');
       setDiscountError('');
       setDiscountApprovalOpen(false);
@@ -278,7 +302,7 @@ export default function POS() {
   };
 
   const openOfflinePayment = async () => {
-    if (discountCode) {
+    if (discountCode || roundingTarget !== null) {
       await odinaAlert('Chegirmali savdoni tekshirish uchun internet kerak. Savat saqlanib turadi.', {
         title: 'Internet kerak',
         tone: 'warning',
@@ -414,7 +438,7 @@ export default function POS() {
     let pendingRecord = null;
 
     try {
-      if (!discountCode) {
+      if (!discountCode && roundingTarget === null) {
         pendingRecord = buildPendingSale({
           idempotencyKey,
           recordedAt,
@@ -442,6 +466,7 @@ export default function POS() {
           quantity: item.quantity,
         })),
         discount_code: discountCode || undefined,
+        rounding_total: roundingTarget ?? undefined,
         owner_pin: discountPct === 100 && discountOwnerPin ? discountOwnerPin : undefined,
         payments,
         idempotency_key: idempotencyKey,
@@ -460,7 +485,7 @@ export default function POS() {
       }
     } catch (error) {
       const message = syncErrorMessage(error);
-      const discountHint = discountCode && isRetryableSyncError(error)
+      const discountHint = (discountCode || roundingTarget !== null) && isRetryableSyncError(error)
         ? ' Aloqa qaytgach shu to‘lov oynasidan yana bosing.'
         : '';
       void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
@@ -705,6 +730,8 @@ export default function POS() {
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
+            roundingTarget={roundingTarget} roundingError={roundingError} onApplyRounding={applyRounding}
+            onRemoveRounding={() => { setRoundingTarget(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift}
           />
         </div>
@@ -725,6 +752,8 @@ export default function POS() {
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
+            roundingTarget={roundingTarget} roundingError={roundingError} onApplyRounding={applyRounding}
+            onRemoveRounding={() => { setRoundingTarget(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); openCheckout(); }} disabled={!shift}
           />
         </SheetContent>
