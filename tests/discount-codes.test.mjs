@@ -514,4 +514,31 @@ test('automatic rounding matches all three cashier examples', async () => {
   }
 });
 
+test('manual discounts reject invalid, stacked and over-limit requests before saving', async () => {
+  for (const amount of [-1, 0, 6000, '2000', 2000.5]) {
+    const f = fixture();
+    const response = await loadHandler(f.client)({ action:'complete_sale',shift_id:'shift',
+      items:[{product_id:'cake',quantity:1}],manual_discount_amount:amount,
+      payments:[{method:'cash',amount:95000}] });
+    assert.equal(response.status,400,JSON.stringify(response));
+    assert.equal(f.db.Sale.length,0);
+    assert.equal(f.db.ProductStock[0].quantity,10);
+  }
+  const f = fixture();
+  const response = await loadHandler(f.client)({ ...saleBody(f.code,5),manual_discount_amount:2000 });
+  assert.equal(response.status,400,JSON.stringify(response));
+  assert.equal(f.db.Sale.length,0);
+  assert.equal(f.db.DiscountCode[0].usage_count,0);
+});
+
+test('backend rejects arbitrary rounded totals and simultaneous adjustment modes', async () => {
+  for (const extra of [{rounding_total:96000},{rounding_total:95000,manual_discount_amount:5000}]) {
+    const f = fixture();
+    const result = await loadHandler(f.client)({action:'complete_sale',shift_id:'shift',
+      items:[{product_id:'cake',quantity:1}],payments:[{method:'cash',amount:95000}],...extra});
+    assert.equal(result.status,400,JSON.stringify(result));
+    assert.equal(f.db.Sale.length,0);
+  }
+});
+
 console.log('Discount, manual adjustment, rounding and idempotency tests passed. No live data was used.');
