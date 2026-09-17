@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 
 export default function Cart({
   cart, onInc, onDec, onRemove, onClear,
-  subtotal, discount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
+  subtotal, discount, couponDiscount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
   roundingTarget, roundingError, onApplyRounding, onRemoveRounding,
   total, onCheckout, disabled,
 }) {
@@ -75,7 +75,7 @@ export default function Cart({
       <div className="odina-cart-summary border-t border-brand-sand/50 p-4 safe-bottom shrink-0 space-y-3 bg-card">
         <DiscountRow
           discountCode={discountCode}
-          discount={discount}
+          discount={couponDiscount}
           onApplyDiscount={onApplyDiscount}
           onRemoveDiscount={onRemoveDiscount}
           discountError={discountError}
