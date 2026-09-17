@@ -514,8 +514,8 @@ test('automatic rounding matches all three cashier examples', async () => {
   }
 });
 
-test('manual discounts reject invalid, stacked and over-limit requests before saving', async () => {
-  for (const amount of [-1, 0, 6000, '2000', 2000.5]) {
+test('manual discounts reject invalid, stacked and zero-or-negative-total requests before saving', async () => {
+  for (const amount of [-1, 0, 100000, 100001, '2000', 2000.5]) {
     const f = fixture();
     const response = await loadHandler(f.client)({ action:'complete_sale',shift_id:'shift',
       items:[{product_id:'cake',quantity:1}],manual_discount_amount:amount,
@@ -529,6 +529,24 @@ test('manual discounts reject invalid, stacked and over-limit requests before sa
   assert.equal(response.status,400,JSON.stringify(response));
   assert.equal(f.db.Sale.length,0);
   assert.equal(f.db.DiscountCode[0].usage_count,0);
+});
+
+test('manual minus has no arbitrary 5000 UZS cap, retains original price and correct totals', async () => {
+  for (const amount of [6000, 20000, 99000]) {
+    const f = fixture();
+    const paid = 100000 - amount;
+    const response = await loadHandler(f.client)({ action: 'complete_sale', shift_id: 'shift',
+      items: [{ product_id: 'cake', quantity: 1 }], manual_discount_amount: amount,
+      payments: [{ method: 'cash', amount: paid }] });
+    assert.equal(response.status, 200, JSON.stringify(response));
+    assert.equal(response.data.sale.discount_amount, amount);
+    assert.equal(response.data.sale.discount_code, 'QAYTIB_BERISH');
+    assert.equal(response.data.sale.total, paid);
+    assert.equal(f.db.Product[0].price, 100000);
+    assert.equal(f.db.SaleItem[0].unit_price, 100000);
+    assert.equal(f.db.SaleItem[0].line_total, paid);
+    assert.equal(f.db.Shift[0].total_sales, paid);
+  }
 });
 
 test('backend rejects arbitrary rounded totals and simultaneous adjustment modes', async () => {
