@@ -46,6 +46,7 @@ export default function POS() {
   const [discountError, setDiscountError] = useState('');
   const [discountOwnerPin, setDiscountOwnerPin] = useState('');
   const [roundingTarget, setRoundingTarget] = useState(null);
+  const [adjustmentMode, setAdjustmentMode] = useState(null);
   const [roundingError, setRoundingError] = useState('');
 
   const [payOpen, setPayOpen] = useState(false);
@@ -137,21 +138,35 @@ export default function POS() {
   const total = Math.max(0, subtotal - discount);
 
   // A rounding decision never carries over when products or quantities change.
-  useEffect(() => { setRoundingTarget(null); setRoundingError(''); }, [cart]);
+  useEffect(() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }, [cart]);
 
-  const applyRounding = (rawTarget) => {
-    const target = Number(rawTarget);
+  const applyAdjustment = (target, mode) => {
     const reduction = subtotal - target;
-    if (discountCode) { setRoundingError('Kupon bilan yaxlitlashni birga ishlatib bo‘lmaydi.'); return false; }
-    if (!/^\d+$/.test(String(rawTarget).trim()) || !Number.isSafeInteger(target) || target <= 0
-      || !Number.isSafeInteger(subtotal) || reduction <= 0
-      || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
-      setRoundingError('Yakuniy summa asl summadan kam bo‘lsin; chegirma 5 000 so‘m yoki 10% limitidan oshmasin.');
+    if (discountCode) { setRoundingError('Kupon bilan birga qo‘llab bo‘lmaydi.'); return false; }
+    if (!Number.isSafeInteger(target) || target <= 0 || !Number.isSafeInteger(subtotal)
+      || reduction <= 0 || reduction > Math.min(5000, Math.floor(subtotal * 0.1))) {
+      setRoundingError('Chegirma 5 000 so‘m yoki 10% limitidan oshmasin.');
       return false;
     }
     setRoundingTarget(target);
+    setAdjustmentMode(mode);
     setRoundingError('');
     return true;
+  };
+
+  const applyManualDiscount = (input) => {
+    // The cashier types a negative adjustment such as -2000, never a new product price.
+    const raw = String(input).trim();
+    if (!/^-\d+$/.test(raw)) {
+      setRoundingError('Masalan, -2000 ko‘rinishida kiriting.');
+      return false;
+    }
+    return applyAdjustment(subtotal + Number(raw), 'manual');
+  };
+
+  const applyRounding = () => {
+    const step = subtotal >= 10000 ? 5000 : subtotal >= 1000 ? 1000 : 100;
+    return applyAdjustment(Math.floor(subtotal / step) * step, 'rounding');
   };
 
   const addToCart = (product) => {
@@ -171,7 +186,7 @@ export default function POS() {
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
   }));
   const removeItem = (item) => setCart((p) => p.filter((i) => i.product_id !== item.product_id));
-  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setRoundingError(''); };
+  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
 
   const validateDiscount = async (code, ownerPin = '') => {
     setDiscountLoading(true);
@@ -187,6 +202,7 @@ export default function POS() {
       setDiscountPct(percentage);
       setDiscountCode(dc.code);
       setRoundingTarget(null);
+      setAdjustmentMode(null);
       setRoundingError('');
       setDiscountOwnerPin(user?.role === 'cashier' && percentage === 100 ? ownerPin : '');
       setDiscountError('');
@@ -466,7 +482,8 @@ export default function POS() {
           quantity: item.quantity,
         })),
         discount_code: discountCode || undefined,
-        rounding_total: roundingTarget ?? undefined,
+        rounding_total: adjustmentMode === 'rounding' ? roundingTarget : undefined,
+        manual_discount_amount: adjustmentMode === 'manual' ? subtotal - roundingTarget : undefined,
         owner_pin: discountPct === 100 && discountOwnerPin ? discountOwnerPin : undefined,
         payments,
         idempotency_key: idempotencyKey,
@@ -730,8 +747,9 @@ export default function POS() {
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
-            roundingTarget={roundingTarget} roundingError={roundingError} onApplyRounding={applyRounding}
-            onRemoveRounding={() => { setRoundingTarget(null); setRoundingError(''); }}
+            roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
+            onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
+            onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift}
           />
         </div>
@@ -752,8 +770,9 @@ export default function POS() {
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
-            roundingTarget={roundingTarget} roundingError={roundingError} onApplyRounding={applyRounding}
-            onRemoveRounding={() => { setRoundingTarget(null); setRoundingError(''); }}
+            roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
+            onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
+            onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); openCheckout(); }} disabled={!shift}
           />
         </SheetContent>
