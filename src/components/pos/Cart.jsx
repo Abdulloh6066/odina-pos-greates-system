@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 export default function Cart({
   cart, onInc, onDec, onRemove, onClear,
   subtotal, discount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
+  roundingTarget, roundingError, onApplyRounding, onRemoveRounding,
   total, onCheckout, disabled,
 }) {
   return (
@@ -79,13 +80,23 @@ export default function Cart({
           onRemoveDiscount={onRemoveDiscount}
           discountError={discountError}
         />
+        {cart.length > 0 && (
+          <RoundingRow
+            subtotal={subtotal}
+            discountCode={discountCode}
+            roundingTarget={roundingTarget}
+            roundingError={roundingError}
+            onApplyRounding={onApplyRounding}
+            onRemoveRounding={onRemoveRounding}
+          />
+        )}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>Oraliq summa</span>
           <span className="font-medium text-foreground">{formatUZS(subtotal)}</span>
         </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-sm text-brand-ink">
-            <span>Chegirma ({discountCode})</span>
+            <span>{discountCode ? `Chegirma (${discountCode})` : 'Yaxlitlash chegirmasi'}</span>
             <span className="font-medium">−{formatUZS(discount)}</span>
           </div>
         )}
@@ -102,6 +113,28 @@ export default function Cart({
           <span className="flex items-center gap-2">{formatUZS(total)} <ArrowUpRight className="w-4 h-4 shrink-0" aria-hidden="true" /></span>
         </Button>
       </div>
+    </div>
+  );
+}
+
+function RoundingRow({ subtotal, discountCode, roundingTarget, roundingError, onApplyRounding, onRemoveRounding }) {
+  const [target, setTarget] = useState('');
+  if (roundingTarget !== null) return (
+    <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 gap-2">
+      <span className="text-sm font-medium text-emerald-800">Yaxlitlandi: {formatUZS(roundingTarget)}</span>
+      <button type="button" onClick={() => { onRemoveRounding(); setTarget(''); }} className="w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-emerald-900 hover:bg-emerald-100" aria-label="Yaxlitlashni bekor qilish"><X className="w-4 h-4" /></button>
+    </div>
+  );
+  return (
+    <div className="rounded-xl border border-border bg-secondary/40 p-3 space-y-2">
+      <div className="text-sm font-semibold">Summani yaxlitlash</div>
+      <p className="text-xs text-muted-foreground">Mijoz to‘laydigan summani kiriting. Ko‘pi bilan 5 000 so‘m yoki 10% chegirma.</p>
+      <div className="flex gap-2">
+        <Input type="number" min="1" step="1" inputMode="numeric" aria-label="Yaxlitlangan yakuniy summa" placeholder={String(subtotal)} value={target} disabled={Boolean(discountCode)} onChange={(e) => setTarget(e.target.value)} className="h-11 min-w-0 flex-1" />
+        <Button type="button" variant="outline" className="h-11 shrink-0" disabled={Boolean(discountCode) || !target} onClick={() => { if (onApplyRounding(target)) setTarget(''); }}>Qo‘llash</Button>
+      </div>
+      {discountCode && <p className="text-xs text-muted-foreground">Yaxlitlash uchun avval kuponni olib tashlang.</p>}
+      {roundingError && <p role="alert" className="text-xs text-destructive">{roundingError}</p>}
     </div>
   );
 }
