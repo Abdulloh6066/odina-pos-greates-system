@@ -65,6 +65,111 @@
         "offset": 500
       }
     },
+    "restaurant_table_orders_version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Stollar bo\u2018yicha to\u2018lanmagan buyurtmalarni bir vaqtda tahrirlash nazorati"
+    },
+    "restaurant_table_orders": {
+      "type": "array",
+      "description": "Do\u2018konning ochiq stol buyurtmalari; to\u2018lovgacha savdo yoki ombor harakati emas",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "occupied",
+              "paying"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string"
+                },
+                "product_name": {
+                  "type": "string"
+                },
+                "image_url": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "subtotal": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "stock_tracked": {
+                  "type": "boolean"
+                },
+                "source_type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "product_id",
+                "product_name",
+                "price",
+                "quantity",
+                "subtotal"
+              ]
+            }
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "opened_by": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          },
+          "checkout_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "revision",
+          "state",
+          "items",
+          "total",
+          "started_at"
+        ]
+      },
+      "default": []
+    },
     "restaurant_table_layout_version": {
       "type": "integer",
       "minimum": 0,
