@@ -28,14 +28,18 @@ test('table picker is server scoped, further constrained by open shift and guard
   assert.match(backend, /const assignedId = userShopId\(actor\)/);
   assert.match(backend, /shops: \[safeShop\(assignedShop\)\]/);
   assert.match(pos, /if \(shift && shift\.shop_id !== shopId\)/);
-  assert.match(pos, /if \(cart\.length && !\(await odinaConfirm\(/);
+  assert.match(pos, /selectedTable && tableCartDirty && !\(await saveTableOrder\(\)\)/);
+  assert.match(pos, /!selectedTable && cart\.length && !\(await odinaConfirm\(/);
   assert.match(pos, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: shopId, table_number: String\(number\) \}\)\}`\)/);
   assert.match(pos, /const priorTableKey = useRef\(tableKey\)/);
   assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/pos'\);\s*void openTablePicker\(\)/);
 });
 
 test('Kassa selection stays a real authenticated completed sale with no premature inventory deduction', () => {
-  assert.match(pos, /\.\.\.\(selectedTable \? \{ table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number \} : \{\}\)/);
+  assert.match(pos, /table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number/);
+  assert.match(pos, /table_order_id: tableOrder\?\.id, table_order_revision: tableOrder\?\.revision/);
+  assert.match(pos, /action: 'save_table_order'/);
+  assert.match(pos, /Hisobni yopish/ .source ? /Hisobni yopish/ : /Hisobni yopish/);
   assert.match(checkout, /requestedTableShopId !== shift\.shop_id/);
   assert.match(checkout, /requestedTableNumber > receiptShop\.restaurant_table_count/);
   assert.match(checkout, /table_number_snapshot: requestedTableNumber/);
