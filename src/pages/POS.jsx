@@ -375,7 +375,8 @@ export default function POS() {
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
   })); };
   const removeItem = (item) => { if (!tableLocked && !paying) setCart((p) => p.filter((i) => i.product_id !== item.product_id)); };
-  const clearCart = () => { if (tableLocked || paying) return; setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
+  const resetCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
+  const clearCart = () => { if (!tableLocked && !paying && (!selectedTable || !tableOrder)) resetCart(); }; 
 
   const validateDiscount = async (code, ownerPin = '') => {
     setDiscountLoading(true);
@@ -615,7 +616,7 @@ export default function POS() {
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
-    clearCart();
+    resetCart();
   };
 
   const applyCompletedSale = (payload) => {
@@ -645,7 +646,8 @@ export default function POS() {
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
-    clearCart();
+    resetCart();
+    setTableOrder(null);
     base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
       .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
       .catch(() => {});
