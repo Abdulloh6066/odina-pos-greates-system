@@ -182,6 +182,59 @@ test('admin can save a non-overlapping floor plan; stale versions and overlaps a
   assert.equal(f.writes, writesAfterSave);
 });
 
+test('each table has its own size, old layouts remain 100%, and larger tables require more space', () => {
+  const legacy = [
+    { number: 1, x: 250, y: 300 },
+    { number: 2, x: 385, y: 300 },
+  ];
+  assert.deepEqual(buildTableLayout(2, legacy), legacy.map((point) => ({ ...point, size: 100 })));
+  assert.equal(validateTableLayout(2, legacy), true);
+  assert.equal(tablesOverlap(legacy[0], legacy[1]), false);
+  const bigger = [{ ...legacy[0], size: 140 }, { ...legacy[1], size: 100 }];
+  assert.equal(tablesOverlap(bigger[0], bigger[1]), true);
+  assert.equal(validateTableLayout(2, bigger), false);
+  assert.equal(validateTableLayout(2, [{ ...bigger[0], x: 84 }, { ...bigger[1], x: 385 }]), true);
+  assert.equal(validateTableLayout(2, [{ ...bigger[0], x: 60 }, bigger[1]]), false);
+  assert.equal(validateTableLayout(2, [{ ...legacy[0], size: 150 }, legacy[1]]), false);
+  assert.equal(validateTableLayout(2, [{ ...legacy[0], size: 95 }, legacy[1]]), false);
+});
+
+test('only admin can save independent sizes, old clients preserve sizes, and bad sizes never write', async () => {
+  const f = fixture();
+  const legacy = [
+    { number: 1, x: 200, y: 250 }, { number: 2, x: 450, y: 250 },
+    { number: 3, x: 700, y: 250 }, { number: 4, x: 200, y: 600 },
+    { number: 5, x: 450, y: 600 }, { number: 6, x: 700, y: 600 },
+    { number: 7, x: 200, y: 820 }, { number: 8, x: 700, y: 820 },
+  ];
+  const invalidSizes = [70, 95, 150, 100.5, '120', null];
+  for (const size of invalidSizes) {
+    const response = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0,
+      layout: [{ ...legacy[0], size }, ...legacy.slice(1)] });
+    assert.equal(response.status, 400);
+  }
+  assert.equal(f.writes, 0);
+  const sized = legacy.map((point, index) => ({ ...point, size: index === 0 ? 140 : index === 1 ? 80 : 100 }));
+  const saved = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout: sized });
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+  assert.equal(saved.data.shop.layout[0].size, 140);
+  assert.equal(saved.data.shop.layout[1].size, 80);
+  assert.equal(saved.data.shop.layout[2].size, 100);
+  const originalWrites = f.writes;
+  assert.equal((await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout: sized })).status, 409);
+  f.as('cashier-2');
+  assert.equal((await f.run({ action: 'status' })).data.shops[0].layout[0].size, 140);
+  assert.equal((await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 1, layout: sized })).status, 403);
+  assert.equal(f.writes, originalWrites);
+  f.as('owner');
+  const oldClient = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 1, layout: legacy });
+  assert.equal(oldClient.status, 200, JSON.stringify(oldClient));
+  assert.equal(oldClient.data.shop.layout[0].size, 140);
+  assert.equal(oldClient.data.shop.layout[1].size, 80);
+  assert.equal((await f.run({ action: 'status' })).data.shops.find((shop) => shop.id === 'central-shop').table_count, 0);
+  assert.equal(f.db.ActionHistory.filter((row) => row.action === 'restaurant_table_layout_changed').length, 2);
+});
+
 test('floor plan and POS integration preserve server validation and immutable sale table snapshot', () => {
   const floorplan = read('src/components/tables/TableFloorplan.jsx');
   const layoutLogic = read('src/lib/table-floorplan.js');
@@ -193,6 +246,10 @@ test('floor plan and POS integration preserve server validation and immutable sa
   assert.match(floorplan, /onPointerMove/);
   assert.match(floorplan, /Joylashuvni saqlash/);
   assert.match(layoutLogic, /tablesOverlap/);
+  assert.match(floorplan, /Stol o‘lchami/);
+  assert.match(floorplan, /resizeTable\(chosen\.number/);
+  assert.match(floorplan, /width: `\$\{Math\.round\(68 \* tableSize\(point\) \/ 100\)\}px`/);
+  assert.equal(JSON.parse(read('base44/entities/Shop.jsonc')).properties.restaurant_table_layout.items.properties.size.maximum, 140);
   assert.match(pos, /table_shop/);
   assert.match(pos, /table_number/);
   assert.match(pos, /selectedTable \? \{ table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number \}/);
