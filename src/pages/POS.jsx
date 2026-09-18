@@ -88,6 +88,13 @@ export default function POS() {
   const [tablePickerError, setTablePickerError] = useState('');
   const [tablePickerShops, setTablePickerShops] = useState([]);
   const [tablePickerShopId, setTablePickerShopId] = useState('');
+  const [tableOrder, setTableOrder] = useState(null);
+  const [tableOrderLoading, setTableOrderLoading] = useState(false);
+  const [tableOrderError, setTableOrderError] = useState('');
+  const [tableSaveError, setTableSaveError] = useState('');
+  const [savingTable, setSavingTable] = useState(false);
+  const savingTableRef = useRef(false);
+  const [tableReload, setTableReload] = useState(0);
 
   // Do not accidentally carry an unsaved cart from one table to another when
   // only the URL changes and React keeps the POS component mounted.
@@ -105,6 +112,85 @@ export default function POS() {
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
   }, [tableKey]);
+
+  // The server owns every open order. Reloading or switching devices restores
+  // the exact unpaid items; nothing is recorded as revenue at this point.
+  useEffect(() => {
+    if (!selectedTable) {
+      setTableOrder(null);
+      setTableOrderLoading(false);
+      setTableOrderError('');
+      setTableSaveError('');
+      return undefined;
+    }
+    let active = true;
+    setTableOrderLoading(true);
+    setTableOrderError('');
+    setTableSaveError('');
+    base44.functions.invoke('restaurant-tables', {
+      action: 'get_table_order', shop_id: selectedTable.shopId, table_number: selectedTable.number,
+    }).then((response) => {
+      if (!active) return;
+      const result = response?.data || response;
+      if (!result?.ok) throw new Error(result?.error || 'Stol buyurtmasi yuklanmadi.');
+      setTableOrder(result.order || null);
+      setCart(result.order?.items || []);
+      setDiscountCode(''); setDiscountPct(0); setDiscountOwnerPin('');
+      setRoundingTarget(null); setAdjustmentMode(null);
+    }).catch((error) => {
+      if (active) setTableOrderError(error?.response?.data?.error || error?.data?.error || error?.message || 'Buyurtmani yuklab bo‘lmadi.');
+    }).finally(() => { if (active) setTableOrderLoading(false); });
+    return () => { active = false; };
+  }, [tableKey, tableReload]);
+
+  const tableCartDirty = Boolean(selectedTable) && (
+    cart.length !== (tableOrder?.items?.length || 0)
+    || cart.some((row) => {
+      const saved = tableOrder?.items?.find((item) => item.product_id === row.product_id);
+      return !saved || saved.quantity !== row.quantity || saved.price !== row.price;
+    })
+  );
+  const tableLocked = Boolean(selectedTable) && (tableOrderLoading || savingTable
+    || Boolean(tableOrderError) || tableOrder?.state === 'paying');
+  const saveTableOrder = async () => {
+    if (!selectedTable || !tableCartDirty) return !selectedTable || Boolean(tableOrder?.id);
+    if (savingTableRef.current || tableOrderLoading || tableOrderError || tableOrder?.state === 'paying') return false;
+    if (!shift || shift.shop_id !== selectedTable.shopId) {
+      void odinaAlert('Buyurtmani saqlash uchun shu do‘kondagi smenani oching.');
+      return false;
+    }
+    if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      void odinaAlert('Stol buyurtmasi serverda saqlanadi. Internet aloqasini kuting; savatingiz o‘chmaydi.');
+      return false;
+    }
+    if (!cart.length) {
+      void odinaAlert('Ochiq buyurtmadagi hamma mahsulotni tozalash mumkin emas. Hisobni yopish yoki mas’ulga murojaat qiling.');
+      return false;
+    }
+    savingTableRef.current = true;
+    setSavingTable(true);
+    setTableSaveError('');
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'save_table_order', shop_id: selectedTable.shopId,
+        table_number: selectedTable.number, shift_id: shift.id,
+        expected_revision: tableOrder?.revision || 0,
+        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity })),
+      });
+      const result = response?.data || response;
+      if (!result?.ok || !result.order?.id) throw new Error(result?.error || 'Buyurtma saqlangani tasdiqlanmadi.');
+      setTableOrder(result.order);
+      setCart(result.order.items);
+      return true;
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.data?.error || error?.message || 'Stol buyurtmasi saqlanmadi.';
+      setTableSaveError(message);
+      return false;
+    } finally {
+      savingTableRef.current = false;
+      setSavingTable(false);
+    }
+  };
 
   const loadAll = async () => {
     setLoadingData(true);
