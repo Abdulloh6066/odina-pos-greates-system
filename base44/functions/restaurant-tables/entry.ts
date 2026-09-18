@@ -1,10 +1,24 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
 
-// Phase 1 only: table configuration and read-only layout. No restaurant orders,
-// reservations, sales, shift changes or inventory writes are performed here.
+// Store-specific table count and spatial layout only. POS checkout lives in
+// complete-sale. This function never creates sales, orders or stock movements.
 const ALLOWED_ROLES = new Set(["admin", "cashier"]);
 const MAX_TABLES = 30;
+const hasValidPosition = (entry: any, count: number) =>
+  entry && Number.isInteger(entry.number) && entry.number >= 1 && entry.number <= count
+  && Number.isInteger(entry.x) && entry.x >= 60 && entry.x <= 940
+  && Number.isInteger(entry.y) && entry.y >= 70 && entry.y <= 930;
+const overlaps = (a: any, b: any) => Math.abs(a.x - b.x) < 115 && Math.abs(a.y - b.y) < 125;
+const validateLayout = (layout: any, count: number) => {
+  if (!Array.isArray(layout) || layout.length !== count || count <= 0 || count > MAX_TABLES) return false;
+  const numbers = new Set<number>();
+  for (const point of layout) {
+    if (!hasValidPosition(point, count) || numbers.has(point.number)) return false;
+    numbers.add(point.number);
+  }
+  return !layout.some((point: any, i: number) => layout.some((other: any, j: number) => i < j && overlaps(point, other)));
+};
 const isShop = (shop: any) => Boolean(shop && shop.active !== false
   && shop.location_type === "shop" && shop.allows_pos !== false);
 const safeShop = (shop: any) => ({
@@ -13,6 +27,11 @@ const safeShop = (shop: any) => ({
   table_count: Number.isInteger(shop.restaurant_table_count)
     && shop.restaurant_table_count >= 0 && shop.restaurant_table_count <= MAX_TABLES
     ? shop.restaurant_table_count : 0,
+  layout_version: Number.isInteger(shop.restaurant_table_layout_version)
+    && shop.restaurant_table_layout_version >= 0 ? shop.restaurant_table_layout_version : 0,
+  layout: (Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [])
+    .filter((row: any) => hasValidPosition(row, Number(shop.restaurant_table_count || 0)))
+    .map((row: any) => ({ number: row.number, x: row.x, y: row.y })),
 });
 
 Deno.serve(async (req) => {
@@ -50,13 +69,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action !== "set_table_count") {
+    if (action !== "set_table_count" && action !== "set_table_layout") {
       return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     }
     if (role !== "admin") {
-      return Response.json({ error: "Stollar sonini faqat admin o‘zgartiradi." }, { status: 403 });
+      return Response.json({ error: "Stollarni faqat admin o‘zgartiradi." }, { status: 403 });
     }
     const shopId = String(body?.shop_id || "");
+    if (action === "set_table_layout") {
+      const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
+      if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
+      const current = safeShop(shop);
+      const version = body?.layout_version;
+      if (!Number.isInteger(version) || version !== current.layout_version) {
+        return Response.json({ error: "Xarita boshqa oynada o‘zgardi. Yangilab qayta joylashtiring." }, { status: 409 });
+      }
+      const layout = body?.layout;
+      if (!validateLayout(layout, current.table_count)) {
+        return Response.json({ error: "Har bir stol bitta marta kiritilsin, chegaradan chiqmasin va stollar ustma-ust kelmasin." }, { status: 400 });
+      }
+      const clean = layout.map((row: any) => ({ number: row.number, x: row.x, y: row.y }))
+        .sort((a: any, b: any) => a.number - b.number);
+      const expectedVersion = version === 0
+        ? { $or: [{ restaurant_table_layout_version: 0 }, { restaurant_table_layout_version: { $exists: false } }] }
+        : { restaurant_table_layout_version: version };
+      const updated = await service.entities.Shop.updateMany(
+        { id: shop.id, ...expectedVersion, restaurant_table_count: current.table_count },
+        { $set: { restaurant_table_layout: clean }, $inc: { restaurant_table_layout_version: 1 } },
+      );
+      if (!updated?.success || Number(updated.updated || 0) !== 1) {
+        return Response.json({ error: "Stollar soni yoki xarita o‘zgardi. Yangilang va qayta urinib ko‘ring." }, { status: 409 });
+      }
+      const saved = await service.entities.Shop.get(shop.id);
+      await service.entities.ActionHistory.create({
+        user_id: String(actor.id || auth.id), user_name: userLabel(actor),
+        action: "restaurant_table_layout_changed",
+        details: `${String(shop.name || shop.id)} · ${current.table_count} stol joylashuvi yangilandi`,
+      });
+      return Response.json({ ok: true, shop: safeShop(saved) });
+    }
+    
     const count = body?.table_count;
     if (!shopId || typeof count !== "number" || !Number.isInteger(count) || count < 0 || count > MAX_TABLES) {
       return Response.json({ error: `Stollar sonini 0 dan ${MAX_TABLES} gacha butun son bilan kiriting.` }, { status: 400 });
@@ -70,7 +122,12 @@ Deno.serve(async (req) => {
 
     // No table orders exist in phase 1. When they are introduced, this action
     // must reject reductions affecting active orders or reservations BEFORE update.
-    const updated = await service.entities.Shop.update(shop.id, { restaurant_table_count: count });
+    const existingLayout = Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [];
+    const updated = await service.entities.Shop.update(shop.id, {
+      restaurant_table_count: count,
+      restaurant_table_layout: existingLayout.filter((row: any) => Number.isInteger(row?.number) && row.number <= count),
+      restaurant_table_layout_version: safeShop(shop).layout_version + 1,
+    });
     await service.entities.ActionHistory.create({
       user_id: String(actor.id || auth.id),
       user_name: userLabel(actor),
