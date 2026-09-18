@@ -52,6 +52,7 @@ export function buildPendingSale({
   recordedAt = new Date().toISOString(),
   shift,
   user,
+  shop,
   cart,
   payments,
 }) {
@@ -100,6 +101,10 @@ export function buildPendingSale({
   }
 
   const recordedIso = timestamp.toISOString();
+  // Offline receipt is printed immediately; freeze only the assigned shop's
+  // currently cached public contact details. The server independently reads
+  // its own authoritative shop data when the queued sale is synchronized.
+  const receiptShop = shop?.id === shift.shop_id ? shop : null;
   const request = {
     action: 'complete_sale',
     shift_id: String(shift.id),
@@ -130,6 +135,9 @@ export function buildPendingSale({
       shift_id: String(shift.id),
       shop_id: String(shift.shop_id),
       shop_name: String(shift.shop_name || ''),
+      receipt_instagram_snapshot: String(receiptShop?.instagram || '').trim().replace(/^@/, ''),
+      receipt_phone_snapshot: String(receiptShop?.phone || '').trim(),
+      receipt_address_snapshot: String(receiptShop?.address || '').trim(),
       items,
       subtotal,
       discount_amount: 0,
