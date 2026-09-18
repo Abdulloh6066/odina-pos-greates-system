@@ -901,11 +901,19 @@ export default function POS() {
           <div className="flex items-center gap-2 min-w-0">
             <Armchair className="w-5 h-5 text-brand-ink shrink-0" />
             <div><strong>{selectedTable ? `${selectedTable.number}-stol · ${tableShop?.name || 'Do‘kon'}` : 'Stol tanlanmagan'}</strong>
-              <p className="text-xs text-muted-foreground">Bu stol uchun tezkor savdo. To‘lanmagan buyurtma hozircha stolga saqlanmaydi.</p>
+              <p className="text-xs text-muted-foreground">{tableOrderLoading ? 'Buyurtma yuklanmoqda…' : tableOrder?.state === 'paying' ? 'To‘lov tekshirilmoqda — yangi savdo boshlamang.' : tableOrder ? `Band · to‘lanmagan: ${formatUZS(tableOrder.total)} · ${tableOrder.items?.length || 0} tur` : 'Bo‘sh stol · buyurtma qo‘shib saqlang.'}</p>
+              {tableCartDirty && !tableOrderLoading && <p className="text-xs font-semibold text-amber-900">Saqlanmagan o‘zgarishlar bor. Stol almashtirilganda avval serverda saqlanadi.</p>}
+              {(tableOrderError || tableSaveError) && <p role="alert" className="text-xs text-destructive">{tableOrderError || tableSaveError}</p>
               {tableSelectionError && <p role="alert" className="text-xs text-destructive">{tableSelectionError}</p>}
             </div>
           </div>
-          <Button type="button" variant="outline" className="min-h-11" onClick={() => void openTablePicker()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
+          <div className="flex flex-wrap gap-2">
+            {(tableOrderError || tableSaveError) && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
+              if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
+              setTableReload((current) => current + 1);
+            }}>Buyurtmani yangilash</Button>}
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => void openTablePicker()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
+          </div>
         </div>
       )}
 
@@ -978,6 +986,7 @@ export default function POS() {
                       product={p}
                       stockQuantity={p.track_stock === false || !shift ? null : Number(stockByProduct[p.id] || 0)}
                       onAdd={addToCart}
+                      disabled={tableLocked || paying}
                     />
                   ))}
                 </div>
@@ -997,6 +1006,8 @@ export default function POS() {
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
+            tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
+            onSaveTable={() => void saveTableOrder()} savingTable={savingTable} locked={tableLocked || paying}
           />
         </div>
       </div>
@@ -1019,7 +1030,9 @@ export default function POS() {
             roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
-            total={total} onCheckout={() => { setMobileCartOpen(false); openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
+            total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
+            tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
+            onSaveTable={() => void saveTableOrder()} savingTable={savingTable} locked={tableLocked || paying}
           />
         </SheetContent>
       </Sheet>
