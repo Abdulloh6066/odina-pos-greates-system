@@ -37,6 +37,34 @@
       "default": 0,
       "description": "Stollar soni: 0 = hali sozlanmagan yoki o\u2018chirilgan"
     },
+    "restaurant_entrance": {
+      "type": "object",
+      "description": "Do\u2018kon zalidagi kirish eshigi: devor va devor bo\u2018ylab 0\u20131000 koordinata",
+      "properties": {
+        "side": {
+          "type": "string",
+          "enum": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 150,
+          "maximum": 850
+        }
+      },
+      "required": [
+        "side",
+        "offset"
+      ],
+      "default": {
+        "side": "top",
+        "offset": 500
+      }
+    },
     "restaurant_table_layout_version": {
       "type": "integer",
       "minimum": 0,
