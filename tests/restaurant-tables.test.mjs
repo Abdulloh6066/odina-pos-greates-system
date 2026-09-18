@@ -63,6 +63,10 @@ function fixture() {
         if (expectedCount !== undefined && (typeof expectedCount === 'object'
           ? !expectedCount.$in.includes(shop.restaurant_table_count ?? null)
           : shop.restaurant_table_count !== expectedCount)) return { success: true, updated: 0 };
+        const layoutExpectation = query.restaurant_table_layout_version;
+        if (layoutExpectation !== undefined && (typeof layoutExpectation === 'object'
+          ? !layoutExpectation.$in.includes(shop.restaurant_table_layout_version ?? null)
+          : shop.restaurant_table_layout_version !== layoutExpectation)) return { success: true, updated: 0 };
         const versionField = query.restaurant_table_orders_version !== undefined
           || query.$or?.some((condition) => Object.hasOwn(condition, 'restaurant_table_orders_version'))
           ? 'restaurant_table_orders_version' : 'restaurant_table_layout_version';
