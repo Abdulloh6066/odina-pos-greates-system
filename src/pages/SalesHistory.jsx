@@ -112,6 +112,7 @@ export default function SalesHistory() {
                   {formatUzbekistan(saleOccurredAt(s), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}
                   {role !== 'cashier' && ` · ${s.user_name || ''}`}
                   {s.shop_name && ` · ${s.shop_name}`}
+                  {Number.isInteger(s.table_number_snapshot) && s.table_number_snapshot > 0 && ` · ${s.table_number_snapshot}-stol`}
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -145,7 +146,7 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
         </DialogHeader>
         <div className="text-xs text-muted-foreground mb-3">
           {formatUzbekistanDateTime(saleOccurredAt(sale), { second: '2-digit' })}
-          {sale.shop_name && ` · ${sale.shop_name}`} · Kassir: {sale.user_name}
+          {sale.shop_name && ` · ${sale.shop_name}`}{Number.isInteger(sale.table_number_snapshot) && sale.table_number_snapshot > 0 && ` · ${sale.table_number_snapshot}-stol`} · Kassir: {sale.user_name}
         </div>
         <div className="space-y-2 mb-3">
           {sale.items?.map((it, i) => (
