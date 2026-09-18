@@ -203,6 +203,16 @@ test('floor plan and POS integration preserve server validation and immutable sa
   assert.match(history, /table_number_snapshot/);
 });
 
+test('entrance marker is at the upper center outside the draggable map and cannot trigger table actions', () => {
+  const floorplan = read('src/components/tables/TableFloorplan.jsx');
+  assert.match(floorplan, /DoorOpen/);
+  assert.match(floorplan, /Kirish \/ Eshik/);
+  assert.match(floorplan, /pointer-events-none absolute left-1\/2 top-0/);
+  assert.match(floorplan, /relative min-w-\[620px\] w-full pt-12/);
+  assert.ok(floorplan.indexOf('Kirish / Eshik') < floorplan.indexOf('ref={boardRef}'));
+  assert.match(floorplan, /if \(!editing\) onOpen\(shop\.id, point\.number\)/);
+});
+
 test('integration is a separate page with role guard and no pretend sales, stock or orders', () => {
   const shop = JSON.parse(read('base44/entities/Shop.jsonc'));
   const fn = JSON.parse(read('base44/functions/restaurant-tables/function.jsonc'));
