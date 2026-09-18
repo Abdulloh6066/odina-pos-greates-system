@@ -30,6 +30,13 @@
     "phone": {
       "type": "string"
     },
+    "restaurant_table_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 30,
+      "default": 0,
+      "description": "Stollar soni: 0 = hali sozlanmagan yoki o\u2018chirilgan"
+    },
     "instagram": {
       "type": "string",
       "description": "Ushbu do\u2018konning chekida ko\u2018rsatiladigan Instagram username"
