@@ -481,7 +481,7 @@ test('rounding idempotency key is tied to requested target', async () => {
 test('rounding UI requires online checkout; existing offline queue remains unmodified', () => {
   const source = readFileSync('src/pages/POS.jsx','utf8');
   assert.match(source,/discountCode \|\| roundingTarget !== null/);
-  assert.match(source,/!discountCode && roundingTarget === null/);
+  assert.match(source,/!selectedTable && !discountCode && roundingTarget === null/);
   assert.match(source,/rounding_total: adjustmentMode === 'rounding'/);
   assert.match(source,/manual_discount_amount: adjustmentMode === 'manual'/);
   const cart = readFileSync('src/components/pos/Cart.jsx','utf8');
