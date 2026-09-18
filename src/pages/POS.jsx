@@ -554,7 +554,8 @@ export default function POS() {
       }
       return;
     }
-    if (!cart.length || stockChecking || offlineSyncing) return;
+    if (!cart.length || stockChecking || offlineSyncing || tableLocked) return;
+    if (selectedTable && (tableCartDirty || !tableOrder?.id) && !(await saveTableOrder())) return;
 
     setStockChecking(true);
     try {
@@ -662,6 +663,9 @@ export default function POS() {
     let pendingRecord = null;
 
     try {
+      if (selectedTable && (tableCartDirty || !tableOrder?.id || tableOrder.state !== 'occupied')) {
+        throw new Error('Buyurtma serverda saqlanganini tekshiring. To‘lovni qayta oching.');
+      }
       if (!selectedTable && !discountCode && roundingTarget === null) {
         pendingRecord = buildPendingSale({
           idempotencyKey,
@@ -687,7 +691,8 @@ export default function POS() {
       const request = pendingRecord?.request || {
         action: 'complete_sale',
         shift_id: shift.id,
-        ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number } : {}),
+        ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number,
+          table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
         items: cart.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
