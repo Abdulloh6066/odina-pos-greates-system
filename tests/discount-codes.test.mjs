@@ -596,4 +596,18 @@ test('each completed sale snapshots only its authenticated shift shop contact de
   assert.equal(centerResult.data.sale.shop_id, 'shop');
 });
 
+test('cashier cannot refund even with owner PIN; backend blocks before writing anything', async () => {
+  const f = fixture();
+  f.db.Sale.push({ id: 'completed-sale', status: 'completed', shop_id: 'shop', user_id: 'cashier',
+    total: 100000, payments: [{ method: 'cash', amount: 100000 }] });
+  const result = await loadHandler(f.client)({
+    action: 'refund_sale', sale_id: 'completed-sale', reason: 'Test only', owner_pin: '2468',
+  });
+  assert.equal(result.status, 403, JSON.stringify(result));
+  assert.match(result.data.error, /faqat egasi/);
+  assert.equal(f.db.Sale[0].status, 'completed');
+  assert.equal(f.db.Refund.length, 0);
+  assert.equal(f.db.StockMovement.length, 0);
+});
+
 console.log('Discount, manual adjustment, rounding, shop receipt contacts and idempotency tests passed. No live data was used.');
