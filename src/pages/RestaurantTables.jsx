@@ -1,14 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Armchair, Building2, Check, ChevronDown, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Armchair, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaConfirm } from '@/lib/odina-dialog';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
+import TableFloorplan from '@/components/tables/TableFloorplan';
 
 const MAX_TABLES = 30;
 const QUICK_COUNTS = [5, 6, 8, 10];
 
 export default function RestaurantTables() {
+  const navigate = useNavigate();
+  const [layoutEditing, setLayoutEditing] = useState(false);
   const [shops, setShops] = useState([]);
   const [selectedShopId, setSelectedShopId] = useState('');
   const [canManage, setCanManage] = useState(false);
@@ -53,6 +57,7 @@ export default function RestaurantTables() {
 
   const saveCount = async () => {
     if (!canManage || !selectedShop || !hasChanges || saving) return;
+    if (layoutEditing && !(await odinaConfirm('Saqlanmagan stol joylashuvi bor. Stol sonini o‘zgartirsangiz bu joylashuv saqlanmaydi. Davom etasizmi?'))) return;
     if (count < selectedShop.table_count) {
       const confirmed = await odinaConfirm({
         title: 'Stollar sonini kamaytirish',
@@ -82,6 +87,25 @@ export default function RestaurantTables() {
     }
   };
 
+  const changeShop = async (shopId) => {
+    if (shopId === selectedShopId || saving) return;
+    if (layoutEditing && !(await odinaConfirm('Xaritadagi saqlanmagan o‘zgarishlar yo‘qoladi. Boshqa do‘konga o‘tasizmi?'))) return;
+    setLayoutEditing(false);
+    setSelectedShopId(shopId);
+  };
+  const refresh = async () => {
+    if (layoutEditing && !(await odinaConfirm('Saqlanmagan joylashuv yo‘qoladi. Xaritani yangilaysizmi?'))) return;
+    setLayoutEditing(false);
+    await load();
+  };
+  const updateLayout = (updatedShop) => {
+    setShops((current) => current.map((shop) => shop.id === updatedShop.id ? updatedShop : shop));
+    setNotice(`${updatedShop.name}: stollar joylashuvi saqlandi.`);
+  };
+  const openTable = (shopId, number) => {
+    navigate(`/pos?${new URLSearchParams({ table_shop: shopId, table_number: String(number) })}`);
+  };
+
   const tableCount = selectedShop?.table_count || 0;
   const totalCount = shops.reduce((sum, shop) => sum + shop.table_count, 0);
 
@@ -89,10 +113,10 @@ export default function RestaurantTables() {
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Stollar"
-        subtitle="Har bir do‘kon stollari alohida. Buyurtma va band qilish keyingi bosqichda ulanadi."
+        subtitle="Stollarni ekranda o‘zingiz joylashtiring. Stolni bosib, shu stol uchun Kassaga o‘ting."
         icon={Armchair}
         eyebrow="ODINA · RESTORAN"
-        actions={<Button variant="outline" onClick={load} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>}
+        actions={<Button variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>}
       />
 
       {error && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm mb-4">{error}</div>}
@@ -121,7 +145,7 @@ export default function RestaurantTables() {
 
           {canManage && shops.length > 1 && (
             <div aria-label="Do‘kon tanlash" className="flex gap-2 flex-wrap">
-              {shops.map((shop) => <button key={shop.id} type="button" disabled={saving} onClick={() => setSelectedShopId(shop.id)} aria-pressed={shop.id === selectedShopId} className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation ${shop.id === selectedShopId ? 'border-brand-olive bg-brand-olive/20 text-foreground' : 'border-border bg-card hover:bg-secondary'}`}>
+              {shops.map((shop) => <button key={shop.id} type="button" disabled={saving} onClick={() => void changeShop(shop.id)} aria-pressed={shop.id === selectedShopId} className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation ${shop.id === selectedShopId ? 'border-brand-olive bg-brand-olive/20 text-foreground' : 'border-border bg-card hover:bg-secondary'}`}>
                 {shop.name} <span className="ml-1 text-xs opacity-70">· {shop.table_count} ta</span>
               </button>)}
             </div>
@@ -161,22 +185,19 @@ export default function RestaurantTables() {
             </div>
 
             {tableCount > 0 ? (
-              <section aria-label={`${selectedShop.name} stollari`} className="space-y-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap"><h2 className="font-display text-xl font-semibold">Stollar rejasi</h2><span className="text-xs text-muted-foreground">{tableCount} ta stol · hozircha faqat ko‘rish</span></div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                  {Array.from({ length: tableCount }, (_, i) => i + 1).map((number) => (
-                    <div key={`${selectedShop.id}-${number}`} className="group min-h-40 rounded-2xl border border-brand-sand/55 bg-card premium-shadow p-4 flex flex-col justify-between gap-4">
-                      <div className="flex justify-between items-start gap-2"><span className="rounded-xl w-10 h-10 flex items-center justify-center bg-brand-olive/10 text-brand-ink"><Armchair className="w-5 h-5" /></span><span className="text-xs text-brand-ink/70 font-semibold">№ {String(number).padStart(2, '0')}</span></div>
-                      <div><h3 className="font-display text-lg font-semibold">{number}-stol</h3><p className="text-xs text-muted-foreground mt-1">Buyurtma va band qilish keyingi bosqichda</p></div>
-                    </div>
-                  ))}
-                </div>
-              </section>
+              <TableFloorplan
+                key={`${selectedShop.id}:${selectedShop.layout_version}:${selectedShop.table_count}`}
+                shop={selectedShop}
+                canManage={canManage}
+                onSaved={updateLayout}
+                onOpen={openTable}
+                onEditingChange={setLayoutEditing}
+              />
             ) : (
               <div className="rounded-2xl border border-dashed border-brand-olive/40 bg-card p-8 sm:p-12 text-center space-y-3"><span className="w-14 h-14 bg-brand-olive/10 rounded-2xl mx-auto flex items-center justify-center"><Sparkles className="w-7 h-7 text-brand-ink" /></span><h2 className="font-display text-xl font-semibold">Stollarni sozlashga tayyor</h2><p className="max-w-md mx-auto text-sm text-muted-foreground">{canManage ? 'Yuqorida stol sonini tanlab saqlang. Har bir do‘konga alohida son belgilanadi.' : 'Admin ushbu do‘kon uchun stollar sonini belgilagach shu yerda ko‘rinadi.'}</p></div>
             )}
           </>}
-          <div className="rounded-xl border border-brand-olive/25 bg-brand-olive/5 p-4 flex items-start gap-3 text-sm text-muted-foreground"><ChevronDown className="w-4 h-4 shrink-0 mt-0.5 text-brand-ink" /><p><strong className="text-foreground">1-bosqich:</strong> do‘kon bo‘yicha stollarni sozlash va ko‘rish. Keyingi bosqichlarda ochiq buyurtma, to‘lov, stokdan aynan bir marta ayirish va vaqtli bron ulanadi. Hozir ushbu sahifa savdo yoki qoldiqni o‘zgartirmaydi.</p></div>
+          <div className="rounded-xl border border-brand-olive/25 bg-brand-olive/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Kassa ulanishi:</strong> stoldan ochilgan tezkor savdo chek va savdolar tarixida stol raqami bilan saqlanadi. Qoldiq faqat savdo yakunlanganda ayiriladi. Stolga to‘lanmagan buyurtma yig‘ish va vaqtli bron keyingi bosqichda qo‘shiladi.</div>
         </div>
       )}
     </div>
