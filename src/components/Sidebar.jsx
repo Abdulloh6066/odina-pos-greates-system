@@ -10,6 +10,7 @@ import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
+import { likelyRoutesForRole, preloadRoute } from '@/lib/route-preload';
 
 const ICONS = {
   LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
@@ -64,6 +65,27 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
     if (screensActive) setScreensOpen(true);
   }, [screensActive]);
 
+  // Fetch code for likely destinations when idle and on navigation intent.
+  // No page component is mounted and no business API call is made by preloading.
+  useEffect(() => {
+    if (navigator.connection?.saveData) return undefined;
+    const warm = () => {
+      for (const path of likelyRoutesForRole(role)) {
+        if (path !== window.location.pathname) void preloadRoute(path, role).catch(() => {});
+      }
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 1800 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(warm, 600);
+    return () => window.clearTimeout(id);
+  }, [role]);
+
+  const warmNavigation = (path) => {
+    if (!navigator.connection?.saveData) void preloadRoute(path, role).catch(() => {});
+  };
+
   const handleLogout = async () => {
     await base44.auth.logout();
   };
@@ -76,6 +98,10 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
         to={item.path}
         end={item.path === '/'}
         onClick={onClose}
+        onPointerEnter={() => warmNavigation(item.path)}
+        onFocus={() => warmNavigation(item.path)}
+        onTouchStart={() => warmNavigation(item.path)}
+        onPointerDown={() => warmNavigation(item.path)}
         title={collapsed ? item.label : undefined}
         className={({ isActive }) =>
           `odina-nav-link group flex min-h-11 items-center gap-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${collapsed ? 'px-3.5 lg:justify-center lg:px-2' : 'px-3.5'} ${
@@ -123,6 +149,10 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
                 key={child.key}
                 to={child.path}
                 onClick={onClose}
+                onPointerEnter={() => warmNavigation(child.path)}
+                onFocus={() => warmNavigation(child.path)}
+                onTouchStart={() => warmNavigation(child.path)}
+                onPointerDown={() => warmNavigation(child.path)}
                 aria-current={child.active ? 'page' : undefined}
                 className={`odina-nav-child flex items-center gap-2.5 min-h-11 px-3 py-2 rounded-xl text-[13px] leading-snug font-medium transition-colors ${child.active ? 'bg-primary/25 text-brand-ink' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
               >
