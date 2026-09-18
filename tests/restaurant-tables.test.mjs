@@ -4,6 +4,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { entranceFromPoint, normalizeEntrance, nudgeEntrance } from '../src/lib/table-floorplan.js';
 
 const read = (path) => readFileSync(path, 'utf8');
 const clone = (value) => value == null ? value : structuredClone(value);
@@ -103,6 +104,7 @@ test('admin sees only active POS shops; no tables are created or implied when co
   assert.equal(data.shops.length, 2);
   assert.equal(data.shops.find((shop) => shop.id === 'central-shop').table_count, 0);
   assert.equal(data.shops.find((shop) => shop.id === 'second-shop').table_count, 8);
+  assert.deepEqual(data.shops.find((shop) => shop.id === 'second-shop').entrance, { side: 'top', offset: 500 });
   assert.equal(data.shops.find((shop) => shop.id === 'warehouse'), undefined);
   assert.equal(f.writes, 0);
 });
@@ -203,14 +205,66 @@ test('floor plan and POS integration preserve server validation and immutable sa
   assert.match(history, /table_number_snapshot/);
 });
 
-test('entrance marker is at the upper center outside the draggable map and cannot trigger table actions', () => {
+test('entrance can snap to all four walls and be nudged without leaving the wall', () => {
+  assert.deepEqual(normalizeEntrance(null), { side: 'top', offset: 500 });
+  assert.deepEqual(normalizeEntrance({ side: 'left', offset: 250 }), { side: 'left', offset: 250 });
+  assert.deepEqual(normalizeEntrance({ side: 'up', offset: 500 }), { side: 'top', offset: 500 });
+  assert.deepEqual(entranceFromPoint(560, 12), { side: 'top', offset: 560 });
+  assert.deepEqual(entranceFromPoint(995, 290), { side: 'right', offset: 290 });
+  assert.deepEqual(entranceFromPoint(360, 992), { side: 'bottom', offset: 360 });
+  assert.deepEqual(entranceFromPoint(9, 680), { side: 'left', offset: 680 });
+  assert.deepEqual(entranceFromPoint(-30, 20), { side: 'left', offset: 150 });
+  assert.deepEqual(nudgeEntrance({ side: 'top', offset: 840 }, 'ArrowRight'), { side: 'top', offset: 850 });
+  assert.deepEqual(nudgeEntrance({ side: 'left', offset: 250 }, 'ArrowDown'), { side: 'left', offset: 270 });
+});
+
+test('entrance is a real draggable marker, only admin can edit, and tables still open the POS', () => {
   const floorplan = read('src/components/tables/TableFloorplan.jsx');
-  assert.match(floorplan, /DoorOpen/);
-  assert.match(floorplan, /Kirish \/ Eshik/);
-  assert.match(floorplan, /pointer-events-none absolute left-1\/2 top-0/);
-  assert.match(floorplan, /relative min-w-\[620px\] w-full pt-12/);
-  assert.ok(floorplan.indexOf('Kirish / Eshik') < floorplan.indexOf('ref={boardRef}'));
-  assert.match(floorplan, /if \(!editing\) onOpen\(shop\.id, point\.number\)/);
+  const page = read('src/pages/RestaurantTables.jsx');
+  assert.match(floorplan, /onPointerDown=\{\(event\) => startDrag\(event, 'entrance'\)\}/);
+  assert.match(floorplan, /onPointerMove=\{\(event\) => onMove\(event, 'entrance'\)\}/);
+  assert.match(floorplan, /setEntrance\(entranceFromPoint/);
+  assert.match(floorplan, /disabled=\{!editing \|\| saving\}/);
+  assert.match(floorplan, /action: 'set_table_layout'/);
+  assert.match(floorplan, /layout_version: shop\.layout_version, layout, entrance/);
+  assert.match(floorplan, /if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
+  assert.ok(page.indexOf('tableCount > 0 && <TableFloorplan') < page.indexOf('Do‘kon stollari'));
+  assert.doesNotMatch(floorplan, /pointer-events-none absolute left-1\/2 top-0/);
+});
+
+test('only admin saves entrance per shop with layout version checks and strict server validation', async () => {
+  const f = fixture();
+  const existing = await f.run({ action: 'status' });
+  const original = existing.data.shops.find((shop) => shop.id === 'second-shop');
+  const layout = [
+    { number: 1, x: 200, y: 200 }, { number: 2, x: 400, y: 200 },
+    { number: 3, x: 600, y: 200 }, { number: 4, x: 800, y: 200 },
+    { number: 5, x: 200, y: 500 }, { number: 6, x: 400, y: 500 },
+    { number: 7, x: 600, y: 500 }, { number: 8, x: 800, y: 500 },
+  ];
+  const denied = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout, entrance: { side: 'ceiling', offset: 500 } });
+  assert.equal(denied.status, 400);
+  const badFraction = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout, entrance: { side: 'top', offset: 200.5 } });
+  assert.equal(badFraction.status, 400);
+  const badRange = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout, entrance: { side: 'right', offset: 0 } });
+  assert.equal(badRange.status, 400);
+  assert.equal(f.writes, 0);
+  const saved = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout, entrance: { side: 'left', offset: 340 } });
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+  assert.deepEqual(saved.data.shop.entrance, { side: 'left', offset: 340 });
+  assert.deepEqual(f.db.Shop[1].restaurant_entrance, { side: 'left', offset: 340 });
+  const writeCount = f.writes;
+  assert.equal((await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0, layout, entrance: { side: 'bottom', offset: 420 } })).status, 409);
+  assert.equal(f.writes, writeCount);
+  f.as('cashier-2');
+  assert.deepEqual((await f.run({ action: 'status' })).data.shops[0].entrance, { side: 'left', offset: 340 });
+  assert.equal((await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 1, layout, entrance: { side: 'bottom', offset: 420 } })).status, 403);
+  assert.equal(f.writes, writeCount);
+  f.as('owner');
+  const changedCount = await f.run({ action: 'set_table_count', shop_id: 'second-shop', table_count: 7 });
+  assert.equal(changedCount.status, 200);
+  assert.deepEqual(changedCount.data.shop.entrance, { side: 'left', offset: 340 });
+  assert.deepEqual(original.entrance, { side: 'top', offset: 500 });
 });
 
 test('integration is a separate page with role guard and no pretend sales, stock or orders', () => {
