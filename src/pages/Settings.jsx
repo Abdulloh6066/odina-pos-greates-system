@@ -27,6 +27,9 @@ export default function Settings() {
   const [ownerPin, setOwnerPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [savingPin, setSavingPin] = useState(false);
+  const [editingShopId, setEditingShopId] = useState('');
+  const [shopContact, setShopContact] = useState({ instagram: '', phone: '', address: '' });
+  const [savingShopContact, setSavingShopContact] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -80,6 +83,40 @@ export default function Settings() {
     }
   };
 
+  const editShopContact = (shop) => {
+    setEditingShopId(shop.id);
+    setShopContact({
+      instagram: shop.instagram || '',
+      phone: shop.phone || '',
+      address: shop.address || '',
+    });
+  };
+
+  const saveShopContact = async () => {
+    const shop = shops.find((row) => row.id === editingShopId && row.location_type === 'shop' && row.allows_pos !== false);
+    if (user?.role !== 'admin' || !shop || savingShopContact) return;
+    const instagram = shopContact.instagram.trim().replace(/^@/, '').toLowerCase();
+    const phone = shopContact.phone.trim();
+    const address = shopContact.address.trim();
+    if ((instagram && !/^[a-z0-9._]{1,30}$/.test(instagram)) || phone.length > 40 || address.length > 300) {
+      void odinaAlert('Instagram: 30 tagacha harf, raqam, nuqta yoki _. Telefon va manzilni qisqartiring.');
+      return;
+    }
+    setSavingShopContact(true);
+    try {
+      const contact = { instagram, phone, address };
+      await base44.entities.Shop.update(shop.id, contact);
+      setShops((current) => current.map((row) => row.id === shop.id ? { ...row, ...contact } : row));
+      setEditingShopId('');
+      await logAction(user, 'shop_receipt_contact_updated', `Do‘kon chek ma’lumotlari yangilandi: ${shop.name}`);
+      void odinaAlert(`${shop.name}: chek ma’lumotlari saqlandi.`);
+    } catch (error) {
+      void odinaAlert('Do‘kon ma’lumotlarini saqlab bo‘lmadi: ' + (error?.message || error));
+    } finally {
+      setSavingShopContact(false);
+    }
+  };
+
   const addShop = async () => {
     const name = await odinaPrompt('Yangi do‘kon nomini kiriting.', {
       title: 'Yangi do‘kon',
@@ -119,8 +156,9 @@ export default function Settings() {
               <Textarea value={thankYou} onChange={(e) => setThankYou(e.target.value)} rows={2} />
             </div>
             <div>
-              <Label className="text-xs mb-1.5 block">Chek tagidagi ma’lumot (ixtiyoriy)</Label>
-              <Input value={receiptFooter} onChange={(e) => setReceiptFooter(e.target.value)} placeholder="Address / phone / Instagram" />
+              <Label className="text-xs mb-1.5 block">Barcha do‘konlar uchun umumiy chek izohi (ixtiyoriy)</Label>
+              <Input value={receiptFooter} onChange={(e) => setReceiptFooter(e.target.value)} placeholder="Masalan: Har kuni siz bilanmiz!" />
+              <p className="text-xs text-muted-foreground mt-1">Instagram, telefon va manzilni pastdagi har bir do‘kon sozlamasida alohida kiriting. Eski umumiy izohda ular yozilgan bo‘lsa, takrorlanmasligi uchun uni shu yerdan tahrirlang.</p>
             </div>
             <div className="w-32">
               <Label className="text-xs mb-1.5 block">Valyuta</Label>
@@ -182,11 +220,40 @@ export default function Settings() {
             </div>
             <div className="space-y-2">
               {shops.map((s) => (
-                <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{s.name} {s.is_main && <span className="text-xs text-brand-ink">· Asosiy</span>}</div>
-                    {s.address && <div className="text-xs text-muted-foreground truncate">{s.address}</div>}
+                <div key={s.id} className="p-3 rounded-xl bg-secondary/50 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{s.name} {s.is_main && <span className="text-xs text-brand-ink">· Asosiy</span>}</div>
+                      {s.address && <div className="text-xs text-muted-foreground break-words">{s.address}</div>}
+                      {s.phone && <div className="text-xs text-muted-foreground">Telefon: {s.phone}</div>}
+                      {s.instagram && <div className="text-xs text-brand-ink">Instagram: @{String(s.instagram).replace(/^@/, '')}</div>}
+                    </div>
+                    {user?.role === 'admin' && s.location_type === 'shop' && s.allows_pos !== false && (
+                      <Button type="button" size="sm" variant="outline" disabled={savingShopContact} onClick={() => editShopContact(s)} className="min-h-11 shrink-0 rounded-xl">Chek sozlamalari</Button>
+                    )}
                   </div>
+                  {editingShopId === s.id && (
+                    <div className="rounded-xl border border-primary/25 bg-card p-3 space-y-3">
+                      <p className="text-sm font-semibold">{s.name} — chekdagi aloqa ma’lumotlari</p>
+                      <div>
+                        <Label className="text-xs mb-1.5 block">Instagram</Label>
+                        <Input value={shopContact.instagram} onChange={(e) => setShopContact((old) => ({ ...old, instagram: e.target.value }))} placeholder="@odinacake" maxLength={31} autoComplete="off" />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1.5 block">Telefon</Label>
+                        <Input type="tel" value={shopContact.phone} onChange={(e) => setShopContact((old) => ({ ...old, phone: e.target.value }))} placeholder="+998 ..." maxLength={40} />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1.5 block">Manzil</Label>
+                        <Textarea value={shopContact.address} onChange={(e) => setShopContact((old) => ({ ...old, address: e.target.value }))} rows={2} maxLength={300} placeholder="Do‘konning aniq manzili" />
+                      </div>
+                      <p className="text-xs text-muted-foreground">Bo‘sh qoldirilgan ma’lumot chekda chiqmaydi. Faqat ushbu do‘kon o‘zgaradi.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" onClick={saveShopContact} disabled={savingShopContact} className="min-h-11 bg-primary text-primary-foreground hover:bg-primary-strong"><Save className="w-4 h-4 mr-1.5" />{savingShopContact ? 'Saqlanmoqda…' : 'Saqlash'}</Button>
+                        <Button type="button" variant="outline" disabled={savingShopContact} onClick={() => setEditingShopId('')} className="min-h-11">Bekor qilish</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {shops.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Hali do‘konlar yo‘q.</p>}
