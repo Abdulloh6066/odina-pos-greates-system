@@ -279,6 +279,7 @@ export default function POS() {
   // restricts the picker to its shop. This is read-only until a table is tapped.
   const openTablePicker = async () => {
     if (screenMode) return;
+    if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
     setTablePickerOpen(true);
     setTablePickerLoading(true);
     setTablePickerError('');
@@ -928,6 +929,11 @@ export default function POS() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {tableCartDirty && !tableOrderLoading && <Button type="button" variant="outline" className="min-h-11" onClick={() => {
+              setCart(tableOrder?.items || []);
+              setTableSaveError('');
+              setDiscountCode(''); setDiscountPct(0); setRoundingTarget(null); setAdjustmentMode(null);
+            }}>Saqlangan holatga qaytish</Button>}
             {tableOrder?.state === 'paying' && <Button type="button" variant="outline" className="min-h-11 border-amber-500" onClick={() => void reconcileTablePayment()}>To‘lovni tekshirish</Button>}
             {(tableOrderError || tableSaveError) && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
@@ -1061,7 +1067,7 @@ export default function POS() {
       {!screenMode && <Sheet open={tablePickerOpen} onOpenChange={setTablePickerOpen}>
         <SheetContent side="bottom" className="h-[92dvh] overflow-y-auto rounded-t-[28px] p-4 sm:p-6">
           <SheetTitle className="font-display text-xl font-bold pr-10">Kassa · Stollar xaritasi</SheetTitle>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">Stolni tanlang — Kassa o‘sha stol bilan ochiladi. Savat avval saqlanmagan bo‘lsa, almashtirishdan oldin tasdiq so‘raladi.</p>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">Bo‘sh stolga yangi buyurtma oching yoki band stolning hisobini davom ettiring. To‘lov faqat mehmon ketganda yakunlanadi.</p>
           {tablePickerLoading ? <div role="status" className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Stollar yuklanmoqda…</div> : <>
             {tablePickerError && <div role="alert" className="mb-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{tablePickerError}</div>}
             {tablePickerShops.length > 1 && <div role="group" aria-label="Stollar do‘konini tanlash" className="mb-4 flex flex-wrap gap-2">
@@ -1082,7 +1088,7 @@ export default function POS() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={() => void openTablePicker()} disabled={tablePickerLoading} className="min-h-11 rounded-xl"><RefreshCw className="h-4 w-4 mr-1.5" /> Yangilash</Button>
             {selectedTable && <Button type="button" variant="outline" onClick={async () => {
-              if (cart.length && !(await odinaConfirm('Oddiy savdoga o‘tsangiz stolning saqlanmagan savati yo‘qoladi. Davom etasizmi?'))) return;
+              if (tableCartDirty && !(await saveTableOrder())) return;
               setTablePickerOpen(false);
               navigate('/pos');
             }} className="min-h-11 rounded-xl">Oddiy savdoga o‘tish</Button>}
