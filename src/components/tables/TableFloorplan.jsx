@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, DoorOpen,
+  Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, DoorOpen,
   Edit3, Grip, MousePointer2, RotateCcw, Save, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -181,7 +181,14 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
               {wall.label} devor
             </button>)}
           </div>
-          <p className="text-xs text-muted-foreground">Eshikni devor bo‘ylab suring. Klaviaturadagi yo‘nalish tugmalari bilan ham aniqroq joylashtirish mumkin.</p>
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
+            <label htmlFor="entrance-position" className="text-xs font-semibold whitespace-nowrap">Eshikning devordagi joyi</label>
+            <input id="entrance-position" type="range" min="150" max="850" step="10" value={entrance.offset} disabled={saving}
+              onChange={(event) => setEntrance((previous) => ({ ...previous, offset: Number(event.target.value) }))}
+              className="min-w-[120px] flex-1 accent-[#ACA95D]" />
+            <span className="w-11 text-right text-xs font-bold tabular-nums text-brand-ink">{entrance.offset / 10}%</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Eshikni devor bo‘ylab suring, yuqoridagi slayderdan foydalaning yoki klaviaturada yo‘nalish tugmalarini bosing.</p>
         </div>
       )}
 
@@ -264,7 +271,6 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
         <span className="inline-flex items-center gap-1.5"><DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— suring yoki devorni tanlang' : '— kirish joyi'}</span>
         <span className="inline-flex items-center gap-1.5">{editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />} {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Ochiq buyurtma va bron keyingi bosqichda'}</span>
       </div>
-      {!editing && <p className="sr-only"><Check /> Kassa bilan tezkor ulanish tayyor.</p>}
     </section>
   );
 }
