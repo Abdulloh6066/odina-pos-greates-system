@@ -23,7 +23,8 @@ const hasValidPosition = (entry: any, count: number) => {
 // Preserve original collision spacing at 100%; larger tables need more room.
 const overlaps = (a: any, b: any) => {
   const factor = (sizeOf(a) + sizeOf(b)) / 200;
-  return Math.abs(a.x - b.x) < 115 * factor && Math.abs(a.y - b.y) < 125 * factor;
+  const verticalSpacing = factor === 1 ? 125 : 175 * factor;
+  return Math.abs(a.x - b.x) < 115 * factor && Math.abs(a.y - b.y) < verticalSpacing;
 };
 const validateLayout = (layout: any, count: number) => {
   if (!Array.isArray(layout) || layout.length !== count || count <= 0 || count > MAX_TABLES) return false;
