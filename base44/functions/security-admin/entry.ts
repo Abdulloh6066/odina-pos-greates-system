@@ -11,6 +11,7 @@ const safeUser = (user: any) => ({
   id: String(user?.id || ""),
   full_name: String(user?.full_name || ""),
   email: String(user?.email || ""),
+  is_owner: isOwner(String(user?.email || "")),
   role: userRole(user),
   shop_id: userShopId(user),
   shop_name: String(user?.shop_name || user?.data?.shop_name || ""),
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Boshqa Admin hisobini faqat hisob egasi boshqaradi." }, { status: 403 });
     }
 
-    const patch: Record<string, unknown> = {}; 
+    const patch: Record<string, unknown> = {};
     const changes: string[] = [];
     const hasRole = Object.prototype.hasOwnProperty.call(body, "role");
     const hasShop = Object.prototype.hasOwnProperty.call(body, "shop_id");
