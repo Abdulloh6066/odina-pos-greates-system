@@ -81,9 +81,9 @@ export function preloadRoute(path, role) {
 }
 
 // Only warm a handful of likely destinations after the browser becomes idle.
-// In particular, do not eagerly download the large Reports bundle or all 22 pages.
+// In particular, do not eagerly download the large Reports bundle or all pages.
 const LIKELY_ROUTES = {
-  admin: ['/pos', '/orders', '/tables', '/warehouse', '/users', '/security'],
+  admin: ['/pos', '/tables', '/warehouse', '/users', '/security'],
   manager: ['/warehouse', '/customers', '/sales'],
   cashier: ['/orders', '/tables', '/warehouse', '/sales'],
   accountant: ['/products', '/warehouse', '/sales'],
