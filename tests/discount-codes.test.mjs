@@ -596,6 +596,19 @@ test('each completed sale snapshots only its authenticated shift shop contact de
   assert.equal(centerResult.data.sale.shop_id, 'shop');
 });
 
+test('cashier cannot create sales from another shop shift', async () => {
+  const f = fixture();
+  f.db.Shift[0].shop_id = 'branch';
+  const result = await loadHandler(f.client)({
+    action: 'complete_sale', shift_id: 'shift',
+    items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+  });
+  assert.equal(result.status, 403, JSON.stringify(result));
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+});
+
 test('cashier cannot refund even with owner PIN; backend blocks before writing anything', async () => {
   const f = fixture();
   f.db.Sale.push({ id: 'completed-sale', status: 'completed', shop_id: 'shop', user_id: 'cashier',
