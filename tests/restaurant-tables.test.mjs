@@ -148,5 +148,6 @@ test('integration is a separate page with role guard and no pretend sales, stock
   assert.match(page, /functions\.invoke\('restaurant-tables'/);
   assert.doesNotMatch(page, /entities\.(Shop|Sale|Shift|ProductStock|CustomerOrder)\.(create|update|delete)/);
   assert.doesNotMatch(backend, /entities\.(Sale|SaleItem|Payment|Shift|ProductStock|IngredientStock|CustomerOrder)\.(create|update|delete)/);
-  assert.match(page, /Buyurtma va band qilish keyingi bosqichda/);
+  assert.match(page, /TableFloorplan/);
+  assert.match(page, /to‘lanmagan buyurtma yig‘ish va vaqtli bron keyingi bosqichda/i);
 });
