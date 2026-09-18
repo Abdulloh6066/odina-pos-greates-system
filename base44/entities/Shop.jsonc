@@ -37,6 +37,42 @@
       "default": 0,
       "description": "Stollar soni: 0 = hali sozlanmagan yoki o\u2018chirilgan"
     },
+    "restaurant_table_layout_version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Stollar joylashuvi versiyasi; bir vaqtda tahrirlash nazorati"
+    },
+    "restaurant_table_layout": {
+      "type": "array",
+      "description": "Stollarning do\u2018kon bo\u2018yicha 0\u20131000 koordinatadagi joylashuvi",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "x": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 940
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 70,
+            "maximum": 930
+          }
+        },
+        "required": [
+          "number",
+          "x",
+          "y"
+        ]
+      },
+      "default": []
+    },
     "instagram": {
       "type": "string",
       "description": "Ushbu do\u2018konning chekida ko\u2018rsatiladigan Instagram username"
