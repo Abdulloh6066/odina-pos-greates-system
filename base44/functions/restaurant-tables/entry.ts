@@ -5,6 +5,18 @@ import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../sha
 // complete-sale. This function never creates sales, orders or stock movements.
 const ALLOWED_ROLES = new Set(["admin", "cashier"]);
 const MAX_TABLES = 30;
+const MAX_ORDER_ITEMS = 100;
+const ordersOf = (shop: any) => Array.isArray(shop?.restaurant_table_orders) ? shop.restaurant_table_orders : [];
+const ordersVersion = (shop: any) => Number.isInteger(shop?.restaurant_table_orders_version)
+  && shop.restaurant_table_orders_version >= 0 ? shop.restaurant_table_orders_version : 0;
+const ordersVersionCondition = (version: number) => version === 0
+  ? { $or: [{ restaurant_table_orders_version: 0 }, { restaurant_table_orders_version: { $exists: false } }] }
+  : { restaurant_table_orders_version: version };
+const orderSummary = (order: any) => ({
+  number: order.number, state: order.state, revision: order.revision,
+  total: order.total, item_count: (order.items || []).reduce((sum: number, item: any) => sum + item.quantity, 0),
+  started_at: order.started_at, updated_at: order.updated_at,
+});
 const DEFAULT_ENTRANCE = { side: "top", offset: 500 };
 const validEntrance = (entry: any) => entry && ["top", "right", "bottom", "left"].includes(entry.side)
   && Number.isInteger(entry.offset) && entry.offset >= 150 && entry.offset <= 850;
@@ -46,6 +58,8 @@ const safeShop = (shop: any) => ({
     && shop.restaurant_table_count >= 0 && shop.restaurant_table_count <= MAX_TABLES
     ? shop.restaurant_table_count : 0,
   entrance: cleanEntrance(shop.restaurant_entrance),
+  orders: ordersOf(shop).filter((order: any) => Number.isInteger(order.number))
+    .map(orderSummary).sort((a: any, b: any) => a.number - b.number),
   layout_version: Number.isInteger(shop.restaurant_table_layout_version)
     && shop.restaurant_table_layout_version >= 0 ? shop.restaurant_table_layout_version : 0,
   layout: (Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [])
@@ -88,13 +102,90 @@ Deno.serve(async (req) => {
       });
     }
 
+    const shopId = String(body?.shop_id || "");
+    if (action === "get_table_order" || action === "save_table_order") {
+      const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
+      if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
+      if (role === "cashier" && userShopId(actor) !== shop.id) {
+        return Response.json({ error: "Boshqa do‘kon stoliga ruxsat yo‘q." }, { status: 403 });
+      }
+      const number = body?.table_number;
+      if (!Number.isInteger(number) || number < 1 || number > safeShop(shop).table_count) {
+        return Response.json({ error: "Bu do‘konda stol topilmadi." }, { status: 400 });
+      }
+      const stored = ordersOf(shop);
+      const existing = stored.find((order: any) => order.number === number) || null;
+      if (action === "get_table_order") return Response.json({ ok: true, order: existing });
+      const shiftId = String(body?.shift_id || "");
+      const shift = shiftId ? await service.entities.Shift.get(shiftId).catch(() => null) : null;
+      if (!shift || shift.status !== "open" || shift.user_id !== actor.id || shift.shop_id !== shop.id) {
+        return Response.json({ error: "Stol buyurtmasini faqat shu do‘kondagi ochiq smenangizda saqlang." }, { status: 403 });
+      }
+      const revision = body?.expected_revision;
+      if (!Number.isInteger(revision) || revision < 0 || revision !== (existing?.revision || 0)) {
+        return Response.json({ error: "Buyurtma boshqa qurilmada o‘zgardi. Yangilang; sizning savatingiz o‘chirilmaydi." }, { status: 409 });
+      }
+      if (existing?.state !== undefined && existing.state !== "occupied") {
+        return Response.json({ error: "Bu stolning to‘lovi boshlangan. Buyurtmani o‘zgartirib bo‘lmaydi." }, { status: 409 });
+      }
+      const requested = body?.items;
+      if (!Array.isArray(requested) || requested.length < 1 || requested.length > MAX_ORDER_ITEMS) {
+        return Response.json({ error: "Buyurtmada 1–100 turdagi mahsulot bo‘lishi kerak." }, { status: 400 });
+      }
+      const previousItems = new Map((existing?.items || []).map((item: any) => [item.product_id, item]));
+      const seen = new Set<string>();
+      const items: any[] = [];
+      for (const row of requested) {
+        const productId = String(row?.product_id || "");
+        const quantity = row?.quantity;
+        if (!productId || seen.has(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000) {
+          return Response.json({ error: "Takroriy mahsulot yoki dona soni noto‘g‘ri." }, { status: 400 });
+        }
+        seen.add(productId);
+        const previous: any = previousItems.get(productId);
+        const product = await service.entities.Product.get(productId).catch(() => null);
+        if (!previous && (!product || product.active === false || product.archived === true)) {
+          return Response.json({ error: "Yangi qo‘shilgan mahsulot sotuvda mavjud emas." }, { status: 409 });
+        }
+        const price = previous ? previous.price : Number(product.price);
+        if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(price * quantity)) {
+          return Response.json({ error: "Mahsulot narxi yoki miqdori noto‘g‘ri." }, { status: 400 });
+        }
+        items.push({ product_id: productId,
+          product_name: previous?.product_name || String(product.name || "Mahsulot"),
+          image_url: previous?.image_url || String(product.image_url || ""),
+          price, quantity, subtotal: price * quantity,
+          stock_tracked: previous ? previous.stock_tracked !== false : product.track_stock !== false,
+          source_type: previous?.source_type || product.source_type || "central_produced" });
+      }
+      const total = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+      if (!Number.isSafeInteger(total) || total > 1_000_000_000_000) {
+        return Response.json({ error: "Buyurtma summasi chegaradan oshdi." }, { status: 400 });
+      }
+      const now = new Date().toISOString();
+      const order = { id: existing?.id || crypto.randomUUID(), number, revision: revision + 1,
+        state: "occupied", items, total, started_at: existing?.started_at || now,
+        opened_by: existing?.opened_by || actor.id, updated_by: actor.id, updated_at: now };
+      const version = ordersVersion(shop);
+      const updated = await service.entities.Shop.updateMany(
+        { id: shop.id, restaurant_table_count: safeShop(shop).table_count, ...ordersVersionCondition(version) },
+        { $set: { restaurant_table_orders: [...stored.filter((row: any) => row.number !== number), order] },
+          $inc: { restaurant_table_orders_version: 1 } },
+      );
+      if (!updated?.success || Number(updated.updated || 0) !== 1) {
+        return Response.json({ error: "Xarita boshqa qurilmada o‘zgardi. Savatni saqlagan holda yangilang." }, { status: 409 });
+      }
+      await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
+        action: "restaurant_table_order_saved",
+        details: `${shop.name} · ${number}-stol · ${revision + 1}-tahrir · ${total} UZS (to‘lanmagan)` }).catch(() => {});
+      return Response.json({ ok: true, order, summary: orderSummary(order) });
+    }
     if (action !== "set_table_count" && action !== "set_table_layout") {
       return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     }
     if (role !== "admin") {
       return Response.json({ error: "Stollarni faqat admin o‘zgartiradi." }, { status: 403 });
     }
-    const shopId = String(body?.shop_id || "");
     if (action === "set_table_layout") {
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
       if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
@@ -148,9 +239,10 @@ Deno.serve(async (req) => {
     }
     const previous = safeShop(shop).table_count;
     if (previous === count) return Response.json({ ok: true, shop: safeShop(shop), unchanged: true });
-
-    // No table orders exist in phase 1. When they are introduced, this action
-    // must reject reductions affecting active orders or reservations BEFORE update.
+    if (ordersOf(shop).some((order: any) => order.number > count)) {
+      return Response.json({ error: "Buyurtmasi ochiq stolni olib tashlab bo‘lmaydi. Avval hisobni yakunlang." }, { status: 409 });
+    }
+    // Keep the table orders intact when the count grows or unused tables are removed.
     const existingLayout = Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [];
     const updated = await service.entities.Shop.update(shop.id, {
       restaurant_table_count: count,
