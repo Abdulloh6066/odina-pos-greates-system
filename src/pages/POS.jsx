@@ -152,6 +152,14 @@ export default function POS() {
   );
   const tableLocked = Boolean(selectedTable) && (tableOrderLoading || savingTable
     || Boolean(tableOrderError) || tableOrder?.state === 'paying');
+  // A browser refresh or tab close must warn about edits not yet acknowledged
+  // by the server. Saved orders remain available after any reload.
+  useEffect(() => {
+    if (!selectedTable || !tableCartDirty) return undefined;
+    const warnUnsaved = (event) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warnUnsaved);
+    return () => window.removeEventListener('beforeunload', warnUnsaved);
+  }, [tableKey, tableCartDirty]);
   const saveTableOrder = async () => {
     if (!selectedTable || !tableCartDirty) return !selectedTable || Boolean(tableOrder?.id);
     if (savingTableRef.current || tableOrderLoading || tableOrderError || tableOrder?.state === 'paying') return false;
