@@ -195,6 +195,8 @@ test('each table has its own size, old layouts remain 100%, and larger tables re
   assert.equal(validateTableLayout(2, bigger), false);
   assert.equal(validateTableLayout(2, [{ ...bigger[0], x: 84 }, { ...bigger[1], x: 385 }]), true);
   assert.equal(validateTableLayout(2, [{ ...bigger[0], x: 60 }, bigger[1]]), false);
+  assert.equal(tablesOverlap({ number: 1, x: 250, y: 300, size: 140 }, { number: 2, x: 250, y: 490, size: 100 }), true);
+  assert.equal(validateTableLayout(1, [{ number: 1, x: 60, y: 70, size: 80 }]), true);
   assert.equal(validateTableLayout(2, [{ ...legacy[0], size: 150 }, legacy[1]]), false);
   assert.equal(validateTableLayout(2, [{ ...legacy[0], size: 95 }, legacy[1]]), false);
 });
