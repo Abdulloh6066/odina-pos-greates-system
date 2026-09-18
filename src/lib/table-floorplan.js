@@ -1,6 +1,12 @@
 // Pure floor-plan coordinates. No SDK calls, inventory access or local storage.
 export const TABLE_MAX = 30;
 export const LIMITS = { minX: 60, maxX: 940, minY: 70, maxY: 930 };
+export const TABLE_SIZES = [80, 90, 100, 110, 120, 130, 140];
+export const tableSize = (entry) => entry?.size === undefined ? 100 : entry.size;
+export const tableBounds = (size) => ({
+  minX: LIMITS.minX * size / 100, maxX: 1000 - LIMITS.minX * size / 100,
+  minY: LIMITS.minY * size / 100, maxY: 1000 - LIMITS.minY * size / 100,
+});
 export const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
 export const ENTRANCE_SIDES = ['top', 'right', 'bottom', 'left'];
@@ -33,18 +39,23 @@ export function nudgeEntrance(entrance, direction, step = 20) {
   return { ...current, offset: clamp(current.offset + change, 150, 850) };
 }
 
-export const tablesOverlap = (left, right) =>
-  Math.abs(left.x - right.x) < 115 && Math.abs(left.y - right.y) < 125;
+export const tablesOverlap = (left, right) => {
+  const factor = (tableSize(left) + tableSize(right)) / 200;
+  return Math.abs(left.x - right.x) < 115 * factor && Math.abs(left.y - right.y) < 125 * factor;
+};
 
 export function buildTableLayout(count, saved = []) {
   const amount = Number.isInteger(count) ? clamp(count, 0, TABLE_MAX) : 0;
   const valid = new Map();
   for (const row of Array.isArray(saved) ? saved : []) {
+    const size = tableSize(row);
     if (!Number.isInteger(row?.number) || row.number < 1 || row.number > amount
-      || !Number.isInteger(row?.x) || row.x < LIMITS.minX || row.x > LIMITS.maxX
-      || !Number.isInteger(row?.y) || row.y < LIMITS.minY || row.y > LIMITS.maxY
+      || !TABLE_SIZES.includes(size)
+      || !Number.isInteger(row?.x) || !Number.isInteger(row?.y)
+      || row.x < tableBounds(size).minX || row.x > tableBounds(size).maxX
+      || row.y < tableBounds(size).minY || row.y > tableBounds(size).maxY
       || valid.has(row.number)) continue;
-    const proposed = { number: row.number, x: row.x, y: row.y };
+    const proposed = { number: row.number, x: row.x, y: row.y, size };
     if (![...valid.values()].some((position) => tablesOverlap(position, proposed))) valid.set(row.number, proposed);
   }
 
@@ -66,7 +77,7 @@ export function buildTableLayout(count, saved = []) {
     if (valid.has(number)) continue;
     const slot = positions.find((position) => ![...valid.values()].some((used) => tablesOverlap(used, position)));
     // Max 30 seats on a 7x6 grid means a valid slot always exists for normal counts.
-    valid.set(number, { number, ...(slot || { x: 500, y: 500 }) });
+    valid.set(number, { number, ...(slot || { x: 500, y: 500 }), size: 100 });
   }
   return [...valid.values()].sort((a, b) => a.number - b.number);
 }
@@ -76,9 +87,12 @@ export function validateTableLayout(count, layout) {
       || !Array.isArray(layout) || layout.length !== count) return false;
   const unique = new Set();
   for (const point of layout) {
+    const size = tableSize(point);
+    const bounds = tableBounds(size);
     if (!point || !Number.isInteger(point.number) || point.number < 1 || point.number > count
-      || !Number.isInteger(point.x) || point.x < LIMITS.minX || point.x > LIMITS.maxX
-      || !Number.isInteger(point.y) || point.y < LIMITS.minY || point.y > LIMITS.maxY
+      || !TABLE_SIZES.includes(size)
+      || !Number.isInteger(point.x) || point.x < bounds.minX || point.x > bounds.maxX
+      || !Number.isInteger(point.y) || point.y < bounds.minY || point.y > bounds.maxY
       || unique.has(point.number)) return false;
     unique.add(point.number);
   }
