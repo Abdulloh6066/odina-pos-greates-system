@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft } from 'lucide-react';
-import TableFloorplan from '@/components/tables/TableFloorplan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -21,6 +20,9 @@ import {
   isRetryableSyncError,
   syncErrorMessage,
 } from '@/lib/offline-sales';
+
+// Load the larger floor-plan component only when the cashier opens its picker.
+const TableFloorplan = React.lazy(() => import('@/components/tables/TableFloorplan'));
 
 export default function POS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
@@ -939,8 +941,10 @@ export default function POS() {
               </Button>)}
             </div>}
             {tablePickerShop && tablePickerShop.table_count > 0
-              ? <TableFloorplan key={`${tablePickerShop.id}:${tablePickerShop.layout_version}`} shop={tablePickerShop}
-                  canManage={false} onOpen={(shopId, number) => void chooseTableInPos(shopId, number)} />
+              ? <React.Suspense fallback={<div role="status" className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Zal xaritasi ochilmoqda…</div>}>
+                  <TableFloorplan key={`${tablePickerShop.id}:${tablePickerShop.layout_version}`} shop={tablePickerShop}
+                    canManage={false} onOpen={(shopId, number) => void chooseTableInPos(shopId, number)} />
+                </React.Suspense>
               : !tablePickerError && <div className="rounded-2xl border border-dashed p-7 text-center text-sm text-muted-foreground">
                   Bu do‘konda stol soni belgilanmagan. «Stollar» sahifasida admin sozlashi mumkin.
                 </div>}
