@@ -132,6 +132,8 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       });
       const result = response?.data || response;
       if (!result?.ok || result?.shop?.id !== shop.id) throw new Error('Xarita saqlangani tasdiqlanmadi.');
+      // Clear the parent's unsaved-change flag even when its versioned key remounts this component.
+      onEditingChange?.(false);
       onSaved(result.shop);
       setEditing(false);
     } catch (err) {
