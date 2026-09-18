@@ -31,24 +31,31 @@ const ROLE_LABELS = {
   warehouse: 'Omborchi',
 };
 
-// Hisob egasi — boshqa adminlar tomonidan o'chirilishi/o'zgartirilishi mumkin emas.
-const OWNER_EMAIL = 'dota26066@gmail.com';
-const isOwnerEmail = (email) => Boolean(email) && String(email).trim().toLowerCase() === OWNER_EMAIL;
-
 export default function Users() {
   const { user } = useOutletContext();
   const [users, setUsers] = useState([]);
   const [shops, setShops] = useState([]);
+  const [canManageAdmins, setCanManageAdmins] = useState(false);
+  const [pendingDemotion, setPendingDemotion] = useState(null);
+  const [demotionShopId, setDemotionShopId] = useState('');
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [u, sh] = await Promise.all([base44.entities.User.list(), base44.entities.Shop.list()]);
-      setUsers(u || []);
+      const [accessResponse, sh] = await Promise.all([
+        base44.functions.invoke('security-admin', { action: 'status' }),
+        base44.entities.Shop.list(),
+      ]);
+      const access = accessResponse?.data || accessResponse;
+      setUsers(access?.users || []);
+      setCanManageAdmins(access?.can_manage_admins === true);
       setShops(sh || []);
-    } catch {}
+    } catch (error) {
+      setCanManageAdmins(false);
+      void odinaAlert('Xodimlar ro‘yxatini yuklab bo‘lmadi: ' + (error?.message || error));
+    }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -67,8 +74,35 @@ export default function Users() {
     }
   };
 
-  const updateRole = async (id, role) => {
-    await updateAccess({ target_user_id: id, role });
+  const updateRole = async (target, role) => {
+    if (role === target.role) return;
+    if ((role === 'admin' || target.role === 'admin') && !canManageAdmins) return;
+    if (target.role === 'admin' && role !== 'admin') {
+      setPendingDemotion({ target, role });
+      setDemotionShopId(target.shop_id || '');
+      return;
+    }
+    if (role === 'admin') {
+      const confirmed = await odinaConfirm({
+        title: 'Admin huquqini berish',
+        description: `${target.full_name || target.email} barcha do‘konlar, Budget va xodimlar bo‘limiga kirish huquqini oladi. Tasdiqlaysizmi?`,
+        confirmLabel: 'Admin qilish',
+        tone: 'danger',
+      });
+      if (!confirmed) return;
+    }
+    await updateAccess({ target_user_id: target.id, role });
+  };
+
+  const confirmDemotion = async () => {
+    if (!pendingDemotion || !demotionShopId) {
+      void odinaAlert('Yangi lavozim uchun do‘konni tanlang.');
+      return;
+    }
+    const { target, role } = pendingDemotion;
+    setPendingDemotion(null);
+    await updateAccess({ target_user_id: target.id, role, shop_id: demotionShopId });
+    setDemotionShopId('');
   };
 
   const updateShop = async (id, shopId) => {
@@ -128,17 +162,17 @@ export default function Users() {
                   <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                 </div>
               </div>
-              {isOwnerEmail(u.email) ? (
+              {u.is_owner ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Shield className="w-4 h-4 text-brand-olive" />
                   Himoyalangan hisob — o‘chirilishi yoki o‘zgartirilishi mumkin emas.
                 </div>
-              ) : u.id !== user.id ? (
+              ) : u.id !== user.id && (u.role !== 'admin' || canManageAdmins) ? (
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 w-full min-w-0">
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ruxsat darajasi</span>
-                    <OdinaSelect value={u.role} onChange={(e) => updateRole(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                      <option value="admin" disabled>Egasi / Admin</option>
+                    <OdinaSelect value={u.role} onChange={(e) => updateRole(u, e.target.value)} className="h-11 rounded-lg border border-input bg-card px-2 text-sm font-medium">
+                      {(canManageAdmins || u.role === 'admin') && <option value="admin" disabled={!canManageAdmins}>Admin</option>}
                       <option value="manager">Boshqaruvchi</option>
                       <option value="cashier">Kassir</option>
                       <option value="accountant">Hisobchi</option>
@@ -148,10 +182,14 @@ export default function Users() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ish joyi</span>
-                    <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-9 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                      <option value="">Joy biriktirilmagan</option>
-                      {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
-                    </OdinaSelect>
+                    {u.role === 'admin' ? (
+                      <p className="min-h-11 flex items-center text-xs text-muted-foreground">Barcha do‘konlar · lavozimni o‘zgartirishda ish joyi tanlanadi</p>
+                    ) : (
+                      <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-11 rounded-lg border border-input bg-card px-2 text-sm font-medium">
+                        <option value="">Joy biriktirilmagan</option>
+                        {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
+                      </OdinaSelect>
+                    )}
                   </div>
                   <div className="flex gap-2 sm:col-span-2">
                     {u.active === false ? (
@@ -186,12 +224,29 @@ export default function Users() {
           {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">Xodimlar topilmadi.</p>}
         </div>
       )}
-      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} />
+      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} canManageAdmins={canManageAdmins} />
+      <Dialog open={Boolean(pendingDemotion)} onOpenChange={(open) => { if (!open) setPendingDemotion(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Admin huquqini qaytarib olish</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">{pendingDemotion?.target.full_name || pendingDemotion?.target.email} yangi lavozimga o‘tadi. Oldingi savdo va moliyaviy tarix saqlanadi.</p>
+          <div className="space-y-2">
+            <Label>Yangi ish joyi</Label>
+            <OdinaSelect value={demotionShopId} onChange={(event) => setDemotionShopId(event.target.value)}>
+              <option value="">Do‘konni tanlang</option>
+              {shops.filter((shop) => shop.active !== false).map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+            </OdinaSelect>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDemotion(null)}>Bekor qilish</Button>
+            <Button disabled={!demotionShopId} onClick={confirmDemotion}>Lavozimni o‘zgartirish</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
+function InviteDialog({ open, onClose, onDone, user, shops = [], canManageAdmins = false }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('cashier');
   const [shopId, setShopId] = useState('');
@@ -210,6 +265,16 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
       return;
     }
 
+    if (role === 'admin') {
+      if (!canManageAdmins) return;
+      const confirmed = await odinaConfirm({
+        title: 'Admin taklifi',
+        description: `${normalizedEmail} barcha do‘konlar, Budget va xodimlar bo‘limiga kirish huquqini oladi. Davom etasizmi?`,
+        confirmLabel: 'Admin taklifini yuborish',
+        tone: 'danger',
+      });
+      if (!confirmed) return;
+    }
     setSaving(true);
     try {
       const result = await base44.functions.invoke('staff-invite', {
@@ -253,6 +318,7 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
               disabled={saving}
               className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
             >
+              {canManageAdmins && <option value="admin">Admin (to‘liq huquq)</option>}
               <option value="manager">Boshqaruvchi</option>
               <option value="cashier">Kassir</option>
               <option value="accountant">Hisobchi</option>
@@ -279,7 +345,7 @@ function InviteDialog({ open, onClose, onDone, user, shops = [] }) {
             </div>
           )}
           <div className="rounded-xl bg-secondary/70 px-3.5 py-3 text-xs leading-5 text-muted-foreground">
-            Xodim emaildagi taklif havolasini ochib, o‘z parolini yaratadi. Birinchi kirishda tanlangan lavozim va ish joyi avtomatik biriktiriladi.
+            Xodim emaildagi taklif havolasini ochib, o‘z parolini yaratadi. Birinchi kirishda tanlangan lavozim va ish joyi avtomatik biriktiriladi. Admin to‘liq huquqqa ega; faqat hisob egasi uni tayinlaydi.
           </div>
         </div>
         <DialogFooter>
