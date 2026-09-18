@@ -51,7 +51,7 @@ test('React uses one shared cached loader; sidebar warms only on intent/idle, no
   assert.match(source, /if \(!inFlight\.has\(key\)\)/);
   assert.match(source, /inFlight\.delete\(key\)/);
   assert.match(source, /return key \? preloadPage\(key\) : Promise\.resolve\(null\)/);
-  assert.doesNotMatch(source, /base44|entities\.|functions\.invoke|\.create\(|\.update\(|\.delete\(/);
+  assert.doesNotMatch(source, /base44|entities\.|functions\.invoke|\.create\(|\.update\(/);
   assert.match(sidebar, /requestIdleCallback/);
   assert.match(sidebar, /onPointerEnter=\{\(\) => warmNavigation\(item\.path\)\}/);
   assert.match(sidebar, /onTouchStart=\{\(\) => warmNavigation\(child\.path\)\}/);
