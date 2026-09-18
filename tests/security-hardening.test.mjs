@@ -9,13 +9,14 @@ import ts from 'typescript';
 
 const read = (path) => readFileSync(path, 'utf8');
 
-test('User RLS allows only admin-wide read and self read; mutations are admin-only', () => {
+test('User RLS allows admin-wide read and self read; only protected owner may update or delete user records directly', () => {
   const schema = JSON.parse(read('base44/entities/User.jsonc'));
   const readRules = schema.rls?.read?.$or || [];
   assert.ok(readRules.some((rule) => rule?.user_condition?.role === 'admin'));
   assert.ok(readRules.some((rule) => rule?.id === '{{user.id}}'));
-  assert.equal(schema.rls?.update?.user_condition?.role, 'admin');
-  assert.equal(schema.rls?.delete?.user_condition?.role, 'admin');
+  const ownerEmail = read('base44/functions/security-admin/entry.ts').match(/const OWNER_EMAIL = "([^"]+)"/)[1];
+  assert.equal(schema.rls?.update?.user_condition?.email, ownerEmail);
+  assert.equal(schema.rls?.delete?.user_condition?.email, ownerEmail);
   assert.equal(schema.rls?.create, undefined);
 });
 
