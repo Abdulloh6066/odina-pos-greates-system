@@ -59,7 +59,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     const valid = payments.filter((p) => Number(p.amount) > 0);
     if (valid.length === 0) { setError('Kamida bitta to‘lov kiriting.'); return; }
     const sum = valid.reduce((s, p) => s + Number(p.amount), 0);
-    if (Math.abs(sum - total) > 1) {
+    // Match the backend: no 1 UZS tolerance, or the cashier sees a false success path.
+    if (sum !== total) {
       setError(`Jami ${formatUZS(total)}, to‘lovlar esa ${formatUZS(sum)}. Farq: ${formatUZS(Math.abs(sum - total))}.`);
       return;
     }
