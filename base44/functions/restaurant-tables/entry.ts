@@ -267,7 +267,8 @@ Deno.serve(async (req) => {
     // Keep the table orders intact when the count grows or unused tables are removed.
     const existingLayout = Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [];
     const countUpdate = await service.entities.Shop.updateMany(
-      { id: shop.id, restaurant_table_count: previous, ...ordersVersionCondition(ordersVersion(shop)) },
+      { id: shop.id, restaurant_table_count: previous === 0 ? { $in: [0, null] } : previous,
+        ...ordersVersionCondition(ordersVersion(shop)) },
       { $set: { restaurant_table_count: count,
         restaurant_table_layout: existingLayout.filter((row: any) => Number.isInteger(row?.number) && row.number <= count),
         restaurant_table_layout_version: safeShop(shop).layout_version + 1 } },
