@@ -158,6 +158,10 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   };
 
   const chosen = layout.find((point) => point.number === selectedNumber);
+  const openOrders = shop.orders || [];
+  const occupiedCount = openOrders.filter((order) => order.state === 'occupied').length;
+  const payingCount = openOrders.filter((order) => order.state === 'paying').length;
+  const unpaidTotal = openOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
   const verticalDoor = entrance.side === 'left' || entrance.side === 'right';
 
   return (
@@ -183,6 +187,13 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
           </> : <Button type="button" variant="outline" onClick={() => { setError(''); setEditing(true); }} className="min-h-11 rounded-xl"><Edit3 className="mr-1.5 h-4 w-4" /> Xaritani tahrirlash</Button>)}
         </div>
       </div>
+
+      {!editing && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Zal holati">
+        <div className="rounded-xl border border-border bg-[#fbf8f0] p-3"><p className="text-[11px] text-muted-foreground">Bo‘sh</p><p className="text-xl font-bold tabular-nums">{Math.max(0, shop.table_count - openOrders.length)}</p></div>
+        <div className="rounded-xl border border-brand-olive/35 bg-brand-olive/10 p-3"><p className="text-[11px] text-muted-foreground">Band</p><p className="text-xl font-bold tabular-nums">{occupiedCount}</p></div>
+        <div className="rounded-xl border border-amber-300/70 bg-[#FECD7C]/20 p-3"><p className="text-[11px] text-muted-foreground">To‘lovda</p><p className="text-xl font-bold tabular-nums">{payingCount}</p></div>
+        <div className="rounded-xl border border-brand-sand/50 bg-card p-3"><p className="text-[11px] text-muted-foreground">Ochiq hisoblar</p><p className="text-lg font-bold tabular-nums text-brand-ink">{unpaidTotal.toLocaleString('en-US')} <span className="text-xs">UZS</span></p></div>
+      </div>}
 
       {editing && (
         <div className="rounded-2xl border border-brand-olive/30 bg-brand-olive/5 p-3 sm:p-4 space-y-3">
@@ -308,7 +319,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Bo‘sh / Band / To‘lov holati'}</span>
         <span className="inline-flex items-center gap-1.5"><DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— suring yoki devorni tanlang' : '— kirish joyi'}</span>
-        <span className="inline-flex items-center gap-1.5">{editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />} {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Ochiq buyurtma va bron keyingi bosqichda'}</span>
+        <span className="inline-flex items-center gap-1.5">{editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />} {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Buyurtma to‘lovgacha stolda qoladi · bron keyingi bosqichda'}</span>
       </div>
     </section>
   );
