@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Boshqaruvchi', cashier: 'Kassir', accountant: 'Hisobchi', production: 'Ishlab chiq.', warehouse: 'Omborchi' };
 
-export default function StaffAccessPanel({ users, currentUser, onChanged }) {
+export default function StaffAccessPanel({ users, currentUser, canManageAdmins = false, onChanged }) {
   const [busy, setBusy] = useState('');
   const navigate = useNavigate();
 
   const toggle = async (u) => {
-    if (u.id === currentUser?.id) return void odinaAlert("O'z hisobingizni o'chira olmaysiz.");
+    if (u.id === currentUser?.id || u.is_owner) return void odinaAlert("Himoyalangan hisobni o‘zgartirib bo‘lmaydi.");
+    if (u.role === 'admin' && !canManageAdmins) return void odinaAlert('Admin hisobini faqat egasi boshqaradi.');
     const nextActive = u.active === false;
     if (!nextActive) {
       const ok = await odinaConfirm(`${u.full_name || u.email} ni o'chirishni tasdiqlang? U tizimga kira olmaydi.`, { tone: 'danger' });
@@ -45,11 +46,12 @@ export default function StaffAccessPanel({ users, currentUser, onChanged }) {
           Barchasi <ArrowUpRight className="w-3.5 h-3.5" />
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">O'chirilgan xodim tizimga kira olmaydi. Lavozim va ish joyini "Xodimlar" sahifasida o'zgartiring.</p>
+      <p className="text-xs text-muted-foreground mb-4">O‘chirilgan xodim tizimga kira olmaydi; hisob va tarix saqlanadi. Admin huquqini faqat hisob egasi boshqaradi. Lavozim va ish joyi «Xodimlar» sahifasida o‘zgartiriladi.</p>
       <div className="space-y-2 max-h-80 overflow-y-auto scrollbar-thin pr-1">
         {users.map((u) => {
           const disabled = u.active === false;
           const isSelf = u.id === currentUser?.id;
+          const protectedAccount = isSelf || u.is_owner || (u.role === 'admin' && !canManageAdmins);
           return (
             <div key={u.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/50">
               <div className="w-8 h-8 rounded-full bg-card flex items-center justify-center font-semibold text-sm shrink-0">{(u.full_name || u.email || '?').charAt(0).toUpperCase()}</div>
@@ -59,7 +61,7 @@ export default function StaffAccessPanel({ users, currentUser, onChanged }) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={'text-[11px] font-medium ' + (disabled ? 'text-destructive' : 'text-emerald-700')}>{disabled ? "O'chirilgan" : 'Faol'}</span>
-                <Switch checked={!disabled} disabled={Boolean(busy) || isSelf} onCheckedChange={() => toggle(u)} aria-label="Kirishni yoqish/o'chirish" />
+                <Switch checked={!disabled} disabled={Boolean(busy) || protectedAccount} onCheckedChange={() => toggle(u)} aria-label="Kirishni yoqish/o'chirish" />
               </div>
             </div>
           );
