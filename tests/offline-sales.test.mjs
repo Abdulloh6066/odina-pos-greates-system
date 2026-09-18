@@ -52,6 +52,23 @@ test('offline sale keeps the original Tashkent business date and safe request ke
   assert.equal(Object.hasOwn(record.request, 'owner_pin'), false);
 });
 
+test('offline preview freezes the assigned shop contact details without trusting a different shop', () => {
+  const shop = {
+    id: 'shop-test', instagram: '@odinacake', phone: '+998 90 123 45 67', address: 'Central street',
+  };
+  const record = pendingSale({ shop });
+  assert.equal(record.local_sale.receipt_instagram_snapshot, 'odinacake');
+  assert.equal(record.local_sale.receipt_phone_snapshot, '+998 90 123 45 67');
+  assert.equal(record.local_sale.receipt_address_snapshot, 'Central street');
+  shop.instagram = 'changed_later';
+  assert.equal(record.local_sale.receipt_instagram_snapshot, 'odinacake');
+  assert.equal(Object.hasOwn(record.request, 'receipt_instagram_snapshot'), false);
+
+  const differentShop = pendingSale({ shop: { ...shop, id: 'another-shop' } });
+  assert.equal(differentShop.local_sale.receipt_instagram_snapshot, '');
+  assert.equal(differentShop.local_sale.receipt_phone_snapshot, '');
+});
+
 test('offline sale is not stored when payment total is invalid', () => {
   assert.throws(
     () => pendingSale({ payments: [{ method: 'cash', amount: 40000 }] }),
