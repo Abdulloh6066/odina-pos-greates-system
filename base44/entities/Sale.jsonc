@@ -47,6 +47,15 @@
     "shop_name": {
       "type": "string"
     },
+    "table_order_id_snapshot": {
+      "type": "string",
+      "description": "To\u2018langan stol buyurtmasining o\u2018zgarmas identifikatori"
+    },
+    "table_order_revision_snapshot": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "To\u2018lov paytidagi stol buyurtmasi versiyasi"
+    },
     "table_number_snapshot": {
       "type": "integer",
       "minimum": 1,
