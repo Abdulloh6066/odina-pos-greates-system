@@ -1022,14 +1022,19 @@ export default async function(req) {
             error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan.",
           }, { status: 409 });
         }
+        let tableReleased = true;
         if (existingSale.table_order_id_snapshot) {
-          await changeLockedTable(service, existingSale.shop_id, existingSale.table_order_id_snapshot, idempotencyKey, true);
+          try {
+            tableReleased = await changeLockedTable(service, existingSale.shop_id,
+              existingSale.table_order_id_snapshot, idempotencyKey, true);
+          } catch { tableReleased = false; }
         }
         const existingShift = await service.entities.Shift.get(existingSale.shift_id).catch(() => null);
         return Response.json({
           sale: existingSale,
           shift: existingShift,
           stock_updates: [],
+          table_released: tableReleased,
           already_processed: true,
         });
       }
@@ -1257,14 +1262,19 @@ export default async function(req) {
           && completedSale.shift_id === shift.id
           && (!completedSale.request_fingerprint || completedSale.request_fingerprint === requestFingerprint)
         ) {
+          let tableReleased = true;
           if (completedSale.table_order_id_snapshot) {
-            await changeLockedTable(service, completedSale.shop_id, completedSale.table_order_id_snapshot, idempotencyKey, true);
+            try {
+              tableReleased = await changeLockedTable(service, completedSale.shop_id,
+                completedSale.table_order_id_snapshot, idempotencyKey, true);
+            } catch { tableReleased = false; }
           }
           const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
           return Response.json({
             sale: completedSale,
             shift: completedShift,
             stock_updates: [],
+            table_released: tableReleased,
             already_processed: true,
           });
         }
