@@ -438,5 +438,6 @@ test('integration is a separate page with role guard and no pretend sales, stock
   assert.doesNotMatch(page, /entities\.(Shop|Sale|Shift|ProductStock|CustomerOrder)\.(create|update|delete)/);
   assert.doesNotMatch(backend, /entities\.(Sale|SaleItem|Payment|Shift|ProductStock|IngredientStock|CustomerOrder)\.(create|update|delete)/);
   assert.match(page, /TableFloorplan/);
-  assert.match(page, /to‘lanmagan buyurtma yig‘ish va vaqtli bron keyingi bosqichda/i);
+  assert.match(page, /mahsulotlar stolda to‘lovgacha saqlanadi/i);
+  assert.match(page, /Bron qilish hali qo‘shilmagan/i);
 });
