@@ -59,6 +59,10 @@ function fixture(percentage = 5) {
       quantity: 10,
     }],
     Settings: [{ id: 'settings', allow_negative_stock: false }],
+    Shop: [
+      { id: 'shop', name: 'Test shop', instagram: 'odinacake', phone: '+998 90 111 11 11', address: 'Central street' },
+      { id: 'branch', name: 'Test Branch', instagram: 'gurlan_odinacake', phone: '+998 90 222 22 22', address: 'Gurlan street' },
+    ],
     DiscountCode: [{
       id: 'discount',
       code,
@@ -559,4 +563,37 @@ test('backend rejects arbitrary rounded totals and simultaneous adjustment modes
   }
 });
 
-console.log('Discount, manual adjustment, rounding and idempotency tests passed. No live data was used.');
+test('each completed sale snapshots only its authenticated shift shop contact details', async () => {
+  const center = fixture();
+  const centerResult = await loadHandler(center.client)({
+    action: 'complete_sale', shift_id: 'shift', items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+    receipt_instagram_snapshot: 'forged_account', // client-supplied details must never be trusted
+  });
+  assert.equal(centerResult.status, 200, JSON.stringify(centerResult));
+  assert.equal(centerResult.data.sale.receipt_instagram_snapshot, 'odinacake');
+  assert.equal(centerResult.data.sale.receipt_phone_snapshot, '+998 90 111 11 11');
+  assert.equal(centerResult.data.sale.receipt_address_snapshot, 'Central street');
+  center.db.Shop[0].instagram = 'changed_later';
+  center.db.Shop[0].phone = 'changed later';
+  assert.equal(center.db.Sale[0].receipt_instagram_snapshot, 'odinacake');
+  assert.equal(center.db.Sale[0].receipt_phone_snapshot, '+998 90 111 11 11');
+
+  const branch = fixture();
+  branch.db.User[0].shop_id = 'branch';
+  branch.db.Shift[0].shop_id = 'branch';
+  branch.db.Shift[0].shop_name = 'Test Branch';
+  branch.db.ProductStock[0].location_id = 'branch';
+  const branchResult = await loadHandler(branch.client)({
+    action: 'complete_sale', shift_id: 'shift', items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+  });
+  assert.equal(branchResult.status, 200, JSON.stringify(branchResult));
+  assert.equal(branchResult.data.sale.receipt_instagram_snapshot, 'gurlan_odinacake');
+  assert.equal(branchResult.data.sale.receipt_phone_snapshot, '+998 90 222 22 22');
+  assert.equal(branchResult.data.sale.receipt_address_snapshot, 'Gurlan street');
+  assert.equal(branchResult.data.sale.shop_id, 'branch');
+  assert.equal(centerResult.data.sale.shop_id, 'shop');
+});
+
+console.log('Discount, manual adjustment, rounding, shop receipt contacts and idempotency tests passed. No live data was used.');
