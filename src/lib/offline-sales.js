@@ -96,7 +96,7 @@ export function buildPendingSale({
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   const total = Math.round(subtotal * 100) / 100;
   const paid = normalizedPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  if (total > 0 && (!normalizedPayments.length || Math.abs(paid - total) > 1)) {
+  if (total > 0 && (!normalizedPayments.length || paid !== total)) {
     throw errorWithCode('To‘lov summasi savdo summasiga teng bo‘lishi kerak.', 'INVALID_PAYMENT_TOTAL');
   }
 
