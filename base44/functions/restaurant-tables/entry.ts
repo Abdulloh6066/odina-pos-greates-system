@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     }
 
     const shopId = String(body?.shop_id || "");
-    if (action === "get_table_order" || action === "save_table_order") {
+    if (action === "get_table_order" || action === "save_table_order" || action === "reconcile_table_payment") {
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
       if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
       if (role === "cashier" && userShopId(actor) !== shop.id) {
@@ -116,6 +116,28 @@ Deno.serve(async (req) => {
       const stored = ordersOf(shop);
       const existing = stored.find((order: any) => order.number === number) || null;
       if (action === "get_table_order") return Response.json({ ok: true, order: existing });
+      if (action === "reconcile_table_payment") {
+        if (!existing || existing.state !== "paying" || !existing.checkout_key) {
+          return Response.json({ error: "To‘lov tekshiriladigan stol topilmadi." }, { status: 409 });
+        }
+        const matches = await service.entities.Sale.filter({
+          table_order_id_snapshot: existing.id, idempotency_key: existing.checkout_key,
+        }, "-created_date", 2);
+        if ((matches || []).length !== 1 || matches[0].status !== "completed"
+          || matches[0].shop_id !== shop.id || matches[0].table_number_snapshot !== number) {
+          return Response.json({ error: "To‘lov tasdiqlanmadi. Qayta to‘lov olmang — egasi Savdolar tarixini tekshirsin." }, { status: 409 });
+        }
+        const version = ordersVersion(shop);
+        const cleared = await service.entities.Shop.updateMany(
+          { id: shop.id, ...ordersVersionCondition(version) },
+          { $set: { restaurant_table_orders: stored.filter((row: any) => row.id !== existing.id) },
+            $inc: { restaurant_table_orders_version: 1 } },
+        );
+        if (!cleared?.success || Number(cleared.updated || 0) !== 1) {
+          return Response.json({ error: "Stol holati o‘zgardi. Yangilang va qayta tekshiring." }, { status: 409 });
+        }
+        return Response.json({ ok: true, sale_id: matches[0].id, released: true });
+      }
       const shiftId = String(body?.shift_id || "");
       const shift = shiftId ? await service.entities.Shift.get(shiftId).catch(() => null) : null;
       if (!shift || shift.status !== "open" || shift.user_id !== actor.id || shift.shop_id !== shop.id) {
@@ -244,11 +266,16 @@ Deno.serve(async (req) => {
     }
     // Keep the table orders intact when the count grows or unused tables are removed.
     const existingLayout = Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [];
-    const updated = await service.entities.Shop.update(shop.id, {
-      restaurant_table_count: count,
-      restaurant_table_layout: existingLayout.filter((row: any) => Number.isInteger(row?.number) && row.number <= count),
-      restaurant_table_layout_version: safeShop(shop).layout_version + 1,
-    });
+    const countUpdate = await service.entities.Shop.updateMany(
+      { id: shop.id, restaurant_table_count: previous, ...ordersVersionCondition(ordersVersion(shop)) },
+      { $set: { restaurant_table_count: count,
+        restaurant_table_layout: existingLayout.filter((row: any) => Number.isInteger(row?.number) && row.number <= count),
+        restaurant_table_layout_version: safeShop(shop).layout_version + 1 } },
+    );
+    if (!countUpdate?.success || Number(countUpdate.updated || 0) !== 1) {
+      return Response.json({ error: "Stol buyurtmasi yoki stollar soni o‘zgardi. Yangilang." }, { status: 409 });
+    }
+    const updated = await service.entities.Shop.get(shop.id);
     await service.entities.ActionHistory.create({
       user_id: String(actor.id || auth.id),
       user_name: userLabel(actor),
