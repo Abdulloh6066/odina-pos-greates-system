@@ -192,6 +192,23 @@ export default function POS() {
     }
   };
 
+  const reconcileTablePayment = async () => {
+    if (!selectedTable || tableOrder?.state !== 'paying') return;
+    if (!isOnline) { void odinaAlert('To‘lovni tekshirish uchun internet kerak.'); return; }
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'reconcile_table_payment', shop_id: selectedTable.shopId, table_number: selectedTable.number,
+      });
+      const result = response?.data || response;
+      if (!result?.ok || !result?.released) throw new Error(result?.error || 'Stolni bo‘shatish tasdiqlanmadi.');
+      setTableReload((current) => current + 1);
+      setTableSaveError('');
+      void odinaAlert('To‘lov Savdolar tarixida tasdiqlandi. Stol endi bo‘sh.');
+    } catch (error) {
+      setTableSaveError(error?.response?.data?.error || error?.data?.error || error?.message || 'To‘lovni tasdiqlab bo‘lmadi.');
+    }
+  };
+
   const loadAll = async () => {
     setLoadingData(true);
     const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts, stockList, wasteAlertResult] = await Promise.all([
@@ -649,6 +666,9 @@ export default function POS() {
     checkoutRecordedAtRef.current = '';
     resetCart();
     setTableOrder(null);
+    if (payload.table_released === false) {
+      void odinaAlert('Savdo yozildi, lekin stolni bo‘shatish tasdiqlanmadi. Qayta pul olmang! Stollar xaritasida «To‘lovni tekshirish» orqali yakunlang.');
+    }
     base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
       .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
       .catch(() => {});
@@ -908,6 +928,7 @@ export default function POS() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {tableOrder?.state === 'paying' && <Button type="button" variant="outline" className="min-h-11 border-amber-500" onClick={() => void reconcileTablePayment()}>To‘lovni tekshirish</Button>}
             {(tableOrderError || tableSaveError) && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
               setTableReload((current) => current + 1);
