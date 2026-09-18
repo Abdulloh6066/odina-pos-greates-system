@@ -64,6 +64,13 @@ export default function Receipt({ open, sale, settings, onClose }) {
           <div className="text-center text-[12px] leading-relaxed px-1 py-1 font-semibold">
             {receiptWishForSale(sale)}
           </div>
+          {(sale.receipt_instagram_snapshot || sale.receipt_phone_snapshot || sale.receipt_address_snapshot) && (
+            <div className="border-t border-dashed border-border mt-2 pt-2 text-center text-[11px] leading-relaxed break-words">
+              {sale.receipt_address_snapshot && <div>Manzil: {sale.receipt_address_snapshot}</div>}
+              {sale.receipt_phone_snapshot && <div>Telefon: {sale.receipt_phone_snapshot}</div>}
+              {sale.receipt_instagram_snapshot && <div>Instagram: @{String(sale.receipt_instagram_snapshot).replace(/^@/, '')}</div>}
+            </div>
+          )}
           {settings?.receipt_footer && <div className="text-center text-[10px] mt-1">{settings.receipt_footer}</div>}
         </div>
 
