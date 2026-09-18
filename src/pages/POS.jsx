@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -24,6 +24,20 @@ import {
 export default function POS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
   const navigate = useNavigate();
+  const location = useLocation();
+  const tableQuery = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    const shopId = query.get('table_shop');
+    const rawNumber = query.get('table_number');
+    if (!shopId && !rawNumber) return { selected: null, invalid: false };
+    if (!shopId || !/^[1-9]\d*$/.test(rawNumber || '')) return { selected: null, invalid: true };
+    const number = Number(rawNumber);
+    if (!Number.isInteger(number) || number > 30) return { selected: null, invalid: true };
+    return { selected: { shopId, number }, invalid: false };
+  }, [location.search]);
+  const selectedTable = screenMode ? null : tableQuery.selected;
+  const tableKey = selectedTable ? `${selectedTable.shopId}:${selectedTable.number}` : '';
+  const priorTableKey = useRef(tableKey);
 
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -65,6 +79,21 @@ export default function POS() {
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+
+  // Do not accidentally carry an unsaved cart from one table to another when
+  // only the URL changes and React keeps the POS component mounted.
+  useEffect(() => {
+    if (priorTableKey.current === tableKey) return;
+    priorTableKey.current = tableKey;
+    setCart([]);
+    setDiscountCode('');
+    setDiscountPct(0);
+    setDiscountOwnerPin('');
+    setRoundingTarget(null);
+    setAdjustmentMode(null);
+    setPayOpen(false);
+    setMobileCartOpen(false);
+  }, [tableKey]);
 
   const loadAll = async () => {
     setLoadingData(true);
@@ -130,6 +159,17 @@ export default function POS() {
 
     return () => unsubscribe?.();
   }, [user?.id]);
+
+  const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
+  const tableSelectionError = tableQuery.invalid && !screenMode
+    ? 'Stol havolasi noto‘g‘ri. Xaritadan qayta tanlang.'
+    : selectedTable && !loadingData && (!tableShop
+      || !Number.isInteger(tableShop.restaurant_table_count)
+      || selectedTable.number > tableShop.restaurant_table_count)
+      ? 'Tanlangan stol bu do‘konda mavjud emas. Xaritani yangilang.'
+      : selectedTable && shift && shift.shop_id !== selectedTable.shopId
+        ? 'Faol smena boshqa do‘konga tegishli. To‘g‘ri smenani tanlang.'
+        : '';
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.subtotal, 0), [cart]);
   const couponDiscount = useMemo(() => Math.round(subtotal * discountPct / 100), [subtotal, discountPct]);
@@ -320,6 +360,10 @@ export default function POS() {
   };
 
   const openOfflinePayment = async () => {
+    if (selectedTable) {
+      await odinaAlert('Stolga bog‘langan savdo faqat internet orqali yakunlanadi. Savat saqlanib turadi.');
+      return false;
+    }
     if (discountCode || roundingTarget !== null) {
       await odinaAlert('Chegirmali savdoni tekshirish uchun internet kerak. Savat saqlanib turadi.', {
         title: 'Internet kerak',
@@ -345,6 +389,14 @@ export default function POS() {
   };
 
   const openCheckout = async () => {
+    if (tableSelectionError || (selectedTable && (!tableShop || (shift && shift.shop_id !== selectedTable.shopId)))) {
+      await odinaAlert(tableSelectionError || 'Stol uchun do‘kon va smenani tekshiring.');
+      return;
+    }
+    if (selectedTable && (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false))) {
+      await odinaAlert('Stol savdosini internet qaytmaguncha yakunlab bo‘lmaydi. Savat saqlanib turadi.');
+      return;
+    }
     if (!shift) {
       if (!isOnline) {
         void odinaAlert('Smenani ochish uchun internet kerak.');
@@ -386,7 +438,7 @@ export default function POS() {
       );
       if (accepted) openPayment(false);
     } catch (error) {
-      if (isRetryableSyncError(error)) {
+      if (isRetryableSyncError(error) && !selectedTable) {
         await openOfflinePayment();
         return;
       }
@@ -456,7 +508,7 @@ export default function POS() {
     let pendingRecord = null;
 
     try {
-      if (!discountCode && roundingTarget === null) {
+      if (!selectedTable && !discountCode && roundingTarget === null) {
         pendingRecord = buildPendingSale({
           idempotencyKey,
           recordedAt,
@@ -469,6 +521,7 @@ export default function POS() {
       }
 
       if (checkoutOffline || !isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+        if (selectedTable) throw new Error('Stol savdosini internet orqali tasdiqlash kerak. Savat saqlanib turadi.');
         if (!pendingRecord) {
           throw new Error('Chegirmali savdoni offline saqlab bo‘lmaydi. Internetni kuting.');
         }
@@ -480,6 +533,7 @@ export default function POS() {
       const request = pendingRecord?.request || {
         action: 'complete_sale',
         shift_id: shift.id,
+        ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number } : {}),
         items: cart.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
@@ -515,6 +569,10 @@ export default function POS() {
   };
 
   const openShift = async ({ shop, starting_cash }) => {
+    if (selectedTable && shop?.id !== selectedTable.shopId) {
+      void odinaAlert('Stol boshqa do‘konga tegishli. Stolning do‘konida smena oching.');
+      return;
+    }
     if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       void odinaAlert('Smenani ochish uchun internet kerak.');
       return;
@@ -666,6 +724,22 @@ export default function POS() {
         onRetry={syncOfflineSales}
       />
 
+      {!screenMode && (selectedTable || tableQuery.invalid) && (
+        <div className="mx-3 sm:mx-5 mt-3 shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 p-3 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <Armchair className="w-5 h-5 text-brand-ink shrink-0" />
+            <div><strong>{selectedTable ? `${selectedTable.number}-stol · ${tableShop?.name || 'Do‘kon'}` : 'Stol tanlanmagan'}</strong>
+              <p className="text-xs text-muted-foreground">Bu stol uchun tezkor savdo. To‘lanmagan buyurtma hozircha stolga saqlanmaydi.</p>
+              {tableSelectionError && <p role="alert" className="text-xs text-destructive">{tableSelectionError}</p>}
+            </div>
+          </div>
+          <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
+            if (cart.length && !(await odinaConfirm('Stollar xaritasiga qaytsangiz joriy saqlanmagan savat yo‘qoladi. Davom etasizmi?'))) return;
+            navigate('/tables');
+          }}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
+        </div>
+      )}
+
       {!screenMode && wasteAlerts.length > 0 && (
         <button
           type="button"
@@ -753,7 +827,7 @@ export default function POS() {
             roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
-            total={total} onCheckout={openCheckout} disabled={!shift}
+            total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
           />
         </div>
       </div>
@@ -776,7 +850,7 @@ export default function POS() {
             roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
-            total={total} onCheckout={() => { setMobileCartOpen(false); openCheckout(); }} disabled={!shift}
+            total={total} onCheckout={() => { setMobileCartOpen(false); openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
           />
         </SheetContent>
       </Sheet>
@@ -789,7 +863,10 @@ export default function POS() {
         loading={paying}
         offline={checkoutOffline || !isOnline}
       />
-      <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => setReceiptOpen(false)} />
+      <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => {
+        setReceiptOpen(false);
+        if (selectedTable && !lastSale?.offline_pending) navigate('/tables');
+      }} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
