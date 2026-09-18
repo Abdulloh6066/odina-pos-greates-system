@@ -462,6 +462,7 @@ export default function POS() {
           recordedAt,
           shift,
           user,
+          shop: shops.find((shop) => shop.id === shift.shop_id),
           cart,
           payments,
         });
