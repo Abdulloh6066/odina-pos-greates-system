@@ -60,7 +60,9 @@ function fixture() {
         const shop = db.Shop.find((row) => row.id === query.id);
         if (!shop) return { success: true, updated: 0 };
         const expectedCount = query.restaurant_table_count;
-        if (expectedCount !== undefined && shop.restaurant_table_count !== expectedCount) return { success: true, updated: 0 };
+        if (expectedCount !== undefined && (typeof expectedCount === 'object'
+          ? !expectedCount.$in.includes(shop.restaurant_table_count ?? null)
+          : shop.restaurant_table_count !== expectedCount)) return { success: true, updated: 0 };
         const versionField = query.restaurant_table_orders_version !== undefined
           || query.$or?.some((condition) => Object.hasOwn(condition, 'restaurant_table_orders_version'))
           ? 'restaurant_table_orders_version' : 'restaurant_table_layout_version';
