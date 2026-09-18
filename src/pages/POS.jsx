@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft } from 'lucide-react';
+import TableFloorplan from '@/components/tables/TableFloorplan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -80,6 +81,11 @@ export default function POS() {
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [tablePickerOpen, setTablePickerOpen] = useState(false);
+  const [tablePickerLoading, setTablePickerLoading] = useState(false);
+  const [tablePickerError, setTablePickerError] = useState('');
+  const [tablePickerShops, setTablePickerShops] = useState([]);
+  const [tablePickerShopId, setTablePickerShopId] = useState('');
 
   // Do not accidentally carry an unsaved cart from one table to another when
   // only the URL changes and React keeps the POS component mounted.
@@ -162,6 +168,53 @@ export default function POS() {
 
     return () => unsubscribe?.();
   }, [user?.id]);
+
+  // The POS table picker uses the same server-scoped map as the Stollar page.
+  // The backend limits cashiers to their assigned shop; an open shift further
+  // restricts the picker to its shop. This is read-only until a table is tapped.
+  const openTablePicker = async () => {
+    if (screenMode) return;
+    setTablePickerOpen(true);
+    setTablePickerLoading(true);
+    setTablePickerError('');
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', { action: 'status' });
+      const result = response?.data || response;
+      if (!Array.isArray(result?.shops)) throw new Error('Stollar javobi noto‘g‘ri.');
+      const available = shift
+        ? result.shops.filter((shop) => shop.id === shift.shop_id)
+        : result.shops;
+      setTablePickerShops(available);
+      setTablePickerShopId((previous) => available.some((shop) => shop.id === previous) ? previous
+        : available.some((shop) => shop.id === selectedTable?.shopId) ? selectedTable.shopId
+          : available[0]?.id || '');
+      if (!available.length) setTablePickerError('Bu smena do‘koni uchun stollar topilmadi. Do‘kon biriktirilishini tekshiring.');
+    } catch (error) {
+      setTablePickerShops([]);
+      setTablePickerShopId('');
+      setTablePickerError(error?.response?.data?.error || error?.data?.error || error?.message || 'Stollar xaritasini yuklab bo‘lmadi.');
+    } finally {
+      setTablePickerLoading(false);
+    }
+  };
+  const chooseTableInPos = async (shopId, number) => {
+    if (tablePickerLoading || (selectedTable?.shopId === shopId && selectedTable?.number === number)) {
+      setTablePickerOpen(false);
+      return;
+    }
+    if (shift && shift.shop_id !== shopId) {
+      void odinaAlert('Bu stol joriy smenaning do‘koniga tegishli emas.');
+      return;
+    }
+    if (cart.length && !(await odinaConfirm({
+      title: 'Saqlanmagan savat',
+      description: 'Boshqa stolga o‘tsangiz joriy savat yo‘qoladi. Avval savdoni yakunlash tavsiya etiladi. Davom etasizmi?',
+      confirmLabel: 'Stolni almashtirish', tone: 'warning',
+    }))) return;
+    setTablePickerOpen(false);
+    navigate(`/pos?${new URLSearchParams({ table_shop: shopId, table_number: String(number) })}`);
+  };
+  const tablePickerShop = tablePickerShops.find((shop) => shop.id === tablePickerShopId);
 
   const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
   const tableSelectionError = tableQuery.invalid && !screenMode
@@ -704,6 +757,11 @@ export default function POS() {
           </div>
         </div>
         <div className="flex-1" />
+        {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void openTablePicker()}
+          aria-label="Stollar xaritasini Kassa ichida ochish"
+          className="h-11 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
+          <Armchair className="h-4 w-4 sm:mr-1.5" /> <span>Stollar</span>
+        </Button>}
         {shift ? (
           <>
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
@@ -741,10 +799,7 @@ export default function POS() {
               {tableSelectionError && <p role="alert" className="text-xs text-destructive">{tableSelectionError}</p>}
             </div>
           </div>
-          <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
-            if (cart.length && !(await odinaConfirm('Stollar xaritasiga qaytsangiz joriy saqlanmagan savat yo‘qoladi. Davom etasizmi?'))) return;
-            navigate('/tables');
-          }}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
+          <Button type="button" variant="outline" className="min-h-11" onClick={() => void openTablePicker()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
         </div>
       )}
 
@@ -863,6 +918,35 @@ export default function POS() {
         </SheetContent>
       </Sheet>
 
+      {!screenMode && <Sheet open={tablePickerOpen} onOpenChange={setTablePickerOpen}>
+        <SheetContent side="bottom" className="h-[92dvh] overflow-y-auto rounded-t-[28px] p-4 sm:p-6">
+          <SheetTitle className="font-display text-xl font-bold pr-10">Kassa · Stollar xaritasi</SheetTitle>
+          <p className="text-sm text-muted-foreground mt-1 mb-4">Stolni tanlang — Kassa o‘sha stol bilan ochiladi. Savat avval saqlanmagan bo‘lsa, almashtirishdan oldin tasdiq so‘raladi.</p>
+          {tablePickerLoading ? <div role="status" className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Stollar yuklanmoqda…</div> : <>
+            {tablePickerError && <div role="alert" className="mb-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{tablePickerError}</div>}
+            {tablePickerShops.length > 1 && <div role="group" aria-label="Stollar do‘konini tanlash" className="mb-4 flex flex-wrap gap-2">
+              {tablePickerShops.map((shop) => <Button key={shop.id} type="button" variant={shop.id === tablePickerShopId ? 'default' : 'outline'}
+                onClick={() => setTablePickerShopId(shop.id)} className="min-h-11 rounded-xl">
+                {shop.name} · {shop.table_count} stol
+              </Button>)}
+            </div>}
+            {tablePickerShop && tablePickerShop.table_count > 0
+              ? <TableFloorplan key={`${tablePickerShop.id}:${tablePickerShop.layout_version}`} shop={tablePickerShop}
+                  canManage={false} onOpen={(shopId, number) => void chooseTableInPos(shopId, number)} />
+              : !tablePickerError && <div className="rounded-2xl border border-dashed p-7 text-center text-sm text-muted-foreground">
+                  Bu do‘konda stol soni belgilanmagan. «Stollar» sahifasida admin sozlashi mumkin.
+                </div>}
+          </>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => void openTablePicker()} disabled={tablePickerLoading} className="min-h-11 rounded-xl"><RefreshCw className="h-4 w-4 mr-1.5" /> Yangilash</Button>
+            {selectedTable && <Button type="button" variant="outline" onClick={async () => {
+              if (cart.length && !(await odinaConfirm('Oddiy savdoga o‘tsangiz stolning saqlanmagan savati yo‘qoladi. Davom etasizmi?'))) return;
+              setTablePickerOpen(false);
+              navigate('/pos');
+            }} className="min-h-11 rounded-xl">Oddiy savdoga o‘tish</Button>}
+          </div>
+        </SheetContent>
+      </Sheet>}
       <PaymentModal
         open={payOpen}
         total={total}
