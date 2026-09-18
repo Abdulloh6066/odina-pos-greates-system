@@ -113,7 +113,7 @@ export default function RestaurantTables() {
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Stollar"
-        subtitle="Stollarni ekranda o‘zingiz joylashtiring. Stolni bosib, shu stol uchun Kassaga o‘ting."
+        subtitle="Zalni haqiqiy joylashuviga moslang: stol va kirish eshigini o‘zingiz joylashtiring."
         icon={Armchair}
         eyebrow="ODINA · RESTORAN"
         actions={<Button variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>}
@@ -152,7 +152,15 @@ export default function RestaurantTables() {
           )}
 
           {selectedShop && <>
-            <div className="odina-panel border border-border rounded-2xl bg-card premium-shadow p-5 sm:p-6">
+            {tableCount > 0 && <TableFloorplan
+              key={`${selectedShop.id}:${selectedShop.layout_version}:${selectedShop.table_count}`}
+              shop={selectedShop}
+              canManage={canManage}
+              onSaved={updateLayout}
+              onOpen={openTable}
+              onEditingChange={setLayoutEditing}
+            />}
+            <div className="odina-panel border border-border rounded-2xl bg-card premium-shadow p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="space-y-1">
                   <div className="text-xs font-semibold tracking-wider text-brand-ink uppercase">Do‘kon stollari</div>
@@ -184,16 +192,7 @@ export default function RestaurantTables() {
               )}
             </div>
 
-            {tableCount > 0 ? (
-              <TableFloorplan
-                key={`${selectedShop.id}:${selectedShop.layout_version}:${selectedShop.table_count}`}
-                shop={selectedShop}
-                canManage={canManage}
-                onSaved={updateLayout}
-                onOpen={openTable}
-                onEditingChange={setLayoutEditing}
-              />
-            ) : (
+            {tableCount === 0 && (
               <div className="rounded-2xl border border-dashed border-brand-olive/40 bg-card p-8 sm:p-12 text-center space-y-3"><span className="w-14 h-14 bg-brand-olive/10 rounded-2xl mx-auto flex items-center justify-center"><Sparkles className="w-7 h-7 text-brand-ink" /></span><h2 className="font-display text-xl font-semibold">Stollarni sozlashga tayyor</h2><p className="max-w-md mx-auto text-sm text-muted-foreground">{canManage ? 'Yuqorida stol sonini tanlab saqlang. Har bir do‘konga alohida son belgilanadi.' : 'Admin ushbu do‘kon uchun stollar sonini belgilagach shu yerda ko‘rinadi.'}</p></div>
             )}
           </>}
