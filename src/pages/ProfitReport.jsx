@@ -9,6 +9,7 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { Image } from '@/components/ui/image';
 import { TrendingUp, Filter, Loader2, Receipt, Wallet, Percent, PiggyBank, Coins, ChevronRight, AlertTriangle } from 'lucide-react';
 import ProductBreakdownDialog from '@/components/profit/ProductBreakdownDialog';
+import TvarojniCostDemo from '@/components/profit/TvarojniCostDemo';
 
 const firstOfMonth = () => uzbekistanMonthStartKey();
 const todayISO = () => uzbekistanDateKey();
@@ -106,6 +107,8 @@ export default function ProfitReport() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">Sotuv tannarxi, yalpi foyda va xarajatlardan keyingi foyda hisoboti.</p>
       </div>
+
+      <TvarojniCostDemo />
 
       {/* Filters */}
       <div className="bg-card rounded-2xl border border-border premium-shadow p-4 mb-6">
