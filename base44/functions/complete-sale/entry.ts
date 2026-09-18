@@ -690,7 +690,37 @@ export default async function(req) {
       if (user.role === "cashier" && user.shop_id !== shift.shop_id) {
         return Response.json({ error: "Kassir boshqa do‘konga biriktirilgan." }, { status: 403 });
       }
-      const normalizedItems = await normalizeSaleItems(service, requestedItems);
+      // Stock precheck must use the same verified, frozen table order as final
+      // checkout; otherwise an archived product or price change blocks payment.
+      let tableItems: any[] | null = null;
+      if (body?.table_number !== undefined || body?.table_order_id !== undefined) {
+        const number = body?.table_number;
+        if (String(body?.table_shop_id || "") !== shift.shop_id || !Number.isInteger(number)) {
+          return Response.json({ error: "Stol do‘koni yoki raqami noto‘g‘ri." }, { status: 403 });
+        }
+        const shop = await service.entities.Shop.get(shift.shop_id).catch(() => null);
+        const order = tableOrders(shop).find((row: any) => row.number === number);
+        if (!shop || shop.active === false || shop.location_type !== "shop"
+          || shop.allows_pos === false || number < 1 || number > shop.restaurant_table_count
+          || !order || order.id !== body.table_order_id || order.revision !== body.table_order_revision
+          || order.state !== "occupied") {
+          return Response.json({ error: "Stol buyurtmasi eskirgan yoki to‘lovda. Yangilang." }, { status: 409 });
+        }
+        const requested = new Map<string, number>();
+        for (const row of requestedItems) {
+          if (!row?.product_id || !Number.isInteger(row.quantity) || row.quantity < 1
+            || requested.has(row.product_id)) {
+            return Response.json({ error: "Stol mahsulotlarini yangilang." }, { status: 409 });
+          }
+          requested.set(row.product_id, row.quantity);
+        }
+        if (requested.size !== order.items?.length
+          || order.items.some((row: any) => requested.get(row.product_id) !== row.quantity)) {
+          return Response.json({ error: "Saqlanmagan stol o‘zgarishlari bor. Avval saqlang." }, { status: 409 });
+        }
+        tableItems = order.items;
+      }
+      const normalizedItems = await normalizeSaleItems(service, requestedItems, tableItems);
       const allowNegativeStock = await stockPolicy(service);
       const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
       if (shortages.length && !allowNegativeStock) {
