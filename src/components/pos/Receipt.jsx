@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
+import { receiptWishForSale } from '@/lib/receipt-wishes';
 
 export default function Receipt({ open, sale, settings, onClose }) {
   const ref = useRef(null);
@@ -59,6 +60,9 @@ export default function Receipt({ open, sale, settings, onClose }) {
           <div className="border-t border-dashed border-border my-2" />
           <div className="text-center text-[12px] py-1">
             {settings?.thank_you_message || 'Rahmat! Sizning tabassumingiz biz uchun juda muhim ❤️'}
+          </div>
+          <div className="text-center text-[12px] leading-relaxed px-1 py-1 font-semibold">
+            {receiptWishForSale(sale)}
           </div>
           {settings?.receipt_footer && <div className="text-center text-[10px] mt-1">{settings.receipt_footer}</div>}
         </div>
