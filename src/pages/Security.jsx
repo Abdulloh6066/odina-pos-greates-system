@@ -15,6 +15,7 @@ import DataCleanupPanel from '@/components/security/DataCleanupPanel';
 export default function Security() {
   const { user } = useOutletContext();
   const [users, setUsers] = useState([]);
+  const [canManageAdmins, setCanManageAdmins] = useState(false);
   const [pinSet, setPinSet] = useState(false);
   const [audit, setAudit] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ export default function Security() {
       const response = await base44.functions.invoke('security-admin', { action: 'status' });
       const data = response?.data || response;
       setUsers(data?.users || []);
+      setCanManageAdmins(data?.can_manage_admins === true);
       setPinSet(Boolean(data?.pin_set));
       setAudit(data?.audit || []);
       setLoadError('');
@@ -65,7 +67,7 @@ export default function Security() {
           <RoleMatrix />
           <div className="grid lg:grid-cols-2 gap-5">
             <PinManager onSaved={() => setReloadKey((k) => k + 1)} />
-            <StaffAccessPanel users={users} currentUser={user} onChanged={() => setReloadKey((k) => k + 1)} />
+            <StaffAccessPanel users={users} currentUser={user} canManageAdmins={canManageAdmins} onChanged={() => setReloadKey((k) => k + 1)} />
           </div>
           <SecurityAuditFeed entries={audit} />
           <BusinessBackupPanel user={user} />
