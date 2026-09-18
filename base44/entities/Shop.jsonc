@@ -29,6 +29,10 @@
     },
     "phone": {
       "type": "string"
+    },
+    "instagram": {
+      "type": "string",
+      "description": "Ushbu do\u2018konning chekida ko\u2018rsatiladigan Instagram username"
     }
   },
   "required": [
