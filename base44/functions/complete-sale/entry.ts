@@ -1474,7 +1474,7 @@ export default async function(req) {
       await service.entities.ActionHistory.create({
         user_id: user.id,
         user_name: user.full_name || user.email,
-        action: "sale_completed","replace_all":false}]}
+        action: "sale_completed",
         details: `${saleNumber}. Total ${total} UZS via ${paymentSummary}. ${normalizedItems.length} lines.`,
       });
     } catch {
