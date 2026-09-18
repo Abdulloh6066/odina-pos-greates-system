@@ -20,7 +20,9 @@ import {
 } from "../../shared/shift-close-helpers.ts";
 import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
 
-async function normalizeSaleItems(service: any, requestedItems: any[]) {
+// Table orders are server-stored before payment. The snapshot is trusted only
+// after the table is authenticated, version-checked and locked below.
+async function normalizeSaleItems(service: any, requestedItems: any[], trustedTableItems: any[] | null = null) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
     const quantity = Math.floor(Number(requested?.quantity));
@@ -33,22 +35,26 @@ async function normalizeSaleItems(service: any, requestedItems: any[]) {
 
   const normalizedItems = [];
   for (const [productId, quantity] of quantities.entries()) {
-    const product = await service.entities.Product.get(productId);
-    if (!product || product.active === false || product.archived === true) {
+    const savedItem = trustedTableItems?.find((item: any) => item.product_id === productId);
+    const product = savedItem || await service.entities.Product.get(productId);
+    if (!product || (!savedItem && (product.active === false || product.archived === true))) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
     }
-    const unitPrice = money(product.price);
+    const unitPrice = savedItem ? savedItem.price : money(product.price);
+    if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
+      throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
+    }
     normalizedItems.push({
-      product_id: product.id,
-      product_name: product.name,
+      product_id: product.id || product.product_id,
+      product_name: savedItem ? savedItem.product_name : product.name,
       image_url: product.image_url || "",
       price: unitPrice,
       quantity,
       subtotal: unitPrice * quantity,
       source_type: product.source_type || "central_produced",
-      stock_tracked: product.track_stock !== false,
+      stock_tracked: product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false,
       stock_location_id: "",
-      stock_quantity_change: product.track_stock === false ? 0 : -quantity,
+      stock_quantity_change: (product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false) ? -quantity : 0,
     });
   }
   return normalizedItems;
@@ -212,7 +218,8 @@ function canonicalSaleRequest(body: any) {
   return JSON.stringify({
     shift_id: String(body?.shift_id || ""),
     ...(body?.table_number !== undefined && body?.table_number !== null
-      ? { table_number: body.table_number, table_shop_id: String(body?.table_shop_id || "") } : {}),
+      ? { table_number: body.table_number, table_shop_id: String(body?.table_shop_id || ""),
+          table_order_id: String(body?.table_order_id || ""), table_order_revision: body?.table_order_revision } : {}),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
     ...(body?.rounding_total !== undefined && body?.rounding_total !== null
@@ -247,6 +254,34 @@ function resolveSoldAt(rawValue: unknown, shift: any, receivedAt: string) {
   return new Date(timestamp).toISOString();
 }
 
+// CAS on the Shop document serializes edits and payment claims for all tables
+// in that shop. No inventory or revenue is touched while an order is occupied.
+const tableOrders = (shop: any) => Array.isArray(shop?.restaurant_table_orders) ? shop.restaurant_table_orders : [];
+const tableOrdersVersion = (shop: any) => Number.isInteger(shop?.restaurant_table_orders_version)
+  && shop.restaurant_table_orders_version >= 0 ? shop.restaurant_table_orders_version : 0;
+const tableVersionQuery = (version: number) => version === 0
+  ? { $or: [{ restaurant_table_orders_version: 0 }, { restaurant_table_orders_version: { $exists: false } }] }
+  : { restaurant_table_orders_version: version };
+
+async function changeLockedTable(service: any, shopId: string, orderId: string, checkoutKey: string, clear: boolean) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const shop = await service.entities.Shop.get(shopId);
+    const orders = tableOrders(shop);
+    const current = orders.find((row: any) => row.id === orderId);
+    if (!current) return true; // Already finalized, no new order can be removed by mistake.
+    if (current.state !== "paying" || current.checkout_key !== checkoutKey) return false;
+    const next = clear ? orders.filter((row: any) => row.id !== orderId)
+      : orders.map((row: any) => row.id === orderId
+        ? { ...row, state: "occupied", checkout_key: "" } : row);
+    const update = await service.entities.Shop.updateMany(
+      { id: shopId, ...tableVersionQuery(tableOrdersVersion(shop)) },
+      { $set: { restaurant_table_orders: next }, $inc: { restaurant_table_orders_version: 1 } },
+    );
+    if (update?.success && Number(update.updated || 0) === 1) return true;
+  }
+  return false;
+}
+
 export default async function(req) {
   const base44 = createClientFromRequest(req);
   const service = base44.asServiceRole;
@@ -259,6 +294,7 @@ export default async function(req) {
   let stockMovementRecords: any[] = [];
   let idempotencyClaimed = false;
   let idempotencyShiftId = "";
+  let tablePaymentLock: { shopId: string; orderId: string; checkoutKey: string } | null = null;
 
   try {
     const authenticatedUser = await base44.auth.me();
