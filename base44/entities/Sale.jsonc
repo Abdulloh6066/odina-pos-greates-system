@@ -47,6 +47,12 @@
     "shop_name": {
       "type": "string"
     },
+    "table_number_snapshot": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30,
+      "description": "Kassadan savdo yakunlangan vaqtdagi restoran stoli; keyin o\u2018zgartirilmaydi"
+    },
     "receipt_instagram_snapshot": {
       "type": "string",
       "description": "Savdo paytidagi do\u2018kon Instagram username; keyingi sozlama o\u2018zgarishlaridan mustaqil"
