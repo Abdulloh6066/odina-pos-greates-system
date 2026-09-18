@@ -3,6 +3,36 @@ export const TABLE_MAX = 30;
 export const LIMITS = { minX: 60, maxX: 940, minY: 70, maxY: 930 };
 export const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
+export const ENTRANCE_SIDES = ['top', 'right', 'bottom', 'left'];
+export const DEFAULT_ENTRANCE = { side: 'top', offset: 500 };
+export const normalizeEntrance = (entry) => (
+  entry && ENTRANCE_SIDES.includes(entry.side) && Number.isInteger(entry.offset)
+    && entry.offset >= 150 && entry.offset <= 850
+    ? { side: entry.side, offset: entry.offset }
+    : { ...DEFAULT_ENTRANCE }
+);
+
+// The entrance lives on a WALL, not inside the seating area. Pointer motion
+// snaps to the nearest wall and keeps the doorway away from tight corners.
+export function entranceFromPoint(x, y) {
+  const edges = [
+    { side: 'top', distance: Math.abs(y), axis: x },
+    { side: 'right', distance: Math.abs(1000 - x), axis: y },
+    { side: 'bottom', distance: Math.abs(1000 - y), axis: x },
+    { side: 'left', distance: Math.abs(x), axis: y },
+  ];
+  const closest = edges.reduce((best, current) => current.distance < best.distance ? current : best);
+  return { side: closest.side, offset: clamp(Math.round(closest.axis / 10) * 10, 150, 850) };
+}
+
+export function nudgeEntrance(entrance, direction, step = 20) {
+  const current = normalizeEntrance(entrance);
+  const change = (current.side === 'top' || current.side === 'bottom')
+    ? direction === 'ArrowLeft' ? -step : direction === 'ArrowRight' ? step : 0
+    : direction === 'ArrowUp' ? -step : direction === 'ArrowDown' ? step : 0;
+  return { ...current, offset: clamp(current.offset + change, 150, 850) };
+}
+
 export const tablesOverlap = (left, right) =>
   Math.abs(left.x - right.x) < 115 && Math.abs(left.y - right.y) < 125;
 
