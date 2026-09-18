@@ -8,7 +8,8 @@ export default function Cart({
   cart, onInc, onDec, onRemove, onClear,
   subtotal, discount, couponDiscount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
   roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding,
-  total, onCheckout, disabled,
+  total, onCheckout, disabled, tableMode = false, tableDirty = false,
+  tableSaved = false, onSaveTable, savingTable = false, locked = false,
 }) {
   return (
     <div className="odina-cart flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
@@ -20,8 +21,8 @@ export default function Cart({
             <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + i.quantity, 0)} ta mahsulot</p>
           </div>
         </div>
-        {cart.length > 0 && (
-          <button onClick={onClear} type="button" className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
+        {cart.length > 0 && !tableSaved && (
+          <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
             <Trash2 className="w-3.5 h-3.5" /> Tozalash
           </button>
         )}
@@ -51,17 +52,17 @@ export default function Cart({
                   <div className="text-sm font-semibold leading-snug break-words">{item.product_name}</div>
                   <div className="text-xs text-muted-foreground mt-1">{formatUZS(item.price)}</div>
                 </div>
-                <button type="button" onClick={() => onRemove(item)} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="h-11 w-11 -mr-1 -mt-1 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
+                <button type="button" onClick={() => onRemove(item)} disabled={locked} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="h-11 w-11 -mr-1 -mt-1 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 mt-3">
                 <div className="inline-flex items-center rounded-xl border border-border bg-card">
-                  <button type="button" onClick={() => onDec(item)} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-11 h-11 rounded-l-xl flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
+                  <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-11 h-11 rounded-l-xl flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                     <Minus className="w-4 h-4" />
                   </button>
                   <span className="min-w-8 px-1 text-center text-sm font-semibold">{item.quantity}</span>
-                  <button type="button" onClick={() => onInc(item)} aria-label={`${item.product_name} miqdorini oshirish`} className="w-11 h-11 rounded-r-xl flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
+                  <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-11 h-11 rounded-r-xl flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
@@ -106,12 +107,20 @@ export default function Cart({
           <span className="font-display text-lg font-bold">Jami</span>
           <span className="text-2xl font-bold tracking-tight text-brand-ink text-right break-words">{formatUZS(total)}</span>
         </div>
+        {tableMode && <div className="rounded-xl border border-brand-olive/30 bg-brand-olive/5 p-3 space-y-2">
+          <p className="text-xs font-medium text-brand-ink">{tableDirty ? '● Buyurtmada saqlanmagan o‘zgarishlar bor' : tableSaved ? '✓ Buyurtma serverda saqlangan · hali to‘lanmagan' : 'Mahsulotlarni qo‘shing, keyin buyurtmani saqlang'}</p>
+          <Button type="button" variant="outline" onClick={onSaveTable}
+            disabled={locked || !tableDirty || cart.length === 0 || savingTable}
+            className="w-full min-h-12 rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
+            {savingTable ? 'Saqlanmoqda…' : 'Buyurtmani stolga saqlash'}
+          </Button>
+        </div>}
         <Button
           onClick={onCheckout}
-          disabled={disabled || cart.length === 0}
+          disabled={disabled || locked || cart.length === 0}
           className="odina-checkout w-full min-h-12 h-auto py-3 whitespace-normal text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong disabled:opacity-40"
         >
-          <span>To‘lovga o‘tish</span>
+          <span>{tableMode ? 'Hisobni yopish · To‘lov' : 'To‘lovga o‘tish'}</span>
           <span className="flex items-center gap-2">{formatUZS(total)} <ArrowUpRight className="w-4 h-4 shrink-0" aria-hidden="true" /></span>
         </Button>
       </div>
