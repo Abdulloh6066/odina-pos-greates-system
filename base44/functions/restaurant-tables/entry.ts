@@ -19,8 +19,8 @@ const hasValidPosition = (entry: any, count: number) => {
     && validSize(size)
     && Number.isInteger(entry.x) && entry.x >= Math.max(60, 60 * size / 100)
     && entry.x <= Math.min(940, 1000 - 60 * size / 100)
-    && Number.isInteger(entry.y) && entry.y >= Math.max(70, 70 * size / 100)
-    && entry.y <= Math.min(930, 1000 - 70 * size / 100);
+    && Number.isInteger(entry.y) && entry.y >= Math.max(70, (size > 100 ? 90 : 70) * size / 100)
+    && entry.y <= Math.min(930, 1000 - (size > 100 ? 90 : 70) * size / 100);
 };
 // Preserve original collision spacing at 100%; larger tables need more room.
 const overlaps = (a: any, b: any) => {
