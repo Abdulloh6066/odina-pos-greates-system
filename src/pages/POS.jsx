@@ -759,7 +759,7 @@ export default function POS() {
         <div className="flex-1" />
         {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void openTablePicker()}
           aria-label="Stollar xaritasini Kassa ichida ochish"
-          className="h-11 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
+          className="hidden xl:inline-flex h-11 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <Armchair className="h-4 w-4 sm:mr-1.5" /> <span>Stollar</span>
         </Button>}
         {shift ? (
@@ -780,6 +780,14 @@ export default function POS() {
           </Button>
         )}
       </div>
+
+      {!screenMode && <div className="xl:hidden shrink-0 border-b border-brand-olive/20 bg-brand-olive/5 px-3 py-2 sm:px-5">
+        <Button type="button" variant="outline" onClick={() => void openTablePicker()}
+          aria-label="Stollar xaritasini Kassa ichida ochish"
+          className="w-full min-h-11 rounded-xl border-brand-olive/50 bg-card font-semibold text-brand-ink touch-manipulation">
+          <Armchair className="h-4 w-4 mr-2" /> Stollar xaritasini ochish
+        </Button>
+      </div>}
 
       <OfflineSalesBanner
         isOnline={isOnline}
