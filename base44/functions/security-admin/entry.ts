@@ -40,6 +40,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Faqat Egasi/Admin uchun." }, { status: 403 });
     }
 
+    // The existing protected owner identity is checked against both the
+    // authenticated session and stored profile; a regular admin cannot claim it.
+    const canManageAdmins = isOwner(String(auth.email || "")) && isOwner(String(admin.email || ""));
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "");
 
@@ -51,6 +54,7 @@ Deno.serve(async (req) => {
       ]);
       return Response.json({
         pin_set: Boolean(securityRows?.[0]?.pin_hash && securityRows?.[0]?.pin_salt),
+        can_manage_admins: canManageAdmins,
         users: (users || []).map(safeUser),
         audit: (auditRows || []).map(safeAudit),
       });
@@ -75,18 +79,23 @@ Deno.serve(async (req) => {
     if (isOwner(String(target.email || ""))) {
       return Response.json({ error: "Hisob egasi himoyalangan — uni o‘zgartirish yoki o‘chirish mumkin emas." }, { status: 403 });
     }
-    if (userRole(target) === "admin") {
-      return Response.json({ error: "Boshqa Admin hisobini bu sahifadan o‘zgartirish mumkin emas." }, { status: 403 });
+    // Owner alone may promote, demote, disable or re-enable another admin.
+    // Other admins retain their existing staff-management privileges.
+    if (userRole(target) === "admin" && !canManageAdmins) {
+      return Response.json({ error: "Boshqa Admin hisobini faqat hisob egasi boshqaradi." }, { status: 403 });
     }
 
-    const patch: Record<string, unknown> = {};
+    const patch: Record<string, unknown> = {}; 
     const changes: string[] = [];
     const hasRole = Object.prototype.hasOwnProperty.call(body, "role");
     const hasShop = Object.prototype.hasOwnProperty.call(body, "shop_id");
     const hasActive = Object.prototype.hasOwnProperty.call(body, "active");
     const nextRole = hasRole ? String(body.role || "") : userRole(target);
 
-    if (!STAFF_ROLES.has(nextRole)) {
+    if (nextRole === "admin" && !canManageAdmins) {
+      return Response.json({ error: "Admin huquqini faqat hisob egasi berishi mumkin." }, { status: 403 });
+    }
+    if (nextRole !== "admin" && !STAFF_ROLES.has(nextRole)) {
       return Response.json({ error: "Xodim lavozimi noto‘g‘ri." }, { status: 400 });
     }
     if (hasRole) {
@@ -102,7 +111,16 @@ Deno.serve(async (req) => {
       changes.push(body.active ? "kirish yoqildi" : "kirish o‘chirildi");
     }
 
-    if (hasRole || hasShop) {
+    if (nextRole === "admin") {
+      if (hasShop && body.shop_id) {
+        return Response.json({ error: "Admin uchun do‘kon biriktirilmaydi." }, { status: 400 });
+      }
+      if (hasRole) {
+        patch.shop_id = "";
+        patch.shop_name = "";
+      }
+    } else if (hasRole || hasShop) {
+      // A former admin must receive a real location before losing admin rights.
       const requestedShopId = hasShop ? String(body.shop_id || "") : userShopId(target);
       if (!requestedShopId) {
         return Response.json({ error: "Xodim uchun ish joyini tanlang." }, { status: 400 });
