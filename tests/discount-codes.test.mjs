@@ -292,6 +292,28 @@ test('failed pre-commit shift claim reopens the same unpaid table without chargi
   assert.equal(f.db.ProductStock[0].quantity, 10);
 });
 
+test('stock precheck honors saved table snapshots even after catalog price or availability changes', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  f.db.Product[0].price = 150000;
+  f.db.Product[0].archived = true;
+  const call = loadHandler(f.client);
+  const request = { action: 'check_stock', shift_id: 'shift', table_shop_id: 'shop',
+    table_number: 2, table_order_id: 'open-order-1', table_order_revision: 1,
+    items: [{ product_id: 'cake', quantity: 1 }] };
+  const checked = await call(request);
+  assert.equal(checked.status, 200, JSON.stringify(checked));
+  assert.deepEqual(checked.data.shortages, []);
+  assert.equal((await call({ ...request, table_order_revision: 0 })).status, 409);
+  assert.equal((await call({ ...request, items: [{ product_id: 'cake', quantity: 2 }] })).status, 409);
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+  const paid = await call(tablePayment('restaurant-archived-00000001'));
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.equal(paid.data.sale.total, 100000);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+});
+
 test('failed financial write restores an unpaid table and rolls back stock without double charging', async () => {
   const f = fixture(5);
   setupUnpaidTable(f);
