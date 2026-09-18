@@ -67,6 +67,7 @@ export default function POS() {
   const [paying, setPaying] = useState(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
+  const checkoutRecordedAtRef = useRef('');
   const [lastSale, setLastSale] = useState(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
 
@@ -93,6 +94,8 @@ export default function POS() {
     setAdjustmentMode(null);
     setPayOpen(false);
     setMobileCartOpen(false);
+    checkoutRequestKeyRef.current = '';
+    checkoutRecordedAtRef.current = '';
   }, [tableKey]);
 
   const loadAll = async () => {
@@ -355,6 +358,7 @@ export default function POS() {
 
   const openPayment = (offline) => {
     checkoutRequestKeyRef.current = createSaleIdempotencyKey();
+    checkoutRecordedAtRef.current = new Date().toISOString();
     setCheckoutOffline(offline);
     setPayOpen(true);
   };
@@ -455,6 +459,7 @@ export default function POS() {
   const closePayment = () => {
     if (paying) return;
     checkoutRequestKeyRef.current = '';
+    checkoutRecordedAtRef.current = '';
     setCheckoutOffline(false);
     setPayOpen(false);
   };
@@ -465,6 +470,7 @@ export default function POS() {
     setReceiptOpen(true);
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
+    checkoutRecordedAtRef.current = '';
     clearCart();
   };
 
@@ -494,6 +500,7 @@ export default function POS() {
     setReceiptOpen(true);
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
+    checkoutRecordedAtRef.current = '';
     clearCart();
     base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
       .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
@@ -504,7 +511,8 @@ export default function POS() {
     setPaying(true);
     const idempotencyKey = checkoutRequestKeyRef.current || createSaleIdempotencyKey();
     checkoutRequestKeyRef.current = idempotencyKey;
-    const recordedAt = new Date().toISOString();
+    const recordedAt = checkoutRecordedAtRef.current || new Date().toISOString();
+    checkoutRecordedAtRef.current = recordedAt;
     let pendingRecord = null;
 
     try {
@@ -559,8 +567,8 @@ export default function POS() {
       }
     } catch (error) {
       const message = syncErrorMessage(error);
-      const discountHint = (discountCode || roundingTarget !== null) && isRetryableSyncError(error)
-        ? ' Aloqa qaytgach shu to‘lov oynasidan yana bosing.'
+      const discountHint = (discountCode || roundingTarget !== null || selectedTable) && isRetryableSyncError(error)
+        ? ' Natija noaniq bo‘lishi mumkin. To‘lov oynasini yopmang; aloqa qaytgach shu tugmani yana bosing. Avval Savdolar tarixini ham tekshiring.'
         : '';
       void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
     } finally {
@@ -861,7 +869,7 @@ export default function POS() {
         onClose={closePayment}
         onConfirm={completeSale}
         loading={paying}
-        offline={checkoutOffline || !isOnline}
+        offline={checkoutOffline || (!isOnline && !selectedTable)}
       />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => {
         setReceiptOpen(false);
