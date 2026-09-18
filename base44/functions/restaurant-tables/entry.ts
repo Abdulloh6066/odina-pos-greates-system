@@ -10,11 +10,21 @@ const validEntrance = (entry: any) => entry && ["top", "right", "bottom", "left"
   && Number.isInteger(entry.offset) && entry.offset >= 150 && entry.offset <= 850;
 const cleanEntrance = (entry: any) => validEntrance(entry)
   ? { side: entry.side, offset: entry.offset } : { ...DEFAULT_ENTRANCE };
-const hasValidPosition = (entry: any, count: number) =>
-  entry && Number.isInteger(entry.number) && entry.number >= 1 && entry.number <= count
-  && Number.isInteger(entry.x) && entry.x >= 60 && entry.x <= 940
-  && Number.isInteger(entry.y) && entry.y >= 70 && entry.y <= 930;
-const overlaps = (a: any, b: any) => Math.abs(a.x - b.x) < 115 && Math.abs(a.y - b.y) < 125;
+// Older stored layouts have no size: display them at their original 100%.
+const sizeOf = (entry: any) => entry?.size === undefined ? 100 : entry?.size;
+const validSize = (size: any) => Number.isInteger(size) && size >= 80 && size <= 140 && size % 10 === 0;
+const hasValidPosition = (entry: any, count: number) => {
+  const size = sizeOf(entry);
+  return entry && Number.isInteger(entry.number) && entry.number >= 1 && entry.number <= count
+    && validSize(size)
+    && Number.isInteger(entry.x) && entry.x >= 60 * size / 100 && entry.x <= 1000 - 60 * size / 100
+    && Number.isInteger(entry.y) && entry.y >= 70 * size / 100 && entry.y <= 1000 - 70 * size / 100;
+};
+// Preserve original collision spacing at 100%; larger tables need more room.
+const overlaps = (a: any, b: any) => {
+  const factor = (sizeOf(a) + sizeOf(b)) / 200;
+  return Math.abs(a.x - b.x) < 115 * factor && Math.abs(a.y - b.y) < 125 * factor;
+};
 const validateLayout = (layout: any, count: number) => {
   if (!Array.isArray(layout) || layout.length !== count || count <= 0 || count > MAX_TABLES) return false;
   const numbers = new Set<number>();
@@ -37,7 +47,7 @@ const safeShop = (shop: any) => ({
     && shop.restaurant_table_layout_version >= 0 ? shop.restaurant_table_layout_version : 0,
   layout: (Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [])
     .filter((row: any) => hasValidPosition(row, Number(shop.restaurant_table_count || 0)))
-    .map((row: any) => ({ number: row.number, x: row.x, y: row.y })),
+    .map((row: any) => ({ number: row.number, x: row.x, y: row.y, size: sizeOf(row) })),
 });
 
 Deno.serve(async (req) => {
@@ -97,11 +107,15 @@ Deno.serve(async (req) => {
         return Response.json({ error: "Eshik joylashuvi noto‘g‘ri. Devorni va joyini qayta tanlang." }, { status: 400 });
       }
       const layout = body?.layout;
-      if (!validateLayout(layout, current.table_count)) {
-        return Response.json({ error: "Har bir stol bitta marta kiritilsin, chegaradan chiqmasin va stollar ustma-ust kelmasin." }, { status: 400 });
+      // Old browser tabs that omit size must not reset sizes saved by a newer tab.
+      const existingSizes = new Map((current.layout || []).map((row: any) => [row.number, row.size]));
+      const clean = Array.isArray(layout) ? layout.map((row: any) => ({
+        number: row?.number, x: row?.x, y: row?.y,
+        size: row?.size === undefined ? (existingSizes.get(row?.number) || 100) : row.size,
+      })).sort((a: any, b: any) => a.number - b.number) : null;
+      if (!validateLayout(clean, current.table_count)) {
+        return Response.json({ error: "Stol soni, o‘lchami yoki joylashuvi noto‘g‘ri. Stollar ustma-ust tushmasligi va xaritadan chiqmasligi kerak." }, { status: 400 });
       }
-      const clean = layout.map((row: any) => ({ number: row.number, x: row.x, y: row.y }))
-        .sort((a: any, b: any) => a.number - b.number);
       const expectedVersion = version === 0
         ? { $or: [{ restaurant_table_layout_version: 0 }, { restaurant_table_layout_version: { $exists: false } }] }
         : { restaurant_table_layout_version: version };
