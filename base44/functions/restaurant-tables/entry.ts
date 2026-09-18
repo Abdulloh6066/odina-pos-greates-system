@@ -1,8 +1,8 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
 
-// Store-specific table count and spatial layout only. POS checkout lives in
-// complete-sale. This function never creates sales, orders or stock movements.
+// Shop-specific floor plans and server-persisted unpaid table orders.
+// Completed sales, payments and stock movements occur only in complete-sale.
 const ALLOWED_ROLES = new Set(["admin", "cashier"]);
 const MAX_TABLES = 30;
 const MAX_ORDER_ITEMS = 100;
