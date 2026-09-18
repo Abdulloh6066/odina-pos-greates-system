@@ -978,6 +978,18 @@ export default async function(req) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
+    // Receipt contacts come only from the shop assigned to the authenticated shift.
+    // Snapshot them at sale time so changing a shop's Instagram/phone/address
+    // never rewrites details on an already completed sale.
+    let receiptShop: any = null;
+    if (service.entities.Shop?.get) {
+      try {
+        receiptShop = await service.entities.Shop.get(shift.shop_id);
+      } catch (error) {
+        console.warn("Receipt shop details could not be loaded:", error);
+      }
+    }
+
     const normalizedItems = await normalizeSaleItems(service, requestedItems);
     const allowNegativeStock = await stockPolicy(service);
     const { plans: stockPlans, shortages: stockWarnings } =
@@ -1187,6 +1199,9 @@ export default async function(req) {
       user_name: user.full_name || user.email,
       shop_id: shift.shop_id,
       shop_name: shift.shop_name,
+      receipt_instagram_snapshot: String(receiptShop?.instagram || "").trim().replace(/^@/, ""),
+      receipt_phone_snapshot: String(receiptShop?.phone || "").trim(),
+      receipt_address_snapshot: String(receiptShop?.address || "").trim(),
       items: normalizedItems,
       subtotal,
       discount_code: discountCode || undefined,
