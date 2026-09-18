@@ -62,7 +62,7 @@
   "rls": {
     "create": {
       "user_condition": {
-        "role": "admin"
+        "email": "dota26066@gmail.com"
       }
     },
     "read": {
@@ -72,12 +72,12 @@
     },
     "update": {
       "user_condition": {
-        "role": "admin"
+        "email": "dota26066@gmail.com"
       }
     },
     "delete": {
       "user_condition": {
-        "role": "admin"
+        "email": "dota26066@gmail.com"
       }
     }
   }
