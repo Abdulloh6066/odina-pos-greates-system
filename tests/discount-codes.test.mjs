@@ -292,6 +292,48 @@ test('failed pre-commit shift claim reopens the same unpaid table without chargi
   assert.equal(f.db.ProductStock[0].quantity, 10);
 });
 
+test('failed financial write restores an unpaid table and rolls back stock without double charging', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  f.entities.StockMovement.create = async () => { throw new Error('Mock stock movement failure'); };
+  const response = await loadHandler(f.client)(tablePayment('restaurant-rollback-000000001'));
+  assert.equal(response.status, 500, JSON.stringify(response));
+  assert.equal(f.db.Shop[0].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Shop[0].restaurant_table_orders[0].state, 'occupied');
+  assert.equal(f.db.Shop[0].restaurant_table_orders[0].items[0].price, 100000);
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.SaleItem.length, 0);
+  assert.equal(f.db.Payment.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+});
+
+test('completed payment stays locked if table release fails and can be reconciled without charging again', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  const updateShop = f.entities.Shop.updateMany;
+  f.entities.Shop.updateMany = async (query, changes) => {
+    if (changes?.$set?.restaurant_table_orders?.length === 0) {
+      return { success: true, updated: 0 }; // Simulate CAS failure clearing the paid table.
+    }
+    return updateShop(query, changes);
+  };
+  const call = loadHandler(f.client);
+  const request = tablePayment('restaurant-release-000000001');
+  const paid = await call(request);
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.equal(paid.data.table_released, false);
+  assert.equal(f.db.Shop[0].restaurant_table_orders[0].state, 'paying');
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  const replay = await call(structuredClone(request));
+  assert.equal(replay.status, 200, JSON.stringify(replay));
+  assert.equal(replay.data.already_processed, true);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+});
+
 test('cashier can validate a 1–99% code without OWNER PIN', async () => {
   const f = fixture(5);
   const response = await loadHandler(f.client)({
