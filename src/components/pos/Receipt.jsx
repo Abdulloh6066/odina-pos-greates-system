@@ -38,6 +38,9 @@ export default function Receipt({ open, sale, settings, onClose }) {
           <div className="text-center">
             <div className="font-display text-lg font-bold">{settings?.shop_name || 'Odina Shop'}</div>
             <div className="text-[11px] text-muted-foreground">{sale.shop_name || ''}</div>
+            {Number.isInteger(sale.table_number_snapshot) && sale.table_number_snapshot > 0 && (
+              <div className="text-[12px] font-bold">Stol: {sale.table_number_snapshot}</div>
+            )}
             <div className="text-[11px] text-muted-foreground">{timeStr}</div>
             <div className="text-[11px] text-muted-foreground">Chek #{sale.sale_number || (sale.id || '').slice(-6).toUpperCase()}</div>
             <div className="text-[11px] text-muted-foreground">Kassir: {sale.user_name || ''}</div>
