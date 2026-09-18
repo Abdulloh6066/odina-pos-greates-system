@@ -46,12 +46,13 @@ export default function SalesHistory() {
   const totalRev = visible.reduce((s, x) => s + (x.status === 'refunded' ? 0 : x.total), 0);
 
   const refundSale = (sale) => {
+    if (role !== 'admin') return;
     setSelected(sale);
     setRefundOpen(true);
   };
 
   const confirmRefund = async ({ reason, owner_pin }) => {
-    if (!selected) return;
+    if (!selected || role !== 'admin') return;
     setRefundLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
@@ -122,7 +123,7 @@ export default function SalesHistory() {
         </div>
       )}
 
-      <SaleDetailDialog sale={selected} canRefund={role !== 'manager'} onRefund={refundSale} onClose={() => setSelected(null)} />
+      <SaleDetailDialog sale={selected} canRefund={role === 'admin'} onRefund={refundSale} onClose={() => setSelected(null)} />
       <RefundDialog
         open={refundOpen}
         sale={selected}
