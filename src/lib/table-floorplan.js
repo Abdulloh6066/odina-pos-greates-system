@@ -41,7 +41,8 @@ export function nudgeEntrance(entrance, direction, step = 20) {
 
 export const tablesOverlap = (left, right) => {
   const factor = (tableSize(left) + tableSize(right)) / 200;
-  return Math.abs(left.x - right.x) < 115 * factor && Math.abs(left.y - right.y) < 125 * factor;
+  const verticalSpacing = factor === 1 ? 125 : 175 * factor;
+  return Math.abs(left.x - right.x) < 115 * factor && Math.abs(left.y - right.y) < verticalSpacing;
 };
 
 export function buildTableLayout(count, saved = []) {
