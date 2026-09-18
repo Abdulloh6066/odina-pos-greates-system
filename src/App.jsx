@@ -20,6 +20,7 @@ import Layout from '@/components/Layout';
 const Dashboard = lazy(() => preloadPage('dashboard'));
 const POS = lazy(() => preloadPage('pos'));
 const Orders = lazy(() => preloadPage('orders'));
+const RestaurantTables = lazy(() => preloadPage('tables'));
 const Customers = lazy(() => preloadPage('customers'));
 const Products = lazy(() => preloadPage('products'));
 const Categories = lazy(() => preloadPage('categories'));
@@ -48,6 +49,7 @@ const ROUTE_TITLES = {
   '/reset-password': 'Yangi parol',
   '/pos': 'Kassa',
   '/orders': 'Buyurtmalar',
+  '/tables': 'Stollar',
   '/customers': 'Mijozlar',
   '/products': 'Mahsulotlar',
   '/categories': 'Kategoriyalar',
@@ -133,6 +135,7 @@ function App() {
                 <Route path="/" element={<RoleRoute pageKey="dashboard"><Dashboard /></RoleRoute>} />
                 <Route path="/pos" element={<RoleRoute pageKey="pos"><POS /></RoleRoute>} />
                 <Route path="/orders" element={<RoleRoute pageKey="orders"><Orders /></RoleRoute>} />
+                <Route path="/tables" element={<RoleRoute pageKey="tables"><RestaurantTables /></RoleRoute>} />
                 <Route path="/customers" element={<RoleRoute pageKey="customers"><Customers /></RoleRoute>} />
                 <Route path="/products" element={<RoleRoute pageKey="products"><Products /></RoleRoute>} />
                 <Route path="/categories" element={<RoleRoute pageKey="categories"><Categories /></RoleRoute>} />
