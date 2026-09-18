@@ -31,7 +31,11 @@ Deno.serve(async (req) => {
 
     if (action === "claim") {
       const email = String(currentUser.email || "").trim().toLowerCase();
-      if (!email) return Response.json({ applied: false });
+      if (!email || isOwner(email)) return Response.json({ applied: false });
+      const storedInvitee = await base44.asServiceRole.entities.User.get(currentUser.id).catch(() => null);
+      if (storedInvitee?.active === false || storedInvitee?.data?.active === false) {
+        return Response.json({ error: "O‘chirilgan hisob taklifni qabul qila olmaydi." }, { status: 403 });
+      }
 
       const matches = await base44.asServiceRole.entities.PendingStaffInvite.filter(
         { email, status: "pending" },
