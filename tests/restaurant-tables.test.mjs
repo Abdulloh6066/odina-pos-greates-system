@@ -224,6 +224,8 @@ test('entrance is a real draggable marker, only admin can edit, and tables still
   assert.match(floorplan, /onPointerDown=\{\(event\) => startDrag\(event, 'entrance'\)\}/);
   assert.match(floorplan, /onPointerMove=\{\(event\) => onMove\(event, 'entrance'\)\}/);
   assert.match(floorplan, /setEntrance\(entranceFromPoint/);
+  assert.match(floorplan, /id="entrance-position" type="range"/);
+  assert.match(floorplan, /Eshikning devordagi joyi/);
   assert.match(floorplan, /disabled=\{!editing \|\| saving\}/);
   assert.match(floorplan, /action: 'set_table_layout'/);
   assert.match(floorplan, /layout_version: shop\.layout_version, layout, entrance/);
