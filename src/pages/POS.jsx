@@ -605,6 +605,9 @@ export default function POS() {
       const result = await base44.functions.invoke('complete-sale', {
         action: 'check_stock',
         shift_id: shift.id,
+        ...(selectedTable ? { table_shop_id: selectedTable.shopId,
+          table_number: selectedTable.number,
+          table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
         items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
       });
       const payload = result?.data || result;
