@@ -1,6 +1,7 @@
 // Restaurant tables phase 1: memory-only backend tests. No live entities or sales.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
@@ -21,16 +22,30 @@ function fixture() {
       { id: 'owner', role: 'admin', email: 'owner@example.test', active: true },
       { id: 'cashier-1', role: 'cashier', email: 'cashier@example.test', shop_id: 'central-shop', active: true },
       { id: 'cashier-2', role: 'cashier', email: 'cashier2@example.test', shop_id: 'second-shop', active: true },
+      { id: 'cashier-3', role: 'cashier', email: 'cashier3@example.test', shop_id: 'second-shop', active: true },
       { id: 'manager', role: 'manager', active: true },
       { id: 'disabled', role: 'admin', active: false },
       { id: 'unassigned', role: 'cashier', active: true },
     ],
+    Shift: [
+      { id: 'shift-main', user_id: 'cashier-1', shop_id: 'central-shop', status: 'open' },
+      { id: 'shift-second', user_id: 'cashier-2', shop_id: 'second-shop', status: 'open' },
+      { id: 'shift-other', user_id: 'cashier-3', shop_id: 'second-shop', status: 'open' },
+    ],
+    Product: [
+      { id: 'cake', name: 'Tort', price: 45000, active: true, image_url: 'cake.png', track_stock: true },
+      { id: 'coffee', name: 'Kofe', price: 20000, active: true, track_stock: false },
+    ],
+    Sale: [],
     ActionHistory: [],
-  };
+  }; 
   let currentId = 'owner';
   let writes = 0;
   const entities = {
     User: { get: async (id) => clone(db.User.find((user) => user.id === id) || null) },
+    Shift: { get: async (id) => clone(db.Shift.find((shift) => shift.id === id) || null) },
+    Product: { get: async (id) => clone(db.Product.find((product) => product.id === id) || null) },
+    Sale: { filter: async (query) => clone(db.Sale.filter((sale) => Object.entries(query).every(([key, value]) => sale[key] === value))) },
     Shop: {
       list: async () => clone(db.Shop),
       get: async (id) => clone(db.Shop.find((shop) => shop.id === id) || null),
@@ -46,18 +61,21 @@ function fixture() {
         if (!shop) return { success: true, updated: 0 };
         const expectedCount = query.restaurant_table_count;
         if (expectedCount !== undefined && shop.restaurant_table_count !== expectedCount) return { success: true, updated: 0 };
-        const version = Number(shop.restaurant_table_layout_version || 0);
-        const versionMatches = query.restaurant_table_layout_version !== undefined
-          ? version === query.restaurant_table_layout_version
+        const versionField = query.restaurant_table_orders_version !== undefined
+          || query.$or?.some((condition) => Object.hasOwn(condition, 'restaurant_table_orders_version'))
+          ? 'restaurant_table_orders_version' : 'restaurant_table_layout_version';
+        const version = Number(shop[versionField] || 0);
+        const versionMatches = query[versionField] !== undefined
+          ? version === query[versionField]
           : Array.isArray(query.$or) && query.$or.some((condition) => (
-            condition.restaurant_table_layout_version === version
-            || (condition.restaurant_table_layout_version?.$exists === false && shop.restaurant_table_layout_version === undefined)
+            condition[versionField] === version
+            || (condition[versionField]?.$exists === false && shop[versionField] === undefined)
           ));
         if (!versionMatches) return { success: true, updated: 0 };
         writes++;
         Object.assign(shop, clone(update.$set || {}));
-        if (update.$inc?.restaurant_table_layout_version) {
-          shop.restaurant_table_layout_version = version + Number(update.$inc.restaurant_table_layout_version);
+        for (const [field, amount] of Object.entries(update.$inc || {})) {
+          shop[field] = Number(shop[field] || 0) + Number(amount);
         }
         return { success: true, updated: 1 };
       },
@@ -82,7 +100,7 @@ function fixture() {
     userRole: (user) => user?.role || '',
     userShopId: (user) => user?.shop_id || '',
     userLabel: (user) => user?.email || 'Xodim',
-    Response, console, Date, Set, Number, String,
+    Response, console, Date, Set, Number, String, crypto: webcrypto,
   });
   assert.equal(typeof handler, 'function');
   return {
