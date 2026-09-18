@@ -345,7 +345,8 @@ test('floor plan and POS integration preserve server validation and immutable sa
   assert.equal(JSON.parse(read('base44/entities/Shop.jsonc')).properties.restaurant_table_layout.items.properties.size.maximum, 140);
   assert.match(pos, /table_shop/);
   assert.match(pos, /table_number/);
-  assert.match(pos, /selectedTable \? \{ table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number \}/);
+  assert.match(pos, /table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number/);
+  assert.match(pos, /table_order_id: tableOrder\?\.id, table_order_revision: tableOrder\?\.revision/);
   assert.match(saleBackend, /requestedTableShopId !== shift\.shop_id/);
   assert.match(saleBackend, /requestedTableNumber > receiptShop\.restaurant_table_count/);
   assert.match(saleBackend, /table_number_snapshot: requestedTableNumber/);
