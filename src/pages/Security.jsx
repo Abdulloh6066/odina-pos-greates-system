@@ -9,6 +9,7 @@ import RoleMatrix from '@/components/security/RoleMatrix';
 import PinManager from '@/components/security/PinManager';
 import StaffAccessPanel from '@/components/security/StaffAccessPanel';
 import SecurityAuditFeed from '@/components/security/SecurityAuditFeed';
+import BusinessBackupPanel from '@/components/security/BusinessBackupPanel';
 import DataCleanupPanel from '@/components/security/DataCleanupPanel';
 
 export default function Security() {
@@ -67,6 +68,7 @@ export default function Security() {
             <StaffAccessPanel users={users} currentUser={user} onChanged={() => setReloadKey((k) => k + 1)} />
           </div>
           <SecurityAuditFeed entries={audit} />
+          <BusinessBackupPanel user={user} />
           <DataCleanupPanel />
         </div>
       )}
