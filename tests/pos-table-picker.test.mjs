@@ -39,7 +39,7 @@ test('Kassa selection stays a real authenticated completed sale with no prematur
   assert.match(pos, /table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number/);
   assert.match(pos, /table_order_id: tableOrder\?\.id, table_order_revision: tableOrder\?\.revision/);
   assert.match(pos, /action: 'save_table_order'/);
-  assert.match(pos, /Hisobni yopish/ .source ? /Hisobni yopish/ : /Hisobni yopish/);
+  assert.match(read('src/components/pos/Cart.jsx'), /Hisobni yopish · To‘lov/);
   assert.match(checkout, /requestedTableShopId !== shift\.shop_id/);
   assert.match(checkout, /requestedTableNumber > receiptShop\.restaurant_table_count/);
   assert.match(checkout, /table_number_snapshot: requestedTableNumber/);
