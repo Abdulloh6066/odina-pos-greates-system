@@ -10,8 +10,8 @@ const source = read('src/lib/route-preload.js');
 // Use the actual route mapping/guard functions with a mock permission predicate.
 // Do not invoke dynamic page imports (no browser/network calls in tests).
 const permissions = {
-  admin: new Set(['dashboard', 'pos', 'orders', 'warehouse', 'users', 'security', 'reports', 'sales']),
-  cashier: new Set(['pos', 'orders', 'warehouse', 'sales']),
+  admin: new Set(['dashboard', 'pos', 'orders', 'tables', 'warehouse', 'users', 'security', 'reports', 'sales']),
+  cashier: new Set(['pos', 'orders', 'tables', 'warehouse', 'sales']),
   warehouse: new Set(['warehouse']),
 };
 const compiled = source
@@ -26,20 +26,22 @@ test('navigation preload respects route roles including warehouse query tabs and
   assert.equal(getPreloadKey('/pos?screen=1', 'cashier'), 'pos');
   assert.equal(getPreloadKey('/security', 'cashier'), null);
   assert.equal(getPreloadKey('/users', 'cashier'), null);
+  assert.equal(getPreloadKey('/tables', 'cashier'), 'tables');
+  assert.equal(getPreloadKey('/tables', 'warehouse'), null);
   assert.equal(getPreloadKey('/reports', 'warehouse'), null);
   assert.equal(getPreloadKey('/warehouse', 'warehouse'), 'warehouse');
   assert.equal(getPreloadKey('/made-up', 'admin'), null);
   assert.equal(getPreloadKey('/login', 'admin'), null);
 });
 
-test('idle warming chooses only permitted likely pages, not all 22 route chunks', () => {
+test('idle warming chooses only permitted likely pages, not all route chunks', () => {
   for (const role of Object.keys(permissions)) {
     const paths = likelyRoutesForRole(role);
     assert.ok(paths.length <= 5);
     for (const path of paths) assert.ok(getPreloadKey(path, role));
     assert.ok(!paths.includes('/reports')); // large reports bundle is loaded on intent only
   }
-  assert.equal(Object.keys(PAGE_LOADERS).length, 22);
+  assert.equal(Object.keys(PAGE_LOADERS).length, 23);
   assert.equal(likelyRoutesForRole('warehouse').length, 0);
 });
 
@@ -47,7 +49,7 @@ test('React uses one shared cached loader; sidebar warms only on intent/idle, no
   const app = read('src/App.jsx');
   const sidebar = read('src/components/Sidebar.jsx');
   const layout = read('src/components/Layout.jsx');
-  assert.equal((app.match(/lazy\(\(\) => preloadPage\('/g) || []).length, 22);
+  assert.equal((app.match(/lazy\(\(\) => preloadPage\('/g) || []).length, 23);
   assert.match(source, /if \(!inFlight\.has\(key\)\)/);
   assert.match(source, /inFlight\.delete\(key\)/);
   assert.match(source, /return key \? preloadPage\(key\) : Promise\.resolve\(null\)/);
