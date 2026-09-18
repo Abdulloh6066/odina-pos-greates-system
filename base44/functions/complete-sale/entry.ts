@@ -991,6 +991,9 @@ export default async function(req) {
             error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan.",
           }, { status: 409 });
         }
+        if (existingSale.table_order_id_snapshot) {
+          await changeLockedTable(service, existingSale.shop_id, existingSale.table_order_id_snapshot, idempotencyKey, true);
+        }
         const existingShift = await service.entities.Shift.get(existingSale.shift_id).catch(() => null);
         return Response.json({
           sale: existingSale,
@@ -1051,7 +1054,32 @@ export default async function(req) {
       return Response.json({ error: "Bu do‘konda ko‘rsatilgan stol mavjud emas. Stollar xaritasini yangilang." }, { status: 409 });
     }
 
-    const normalizedItems = await normalizeSaleItems(service, requestedItems);
+    // A paid table must match the server-stored order, not browser totals.
+    const tableOrder: any = hasTable
+      ? tableOrders(receiptShop).find((row: any) => row.number === requestedTableNumber) : null;
+    if (hasTable) {
+      if (!tableOrder || !body?.table_order_id || body.table_order_id !== tableOrder.id
+        || !Number.isInteger(body?.table_order_revision)
+        || body.table_order_revision !== tableOrder.revision) {
+        return Response.json({ error: "Stol buyurtmasi eski yoki saqlanmagan. Stolni yangilang va qayta tekshiring." }, { status: 409 });
+      }
+      if (tableOrder.state !== "occupied") {
+        return Response.json({ error: "Bu stol bo‘yicha to‘lov allaqachon boshlangan. Savdolar tarixini tekshiring." }, { status: 409 });
+      }
+      const requested = new Map<string, number>();
+      for (const row of requestedItems) {
+        const id = String(row?.product_id || "");
+        if (!id || !Number.isInteger(row?.quantity) || row.quantity < 1 || requested.has(id)) {
+          return Response.json({ error: "Stol mahsulotlari noto‘g‘ri. Buyurtmani yangilang." }, { status: 409 });
+        }
+        requested.set(id, row.quantity);
+      }
+      if (requested.size !== tableOrder.items?.length
+        || tableOrder.items.some((item: any) => requested.get(item.product_id) !== item.quantity)) {
+        return Response.json({ error: "Stol savati saqlangan buyurtmadan farq qiladi. Avval saqlang." }, { status: 409 });
+      }
+    }
+    const normalizedItems = await normalizeSaleItems(service, requestedItems, tableOrder?.items || null);
     const allowNegativeStock = await stockPolicy(service);
     const { plans: stockPlans, shortages: stockWarnings } =
       await planSaleStock(service, shift.shop_id, normalizedItems);
