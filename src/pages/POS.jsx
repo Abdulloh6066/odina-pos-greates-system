@@ -903,7 +903,7 @@ export default function POS() {
             <div><strong>{selectedTable ? `${selectedTable.number}-stol · ${tableShop?.name || 'Do‘kon'}` : 'Stol tanlanmagan'}</strong>
               <p className="text-xs text-muted-foreground">{tableOrderLoading ? 'Buyurtma yuklanmoqda…' : tableOrder?.state === 'paying' ? 'To‘lov tekshirilmoqda — yangi savdo boshlamang.' : tableOrder ? `Band · to‘lanmagan: ${formatUZS(tableOrder.total)} · ${tableOrder.items?.length || 0} tur` : 'Bo‘sh stol · buyurtma qo‘shib saqlang.'}</p>
               {tableCartDirty && !tableOrderLoading && <p className="text-xs font-semibold text-amber-900">Saqlanmagan o‘zgarishlar bor. Stol almashtirilganda avval serverda saqlanadi.</p>}
-              {(tableOrderError || tableSaveError) && <p role="alert" className="text-xs text-destructive">{tableOrderError || tableSaveError}</p>
+              {(tableOrderError || tableSaveError) && <p role="alert" className="text-xs text-destructive">{tableOrderError || tableSaveError}</p>}
               {tableSelectionError && <p role="alert" className="text-xs text-destructive">{tableSelectionError}</p>}
             </div>
           </div>
