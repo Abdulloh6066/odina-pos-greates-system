@@ -211,6 +211,8 @@ function canonicalSaleRequest(body: any) {
 
   return JSON.stringify({
     shift_id: String(body?.shift_id || ""),
+    ...(body?.table_number !== undefined && body?.table_number !== null
+      ? { table_number: body.table_number, table_shop_id: String(body?.table_shop_id || "") } : {}),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
     ...(body?.rounding_total !== undefined && body?.rounding_total !== null
@@ -981,6 +983,19 @@ export default async function(req) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
+    // Restaurant table is optional. Never trust URL/body shop or table numbers.
+    // Direct table checkout is online-only in POS; inventory remains deducted
+    // solely by this completed-sale path, not when a table is selected.
+    const hasTable = body?.table_number !== undefined && body?.table_number !== null;
+    const requestedTableNumber = body?.table_number;
+    const requestedTableShopId = String(body?.table_shop_id || "");
+    if ((!hasTable && requestedTableShopId)
+      || (hasTable && (typeof requestedTableNumber !== "number"
+        || !Number.isInteger(requestedTableNumber) || requestedTableNumber < 1
+        || !requestedTableShopId || requestedTableShopId !== shift.shop_id))) {
+      return Response.json({ error: "Stol yoki do‘kon tanlovi noto‘g‘ri. Stollar xaritasidan qayta tanlang." }, { status: 403 });
+    }
+
     // Receipt contacts come only from the shop assigned to the authenticated shift.
     // Snapshot them at sale time so changing a shop's Instagram/phone/address
     // never rewrites details on an already completed sale.
@@ -991,6 +1006,13 @@ export default async function(req) {
       } catch (error) {
         console.warn("Receipt shop details could not be loaded:", error);
       }
+    }
+
+    if (hasTable && (!receiptShop || receiptShop.active === false
+      || receiptShop.location_type !== "shop" || receiptShop.allows_pos === false
+      || !Number.isInteger(receiptShop.restaurant_table_count)
+      || requestedTableNumber > receiptShop.restaurant_table_count)) {
+      return Response.json({ error: "Bu do‘konda ko‘rsatilgan stol mavjud emas. Stollar xaritasini yangilang." }, { status: 409 });
     }
 
     const normalizedItems = await normalizeSaleItems(service, requestedItems);
@@ -1202,6 +1224,7 @@ export default async function(req) {
       user_name: user.full_name || user.email,
       shop_id: shift.shop_id,
       shop_name: shift.shop_name,
+      ...(hasTable ? { table_number_snapshot: requestedTableNumber } : {}),
       receipt_instagram_snapshot: String(receiptShop?.instagram || "").trim().replace(/^@/, ""),
       receipt_phone_snapshot: String(receiptShop?.phone || "").trim(),
       receipt_address_snapshot: String(receiptShop?.address || "").trim(),
