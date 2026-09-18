@@ -12,9 +12,9 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'orders', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  admin: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
-  cashier: ['pos', 'orders', 'customers', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
+  cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
   production: ['warehouse', 'products', 'customers', 'screens'],
   warehouse: ['warehouse'],
@@ -33,6 +33,7 @@ export const MENU_ITEMS = [
   { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
   { key: 'pos', label: 'Kassa', path: '/pos', icon: 'ShoppingCart' },
   { key: 'orders', label: 'Buyurtmalar', path: '/orders', icon: 'ClipboardList' },
+  { key: 'tables', label: 'Stollar', path: '/tables', icon: 'Armchair' },
   { key: 'customers', label: 'Mijozlar', path: '/customers', icon: 'Contact' },
   { key: 'screens', label: 'Ekranlar', path: '/production-screen', icon: 'Monitor' },
   { key: 'waste', label: 'Chiqitlar', path: '/waste', icon: 'Trash2' },
