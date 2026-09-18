@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
-  Archive, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown, Circle, Clock,
+  Archive, Armchair, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown, Circle, Clock,
   ClipboardList, Contact, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, Shield, ShieldCheck, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp, ClipboardCheck, FileSpreadsheet,
 } from 'lucide-react';
@@ -13,7 +13,7 @@ import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
 import { likelyRoutesForRole, preloadRoute } from '@/lib/route-preload';
 
 const ICONS = {
-  LayoutDashboard, ShoppingCart, ClipboardList, Cake, Tags, BarChart3, Ticket,
+  LayoutDashboard, ShoppingCart, ClipboardList, Armchair, Cake, Tags, BarChart3, Ticket,
   ReceiptText, Clock, Banknote, Building2, WalletCards, Warehouse, Users, Settings, Shield, ShieldCheck, Trash2, Monitor, TrendingUp, Contact, FileSpreadsheet,
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
