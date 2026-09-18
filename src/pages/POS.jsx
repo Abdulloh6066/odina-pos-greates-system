@@ -965,7 +965,10 @@ export default function POS() {
       />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => {
         setReceiptOpen(false);
-        if (selectedTable && !lastSale?.offline_pending) navigate('/tables');
+        if (selectedTable && !lastSale?.offline_pending) {
+          navigate('/pos');
+          void openTablePicker();
+        }
       }} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
