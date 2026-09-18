@@ -294,6 +294,7 @@ export default async function(req) {
   let stockMovementRecords: any[] = [];
   let idempotencyClaimed = false;
   let idempotencyShiftId = "";
+  let idempotencyKey = "";
   let tablePaymentLock: { shopId: string; orderId: string; checkoutKey: string } | null = null;
 
   try {
@@ -959,7 +960,7 @@ export default async function(req) {
     const requestedDiscountCode = String(body?.discount_code || "").trim().toUpperCase();
     const roundingRequested = body?.rounding_total !== undefined && body?.rounding_total !== null;
     const manualRequested = body?.manual_discount_amount !== undefined && body?.manual_discount_amount !== null;
-    const idempotencyKey = String(body?.idempotency_key || "").trim();
+    idempotencyKey = String(body?.idempotency_key || "").trim();
 
     if (idempotencyKey && !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       return Response.json({ error: "Savdo so‘rovining xavfsizlik kaliti noto‘g‘ri." }, { status: 400 });
