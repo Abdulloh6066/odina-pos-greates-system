@@ -214,6 +214,84 @@ const saleBody = (code, percentage, ownerPin) => ({
     : [{ method: 'cash', amount: 100000 - (100000 * percentage / 100) }],
 });
 
+const setupUnpaidTable = (f, price = 100000) => {
+  f.db.Shop[0].location_type = 'shop';
+  f.db.Shop[0].allows_pos = true;
+  f.db.Shop[0].restaurant_table_count = 4;
+  f.db.Shop[0].restaurant_table_orders_version = 0;
+  f.db.Shop[0].restaurant_table_orders = [{
+    id: 'open-order-1', number: 2, revision: 1, state: 'occupied',
+    items: [{ product_id: 'cake', product_name: 'Test cake', image_url: 'cake.png',
+      price, quantity: 1, subtotal: price, stock_tracked: true, source_type: 'central_produced' }],
+    total: price, started_at: '2026-09-11T17:00:00.000Z', updated_at: '2026-09-11T17:00:00.000Z',
+    opened_by: 'cashier', updated_by: 'cashier',
+  }];
+};
+const tablePayment = (key = 'restaurant-checkout-key-00001') => ({
+  action: 'complete_sale', shift_id: 'shift',
+  table_shop_id: 'shop', table_number: 2,
+  table_order_id: 'open-order-1', table_order_revision: 1,
+  items: [{ product_id: 'cake', quantity: 1 }],
+  payments: [{ method: 'cash', amount: 100000 }],
+  idempotency_key: key, recorded_at: '2026-09-11T20:30:00.000Z',
+});
+
+test('restaurant customer stays unpaid until one final checkout; retry cannot charge twice', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  f.db.Product[0].price = 125000; // Save-time price must be immutable.
+  const call = loadHandler(f.client);
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+  const request = tablePayment();
+  const paid = await call(request);
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.equal(paid.data.sale.total, 100000);
+  assert.equal(paid.data.sale.table_order_id_snapshot, 'open-order-1');
+  assert.equal(paid.data.sale.table_number_snapshot, 2);
+  assert.equal(paid.data.table_released, true);
+  assert.equal(f.db.SaleItem[0].unit_price, 100000);
+  assert.equal(f.db.Shop[0].restaurant_table_orders.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  assert.equal(f.db.Shift[0].total_sales, 100000);
+  const replay = await call(structuredClone(request));
+  assert.equal(replay.status, 200, JSON.stringify(replay));
+  assert.equal(replay.data.already_processed, true);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  assert.equal((await call(tablePayment('different-checkout-key-000002'))).status, 409);
+});
+
+test('restaurant backend rejects forged quantities, stale versions, and concurrent distinct payments', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  const call = loadHandler(f.client);
+  const bad = { ...tablePayment(), items: [{ product_id: 'cake', quantity: 2 }],
+    payments: [{ method: 'cash', amount: 200000 }] };
+  assert.equal((await call(bad)).status, 409);
+  assert.equal((await call({ ...tablePayment(), table_order_revision: 0 })).status, 409);
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+  const competing = await Promise.all([call(tablePayment('restaurant-concurrent-00001')),
+    call(tablePayment('restaurant-concurrent-00002'))]);
+  assert.deepEqual(competing.map((row) => row.status).sort(), [200, 409]);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+});
+
+test('failed pre-commit shift claim reopens the same unpaid table without charging', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  f.entities.Shift.updateMany = async () => ({ success: true, updated: 0 });
+  const response = await loadHandler(f.client)(tablePayment());
+  assert.equal(response.status, 503, JSON.stringify(response));
+  assert.equal(f.db.Shop[0].restaurant_table_orders[0].state, 'occupied');
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+});
+
 test('cashier can validate a 1–99% code without OWNER PIN', async () => {
   const f = fixture(5);
   const response = await loadHandler(f.client)({
