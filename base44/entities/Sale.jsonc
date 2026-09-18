@@ -47,6 +47,18 @@
     "shop_name": {
       "type": "string"
     },
+    "receipt_instagram_snapshot": {
+      "type": "string",
+      "description": "Savdo paytidagi do\u2018kon Instagram username; keyingi sozlama o\u2018zgarishlaridan mustaqil"
+    },
+    "receipt_phone_snapshot": {
+      "type": "string",
+      "description": "Savdo paytidagi do\u2018kon telefon raqami"
+    },
+    "receipt_address_snapshot": {
+      "type": "string",
+      "description": "Savdo paytidagi do\u2018kon manzili"
+    },
     "customer_id": {
       "type": "string",
       "description": "Bog'langan mijoz (Customer) yozuvi IDsi"
