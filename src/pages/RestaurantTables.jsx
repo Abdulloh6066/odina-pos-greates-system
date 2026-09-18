@@ -42,8 +42,8 @@ export default function RestaurantTables() {
   const selectedShop = shops.find((shop) => shop.id === selectedShopId);
   useEffect(() => {
     setDraftCount(String(selectedShop?.table_count ?? 0));
-    setNotice('');
   }, [selectedShopId, selectedShop?.table_count]);
+  useEffect(() => { setNotice(''); }, [selectedShopId]);
 
   const count = Number(draftCount);
   const validCount = /^(0|[1-9]\d*)$/.test(draftCount) && Number.isInteger(count) && count <= MAX_TABLES;
