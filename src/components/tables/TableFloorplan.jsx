@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Armchair, Check, Edit3, Grip, RefreshCw, Save, X } from 'lucide-react';
+import { Armchair, Check, DoorOpen, Edit3, Grip, RefreshCw, Save, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { buildTableLayout, clamp, LIMITS, validateTableLayout } from '@/lib/table-floorplan';
@@ -81,6 +81,11 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {editing && !valid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar ustma-ust tushmoqda. Saqlash uchun ularni biroz uzoqlashtiring.</p>}
       <div className="max-w-full overflow-x-auto overscroll-x-contain pb-2">
+        <div className="relative min-w-[620px] w-full pt-12">
+          <div aria-label="Kirish eshigi: xaritaning yuqori o‘rtasida" className="pointer-events-none absolute left-1/2 top-0 z-20 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-b-xl rounded-t-lg border-2 border-brand-olive bg-card px-4 py-2 text-xs font-bold tracking-wide text-brand-ink shadow-sm">
+            <DoorOpen aria-hidden="true" className="h-5 w-5" /> Kirish / Eshik
+          </div>
+          <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-9 z-20 h-3 w-px bg-brand-olive" />
         <div ref={boardRef} aria-label="Stollar joylashuvini ko‘rsatuvchi xarita" className={`relative min-w-[620px] w-full aspect-[10/7] sm:aspect-[16/10] rounded-[28px] border-2 overflow-hidden shadow-inner ${editing ? 'border-brand-olive bg-[#f8f4e9]' : 'border-brand-sand/50 bg-[#fbf8f0]'}`}
           style={{ backgroundImage: 'radial-gradient(circle, rgba(172,169,93,.22) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
           <div className="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none">
@@ -114,6 +119,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
             </button>
           ))}
           <div className="absolute bottom-3 left-4 right-4 pointer-events-none text-center text-[10px] text-brand-ink/65">{shop.table_count} ta stol · {editing ? 'Surib joylashtiring' : 'Stolni tanlang'}</div>
+        </div>
         </div>
       </div>
       {editing && <p className="text-xs text-muted-foreground flex items-center gap-2"><RefreshCw className="w-4 h-4" /> Joylashuv faqat «Joylashuvni saqlash» bosilgandan keyin boshqa qurilmalarda ham ko‘rinadi.</p>}
