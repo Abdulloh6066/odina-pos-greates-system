@@ -1181,6 +1181,22 @@ export default async function(req) {
       }, { status: 400 });
     }
 
+    // The one-time table lock must precede any financial or stock mutations.
+    if (tableOrder) {
+      if (!idempotencyKey) return Response.json({ error: "Stol to‘lovi uchun takrorlanmas kalit kerak." }, { status: 400 });
+      const claim = await service.entities.Shop.updateMany(
+        { id: receiptShop.id, restaurant_table_count: receiptShop.restaurant_table_count,
+          ...tableVersionQuery(tableOrdersVersion(receiptShop)) },
+        { $set: { restaurant_table_orders: tableOrders(receiptShop).map((row: any) => row.id === tableOrder.id
+          ? { ...row, state: "paying", checkout_key: idempotencyKey } : row) },
+          $inc: { restaurant_table_orders_version: 1 } },
+      );
+      if (!claim?.success || Number(claim.updated || 0) !== 1) {
+        return Response.json({ error: "Stol boshqa kassada o‘zgardi yoki to‘lov boshlangan. Xaritani yangilang." }, { status: 409 });
+      }
+      tablePaymentLock = { shopId: receiptShop.id, orderId: tableOrder.id, checkoutKey: idempotencyKey };
+    }
+
     const receivedAt = new Date().toISOString();
     const soldAt = idempotencyKey
       ? resolveSoldAt(body?.recorded_at, shift, receivedAt)
@@ -1210,6 +1226,9 @@ export default async function(req) {
           && completedSale.shift_id === shift.id
           && (!completedSale.request_fingerprint || completedSale.request_fingerprint === requestFingerprint)
         ) {
+          if (completedSale.table_order_id_snapshot) {
+            await changeLockedTable(service, completedSale.shop_id, completedSale.table_order_id_snapshot, idempotencyKey, true);
+          }
           const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
           return Response.json({
             sale: completedSale,
@@ -1288,7 +1307,8 @@ export default async function(req) {
       user_name: user.full_name || user.email,
       shop_id: shift.shop_id,
       shop_name: shift.shop_name,
-      ...(hasTable ? { table_number_snapshot: requestedTableNumber } : {}),
+      ...(hasTable ? { table_number_snapshot: requestedTableNumber,
+        table_order_id_snapshot: tableOrder.id, table_order_revision_snapshot: tableOrder.revision } : {}),
       receipt_instagram_snapshot: String(receiptShop?.instagram || "").trim().replace(/^@/, ""),
       receipt_phone_snapshot: String(receiptShop?.phone || "").trim(),
       receipt_address_snapshot: String(receiptShop?.address || "").trim(),
