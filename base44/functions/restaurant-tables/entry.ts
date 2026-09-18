@@ -5,6 +5,11 @@ import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../sha
 // complete-sale. This function never creates sales, orders or stock movements.
 const ALLOWED_ROLES = new Set(["admin", "cashier"]);
 const MAX_TABLES = 30;
+const DEFAULT_ENTRANCE = { side: "top", offset: 500 };
+const validEntrance = (entry: any) => entry && ["top", "right", "bottom", "left"].includes(entry.side)
+  && Number.isInteger(entry.offset) && entry.offset >= 150 && entry.offset <= 850;
+const cleanEntrance = (entry: any) => validEntrance(entry)
+  ? { side: entry.side, offset: entry.offset } : { ...DEFAULT_ENTRANCE };
 const hasValidPosition = (entry: any, count: number) =>
   entry && Number.isInteger(entry.number) && entry.number >= 1 && entry.number <= count
   && Number.isInteger(entry.x) && entry.x >= 60 && entry.x <= 940
@@ -27,6 +32,7 @@ const safeShop = (shop: any) => ({
   table_count: Number.isInteger(shop.restaurant_table_count)
     && shop.restaurant_table_count >= 0 && shop.restaurant_table_count <= MAX_TABLES
     ? shop.restaurant_table_count : 0,
+  entrance: cleanEntrance(shop.restaurant_entrance),
   layout_version: Number.isInteger(shop.restaurant_table_layout_version)
     && shop.restaurant_table_layout_version >= 0 ? shop.restaurant_table_layout_version : 0,
   layout: (Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [])
@@ -84,6 +90,12 @@ Deno.serve(async (req) => {
       if (!Number.isInteger(version) || version !== current.layout_version) {
         return Response.json({ error: "Xarita boshqa oynada o‘zgardi. Yangilab qayta joylashtiring." }, { status: 409 });
       }
+      // Older clients may omit entrance; preserve the saved location in that case.
+      // New clients must supply a valid wall and position; never trust browser data.
+      const entrance = body?.entrance === undefined ? current.entrance : body.entrance;
+      if (!validEntrance(entrance)) {
+        return Response.json({ error: "Eshik joylashuvi noto‘g‘ri. Devorni va joyini qayta tanlang." }, { status: 400 });
+      }
       const layout = body?.layout;
       if (!validateLayout(layout, current.table_count)) {
         return Response.json({ error: "Har bir stol bitta marta kiritilsin, chegaradan chiqmasin va stollar ustma-ust kelmasin." }, { status: 400 });
@@ -95,7 +107,7 @@ Deno.serve(async (req) => {
         : { restaurant_table_layout_version: version };
       const updated = await service.entities.Shop.updateMany(
         { id: shop.id, ...expectedVersion, restaurant_table_count: current.table_count },
-        { $set: { restaurant_table_layout: clean }, $inc: { restaurant_table_layout_version: 1 } },
+        { $set: { restaurant_table_layout: clean, restaurant_entrance: cleanEntrance(entrance) }, $inc: { restaurant_table_layout_version: 1 } },
       );
       if (!updated?.success || Number(updated.updated || 0) !== 1) {
         return Response.json({ error: "Stollar soni yoki xarita o‘zgardi. Yangilang va qayta urinib ko‘ring." }, { status: 409 });
