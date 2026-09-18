@@ -6,7 +6,7 @@ import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../sha
 const ALLOWED_ROLES = new Set(["admin", "cashier"]);
 const MAX_TABLES = 30;
 const isShop = (shop: any) => Boolean(shop && shop.active !== false
-  && shop.location_type !== "production" && shop.allows_pos !== false);
+  && shop.location_type === "shop" && shop.allows_pos !== false);
 const safeShop = (shop: any) => ({
   id: String(shop.id),
   name: String(shop.name || "Do‘kon"),
