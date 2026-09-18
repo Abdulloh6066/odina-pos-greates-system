@@ -113,7 +113,7 @@ export default function RestaurantTables() {
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Stollar"
-        subtitle="Zalni haqiqiy joylashuviga moslang: stol va kirish eshigini o‘zingiz joylashtiring."
+        subtitle="Zalning haqiqiy xaritasi, har bir stolning ochiq hisobi va Kassaga tezkor ulanish."
         icon={Armchair}
         eyebrow="ODINA · RESTORAN"
         actions={<Button variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>}
@@ -196,7 +196,7 @@ export default function RestaurantTables() {
               <div className="rounded-2xl border border-dashed border-brand-olive/40 bg-card p-8 sm:p-12 text-center space-y-3"><span className="w-14 h-14 bg-brand-olive/10 rounded-2xl mx-auto flex items-center justify-center"><Sparkles className="w-7 h-7 text-brand-ink" /></span><h2 className="font-display text-xl font-semibold">Stollarni sozlashga tayyor</h2><p className="max-w-md mx-auto text-sm text-muted-foreground">{canManage ? 'Yuqoridagi sozlamalarda stol sonini saqlang. Har bir do‘konga alohida son belgilanadi.' : 'Admin ushbu do‘kon uchun stollar sonini belgilagach shu yerda ko‘rinadi.'}</p></div>
             )}
           </>}
-          <div className="rounded-xl border border-brand-olive/25 bg-brand-olive/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Kassa ulanishi:</strong> stoldan ochilgan tezkor savdo chek va savdolar tarixida stol raqami bilan saqlanadi. Qoldiq faqat savdo yakunlanganda ayiriladi. Stolga to‘lanmagan buyurtma yig‘ish va vaqtli bron keyingi bosqichda qo‘shiladi.</div>
+          <div className="rounded-xl border border-brand-olive/25 bg-brand-olive/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Stol buyurtmalari:</strong> mahsulotlar stolda to‘lovgacha saqlanadi, boshqa kassirdan qayta ochib davom ettirish mumkin. Daromad va ombor qoldig‘i faqat yakuniy to‘lovda yoziladi. Bron qilish hali qo‘shilmagan.</div>
         </div>
       )}
     </div>
