@@ -30,6 +30,7 @@ test('table picker is server scoped, further constrained by open shift and guard
   assert.match(pos, /if \(cart\.length && !\(await odinaConfirm\(/);
   assert.match(pos, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: shopId, table_number: String\(number\) \}\)\}`\)/);
   assert.match(pos, /const priorTableKey = useRef\(tableKey\)/);
+  assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/pos'\);\s*void openTablePicker\(\)/);
 });
 
 test('Kassa selection stays a real authenticated completed sale with no premature inventory deduction', () => {
