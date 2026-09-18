@@ -294,10 +294,12 @@ export default function POS() {
       void odinaAlert('Bu stol joriy smenaning do‘koniga tegishli emas.');
       return;
     }
-    if (cart.length && !(await odinaConfirm({
-      title: 'Saqlanmagan savat',
-      description: 'Boshqa stolga o‘tsangiz joriy savat yo‘qoladi. Avval savdoni yakunlash tavsiya etiladi. Davom etasizmi?',
-      confirmLabel: 'Stolni almashtirish', tone: 'warning',
+    if (selectedTable && tableOrderLoading) return;
+    if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
+    if (!selectedTable && cart.length && !(await odinaConfirm({
+      title: 'Oddiy savat saqlanmagan',
+      description: 'Stolga o‘tsangiz oddiy savat o‘chadi. Avval uning savdosini yakunlang yoki tasdiqlang.',
+      confirmLabel: 'Stolga o‘tish', tone: 'warning',
     }))) return;
     setTablePickerOpen(false);
     navigate(`/pos?${new URLSearchParams({ table_shop: shopId, table_number: String(number) })}`);
@@ -356,23 +358,24 @@ export default function POS() {
   };
 
   const addToCart = (product) => {
+    if (tableLocked || paying) return;
     setCart((prev) => {
       const existing = prev.find((i) => i.product_id === product.id);
       if (existing) {
-        return prev.map((i) => i.product_id === product.id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + product.price } : i);
+        return prev.map((i) => i.product_id === product.id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i);
       }
       return [...prev, { product_id: product.id, product_name: product.name, image_url: product.image_url, price: product.price, quantity: 1, subtotal: product.price }];
     });
   };
 
-  const inc = (item) => setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i));
-  const dec = (item) => setCart((p) => p.flatMap((i) => {
+  const inc = (item) => { if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
+  const dec = (item) => { if (tableLocked || paying) return; setCart((p) => p.flatMap((i) => {
     if (i.product_id !== item.product_id) return [i];
     const q = i.quantity - 1;
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
-  }));
-  const removeItem = (item) => setCart((p) => p.filter((i) => i.product_id !== item.product_id));
-  const clearCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
+  })); };
+  const removeItem = (item) => { if (!tableLocked && !paying) setCart((p) => p.filter((i) => i.product_id !== item.product_id)); };
+  const clearCart = () => { if (tableLocked || paying) return; setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
 
   const validateDiscount = async (code, ownerPin = '') => {
     setDiscountLoading(true);
