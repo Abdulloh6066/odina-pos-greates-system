@@ -11,7 +11,8 @@ const backend = read('base44/functions/restaurant-tables/entry.ts');
 const checkout = read('base44/functions/complete-sale/entry.ts');
 
 test('Kassa visibly opens the real shared floor plan on desktop and touch devices, not a fake list', () => {
-  assert.match(pos, /import TableFloorplan from '@\/components\/tables\/TableFloorplan'/);
+  assert.match(pos, /const TableFloorplan = React\.lazy\(\(\) => import\('@\/components\/tables\/TableFloorplan'\)\)/);
+  assert.match(pos, /<React\.Suspense fallback=/);
   assert.match(pos, /Stollar xaritasini Kassa ichida ochish/);
   assert.match(pos, /Stollar xaritasini ochish/);
   assert.match(pos, /<Sheet open=\{tablePickerOpen\}/);
