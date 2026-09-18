@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, DoorOpen,
-  Edit3, Grip, MousePointer2, RotateCcw, Save, X,
+  Edit3, Grip, Minus, MousePointer2, Plus, RotateCcw, Save, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import {
-  buildTableLayout, clamp, entranceFromPoint, LIMITS, normalizeEntrance,
-  nudgeEntrance, validateTableLayout,
+  buildTableLayout, clamp, entranceFromPoint, normalizeEntrance,
+  nudgeEntrance, tableBounds, tableSize, TABLE_SIZES, validateTableLayout,
 } from '@/lib/table-floorplan';
 
 const WALLS = [
@@ -61,19 +61,33 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   }, [defaultLayout, defaultEntrance]);
 
   const tableDirty = layout.some((point, index) =>
-    point.x !== defaultLayout[index]?.x || point.y !== defaultLayout[index]?.y);
+    point.x !== defaultLayout[index]?.x || point.y !== defaultLayout[index]?.y
+    || tableSize(point) !== tableSize(defaultLayout[index]));
   const entranceDirty = entrance.side !== defaultEntrance.side || entrance.offset !== defaultEntrance.offset;
   const dirty = tableDirty || entranceDirty;
   const valid = validateTableLayout(shop.table_count, layout);
   useEffect(() => { onEditingChange?.(editing && dirty); }, [editing, dirty, onEditingChange]);
 
   const place = (number, x, y) => {
-    setLayout((previous) => previous.map((point) => point.number === number
-      ? {
+    setLayout((previous) => previous.map((point) => {
+      if (point.number !== number) return point;
+      const bounds = tableBounds(tableSize(point));
+      return {
         ...point,
-        x: clamp(Math.round(x / 5) * 5, LIMITS.minX, LIMITS.maxX),
-        y: clamp(Math.round(y / 5) * 5, LIMITS.minY, LIMITS.maxY),
-      } : point));
+        x: clamp(Math.round(x / 5) * 5, bounds.minX, bounds.maxX),
+        y: clamp(Math.round(y / 5) * 5, bounds.minY, bounds.maxY),
+      };
+    }));
+  };
+  const resizeTable = (number, requestedSize) => {
+    if (!editing || saving || !TABLE_SIZES.includes(requestedSize)) return;
+    setLayout((previous) => previous.map((point) => {
+      if (point.number !== number) return point;
+      const bounds = tableBounds(requestedSize);
+      return { ...point, size: requestedSize,
+        x: clamp(point.x, bounds.minX, bounds.maxX),
+        y: clamp(point.y, bounds.minY, bounds.maxY) };
+    }));
   };
   const pointerCoordinates = (event) => {
     const bounds = boardRef.current?.getBoundingClientRect();
