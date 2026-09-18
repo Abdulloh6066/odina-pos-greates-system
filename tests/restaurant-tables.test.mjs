@@ -4,7 +4,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
-import { entranceFromPoint, normalizeEntrance, nudgeEntrance } from '../src/lib/table-floorplan.js';
+import { buildTableLayout, entranceFromPoint, normalizeEntrance, nudgeEntrance, tablesOverlap, validateTableLayout } from '../src/lib/table-floorplan.js';
 
 const read = (path) => readFileSync(path, 'utf8');
 const clone = (value) => value == null ? value : structuredClone(value);
@@ -167,7 +167,7 @@ test('admin can save a non-overlapping floor plan; stale versions and overlaps a
   const saved = await f.run({ action: 'set_table_layout', shop_id: 'central-shop', layout_version: 1, layout });
   assert.equal(saved.status, 200, JSON.stringify(saved));
   assert.equal(saved.data.shop.layout_version, 2);
-  assert.deepEqual(saved.data.shop.layout, layout);
+  assert.deepEqual(saved.data.shop.layout, layout.map((point) => ({ ...point, size: 100 })));
   const writesAfterSave = f.writes;
   const stale = await f.run({ action: 'set_table_layout', shop_id: 'central-shop', layout_version: 1, layout });
   assert.equal(stale.status, 409);
