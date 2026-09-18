@@ -9,6 +9,7 @@ import OdinaDialogProvider from '@/components/ui/odina-dialog-provider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import RoleRoute from '@/components/RoleRoute';
+import { preloadPage } from '@/lib/route-preload';
 // Auth pages
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -16,28 +17,28 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 // App shell stays eager; feature pages load only when their route is opened.
 import Layout from '@/components/Layout';
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const POS = lazy(() => import('@/pages/POS'));
-const Orders = lazy(() => import('@/pages/Orders'));
-const Customers = lazy(() => import('@/pages/Customers'));
-const Products = lazy(() => import('@/pages/Products'));
-const Categories = lazy(() => import('@/pages/Categories'));
-const Users = lazy(() => import('@/pages/Users'));
-const Reports = lazy(() => import('@/pages/Reports'));
-const DiscountCodes = lazy(() => import('@/pages/DiscountCodes'));
-const Settings = lazy(() => import('@/pages/Settings'));
-const SalesHistory = lazy(() => import('@/pages/SalesHistory'));
-const Shifts = lazy(() => import('@/pages/Shifts'));
-const CashOutHistory = lazy(() => import('@/pages/CashOutHistory'));
-const CashRecipients = lazy(() => import('@/pages/CashRecipients'));
-const Warehouse = lazy(() => import('@/pages/Warehouse'));
-const Waste = lazy(() => import('@/pages/Waste'));
-const Budget = lazy(() => import('@/pages/Budget'));
-const ProductionScreen = lazy(() => import('@/pages/ProductionScreen'));
-const ProfitReport = lazy(() => import('@/pages/ProfitReport'));
-const AuditExport = lazy(() => import('@/pages/AuditExport'));
-const Security = lazy(() => import('@/pages/Security'));
-const DailyExport = lazy(() => import('@/pages/DailyExport'));
+const Dashboard = lazy(() => preloadPage('dashboard'));
+const POS = lazy(() => preloadPage('pos'));
+const Orders = lazy(() => preloadPage('orders'));
+const Customers = lazy(() => preloadPage('customers'));
+const Products = lazy(() => preloadPage('products'));
+const Categories = lazy(() => preloadPage('categories'));
+const Users = lazy(() => preloadPage('users'));
+const Reports = lazy(() => preloadPage('reports'));
+const DiscountCodes = lazy(() => preloadPage('discounts'));
+const Settings = lazy(() => preloadPage('settings'));
+const SalesHistory = lazy(() => preloadPage('sales'));
+const Shifts = lazy(() => preloadPage('shifts'));
+const CashOutHistory = lazy(() => preloadPage('cashouts'));
+const CashRecipients = lazy(() => preloadPage('recipients'));
+const Warehouse = lazy(() => preloadPage('warehouse'));
+const Waste = lazy(() => preloadPage('waste'));
+const Budget = lazy(() => preloadPage('budget'));
+const ProductionScreen = lazy(() => preloadPage('screens'));
+const ProfitReport = lazy(() => preloadPage('profit'));
+const AuditExport = lazy(() => preloadPage('audit'));
+const Security = lazy(() => preloadPage('security'));
+const DailyExport = lazy(() => preloadPage('dailyexport'));
 
 const ROUTE_TITLES = {
   '/': 'Bosh sahifa',
