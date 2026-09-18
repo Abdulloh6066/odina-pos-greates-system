@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { Armchair, Building2, Check, ChevronDown, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaConfirm } from '@/lib/odina-dialog';
@@ -10,7 +9,6 @@ const MAX_TABLES = 30;
 const QUICK_COUNTS = [5, 6, 8, 10];
 
 export default function RestaurantTables() {
-  const { user } = useOutletContext();
   const [shops, setShops] = useState([]);
   const [selectedShopId, setSelectedShopId] = useState('');
   const [canManage, setCanManage] = useState(false);
