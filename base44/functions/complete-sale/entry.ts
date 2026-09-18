@@ -1502,11 +1502,12 @@ export default async function(req) {
           { $pull: { sale_request_keys: idempotencyKey } },
         );
       } catch {
+        rollbackSafe = false;
         // Preserve the original failure. A retry can be reviewed if the claim remains.
       }
     }
     for (const movement of stockMovementRecords) {
-      try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch {}
+      try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch { rollbackSafe = false; }
     }
     for (const change of stockChanges) {
       try {
@@ -1529,13 +1530,13 @@ export default async function(req) {
       }
     }
     for (const record of paymentRecords) {
-      try { await base44.asServiceRole.entities.Payment.delete(record.id); } catch {}
+      try { await base44.asServiceRole.entities.Payment.delete(record.id); } catch { rollbackSafe = false; }
     }
     for (const record of saleItems) {
-      try { await base44.asServiceRole.entities.SaleItem.delete(record.id); } catch {}
+      try { await base44.asServiceRole.entities.SaleItem.delete(record.id); } catch { rollbackSafe = false; }
     }
     if (sale) {
-      try { await base44.asServiceRole.entities.Sale.delete(sale.id); } catch {}
+      try { await base44.asServiceRole.entities.Sale.delete(sale.id); } catch { rollbackSafe = false; }
     }
 
     return Response.json({
