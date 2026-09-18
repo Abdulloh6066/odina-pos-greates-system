@@ -1237,6 +1237,10 @@ export default async function(req) {
             already_processed: true,
           });
         }
+        if (tablePaymentLock) {
+          await changeLockedTable(service, tablePaymentLock.shopId,
+            tablePaymentLock.orderId, tablePaymentLock.checkoutKey, false).catch(() => false);
+        }
         return Response.json({
           error: "Savdo serverda yakunlanmoqda. Bir ozdan so‘ng avtomatik qayta yuboriladi.",
         }, { status: 503 });
@@ -1463,11 +1467,15 @@ export default async function(req) {
       order_count: Number(shift.order_count || 0) + 1,
     };
 
-    // Release only after stock, payments and shift totals have committed.
+    // A failure to update the floor plan must not roll back already committed
+    // money. Keep the table locked and reconcile via the same sale request key.
+    let tableReleased = true;
     if (tablePaymentLock) {
-      const freed = await changeLockedTable(service, tablePaymentLock.shopId,
-        tablePaymentLock.orderId, tablePaymentLock.checkoutKey, true);
-      if (!freed) console.error("Paid table could not be freed; repeat the same idempotency key to reconcile.");
+      try {
+        tableReleased = await changeLockedTable(service, tablePaymentLock.shopId,
+          tablePaymentLock.orderId, tablePaymentLock.checkoutKey, true);
+      } catch { tableReleased = false; }
+      if (!tableReleased) console.error("Paid table still locked; retry the SAME sale key to reconcile.");
     }
 
     try {
@@ -1485,6 +1493,7 @@ export default async function(req) {
       sale,
       sale_items: saleItems,
       payments: paymentRecords,
+      table_released: tableReleased,
       shift: updatedShift,
       stock_warnings: stockWarnings,
       allow_negative_stock: allowNegativeStock,
