@@ -4,8 +4,10 @@ export const LIMITS = { minX: 60, maxX: 940, minY: 70, maxY: 930 };
 export const TABLE_SIZES = [80, 90, 100, 110, 120, 130, 140];
 export const tableSize = (entry) => entry?.size === undefined ? 100 : entry.size;
 export const tableBounds = (size) => ({
-  minX: LIMITS.minX * size / 100, maxX: 1000 - LIMITS.minX * size / 100,
-  minY: LIMITS.minY * size / 100, maxY: 1000 - LIMITS.minY * size / 100,
+  minX: Math.max(LIMITS.minX, LIMITS.minX * size / 100),
+  maxX: Math.min(LIMITS.maxX, 1000 - LIMITS.minX * size / 100),
+  minY: Math.max(LIMITS.minY, LIMITS.minY * size / 100),
+  maxY: Math.min(LIMITS.maxY, 1000 - LIMITS.minY * size / 100),
 });
 export const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
