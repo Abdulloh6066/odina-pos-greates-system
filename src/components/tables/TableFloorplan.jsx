@@ -241,8 +241,10 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 {editing && <Grip aria-hidden="true" className="h-3 w-3 shrink-0 opacity-65" />}
               </button>
 
-              {layout.map((point) => <button key={point.number} type="button"
-                aria-label={`${point.number}-stol${editing ? ', joylashuvni o‘zgartirish' : ', Kassaga o‘tish'}`}
+              {layout.map((point) => {
+                const order = (shop.orders || []).find((row) => row.number === point.number);
+                return <button key={point.number} type="button"
+                aria-label={`${point.number}-stol, ${order ? (order.state === 'paying' ? 'To‘lov tekshirilmoqda' : `Band, ${order.total} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Kassaga o‘tish'}`}
                 title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol — Kassaga o‘tish`}
                 disabled={saving}
                 onPointerDown={(event) => startDrag(event, point.number)}
@@ -254,10 +256,17 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, width: `${Math.round(68 * tableSize(point) / 100)}px`, height: `${Math.round(68 * tableSize(point) / 100)}px`, transform: 'translate(-50%, -50%)', touchAction: editing ? 'none' : 'manipulation' }}
                 className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow] ${editing
                   ? selectedNumber === point.number ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20' : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
-                  : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'}`}>
+                  : order ? order.state === 'paying'
+                    ? 'cursor-pointer bg-[#FECD7C]/45 border-amber-600 text-foreground ring-2 ring-amber-400/40'
+                    : 'cursor-pointer bg-[#FECD7C]/30 border-brand-olive text-foreground ring-2 ring-brand-olive/25 hover:shadow-lg'
+                    : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'}`}>
                 {editing ? <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" /> : <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />}
                 <span className="text-xs">{point.number}-stol</span>
-              </button>)}
+                {!editing && <span className="pointer-events-none absolute top-full mt-1 rounded-lg border border-border bg-card/95 px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap shadow-sm">
+                  {order ? order.state === 'paying' ? 'To‘lov…' : `${Number(order.total).toLocaleString('en-US')} UZS` : 'Bo‘sh'}
+                </span>}
+              </button>;
+              })}
               <div className="pointer-events-none absolute bottom-3 left-4 right-4 text-center text-[10px] text-brand-ink/65">{shop.table_count} ta stol · {editing ? 'Surib joylashtiring' : 'Stolni tanlang'}</div>
             </div>
           </div>
@@ -297,7 +306,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       </div>}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5"><Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Kassaga o‘tish'}</span>
+        <span className="inline-flex items-center gap-1.5"><Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Bo‘sh / Band / To‘lov holati'}</span>
         <span className="inline-flex items-center gap-1.5"><DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— suring yoki devorni tanlang' : '— kirish joyi'}</span>
         <span className="inline-flex items-center gap-1.5">{editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />} {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Ochiq buyurtma va bron keyingi bosqichda'}</span>
       </div>
