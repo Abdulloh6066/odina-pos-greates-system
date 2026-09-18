@@ -209,7 +209,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       )}
 
       {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      {editing && !valid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar ustma-ust tushmoqda. Saqlash uchun ularni biroz uzoqlashtiring.</p>}
+      {editing && !valid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar kattaligi yoki joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring. Xaritadan tashqariga chiqmasin.</p>}
 
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
         <div className="max-w-full overflow-x-auto overscroll-x-contain pb-2">
@@ -251,8 +251,8 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 onPointerCancel={stopDrag}
                 onKeyDown={(event) => keyboardMove(event, point)}
                 onClick={() => { if (editing) setSelectedNumber(point.number); else onOpen(shop.id, point.number); }}
-                style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, transform: 'translate(-50%, -50%)', touchAction: editing ? 'none' : 'manipulation' }}
-                className={`absolute z-10 h-[58px] w-[58px] sm:h-[68px] sm:w-[68px] rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow] ${editing
+                style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, width: `${Math.round(68 * tableSize(point) / 100)}px`, height: `${Math.round(68 * tableSize(point) / 100)}px`, transform: 'translate(-50%, -50%)', touchAction: editing ? 'none' : 'manipulation' }}
+                className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow] ${editing
                   ? selectedNumber === point.number ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20' : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
                   : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'}`}>
                 {editing ? <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" /> : <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />}
@@ -267,9 +267,23 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       {editing && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/30 p-3 sm:p-4">
         <div className="min-w-0">
           <p className="font-semibold text-sm">{chosen ? `${chosen.number}-stolni aniq joylashtirish` : 'Stolni tanlang'}</p>
-          <p className="text-xs text-muted-foreground">{chosen ? 'Quyidagi tugmalar stolni kichik qadam bilan suradi.' : 'Stolni bosing yoki ushlab suring. Eshikni ham xaritada surish mumkin.'}</p>
+          <p className="text-xs text-muted-foreground">{chosen ? 'Stolni suring yoki o‘lchamini alohida o‘zgartiring.' : 'Xaritadan stolni tanlang: joyi va o‘lchamini tahrirlaysiz.'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {chosen && <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-olive/30 bg-card px-3 py-2">
+            <span className="text-xs font-semibold whitespace-nowrap">Stol o‘lchami</span>
+            <button type="button" aria-label="Stolni kichraytirish" disabled={saving || tableSize(chosen) <= 80}
+              onClick={() => resizeTable(chosen.number, tableSize(chosen) - 10)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-border hover:bg-primary/20 disabled:opacity-40"><Minus className="h-4 w-4" /></button>
+            <input type="range" aria-label={`${chosen.number}-stol o‘lchami`} min="80" max="140" step="10"
+              value={tableSize(chosen)} disabled={saving}
+              onChange={(event) => resizeTable(chosen.number, Number(event.target.value))}
+              className="w-28 sm:w-36 accent-[#ACA95D]" />
+            <button type="button" aria-label="Stolni kattalashtirish" disabled={saving || tableSize(chosen) >= 140}
+              onClick={() => resizeTable(chosen.number, tableSize(chosen) + 10)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-border hover:bg-primary/20 disabled:opacity-40"><Plus className="h-4 w-4" /></button>
+            <span className="w-10 text-right text-xs font-bold tabular-nums text-brand-ink">{tableSize(chosen)}%</span>
+          </div>}
           {ARROWS.map(({ key, icon: Icon, label }) => <button key={key} type="button" aria-label={label} disabled={!chosen || saving}
             onClick={() => {
               if (!chosen) return;
