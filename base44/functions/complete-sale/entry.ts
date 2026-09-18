@@ -1494,6 +1494,7 @@ export default async function(req) {
       })),
     });
   } catch (error) {
+    let rollbackSafe = true;
     if (idempotencyClaimed && idempotencyShiftId && idempotencyKey) {
       try {
         await base44.asServiceRole.entities.Shift.updateMany(
