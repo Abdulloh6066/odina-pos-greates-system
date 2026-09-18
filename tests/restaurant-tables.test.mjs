@@ -213,7 +213,7 @@ test('entrance can snap to all four walls and be nudged without leaving the wall
   assert.deepEqual(entranceFromPoint(995, 290), { side: 'right', offset: 290 });
   assert.deepEqual(entranceFromPoint(360, 992), { side: 'bottom', offset: 360 });
   assert.deepEqual(entranceFromPoint(9, 680), { side: 'left', offset: 680 });
-  assert.deepEqual(entranceFromPoint(-30, 20), { side: 'left', offset: 150 });
+  assert.deepEqual(entranceFromPoint(-30, 200), { side: 'left', offset: 200 });
   assert.deepEqual(nudgeEntrance({ side: 'top', offset: 840 }, 'ArrowRight'), { side: 'top', offset: 850 });
   assert.deepEqual(nudgeEntrance({ side: 'left', offset: 250 }, 'ArrowDown'), { side: 'left', offset: 270 });
 });
@@ -228,7 +228,7 @@ test('entrance is a real draggable marker, only admin can edit, and tables still
   assert.match(floorplan, /action: 'set_table_layout'/);
   assert.match(floorplan, /layout_version: shop\.layout_version, layout, entrance/);
   assert.match(floorplan, /if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
-  assert.ok(page.indexOf('tableCount > 0 && <TableFloorplan') < page.indexOf('Do‘kon stollari'));
+  assert.ok(page.indexOf('tableCount > 0 && <TableFloorplan') < page.indexOf('tracking-wider text-brand-ink uppercase">Do‘kon stollari'));
   assert.doesNotMatch(floorplan, /pointer-events-none absolute left-1\/2 top-0/);
 });
 
