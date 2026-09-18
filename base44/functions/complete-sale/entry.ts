@@ -665,6 +665,9 @@ export default async function(req) {
     }
 
     if (action === "refund_sale") {
+      if (user.role !== "admin") {
+        return Response.json({ error: "Savdoni faqat egasi qaytarishi mumkin." }, { status: 403 });
+      }
       if (!(await verifyOwnerPin(service, body?.owner_pin, user))) {
         return Response.json({ error: "Egasi PIN kodi noto‘g‘ri." }, { status: 403 });
       }
