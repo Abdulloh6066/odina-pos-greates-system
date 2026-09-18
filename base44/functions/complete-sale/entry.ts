@@ -1515,7 +1515,7 @@ export default async function(req) {
           { id: change.stockRecord.id },
           { $inc: { quantity: change.item.quantity } },
         );
-      } catch {}
+      } catch { rollbackSafe = false; }
     }
     if (claimedDiscount && discountChanged) {
       try {
@@ -1526,6 +1526,7 @@ export default async function(req) {
           active: claimedDiscount.active,
         });
       } catch {
+        rollbackSafe = false;
         // Preserve the original failure.
       }
     }
@@ -1539,6 +1540,16 @@ export default async function(req) {
       try { await base44.asServiceRole.entities.Sale.delete(sale.id); } catch { rollbackSafe = false; }
     }
 
+    // An uncertain payment must never reopen the table for a second charge.
+    if (tablePaymentLock && rollbackSafe) {
+      try {
+        const matches = await service.entities.Sale.filter({ idempotency_key: tablePaymentLock.checkoutKey }, '-created_date', 2);
+        if (!(matches || []).length) {
+          await changeLockedTable(service, tablePaymentLock.shopId,
+            tablePaymentLock.orderId, tablePaymentLock.checkoutKey, false);
+        }
+      } catch { /* Fail closed for owner reconciliation. */ }
+    }
     return Response.json({
       error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",
     }, { status: Number((error as any)?.status || 500) });
