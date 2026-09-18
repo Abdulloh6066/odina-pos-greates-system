@@ -40,6 +40,26 @@ function fixture() {
         Object.assign(shop, clone(changes));
         return clone(shop);
       },
+      updateMany: async (query, update) => {
+        const shop = db.Shop.find((row) => row.id === query.id);
+        if (!shop) return { success: true, updated: 0 };
+        const expectedCount = query.restaurant_table_count;
+        if (expectedCount !== undefined && shop.restaurant_table_count !== expectedCount) return { success: true, updated: 0 };
+        const version = Number(shop.restaurant_table_layout_version || 0);
+        const versionMatches = query.restaurant_table_layout_version !== undefined
+          ? version === query.restaurant_table_layout_version
+          : Array.isArray(query.$or) && query.$or.some((condition) => (
+            condition.restaurant_table_layout_version === version
+            || (condition.restaurant_table_layout_version?.$exists === false && shop.restaurant_table_layout_version === undefined)
+          ));
+        if (!versionMatches) return { success: true, updated: 0 };
+        writes++;
+        Object.assign(shop, clone(update.$set || {}));
+        if (update.$inc?.restaurant_table_layout_version) {
+          shop.restaurant_table_layout_version = version + Number(update.$inc.restaurant_table_layout_version);
+        }
+        return { success: true, updated: 1 };
+      },
     },
     ActionHistory: { create: async (record) => { db.ActionHistory.push(clone(record)); return clone(record); } },
   };
@@ -129,6 +149,58 @@ test('only active admin can set each shop count, with strict validation and an a
   f.as('disabled');
   assert.equal((await f.run({ action: 'set_table_count', shop_id: 'central-shop', table_count: 0 })).status, 403);
   assert.equal(f.writes, 2);
+});
+
+test('admin can save a non-overlapping floor plan; stale versions and overlaps are rejected without overwrite', async () => {
+  const f = fixture();
+  const countResult = await f.run({ action: 'set_table_count', shop_id: 'central-shop', table_count: 4 });
+  assert.equal(countResult.status, 200);
+  assert.equal(countResult.data.shop.layout_version, 1);
+  const layout = [
+    { number: 1, x: 150, y: 200 },
+    { number: 2, x: 350, y: 200 },
+    { number: 3, x: 150, y: 500 },
+    { number: 4, x: 350, y: 500 },
+  ];
+  const saved = await f.run({ action: 'set_table_layout', shop_id: 'central-shop', layout_version: 1, layout });
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+  assert.equal(saved.data.shop.layout_version, 2);
+  assert.deepEqual(saved.data.shop.layout, layout);
+  const writesAfterSave = f.writes;
+  const stale = await f.run({ action: 'set_table_layout', shop_id: 'central-shop', layout_version: 1, layout });
+  assert.equal(stale.status, 409);
+  assert.equal(f.writes, writesAfterSave);
+  const overlap = layout.map((point) => ({ ...point }));
+  overlap[1] = { number: 2, x: 200, y: 240 };
+  const rejected = await f.run({ action: 'set_table_layout', shop_id: 'central-shop', layout_version: 2, layout: overlap });
+  assert.equal(rejected.status, 400);
+  assert.equal(f.writes, writesAfterSave);
+  f.as('cashier-1');
+  assert.equal((await f.run({ action: 'set_table_layout', shop_id: 'central-shop', layout_version: 2, layout })).status, 403);
+  assert.equal(f.writes, writesAfterSave);
+});
+
+test('floor plan and POS integration preserve server validation and immutable sale table snapshot', () => {
+  const floorplan = read('src/components/tables/TableFloorplan.jsx');
+  const layoutLogic = read('src/lib/table-floorplan.js');
+  const pos = read('src/pages/POS.jsx');
+  const saleBackend = read('base44/functions/complete-sale/entry.ts');
+  const saleSchema = JSON.parse(read('base44/entities/Sale.jsonc'));
+  const receipt = read('src/components/pos/Receipt.jsx');
+  const history = read('src/pages/SalesHistory.jsx');
+  assert.match(floorplan, /onPointerMove/);
+  assert.match(floorplan, /Joylashuvni saqlash/);
+  assert.match(layoutLogic, /tablesOverlap/);
+  assert.match(pos, /table_shop/);
+  assert.match(pos, /table_number/);
+  assert.match(pos, /selectedTable \? \{ table_shop_id: selectedTable\.shopId, table_number: selectedTable\.number \}/);
+  assert.match(saleBackend, /requestedTableShopId !== shift\.shop_id/);
+  assert.match(saleBackend, /requestedTableNumber > receiptShop\.restaurant_table_count/);
+  assert.match(saleBackend, /table_number_snapshot: requestedTableNumber/);
+  assert.equal(saleSchema.properties.table_number_snapshot.minimum, 1);
+  assert.equal(saleSchema.properties.table_number_snapshot.maximum, 30);
+  assert.match(receipt, /Stol:/);
+  assert.match(history, /table_number_snapshot/);
 });
 
 test('integration is a separate page with role guard and no pretend sales, stock or orders', () => {
