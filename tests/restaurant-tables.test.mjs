@@ -257,6 +257,75 @@ test('only admin can save independent sizes, old clients preserve sizes, and bad
   assert.equal(f.db.ActionHistory.filter((row) => row.action === 'restaurant_table_layout_changed').length, 2);
 });
 
+test('unpaid orders survive navigation, preserve prices, and stay in their authenticated shop', async () => {
+  const f = fixture();
+  f.as('cashier-2');
+  const first = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-second', expected_revision: 0,
+    items: [{ product_id: 'cake', quantity: 2, price: 1 }, { product_id: 'coffee', quantity: 1 }] });
+  assert.equal(first.status, 200, JSON.stringify(first));
+  assert.equal(first.data.order.total, 110000);
+  assert.equal(first.data.order.revision, 1);
+  assert.equal(first.data.order.items[0].price, 45000);
+  assert.equal((await f.run({ action: 'status' })).data.shops[0].orders[0].state, 'occupied');
+  assert.equal((await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 })).data.order.items.length, 2);
+  assert.equal(f.db.Sale.length, 0); // Saving an order must never create a sale.
+  f.db.Product[0].price = 60000;
+  const savedAgain = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-second', expected_revision: 1,
+    items: [{ product_id: 'cake', quantity: 3 }, { product_id: 'coffee', quantity: 1 }] });
+  assert.equal(savedAgain.status, 200, JSON.stringify(savedAgain));
+  assert.equal(savedAgain.data.order.items[0].price, 45000);
+  assert.equal(savedAgain.data.order.total, 155000);
+  f.as('cashier-3');
+  assert.equal((await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 })).data.order.revision, 2);
+  const stale = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-other', expected_revision: 1, items: [{ product_id: 'cake', quantity: 1 }] });
+  assert.equal(stale.status, 409);
+  f.as('cashier-1');
+  assert.equal((await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 })).status, 403);
+  assert.equal((await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-main', expected_revision: 2, items: [{ product_id: 'cake', quantity: 1 }] })).status, 403);
+  f.as('owner');
+  assert.equal((await f.run({ action: 'set_table_count', shop_id: 'second-shop', table_count: 1 })).status, 409);
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Sale.length, 0);
+});
+
+test('simultaneous saves on the same table cannot silently overwrite one another', async () => {
+  const f = fixture();
+  f.as('cashier-2');
+  const request = (product_id) => ({ action: 'save_table_order', shop_id: 'second-shop',
+    table_number: 3, shift_id: 'shift-second', expected_revision: 0,
+    items: [{ product_id, quantity: 1 }] });
+  const results = await Promise.all([f.run(request('cake')), f.run(request('coffee'))]);
+  assert.deepEqual(results.map((row) => row.status).sort(), [200, 409]);
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Shop[1].restaurant_table_orders[0].revision, 1);
+  assert.equal(f.db.Sale.length, 0);
+});
+
+test('uncertain payment is locked and never freed without a matching completed sale', async () => {
+  const f = fixture();
+  f.as('cashier-2');
+  const saved = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 4,
+    shift_id: 'shift-second', expected_revision: 0, items: [{ product_id: 'cake', quantity: 1 }] });
+  assert.equal(saved.status, 200);
+  const order = f.db.Shop[1].restaurant_table_orders[0];
+  order.state = 'paying';
+  order.checkout_key = 'secure-checkout-123456789';
+  assert.equal((await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 4,
+    shift_id: 'shift-second', expected_revision: 1, items: [{ product_id: 'cake', quantity: 2 }] })).status, 409);
+  assert.equal((await f.run({ action: 'reconcile_table_payment', shop_id: 'second-shop', table_number: 4 })).status, 409);
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 1);
+  f.db.Sale.push({ id: 'real-sale-mock', table_order_id_snapshot: order.id,
+    idempotency_key: order.checkout_key, status: 'completed', shop_id: 'second-shop', table_number_snapshot: 4 });
+  const reconciled = await f.run({ action: 'reconcile_table_payment', shop_id: 'second-shop', table_number: 4 });
+  assert.equal(reconciled.status, 200, JSON.stringify(reconciled));
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 0);
+  assert.equal((await f.run({ action: 'status' })).data.shops[0].orders.length, 0);
+});
+
 test('floor plan and POS integration preserve server validation and immutable sale table snapshot', () => {
   const floorplan = read('src/components/tables/TableFloorplan.jsx');
   const layoutLogic = read('src/lib/table-floorplan.js');
