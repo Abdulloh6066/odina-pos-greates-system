@@ -6,8 +6,8 @@ export const tableSize = (entry) => entry?.size === undefined ? 100 : entry.size
 export const tableBounds = (size) => ({
   minX: Math.max(LIMITS.minX, LIMITS.minX * size / 100),
   maxX: Math.min(LIMITS.maxX, 1000 - LIMITS.minX * size / 100),
-  minY: Math.max(LIMITS.minY, LIMITS.minY * size / 100),
-  maxY: Math.min(LIMITS.maxY, 1000 - LIMITS.minY * size / 100),
+  minY: Math.max(LIMITS.minY, (size > 100 ? 90 : 70) * size / 100),
+  maxY: Math.min(LIMITS.maxY, 1000 - (size > 100 ? 90 : 70) * size / 100),
 });
 export const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
