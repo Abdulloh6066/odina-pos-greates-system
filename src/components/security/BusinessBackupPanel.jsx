@@ -41,7 +41,7 @@ export default function BusinessBackupPanel({ user }) {
         Mahsulot, ombor, retsept, savdo, smena, to‘lov va moliyaviy tarixni {BACKUP_ENTITIES.length} ta biznes jadvalidan o‘qib, kompyuteringizga JSON arxiv sifatida yuklaydi. Bazaga hech narsa yozilmaydi.
       </p>
       <p className="text-xs text-muted-foreground">
-        Faylda mijozlar va moliyaviy ma’lumotlar bor: uni maxfiy saqlang. Parollar, PIN, xodim akkauntlari va Telegram tokenlari kiritilmaydi. Bu avtomatik tiklash tizimi emas. To‘liq va bir vaqtdagi nusxa uchun eksport vaqtida savdolarni vaqtincha to‘xtating.
+        Faylda mijozlar va moliyaviy ma’lumotlar bor: uni maxfiy saqlang. Parol, PIN, token va xodim akkauntlari saqlanadigan maxfiy jadvallar eksport qilinmaydi. Bu avtomatik tiklash tizimi emas. Izchil nusxa uchun eksport vaqtida savdolarni vaqtincha to‘xtating.
       </p>
       {progress && <p role="status" className="text-sm text-brand-ink">{progress}</p>}
       <Button type="button" onClick={download} disabled={exporting} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong">
