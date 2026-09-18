@@ -1463,11 +1463,18 @@ export default async function(req) {
       order_count: Number(shift.order_count || 0) + 1,
     };
 
+    // Release only after stock, payments and shift totals have committed.
+    if (tablePaymentLock) {
+      const freed = await changeLockedTable(service, tablePaymentLock.shopId,
+        tablePaymentLock.orderId, tablePaymentLock.checkoutKey, true);
+      if (!freed) console.error("Paid table could not be freed; repeat the same idempotency key to reconcile.");
+    }
+
     try {
       await service.entities.ActionHistory.create({
         user_id: user.id,
         user_name: user.full_name || user.email,
-        action: "sale_completed",
+        action: "sale_completed","replace_all":false}]}
         details: `${saleNumber}. Total ${total} UZS via ${paymentSummary}. ${normalizedItems.length} lines.`,
       });
     } catch {
