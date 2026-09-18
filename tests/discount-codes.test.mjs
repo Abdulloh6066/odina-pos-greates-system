@@ -103,9 +103,12 @@ function fixture(percentage = 5) {
     }
     return actual === expected;
   };
-  const matches = (row, query) => Object.entries(query || {}).every(
-    ([key, value]) => matchesValue(row[key], value),
-  );
+  const matches = (row, query) => {
+    if (Array.isArray(query?.$or) && !query.$or.some((condition) => matches(row, condition))) return false;
+    return Object.entries(query || {}).filter(([key]) => key !== '$or').every(
+      ([key, value]) => matchesValue(row[key], value),
+    );
+  };
 
   const entities = Object.fromEntries(Object.keys(db).map((name) => {
     const entity = {
