@@ -6,6 +6,7 @@ export const PAGE_LOADERS = {
   dashboard: () => import('@/pages/Dashboard'),
   pos: () => import('@/pages/POS'),
   orders: () => import('@/pages/Orders'),
+  tables: () => import('@/pages/RestaurantTables'),
   customers: () => import('@/pages/Customers'),
   products: () => import('@/pages/Products'),
   categories: () => import('@/pages/Categories'),
@@ -31,6 +32,7 @@ const ROUTE_KEYS = {
   '/': 'dashboard',
   '/pos': 'pos',
   '/orders': 'orders',
+  '/tables': 'tables',
   '/customers': 'customers',
   '/products': 'products',
   '/categories': 'categories',
@@ -81,9 +83,9 @@ export function preloadRoute(path, role) {
 // Only warm a handful of likely destinations after the browser becomes idle.
 // In particular, do not eagerly download the large Reports bundle or all 22 pages.
 const LIKELY_ROUTES = {
-  admin: ['/pos', '/orders', '/warehouse', '/users', '/security'],
+  admin: ['/pos', '/orders', '/tables', '/warehouse', '/users', '/security'],
   manager: ['/warehouse', '/customers', '/sales'],
-  cashier: ['/orders', '/warehouse', '/sales'],
+  cashier: ['/orders', '/tables', '/warehouse', '/sales'],
   accountant: ['/products', '/warehouse', '/sales'],
   production: ['/warehouse', '/products'],
   warehouse: [],
