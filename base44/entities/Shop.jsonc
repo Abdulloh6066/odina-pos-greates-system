@@ -91,6 +91,12 @@
             "type": "integer",
             "minimum": 70,
             "maximum": 930
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 80,
+            "maximum": 140,
+            "description": "Stolning xaritadagi individual o\u2018lchami foizda; eski stollar 100%"
           }
         },
         "required": [
