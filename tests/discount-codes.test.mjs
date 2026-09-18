@@ -351,6 +351,7 @@ test('completed payment stays locked if table release fails and can be reconcile
   const replay = await call(structuredClone(request));
   assert.equal(replay.status, 200, JSON.stringify(replay));
   assert.equal(replay.data.already_processed, true);
+  assert.equal(replay.data.table_released, false);
   assert.equal(f.db.Sale.length, 1);
   assert.equal(f.db.Payment.length, 1);
   assert.equal(f.db.ProductStock[0].quantity, 9);
