@@ -1,6 +1,6 @@
 {
   "name": "restaurant-tables",
   "entry": "entry.ts",
-  "description": "Do‘kon bo‘yicha stol sonini ko‘rish va admin tomonidan sozlash. Savdo, band qilish va omborga tegmaydi.",
+  "description": "Do‘kon zali, stol soni va to‘lovgacha ochiq buyurtmalarni saqlash. Savdo, to‘lov va ombor faqat complete-sale orqali yakunlanadi.",
   "is_public": false
 }
