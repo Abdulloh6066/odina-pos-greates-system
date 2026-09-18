@@ -1,0 +1,6 @@
+{
+  "name": "restaurant-tables",
+  "entry": "entry.ts",
+  "description": "Do‘kon bo‘yicha stol sonini ko‘rish va admin tomonidan sozlash. Savdo, band qilish va omborga tegmaydi.",
+  "is_public": false
+}
