@@ -13,6 +13,11 @@ export default function Receipt({ open, sale, settings, onClose }) {
   const handlePrint = () => { window.print(); };
 
   const timeStr = formatUzbekistanDateTime(sale.sold_at || sale.created_date || sale.created_at || Date.now());
+  // Legacy shared footers may contain a different shop's Instagram or location.
+  // Keep them for old receipts, but never print a conflicting shared social footer
+  // beside a newly snapshotted shop-specific Instagram.
+  const sharedFooter = settings?.receipt_footer || '';
+  const showSharedFooter = !sale.receipt_instagram_snapshot || !/@[a-z0-9._]+/i.test(sharedFooter);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -71,7 +76,7 @@ export default function Receipt({ open, sale, settings, onClose }) {
               {sale.receipt_instagram_snapshot && <div>Instagram: @{String(sale.receipt_instagram_snapshot).replace(/^@/, '')}</div>}
             </div>
           )}
-          {settings?.receipt_footer && <div className="text-center text-[10px] mt-1">{settings.receipt_footer}</div>}
+          {showSharedFooter && sharedFooter && <div className="text-center text-[10px] mt-1">{sharedFooter}</div>}
         </div>
 
         <DialogFooter className="gap-2 no-print">
