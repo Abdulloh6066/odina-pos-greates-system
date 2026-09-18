@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import OdinaBrand from './brand/OdinaBrand';
@@ -36,11 +36,21 @@ export default function Layout() {
     );
   }
 
+  const pageFallback = (
+    <div role="status" aria-label="Sahifa yuklanmoqda" className="odina-page p-5 sm:p-8 space-y-4 animate-pulse">
+      <div className="h-8 w-48 rounded-xl bg-secondary" />
+      <div className="h-24 rounded-2xl bg-secondary" />
+      <div className="h-40 rounded-2xl bg-secondary" />
+    </div>
+  );
+
   if (screenMode) {
     return (
       <div className="min-h-dvh bg-background flex flex-col">
         <main className="odina-workspace flex-1 min-w-0">
-          <Outlet context={{ user, sidebarCollapsed: false, reloadUser: checkUserAuth, screenMode: true }} />
+          <Suspense fallback={pageFallback}>
+            <Outlet context={{ user, sidebarCollapsed: false, reloadUser: checkUserAuth, screenMode: true }} />
+          </Suspense>
         </main>
       </div>
     );
@@ -64,7 +74,9 @@ export default function Layout() {
           <div className="w-9" />
         </div>
         <main className="odina-workspace flex-1 min-w-0">
-          <Outlet context={{ user, sidebarCollapsed, reloadUser: checkUserAuth, screenMode: false }} />
+          <Suspense fallback={pageFallback}>
+            <Outlet context={{ user, sidebarCollapsed, reloadUser: checkUserAuth, screenMode: false }} />
+          </Suspense>
         </main>
       </div>
     </div>
