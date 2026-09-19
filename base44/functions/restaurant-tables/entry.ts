@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
+import { allocateServiceTicketNumber } from "../../shared/shift-close-helpers.ts";
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
 // Completed sales, payments and stock movements occur only in complete-sale.
@@ -13,7 +14,7 @@ const ordersVersionCondition = (version: number) => version === 0
   ? { $or: [{ restaurant_table_orders_version: 0 }, { restaurant_table_orders_version: { $exists: false } }] }
   : { restaurant_table_orders_version: version };
 const orderSummary = (order: any) => ({
-  number: order.number, state: order.state, revision: order.revision,
+  number: order.number, ticket_number: order.ticket_number, state: order.state, revision: order.revision,
   total: order.total, item_count: (order.items || []).reduce((sum: number, item: any) => sum + item.quantity, 0),
   started_at: order.started_at, updated_at: order.updated_at,
 });
@@ -270,8 +271,13 @@ Deno.serve(async (req) => {
       if (!Number.isSafeInteger(total) || total > 1_000_000_000_000) {
         return Response.json({ error: "Buyurtma summasi chegaradan oshdi." }, { status: 400 });
       }
+      // One permanent service number per unpaid table order. Reopening, adding
+      // products and payment must never generate a second kitchen ticket number.
+      const ticketNumber = Number.isSafeInteger(existing?.ticket_number) && existing.ticket_number > 0
+        ? existing.ticket_number : await allocateServiceTicketNumber(service, shop.id);
       const now = new Date().toISOString();
-      const order = { id: existing?.id || crypto.randomUUID(), number, revision: revision + 1,
+      const order = { id: existing?.id || crypto.randomUUID(), number, ticket_number: ticketNumber,
+        revision: revision + 1,
         state: "occupied", items, total, started_at: existing?.started_at || now,
         opened_by: existing?.opened_by || actor.id,
         opened_by_name: existing?.opened_by_name || String(body?.opened_by_name || userLabel(actor)),
