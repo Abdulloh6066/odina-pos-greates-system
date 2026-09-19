@@ -59,7 +59,8 @@ test('real ticket component renders reference hierarchy with authentic order/tab
 test('ordinary sale does not falsely show a table, and reprints have only a discreet footer', () => {
   const ordinary = render({ ...example, table_number: null, number: 'OD-20260920-REAL' }, { tableNumber: undefined, mode: 'sale' });
   assert.match(ordinary, /BUYURTMA № #OD-20260920-REAL/);
-  assert.match(ordinary, /Oddiy buyurtma/);
+  assert.match(ordinary, /Olib ketish/);
+  assert.doesNotMatch(ordinary, /Oddiy buyurtma/);
   assert.doesNotMatch(ordinary, /1-stol/);
   const reprint = render({ ...example, revision: 2 });
   assert.match(reprint, /Qayta chop · 2-tahrir/);
