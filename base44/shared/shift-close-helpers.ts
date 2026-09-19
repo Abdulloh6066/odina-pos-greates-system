@@ -1,6 +1,78 @@
 // Shared helpers for shift-closing logic. Pure module: no SDK import, no Deno.serve.
 // Both complete-sale and shift-close-v2 import from here to avoid duplication.
 
+// Shop-wide sequential KITCHEN TICKET numbers are distinct from immutable Sale.sale_number
+// and CustomerOrder.order_number. The counter is atomically claimed on Shop so all cashiers
+// and all shifts in the same shop share it, regardless of date or device.
+const serviceTicketVersion = (shop: any) => Number.isSafeInteger(shop?.service_ticket_version)
+  && shop.service_ticket_version >= 0 ? shop.service_ticket_version : 0;
+const serviceTicketVersionQuery = (version: number) => version === 0
+  ? { $or: [{ service_ticket_version: 0 }, { service_ticket_version: { $exists: false } }] }
+  : { service_ticket_version: version };
+
+export async function allocateServiceTicketNumber(service: any, shopId: string): Promise<number> {
+  if (!shopId || !service?.entities?.Shop?.get || !service?.entities?.Shop?.updateMany) {
+    throw httpError("Xizmat cheki uchun do‘kon aniqlanmadi.", 409);
+  }
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const shop = await service.entities.Shop.get(shopId);
+    if (!shop || shop.active === false || shop.allows_pos === false || shop.location_type === "production") {
+      throw httpError("Xizmat cheki do‘koni faol emas.", 409);
+    }
+    const version = serviceTicketVersion(shop);
+    const counter = Number.isSafeInteger(shop.service_ticket_counter) && shop.service_ticket_counter >= 0
+      ? shop.service_ticket_counter : 0;
+    if (shop.service_ticket_cycle_active !== true) {
+      // Existing open shifts at rollout may already have completed ordinary sales.
+      // Bootstrap their saved order counts without editing their historical records.
+      const opened = await service.entities.Shift.filter({ shop_id: shopId, status: "open" }, "-opened_at", 1000);
+      if (!opened?.length) throw httpError("Xizmat cheki uchun do‘konda ochiq smena kerak.", 409);
+      const legacyBaseline = counter === 0
+        ? (opened || []).reduce((sum: number, shift: any) => sum + Math.max(0, Number(shift.order_count) || 0), 0)
+          + (Array.isArray(shop.restaurant_table_orders)
+            ? shop.restaurant_table_orders.filter((order: any) => !Number.isSafeInteger(order?.ticket_number)).length : 0)
+        : 0;
+      if (!Number.isSafeInteger(legacyBaseline) || legacyBaseline > 1_000_000_000) {
+        throw httpError("Buyurtma raqamlashini tekshirish kerak. Egaga xabar bering.", 409);
+      }
+      const activated = await service.entities.Shop.updateMany(
+        { id: shopId, ...serviceTicketVersionQuery(version) },
+        { $set: { service_ticket_cycle_active: true, service_ticket_counter: legacyBaseline },
+          $inc: { service_ticket_version: 1 } },
+      );
+      if (activated?.success && Number(activated.updated || 0) === 1) continue;
+      continue; // Another cashier initialized this shop; read its counter again.
+    }
+    if (counter >= 1_000_000_000) throw httpError("Xizmat cheki raqamlash chegarasiga yetdi.", 409);
+    const claimed = await service.entities.Shop.updateMany(
+      { id: shopId, service_ticket_cycle_active: true, ...serviceTicketVersionQuery(version) },
+      { $inc: { service_ticket_counter: 1, service_ticket_version: 1 } },
+    );
+    if (claimed?.success && Number(claimed.updated || 0) === 1) return counter + 1;
+  }
+  throw httpError("Buyurtma raqami boshqa kassada o‘zgardi. Qayta urinib ko‘ring.", 409);
+}
+
+// Called ONLY after a shift is durably closed. A second still-open or closing
+// shift keeps the sequence alive. Leave the old counter as an audit clue;
+// the first request of the next cycle starts again at 1.
+export async function finishServiceTicketCycleIfLastShift(service: any, shopId: string): Promise<boolean> {
+  if (!shopId || !service?.entities?.Shop?.get || !service?.entities?.Shift?.filter) return false;
+  const shop = await service.entities.Shop.get(shopId).catch(() => null);
+  if (!shop || shop.service_ticket_cycle_active !== true) return false;
+  const version = serviceTicketVersion(shop);
+  const [opened, closing] = await Promise.all([
+    service.entities.Shift.filter({ shop_id: shopId, status: "open" }, "-opened_at", 1),
+    service.entities.Shift.filter({ shop_id: shopId, status: "closing" }, "-opened_at", 1),
+  ]);
+  if (opened?.length || closing?.length) return false;
+  const result = await service.entities.Shop.updateMany(
+    { id: shopId, service_ticket_cycle_active: true, ...serviceTicketVersionQuery(version) },
+    { $set: { service_ticket_cycle_active: false }, $inc: { service_ticket_version: 1 } },
+  );
+  return Boolean(result?.success && Number(result.updated || 0) === 1);
+}
+
 export const money = (value: unknown) => Math.round(Number(value) || 0);
 
 export const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
