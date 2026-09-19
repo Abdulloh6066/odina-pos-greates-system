@@ -249,7 +249,7 @@ test('restaurant customer stays unpaid until one final checkout; retry cannot ch
   assert.equal(paid.data.sale.total, 100000);
   assert.equal(paid.data.sale.table_order_id_snapshot, 'open-order-1');
   assert.equal(paid.data.sale.table_number_snapshot, 2);
-  assert.equal(paid.data.sale.service_ticket_number, 1);
+  assert.equal(paid.data.sale.service_ticket_number, 2, 'Legacy unnumbered open table already contributes to bootstrap count');
   assert.equal(paid.data.table_released, true);
   assert.equal(f.db.SaleItem[0].unit_price, 100000);
   assert.equal(f.db.Shop[0].restaurant_table_orders.length, 0);
