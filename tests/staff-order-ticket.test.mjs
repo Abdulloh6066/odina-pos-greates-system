@@ -11,6 +11,8 @@ test('ordinary sale staff ticket uses the saved sale snapshot without payment de
   };
   const ticket = staffTicketFromSale(sale);
   assert.equal(ticket.number, 32);
+  assert.equal(staffTicketFromSale({ ...sale, service_ticket_number: 110 }).number, 110);
+  assert.equal(sale.sale_number, 32, 'The original sale number remains untouched');
   assert.equal(ticket.items[0].product_name, 'Qahva');
   assert.equal(ticket.items[0].quantity, 2);
   assert.equal(ticket.opened_by_name, 'Kassir');
