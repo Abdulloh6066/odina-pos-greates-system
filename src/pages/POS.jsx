@@ -277,7 +277,7 @@ export default function POS() {
   // The operational floor plan has its own /tables page. Never discard a
   // table's unsaved edits when navigating away; keep an ordinary unsaved cart.
   const goToTables = async () => {
-    if (screenMode || savingTableRef.current || paying || tableOrderLoading) return;
+    if (screenMode || savingTableRef.current || paying || payOpen || stockChecking || tableOrderLoading) return;
     if (selectedTable && tableOrderError) {
       void odinaAlert('Stol buyurtmasi yuklanmagan. Avval buyurtmani yangilang; saqlanmagan mahsulotlar yo‘qolmasligi kerak.');
       return;
@@ -296,7 +296,7 @@ export default function POS() {
   // Leave this table only after the server confirms the write; a failed save
   // keeps the cart on screen for retry without creating a new sale.
   const saveAndStartNextOrder = async () => {
-    if (!selectedTable || tableOrderLoading || savingTableRef.current || paying
+    if (!selectedTable || tableOrderLoading || savingTableRef.current || paying || payOpen || stockChecking
       || tableOrderError || tableOrder?.state === 'paying') return;
     if (tableCartDirty && !(await saveTableOrder())) return;
     if (!tableCartDirty && !tableOrder?.id) return;
@@ -1033,7 +1033,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying}
+            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </div>
       </div>
@@ -1058,7 +1058,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying}
+            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </SheetContent>
       </Sheet>
