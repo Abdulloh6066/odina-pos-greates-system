@@ -14,7 +14,7 @@ export async function allocateServiceTicketNumber(service: any, shopId: string):
   if (!shopId || !service?.entities?.Shop?.get || !service?.entities?.Shop?.updateMany) {
     throw httpError("Xizmat cheki uchun do‘kon aniqlanmadi.", 409);
   }
-  for (let attempt = 0; attempt < 32; attempt += 1) {
+  for (let attempt = 0; attempt < 128; attempt += 1) {
     const shop = await service.entities.Shop.get(shopId);
     if (!shop || shop.active === false || shop.allows_pos === false || shop.location_type === "production") {
       throw httpError("Xizmat cheki do‘koni faol emas.", 409);
