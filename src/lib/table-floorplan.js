@@ -2,6 +2,63 @@
 export const TABLE_MAX = 30;
 export const LIMITS = { minX: 60, maxX: 940, minY: 70, maxY: 930 };
 export const TABLE_SIZES = [80, 90, 100, 110, 120, 130, 140];
+export const MAX_OUTDOOR_VERTICES = 12;
+
+// Shop-specific outdoor area. No default street is assumed: the owner draws it.
+// Points use the same 0–1000 coordinates as tables; no existing positions migrate.
+const cross = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+const onSegment = (a, b, p) => cross(a, b, p) === 0
+  && p.x >= Math.min(a.x, b.x) && p.x <= Math.max(a.x, b.x)
+  && p.y >= Math.min(a.y, b.y) && p.y <= Math.max(a.y, b.y);
+const segmentCrosses = (a, b, c, d) => {
+  const abC = cross(a, b, c); const abD = cross(a, b, d);
+  const cdA = cross(c, d, a); const cdB = cross(c, d, b);
+  return (abC === 0 && onSegment(a, b, c)) || (abD === 0 && onSegment(a, b, d))
+    || (cdA === 0 && onSegment(c, d, a)) || (cdB === 0 && onSegment(c, d, b))
+    || ((abC > 0) !== (abD > 0) && (cdA > 0) !== (cdB > 0));
+};
+
+export function validOutdoorPolygon(polygon) {
+  if (!Array.isArray(polygon)) return false;
+  if (polygon.length === 0) return true;
+  if (polygon.length < 3 || polygon.length > MAX_OUTDOOR_VERTICES) return false;
+  const seen = new Set();
+  for (const point of polygon) {
+    if (!point || !Number.isInteger(point.x) || !Number.isInteger(point.y)
+      || point.x < 0 || point.x > 1000 || point.y < 0 || point.y > 1000) return false;
+    const key = `${point.x}:${point.y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  const doubleArea = Math.abs(polygon.reduce((sum, point, index) => {
+    const next = polygon[(index + 1) % polygon.length];
+    return sum + point.x * next.y - next.x * point.y;
+  }, 0));
+  if (doubleArea < 20000) return false;
+  for (let i = 0; i < polygon.length; i += 1) {
+    for (let j = i + 1; j < polygon.length; j += 1) {
+      if (j === i + 1 || (i === 0 && j === polygon.length - 1)) continue;
+      if (segmentCrosses(polygon[i], polygon[(i + 1) % polygon.length],
+        polygon[j], polygon[(j + 1) % polygon.length])) return false;
+    }
+  }
+  return true;
+}
+
+export const normalizeOutdoorPolygon = (value) => validOutdoorPolygon(value)
+  ? value.map(({ x, y }) => ({ x, y })) : [];
+
+export function pointInOutdoorPolygon(point, polygon) {
+  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i]; const b = polygon[j];
+    if (onSegment(a, b, point)) return true;
+    if ((a.y > point.y) !== (b.y > point.y)
+      && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
 export const tableSize = (entry) => entry?.size === undefined ? 100 : entry.size;
 export const tableBounds = (size) => ({
   minX: Math.max(LIMITS.minX, LIMITS.minX * size / 100),
