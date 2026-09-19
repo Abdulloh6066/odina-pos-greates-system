@@ -35,7 +35,7 @@ export const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export const cleanQty = (v: any) => {
   const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : NaN;
+  return Number.isSafeInteger(n) && n > 0 ? n : NaN;
 };
 
 export const unitLabel = (u: string) => (u === "sheet" ? "list" : "dona");
