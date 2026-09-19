@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -39,6 +39,7 @@ export default function POS() {
   const selectedTable = screenMode ? null : tableQuery.selected;
   const tableKey = selectedTable ? `${selectedTable.shopId}:${selectedTable.number}` : '';
   const priorTableKey = useRef(tableKey);
+  const lastSavedOrderRef = useRef(null);
 
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -195,10 +196,17 @@ export default function POS() {
         action: 'save_table_order', shop_id: selectedTable.shopId,
         table_number: selectedTable.number, shift_id: shift.id,
         expected_revision: tableOrder?.revision || 0,
-        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity })),
+        items: cart.map((row) => ({
+          product_id: row.product_id,
+          quantity: row.quantity,
+          variant_name: row.variant_name || row.variant || '',
+          notes: row.notes || '',
+        })),
+        opened_by_name: user?.name || user?.full_name || '',
       });
       const result = response?.data || response;
       if (!result?.ok || !result.order?.id) throw new Error(result?.error || 'Buyurtma saqlangani tasdiqlanmadi.');
+      lastSavedOrderRef.current = result.order;
       setTableOrder(result.order);
       setCart(result.order.items);
       return true;
@@ -303,11 +311,6 @@ export default function POS() {
       return;
     }
     if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
-    if (!selectedTable && cart.length && !(await odinaConfirm({
-      title: 'Oddiy savat saqlanmagan',
-      description: 'Stollar sahifasiga o‘tsangiz oddiy savat o‘chadi. Avval savdoni yakunlang yoki tasdiqlang.',
-      confirmLabel: 'Stollarni ochish', tone: 'warning',
-    }))) return;
     setMobileCartOpen(false);
     navigate('/tables', { state: { shopId: selectedTable?.shopId || shift?.shop_id || user?.shop_id || '' } });
   };
@@ -1030,6 +1033,22 @@ export default function POS() {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
               setTableReload((current) => current + 1);
             }}>Buyurtmani yangilash</Button>}
+            {Boolean(selectedTable && (tableOrder?.items?.length || cart.length)) && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 rounded-xl border-brand-olive/50 bg-card text-brand-ink font-semibold touch-manipulation"
+                onClick={() => setStaffTicketModal({
+                  open: true,
+                  shop: tableShop,
+                  shopId: selectedTable.shopId,
+                  tableNumber: selectedTable.number,
+                  order: tableOrder,
+                })}
+              >
+                <UtensilsCrossed className="w-4 h-4 mr-1.5" /> Xizmat cheki
+              </Button>
+            )}
             <Button type="button" variant="outline" className="min-h-11" onClick={() => void goToTables()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
           </div>
         </div>

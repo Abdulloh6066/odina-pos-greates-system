@@ -57,13 +57,13 @@ test('Kassa opens the dedicated Stollar page instead of a large modal on desktop
   assert.doesNotMatch(pos, /entities\.Shop\.(update|create|delete)/);
 });
 
-test('dedicated map retains backend shop scoping, and navigation protects unsaved table and ordinary carts', () => {
+test('dedicated map retains backend shop scoping, and navigation protects unsaved table edits', () => {
   const page = read('src/pages/RestaurantTables.jsx');
   assert.match(page, /functions\.invoke\('restaurant-tables', \{ action: 'status' \}\)/);
   assert.match(backend, /const assignedId = userShopId\(actor\)/);
   assert.match(backend, /shops: \[safeShop\(assignedShop\)\]/);
   assert.match(pos, /selectedTable && tableCartDirty && !\(await saveTableOrder\(\)\)/);
-  assert.match(pos, /!selectedTable && cart\.length && !\(await odinaConfirm\(/);
+  assert.match(pos, /navigate\('\/tables', \{ state: \{ shopId:/);
   assert.match(page, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: selectedShop\.id, table_number: String\(number\) \}\)\}`\)/);
   assert.match(pos, /const priorTableKey = useRef\(tableKey\)/);
   assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/tables', \{ state: \{ shopId:/);
@@ -214,5 +214,23 @@ test('central location and branch tables remain strictly isolated in backend and
   assert.match(tablesPage, /shop\.is_main && \(\s*<span[^>]*>\s*Asosiy\s*<\/span>\s*\)/);
   assert.match(tablesPage, /available\.some\(\(shop\) => shop\.id === user\?\.shop_id\)/);
   assert.match(tablesPage, /setInspectTableNumber\(null\)/);
+});
+
+test('staff order ticket matches reference layout with table number, time, taker, no payment disclaimer, no prices', () => {
+  const ticketModal = read('src/components/tables/StaffOrderTicketModal.jsx');
+  const tableSheet = read('src/components/tables/TableDetailSheet.jsx');
+  assert.match(ticketModal, /BUYURTMA № #\{ticketOrder\?\.number \|\| tableNumber\}/);
+  assert.match(ticketModal, /\{tableNumber\}-stol/);
+  assert.match(ticketModal, /VAQT/);
+  assert.match(ticketModal, /BUYURTMA OLUVCHI/);
+  assert.match(ticketModal, /\{item\.product_name\}/);
+  assert.match(ticketModal, /\{item\.quantity\}/);
+  assert.doesNotMatch(ticketModal, /to‘lov hujjati hisoblanmaydi/i);
+  assert.doesNotMatch(ticketModal, /TURI/);
+  assert.doesNotMatch(ticketModal, /MAHSULOTLAR VA MIQDOR/);
+  assert.doesNotMatch(ticketModal, /formatUZS/);
+  assert.match(pos, /<StaffOrderTicketModal/);
+  assert.match(tableSheet, /<StaffOrderTicketModal/);
+  assert.match(pos, /setStaffTicketModal/);
 });
 

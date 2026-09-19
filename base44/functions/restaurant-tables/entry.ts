@@ -262,7 +262,9 @@ Deno.serve(async (req) => {
           image_url: previous?.image_url || String(product.image_url || ""),
           price, quantity, subtotal: price * quantity,
           stock_tracked: previous ? previous.stock_tracked !== false : product.track_stock !== false,
-          source_type: previous?.source_type || product.source_type || "central_produced" });
+          source_type: previous?.source_type || product.source_type || "central_produced",
+          variant_name: String(row?.variant_name || row?.variant || previous?.variant_name || "").trim(),
+          notes: String(row?.notes || previous?.notes || "").trim() });
       }
       const total = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
       if (!Number.isSafeInteger(total) || total > 1_000_000_000_000) {
@@ -271,7 +273,11 @@ Deno.serve(async (req) => {
       const now = new Date().toISOString();
       const order = { id: existing?.id || crypto.randomUUID(), number, revision: revision + 1,
         state: "occupied", items, total, started_at: existing?.started_at || now,
-        opened_by: existing?.opened_by || actor.id, updated_by: actor.id, updated_at: now };
+        opened_by: existing?.opened_by || actor.id,
+        opened_by_name: existing?.opened_by_name || String(body?.opened_by_name || userLabel(actor)),
+        customer_name: String(body?.customer_name || existing?.customer_name || "").trim(),
+        notes: String(body?.notes || existing?.notes || "").trim(),
+        updated_by: actor.id, updated_at: now };
       const version = ordersVersion(shop);
       const updated = await service.entities.Shop.updateMany(
         { id: shop.id, restaurant_table_count: safeShop(shop).table_count, ...ordersVersionCondition(version) },

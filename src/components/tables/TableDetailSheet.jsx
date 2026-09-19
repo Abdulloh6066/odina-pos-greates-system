@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Armchair, Clock, ShoppingBag, ArrowRight, CreditCard,
-  Printer, AlertCircle, CheckCircle2
+  Printer, AlertCircle, CheckCircle2, UtensilsCrossed
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
@@ -21,8 +21,8 @@ export default function TableDetailSheet({
 }) {
   const [loading, setLoading] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
-  const [staffTicketOpen, setStaffTicketOpen] = useState(false);
   const [error, setError] = useState('');
+  const [showStaffTicket, setShowStaffTicket] = useState(false);
   const printRef = useRef(null);
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function TableDetailSheet({
 
   return (
     <>
-    <Dialog open={open && !staffTicketOpen} onOpenChange={(val) => !val && onClose()}>
+      <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-[24px] border border-border bg-card shadow-2xl">
         {/* Header */}
         <div className="p-5 border-b border-border bg-brand-surface flex items-start justify-between gap-3">
@@ -246,33 +246,34 @@ export default function TableDetailSheet({
                   To‘lov qilish
                 </Button>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowStaffTicket(true)}
+                  className="min-h-11 rounded-xl text-xs font-semibold border-brand-olive/40 hover:bg-brand-olive/10"
+                >
+                  <UtensilsCrossed className="w-4 h-4 mr-1.5 text-brand-ink" />
+                  Xizmat cheki
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handlePrintPrecheck}
-                  className="flex-1 min-h-11 rounded-xl text-xs font-semibold"
+                  className="min-h-11 rounded-xl text-xs font-semibold"
                 >
                   <Printer className="w-4 h-4 mr-1.5" />
                   Hisob cheki (Pre-check)
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStaffTicketOpen(true)}
-                  className="flex-1 min-h-11 rounded-xl text-xs font-semibold"
-                >
-                  <Printer className="w-4 h-4 mr-1.5" /> Xizmat cheki
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={onClose}
-                  className="min-h-11 rounded-xl text-xs"
-                >
-                  Yopish
-                </Button>
               </div>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onClose}
+                className="min-h-10 rounded-xl text-xs text-muted-foreground"
+              >
+                Yopish
+              </Button>
             </>
           ) : (
             <div className="flex items-center gap-2">
@@ -299,8 +300,14 @@ export default function TableDetailSheet({
         </div>
       </DialogContent>
     </Dialog>
-    <StaffOrderTicketModal open={open && staffTicketOpen} onClose={() => setStaffTicketOpen(false)}
-      shop={shop} shopId={shop?.id} tableNumber={tableNumber} order={tableOrder} />
-    </>
+    <StaffOrderTicketModal
+      open={showStaffTicket}
+      onClose={() => setShowStaffTicket(false)}
+      shop={shop}
+      shopId={shop?.id}
+      tableNumber={tableNumber}
+      order={tableOrder}
+    />
+  </>
   );
 }
