@@ -78,7 +78,8 @@ test('saving an unpaid table returns to clean POS only after server confirmation
   assert.match(action, /resetCart\(\)/);
   assert.match(action, /setTableOrder\(null\)/);
   assert.match(action, /setMobileCartOpen\(false\)/);
-  assert.match(action, /navigate\('\/pos', \{ replace: true, state: \{ savedTableNumber: savedNumber \} \}\)/);
+  assert.match(action, /navigate\('\/pos', \{ replace: true, state: \{ savedTableNumber: savedNumber, savedShopId \} \}\)/);
+  assert.match(action, /setStaffTicket\(\{ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber \}\)/);
   assert.ok(action.indexOf('await saveTableOrder()') < action.indexOf('resetCart()'));
   assert.match(cart, /tableDirty \? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'/);
   assert.match(cart, /disabled=\{locked \|\| \(!tableDirty && !tableSaved\)/);
@@ -94,7 +95,7 @@ const exerciseFastSave = async ({ dirty = true, order = { id: 'mock-order', stat
   succeeds = true, error = '', busy = false } = {}) => {
   const events = [];
   const context = {
-    selectedTable: { number: 3 }, tableOrderLoading: busy,
+    selectedTable: { number: 3, shopId: 'shop-1' }, tableShop: { id: 'shop-1', name: 'Mock shop' }, tableOrderLoading: busy,
     savingTableRef: { current: false }, paying: false, payOpen: false,
     stockChecking: false, tableOrderError: error, tableOrder: order,
     tableCartDirty: dirty,
@@ -107,6 +108,7 @@ const exerciseFastSave = async ({ dirty = true, order = { id: 'mock-order', stat
     setSearch: () => events.push('reset-search'),
     setMobileCartOpen: () => events.push('close-mobile-sheet'),
     navigate: (path, options) => events.push(`navigate:${path}:${options?.state?.savedTableNumber}`),
+    setStaffTicket: (ticket) => events.push(`ticket:${ticket.mode}:${ticket.shopId}:${ticket.tableNumber}`),
   };
   assert.ok(fastSaveAction.startsWith('const saveAndStartNextOrder = async () => {'));
   vm.runInNewContext(`${fastSaveAction}\nglobalThis.runFastSave = saveAndStartNextOrder;`, context);
@@ -118,7 +120,8 @@ test('confirmed server save resets Kassa and navigates only after success', asyn
   const events = await exerciseFastSave();
   assert.equal(events[0], 'server-save');
   assert.equal(events[1], 'reset-cart');
-  assert.equal(events.at(-1), 'navigate:/pos:3');
+  assert.equal(events.at(-2), 'navigate:/pos:3');
+  assert.equal(events.at(-1), 'ticket:table:shop-1:3');
   assert.ok(events.includes('close-mobile-sheet'));
 });
 
@@ -129,7 +132,8 @@ test('failed server save, existing saved order and pending load never silently l
   assert.deepEqual(await exerciseFastSave({ dirty: false, order: null }), []);
   const existing = await exerciseFastSave({ dirty: false });
   assert.equal(existing[0], 'reset-cart');
-  assert.equal(existing.at(-1), 'navigate:/pos:3');
+  assert.equal(existing.at(-2), 'navigate:/pos:3');
+  assert.equal(existing.at(-1), 'ticket:table:shop-1:3');
 });
 
 test('Kassa selection stays a real authenticated completed sale with no premature inventory deduction', () => {
