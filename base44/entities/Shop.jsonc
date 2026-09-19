@@ -170,6 +170,31 @@
       },
       "default": []
     },
+    "restaurant_outdoor_polygon": {
+      "type": "array",
+      "description": "Admin chizgan ko\u2018cha/terassa hududi chegarasi, xaritada 0\u20131000 koordinatalar; bo\u2018sh ro\u2018yxat = hali belgilanmagan",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "default": []
+    },
     "restaurant_table_layout_version": {
       "type": "integer",
       "minimum": 0,
