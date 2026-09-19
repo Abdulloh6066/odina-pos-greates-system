@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Armchair, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { Armchair, ArrowLeft, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaConfirm } from '@/lib/odina-dialog';
 import PageHeader from '@/components/PageHeader';
@@ -107,16 +107,18 @@ export default function RestaurantTables() {
   };
 
   const tableCount = selectedShop?.table_count || 0;
-  const totalCount = shops.reduce((sum, shop) => sum + shop.table_count, 0);
 
   return (
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Stollar"
-        subtitle="Zalning haqiqiy xaritasi, har bir stolning ochiq hisobi va Kassaga tezkor ulanish."
+        subtitle="Alohida zal ekrani: stolni tanlang, buyurtmani davom ettiring yoki Kassada yangi buyurtma oling."
         icon={Armchair}
         eyebrow="ODINA · RESTORAN"
-        actions={<Button variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>}
+        actions={<>
+          <Button type="button" onClick={() => navigate('/pos')} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong"><ArrowLeft className="w-4 h-4 mr-2" /> Yangi buyurtma · Kassa</Button>
+          <Button type="button" variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>
+        </>}
       />
 
       {error && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 text-destructive px-4 py-3 text-sm mb-4">{error}</div>}
@@ -132,15 +134,10 @@ export default function RestaurantTables() {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="odina-panel bg-card border border-border rounded-2xl p-5 premium-shadow flex items-center gap-4">
-              <span className="w-12 h-12 rounded-2xl bg-brand-olive/15 text-brand-ink flex items-center justify-center"><Building2 className="w-6 h-6" /></span>
-              <div><div className="text-xs text-muted-foreground">{canManage ? 'Faol do‘konlar' : 'Biriktirilgan do‘kon'}</div><div className="text-2xl font-semibold">{shops.length}</div></div>
-            </div>
-            <div className="odina-panel bg-card border border-border rounded-2xl p-5 premium-shadow flex items-center gap-4">
-              <span className="w-12 h-12 rounded-2xl bg-primary/20 text-brand-ink flex items-center justify-center"><Armchair className="w-6 h-6" /></span>
-              <div><div className="text-xs text-muted-foreground">{canManage ? 'Jami sozlangan stollar' : 'Do‘kon stollari'}</div><div className="text-2xl font-semibold">{totalCount}</div></div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand-olive/25 bg-brand-olive/5 px-4 py-3 text-sm text-brand-ink">
+            <Armchair className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span className="font-semibold">Stolni bosing → Kassa.</span>
+            <span className="text-muted-foreground">Buyurtma to‘lovgacha stolda qoladi. Saqlagach Kassa yangi savat bilan ochiladi.</span>
           </div>
 
           {canManage && shops.length > 1 && (
