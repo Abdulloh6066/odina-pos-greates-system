@@ -232,6 +232,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-sand/60 bg-[#fbf6eb] px-3 py-2 font-semibold text-brand-ink"><Building2 className="h-4 w-4" aria-hidden="true" /> Do‘kon ichi · {indoorCount} stol</span>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-olive/40 bg-[#eef0e4] px-3 py-2 font-semibold text-brand-ink"><Sun className="h-4 w-4" aria-hidden="true" /> Ko‘cha / terassa · {outdoorCount} stol</span>
         {editing && <span className="text-muted-foreground">Chegara ochiq: stolni kerakli tomonga surib, joylashuvni saqlang.</span>}
+        <span className="w-full text-[11px] text-muted-foreground">Hududlar stolning xaritadagi joyiga qarab ko‘rsatiladi. Eski joylashuv avtomatik o‘zgarmaydi.</span>
       </div>
 
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
