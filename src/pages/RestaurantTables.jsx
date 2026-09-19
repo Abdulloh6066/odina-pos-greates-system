@@ -105,6 +105,10 @@ export default function RestaurantTables() {
   const openTable = (shopId, number) => {
     navigate(`/pos?${new URLSearchParams({ table_shop: shopId, table_number: String(number) })}`);
   };
+  const startNewOrder = async () => {
+    if (layoutEditing && !(await odinaConfirm('Saqlanmagan xarita joylashuvi yo‘qolishi mumkin. Kassaga o‘tasizmi?'))) return;
+    navigate('/pos');
+  }; 
 
   const tableCount = selectedShop?.table_count || 0;
 
@@ -116,7 +120,7 @@ export default function RestaurantTables() {
         icon={Armchair}
         eyebrow="ODINA · RESTORAN"
         actions={<>
-          <Button type="button" onClick={() => navigate('/pos')} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong"><ArrowLeft className="w-4 h-4 mr-2" /> Yangi buyurtma · Kassa</Button>
+          <Button type="button" onClick={() => void startNewOrder()} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong"><ArrowLeft className="w-4 h-4 mr-2" /> Yangi buyurtma · Kassa</Button>
           <Button type="button" variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>
         </>}
       />
