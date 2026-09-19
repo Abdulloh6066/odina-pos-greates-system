@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
+import { Printer, ReceiptText } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
 
-export default function Receipt({ open, sale, settings, onClose }) {
+export default function Receipt({ open, sale, settings, onClose, onStaffTicket }) {
   const ref = useRef(null);
   if (!sale) return null;
 
@@ -82,9 +82,14 @@ export default function Receipt({ open, sale, settings, onClose }) {
           {showSharedFooter && sharedFooter && <div className="text-center text-[10px] mt-1">{sharedFooter}</div>}
         </div>
 
-        <DialogFooter className="gap-2 no-print">
-          <Button variant="outline" onClick={onClose} className="flex-1">Yangi buyurtma</Button>
-          <Button onClick={handlePrint} className="flex-1 bg-primary text-primary-foreground hover:bg-primary-strong">
+        <DialogFooter className="flex flex-wrap gap-2 no-print">
+          <Button variant="outline" onClick={onClose} className="flex-1 min-w-[120px]">Yangi buyurtma</Button>
+          {onStaffTicket && !sale.table_number_snapshot && sale.items?.length > 0 && (
+            <Button variant="outline" onClick={() => onStaffTicket(sale)} className="flex-1 min-w-[120px]">
+              <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
+            </Button>
+          )}
+          <Button onClick={handlePrint} className="flex-1 min-w-[120px] bg-primary text-primary-foreground hover:bg-primary-strong">
             <Printer className="w-4 h-4 mr-1.5" /> Chop etish
           </Button>
         </DialogFooter>
