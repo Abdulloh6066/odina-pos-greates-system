@@ -104,7 +104,7 @@ test('sortRequests: muddati o\'tgan va shoshilinch birinchi', () => {
     { request_number: 'C', required_date: '2026-09-11', shop_id: 's1' }, // bugun -> shoshilinch (<=24h)
   ];
   const sorted = L.sortRequests(requests, nowParts).map((r) => r.request_number);
-  assert.deepEqual(sorted, ['B', 'C', 'A']);
+  assert.deepEqual(Array.from(sorted), ['B', 'C', 'A']);
 });
 
 test('aggregateByProduct: mahsulot bo\'yicha jami va do\'kon bo\'yicha taqsimot', () => {
