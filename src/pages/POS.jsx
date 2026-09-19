@@ -983,6 +983,16 @@ function LivePOS() {
         </Button>
       </div>}
 
+      {!screenMode && !selectedTable && user?.role === 'admin' && (
+        <div className="mx-3 sm:mx-5 mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-2.5 text-sm">
+          <span>Yangi mahsulotlarni vaqtinchalik 5 000 UZS bilan ko‘rish</span>
+          <Button type="button" variant="outline" onClick={() => navigate('/pos?sinov=1')}
+            className="min-h-11 rounded-xl border-brand-olive/50 bg-card font-semibold text-brand-ink">
+            Kassa sinovi
+          </Button>
+        </div>
+      )}
+
       {!screenMode && !selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-ink" aria-hidden="true" />
