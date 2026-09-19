@@ -214,7 +214,7 @@ export default function StaffOrderTicketModal({
       <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-3'}`} />
 
       {/* Items Section */}
-      <div className={`pt-0.5 ${isPrint ? 'space-y-2' : 'space-y-3'}`}> 
+      <div className={`pt-0.5 ${isPrint ? 'space-y-2' : 'space-y-3'}`}>
         {items.map((item, idx) => (
           <div key={idx}>
             <div className="flex justify-between items-baseline gap-3">
@@ -249,7 +249,7 @@ export default function StaffOrderTicketModal({
   );
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}> 
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg p-0 overflow-hidden bg-background border-border shadow-2xl rounded-2xl flex flex-col max-h-[92vh]">
         <DialogTitle className="sr-only">Xizmat cheki (Oshxona)</DialogTitle>
         <DialogDescription className="sr-only">
