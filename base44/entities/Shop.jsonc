@@ -30,6 +30,23 @@
     "phone": {
       "type": "string"
     },
+    "service_ticket_counter": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Do\u2018konning joriy smenalar davridagi oshxona xizmat cheki raqami; savdo ID emas"
+    },
+    "service_ticket_version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Ikki kassir bir xil xizmat raqamini olmasligi uchun atomik versiya"
+    },
+    "service_ticket_cycle_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Shu do\u2018konda smenalar davri davom etmoqda; barcha smenalar yopilsa false"
+    },
     "restaurant_table_count": {
       "type": "integer",
       "minimum": 0,
