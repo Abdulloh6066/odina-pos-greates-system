@@ -375,31 +375,62 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
 
               {layout.map((point) => {
                 const order = (shop.orders || []).find((row) => row.number === point.number);
-                return <button key={point.number} type="button"
-                aria-label={`${point.number}-stol, ${order ? (order.state === 'paying' ? 'To‘lov tekshirilmoqda' : `Band, ${order.total} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Kassaga o‘tish'}`}
-                title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol — Kassaga o‘tish`}
-                disabled={saving || zoneDrawing}
-                onPointerDown={(event) => startDrag(event, point.number)}
-                onPointerMove={(event) => onMove(event, point.number)}
-                onPointerUp={stopDrag}
-                onPointerCancel={stopDrag}
-                onKeyDown={(event) => keyboardMove(event, point)}
-                onClick={() => { if (zoneDrawing) return; if (editing) setSelectedNumber(point.number); else onOpen(shop.id, point.number); }}
-                style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, width: `${Math.round(68 * tableSize(point) / 100)}px`, height: `${Math.round(68 * tableSize(point) / 100)}px`, transform: 'translate(-50%, -50%)', touchAction: editing ? 'none' : 'manipulation' }}
-                className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow,transform] ${editing
-                  ? selectedNumber === point.number ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20' : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
-                  : selectedViewNumber === point.number
-                    ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/40 shadow-xl scale-105 z-20'
-                    : order ? order.state === 'paying'
-                      ? 'cursor-pointer bg-[#FECD7C]/45 border-amber-600 text-foreground ring-2 ring-amber-400/40'
-                      : 'cursor-pointer bg-[#FECD7C]/30 border-brand-olive text-foreground ring-2 ring-brand-olive/25 hover:shadow-lg'
-                      : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'}`}>
-                {editing ? <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" /> : <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />}
-                <span className="text-xs">{point.number}-stol</span>
-                {!editing && <span className="pointer-events-none absolute top-full mt-1 rounded-lg border border-border bg-card/95 px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap shadow-sm">
-                  {order ? order.state === 'paying' ? 'To‘lov…' : `${Number(order.total).toLocaleString('en-US')} UZS` : 'Bo‘sh'}
-                </span>}
-              </button>;
+                const isOccupied = Boolean(order);
+                const isPaying = order?.state === 'paying';
+                const isSelected = selectedViewNumber === point.number;
+
+                return (
+                  <button
+                    key={point.number}
+                    type="button"
+                    aria-label={`${point.number}-stol, ${isOccupied ? (isPaying ? 'To‘lov tekshirilmoqda' : `Band, ${Number(order.total || 0).toLocaleString('en-US')} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Ko‘rish va kassaga o‘tish'}`}
+                    title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol${isOccupied ? ` — Band (${Number(order.total || 0).toLocaleString('en-US')} UZS)` : ' — Bo‘sh'}`}
+                    disabled={saving || zoneDrawing}
+                    onPointerDown={(event) => startDrag(event, point.number)}
+                    onPointerMove={(event) => onMove(event, point.number)}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    onKeyDown={(event) => keyboardMove(event, point)}
+                    onClick={() => {
+                      if (zoneDrawing) return;
+                      if (editing) setSelectedNumber(point.number);
+                      else onOpen(shop.id, point.number);
+                    }}
+                    style={{
+                      left: `${point.x / 10}%`,
+                      top: `${point.y / 10}%`,
+                      width: `${Math.round(68 * tableSize(point) / 100)}px`,
+                      height: `${Math.round(68 * tableSize(point) / 100)}px`,
+                      transform: 'translate(-50%, -50%)',
+                      touchAction: editing ? 'none' : 'manipulation',
+                    }}
+                    className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-all ${
+                      editing
+                        ? selectedNumber === point.number
+                          ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20'
+                          : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
+                        : isSelected
+                          ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/50 shadow-xl scale-105 z-20'
+                          : isOccupied
+                            ? isPaying
+                              ? 'cursor-pointer bg-[#FECD7C] border-amber-600 text-brand-ink ring-2 ring-amber-500/60 shadow-md hover:scale-105'
+                              : 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-2 ring-brand-olive/40 shadow-md hover:scale-105'
+                            : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'
+                    }`}
+                  >
+                    {editing ? (
+                      <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" />
+                    ) : (
+                      <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />
+                    )}
+                    <span className="text-xs">{point.number}-stol</span>
+                    {!editing && isOccupied && (
+                      <span className="pointer-events-none absolute top-full mt-1.5 rounded-lg border border-amber-300/80 bg-[#fff9ea] px-2 py-0.5 text-[10px] font-bold text-brand-ink whitespace-nowrap shadow-sm">
+                        {isPaying ? `${Number(order.total || 0).toLocaleString('en-US')} UZS · To‘lov` : `${Number(order.total || 0).toLocaleString('en-US')} UZS`}
+                      </span>
+                    )}
+                  </button>
+                );
               })}
               <div className="pointer-events-none absolute z-[2] bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">{shop.table_count} ta stol · {zoneDrawing ? 'Ko‘cha chegarasini chizing' : editing ? 'Stollarni kerakli joyga suring' : 'Stolni tanlang'}</div>
             </div>
