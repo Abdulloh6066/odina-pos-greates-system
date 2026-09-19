@@ -862,8 +862,8 @@ export default function POS() {
           </div>
         </div>
         <div className="flex-1" />
-        {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void openTablePicker()}
-          aria-label="Stollar xaritasini Kassa ichida ochish"
+        {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
+          aria-label="Stollar sahifasini ochish"
           className="hidden xl:inline-flex h-11 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <Armchair className="h-4 w-4 sm:mr-1.5" /> <span>Stollar</span>
         </Button>}
@@ -887,10 +887,10 @@ export default function POS() {
       </div>
 
       {!screenMode && <div className="xl:hidden shrink-0 border-b border-brand-olive/20 bg-brand-olive/5 px-3 py-2 sm:px-5">
-        <Button type="button" variant="outline" onClick={() => void openTablePicker()}
-          aria-label="Stollar xaritasini Kassa ichida ochish"
+        <Button type="button" variant="outline" onClick={() => void goToTables()}
+          aria-label="Stollar sahifasini ochish"
           className="w-full min-h-11 rounded-xl border-brand-olive/50 bg-card font-semibold text-brand-ink touch-manipulation">
-          <Armchair className="h-4 w-4 mr-2" /> Stollar xaritasini ochish
+          <Armchair className="h-4 w-4 mr-2" /> Stollar sahifasini ochish
         </Button>
       </div>}
 
@@ -925,7 +925,7 @@ export default function POS() {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
               setTableReload((current) => current + 1);
             }}>Buyurtmani yangilash</Button>}
-            <Button type="button" variant="outline" className="min-h-11" onClick={() => void openTablePicker()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
+            <Button type="button" variant="outline" className="min-h-11" onClick={() => void goToTables()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
           </div>
         </div>
       )}
@@ -1020,7 +1020,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveTableOrder()} savingTable={savingTable} locked={tableLocked || paying}
+            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying}
           />
         </div>
       </div>
@@ -1045,7 +1045,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveTableOrder()} savingTable={savingTable} locked={tableLocked || paying}
+            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying}
           />
         </SheetContent>
       </Sheet>
@@ -1092,8 +1092,7 @@ export default function POS() {
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => {
         setReceiptOpen(false);
         if (selectedTable && !lastSale?.offline_pending) {
-          navigate('/pos');
-          void openTablePicker();
+          navigate('/tables');
         }
       }} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
