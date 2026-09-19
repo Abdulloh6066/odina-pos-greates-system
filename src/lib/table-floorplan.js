@@ -53,6 +53,47 @@ export function validOutdoorPolygon(polygon) {
   return true;
 }
 
+export function polygonToBox(polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return null;
+  const xs = polygon.map((p) => p.x);
+  const ys = polygon.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const x = clamp(minX, 0, 850);
+  const y = clamp(minY, 0, 860);
+  return {
+    x,
+    y,
+    width: clamp(maxX - minX, 150, 1000 - x),
+    height: clamp(maxY - minY, 140, 1000 - y),
+  };
+}
+
+export function boxToPolygon(box) {
+  if (!box) return [];
+  const x1 = clamp(Math.round(box.x / 5) * 5, 0, 850);
+  const y1 = clamp(Math.round(box.y / 5) * 5, 0, 860);
+  const width = clamp(Math.round(Math.max(150, box.width) / 5) * 5, 150, 1000 - x1);
+  const height = clamp(Math.round(Math.max(140, box.height) / 5) * 5, 140, 1000 - y1);
+  const x2 = x1 + width;
+  const y2 = y1 + height;
+  return [
+    { x: x1, y: y1 },
+    { x: x2, y: y1 },
+    { x: x2, y: y2 },
+    { x: x1, y: y2 },
+  ];
+}
+
+export const PRESET_ZONES = [
+  { id: 'top', label: 'Yuqori ko‘cha', box: { x: 50, y: 30, width: 900, height: 270 } },
+  { id: 'bottom', label: 'Pastki ko‘cha', box: { x: 50, y: 700, width: 900, height: 270 } },
+  { id: 'right', label: 'O‘ng terassa', box: { x: 680, y: 50, width: 270, height: 900 } },
+  { id: 'left', label: 'Chap terassa', box: { x: 50, y: 50, width: 270, height: 900 } },
+];
+
 export const normalizeOutdoorPolygon = (value) => validOutdoorPolygon(value)
   ? value.map(({ x, y }) => ({ x, y })) : [];
 

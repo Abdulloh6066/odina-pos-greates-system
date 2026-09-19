@@ -29,6 +29,14 @@
 4. `src/pages/POS.jsx` (YANGILANDI):
    - URL orqali `action=pay` kelganda stol buyurtmasi yuklangach avtomatik to‘lov oynasini ochish imkoniyati ulandi.
 
+5. Ko‘cha / terassa hududini erkin to‘rtburchak chizish va cho‘zish (Box Draw & Resize) — `TableFloorplan.jsx` va `table-floorplan.js`:
+   - Qotib qolgan «0/12 ta nuqta» va chiziqlar kesishishi xatolari to‘liq almashtirildi.
+   - Xaritada sichqoncha/barmoq bilan bitta harakatda ko‘cha to‘rtburchagini tortib chizish (Drag-to-Draw) imkoniyati.
+   - 4 ta burchakdagi dumaloq tutqichlar (NW, NE, SE, SW) orqali hududni xohlagan tomonga kengaytirish yoki qisqartirish.
+   - O‘rtadagi dastak orqali butun hududni xaritadagi boshqa joyga surish (Move).
+   - Tezkor andozalar: «Yuqori ko‘cha», «Pastki ko‘cha», «O‘ng terassa», «Chap terassa» va «Hududni tozalash».
+   - «✓ Tayyor · Stollarni joylashtirish» orqali stollarni ko‘cha zonasiga erkin surib qo‘yish.
+
 ---
 
 ## Nimalar O‘ZGARISHSIZ QOLDIRILDI

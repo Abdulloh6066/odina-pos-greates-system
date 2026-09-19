@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, Check, DoorOpen,
-  Edit3, Grip, Minus, MousePointer2, PenTool, Plus, RotateCcw, Save, Sun, Undo2, X,
+  Edit3, Grip, Maximize2, Minus, MousePointer2, Move, Plus, RotateCcw, Save, Sun, Trash2, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import {
   buildTableLayout, clamp, entranceFromPoint, normalizeEntrance, normalizeOutdoorPolygon,
   nudgeEntrance, pointInOutdoorPolygon, tableBounds, tableSize, TABLE_SIZES,
-  validOutdoorPolygon, MAX_OUTDOOR_VERTICES, validateTableLayout,
+  validOutdoorPolygon, validateTableLayout, polygonToBox, boxToPolygon, PRESET_ZONES,
 } from '@/lib/table-floorplan';
 
 const WALLS = [
@@ -50,8 +50,8 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   const [layout, setLayout] = useState(defaultLayout);
   const [entrance, setEntrance] = useState(defaultEntrance);
   const [outdoorPolygon, setOutdoorPolygon] = useState(defaultOutdoor);
-  const [zoneDrawing, setZoneDrawing] = useState(false);
-  const [zoneClosed, setZoneClosed] = useState(true);
+  const [zoneMode, setZoneMode] = useState(false);
+  const [tempBox, setTempBox] = useState(null);
   const [editing, setEditing] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -63,13 +63,15 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
     setLayout(defaultLayout);
     setEntrance(defaultEntrance);
     setOutdoorPolygon(defaultOutdoor);
-    setZoneDrawing(false);
-    setZoneClosed(true);
+    setZoneMode(false);
+    setTempBox(null);
     setEditing(false);
     setSelectedNumber(null);
     setError('');
     dragging.current = null;
   }, [defaultLayout, defaultEntrance, defaultOutdoor]);
+
+  const outdoorBox = useMemo(() => polygonToBox(outdoorPolygon), [outdoorPolygon]);
 
   const tableDirty = layout.some((point, index) =>
     point.x !== defaultLayout[index]?.x || point.y !== defaultLayout[index]?.y
@@ -77,7 +79,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   const entranceDirty = entrance.side !== defaultEntrance.side || entrance.offset !== defaultEntrance.offset;
   const zoneDirty = JSON.stringify(outdoorPolygon) !== JSON.stringify(defaultOutdoor);
   const dirty = tableDirty || entranceDirty || zoneDirty;
-  const zoneValid = validOutdoorPolygon(outdoorPolygon) && (!zoneDrawing || zoneClosed);
+  const zoneValid = validOutdoorPolygon(outdoorPolygon);
   const valid = validateTableLayout(shop.table_count, layout) && zoneValid;
   useEffect(() => { onEditingChange?.(editing && dirty); }, [editing, dirty, onEditingChange]);
 
@@ -115,41 +117,90 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       || dragging.current.pointerId !== event.pointerId) return;
     const position = pointerCoordinates(event);
     if (!position) return;
-    if (target === 'entrance') setEntrance(entranceFromPoint(position.x, position.y));
-    else if (target === 'zone-vertex') {
-      const vertexIndex = dragging.current.index;
-      setOutdoorPolygon((current) => current.map((point, index) => index === vertexIndex
-        ? { x: clamp(Math.round(position.x / 5) * 5, 0, 1000),
-          y: clamp(Math.round(position.y / 5) * 5, 0, 1000) } : point));
-    } else place(target, position.x, position.y);
+
+    if (target === 'entrance') {
+      setEntrance(entranceFromPoint(position.x, position.y));
+    } else if (target === 'table') {
+      place(dragging.current.extra, position.x, position.y);
+    } else if (target === 'zone-draw') {
+      const start = dragging.current.startPointer;
+      const x = clamp(Math.min(start.x, position.x), 0, 1000);
+      const y = clamp(Math.min(start.y, position.y), 0, 1000);
+      const width = clamp(Math.abs(position.x - start.x), 0, 1000 - x);
+      const height = clamp(Math.abs(position.y - start.y), 0, 1000 - y);
+      setTempBox({ x, y, width, height });
+    } else if (target === 'zone-corner') {
+      const corner = dragging.current.extra;
+      const init = dragging.current.initialBox;
+      if (!init) return;
+
+      const right = init.x + init.width;
+      const bottom = init.y + init.height;
+
+      let newX = init.x;
+      let newY = init.y;
+      let newW = init.width;
+      let newH = init.height;
+
+      if (corner === 'se') {
+        newW = clamp(position.x - init.x, 150, 1000 - init.x);
+        newH = clamp(position.y - init.y, 140, 1000 - init.y);
+      } else if (corner === 'sw') {
+        newX = clamp(position.x, 0, right - 150);
+        newW = right - newX;
+        newH = clamp(position.y - init.y, 140, 1000 - init.y);
+      } else if (corner === 'ne') {
+        newY = clamp(position.y, 0, bottom - 140);
+        newW = clamp(position.x - init.x, 150, 1000 - init.x);
+        newH = bottom - newY;
+      } else if (corner === 'nw') {
+        newX = clamp(position.x, 0, right - 150);
+        newY = clamp(position.y, 0, bottom - 140);
+        newW = right - newX;
+        newH = bottom - newY;
+      }
+
+      setOutdoorPolygon(boxToPolygon({ x: newX, y: newY, width: newW, height: newH }));
+    } else if (target === 'zone-move') {
+      const start = dragging.current.startPointer;
+      const init = dragging.current.initialBox;
+      if (!init || !start) return;
+      const dx = position.x - start.x;
+      const dy = position.y - start.y;
+      const newX = clamp(init.x + dx, 0, 1000 - init.width);
+      const newY = clamp(init.y + dy, 0, 1000 - init.height);
+      setOutdoorPolygon(boxToPolygon({ ...init, x: newX, y: newY }));
+    }
   };
-  const startDrag = (event, target) => {
+  const startDrag = (event, target, extra = null) => {
     if (!editing || saving) return;
     event.preventDefault();
-    dragging.current = { target, pointerId: event.pointerId };
-    if (target !== 'entrance') setSelectedNumber(target);
+    const pos = pointerCoordinates(event);
+    if (!pos) return;
+
+    dragging.current = {
+      target,
+      extra,
+      pointerId: event.pointerId,
+      startPointer: pos,
+      initialBox: outdoorBox ? { ...outdoorBox } : null,
+    };
+
+    if (target === 'table') setSelectedNumber(extra);
     else setSelectedNumber(null);
+
     event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const startVertexDrag = (event, index) => {
-    if (!editing || !zoneDrawing || saving) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragging.current = { target: 'zone-vertex', index, pointerId: event.pointerId };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const addZonePoint = (event) => {
-    if (!editing || !zoneDrawing || zoneClosed || saving) return;
-    const position = pointerCoordinates(event);
-    if (!position) return;
-    const point = { x: clamp(Math.round(position.x / 5) * 5, 0, 1000),
-      y: clamp(Math.round(position.y / 5) * 5, 0, 1000) };
-    setOutdoorPolygon((current) => current.length >= MAX_OUTDOOR_VERTICES
-      || current.some((vertex) => vertex.x === point.x && vertex.y === point.y)
-      ? current : [...current, point]);
   };
   const stopDrag = (event) => {
-    if (dragging.current?.pointerId === event.pointerId) dragging.current = null;
+    if (dragging.current?.pointerId === event.pointerId) {
+      if (dragging.current.target === 'zone-draw' && tempBox) {
+        if (tempBox.width >= 100 && tempBox.height >= 100) {
+          setOutdoorPolygon(boxToPolygon(tempBox));
+        }
+        setTempBox(null);
+      }
+      dragging.current = null;
+    }
   };
   const keyboardMove = (event, point) => {
     if (!editing || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
@@ -164,8 +215,8 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
     setLayout(defaultLayout);
     setEntrance(defaultEntrance);
     setOutdoorPolygon(defaultOutdoor);
-    setZoneDrawing(false);
-    setZoneClosed(true);
+    setZoneMode(false);
+    setTempBox(null);
     setSelectedNumber(null);
     setError('');
   };
@@ -202,7 +253,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   const payingCount = openOrders.filter((order) => order.state === 'paying').length;
   const unpaidTotal = openOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
   const verticalDoor = entrance.side === 'left' || entrance.side === 'right';
-  const finishedZone = zoneClosed && outdoorPolygon.length >= 3 && validOutdoorPolygon(outdoorPolygon);
+  const finishedZone = outdoorPolygon.length >= 3 && validOutdoorPolygon(outdoorPolygon);
   const outdoorCount = finishedZone
     ? layout.filter((point) => pointInOutdoorPolygon(point, outdoorPolygon)).length : 0;
   const indoorCount = layout.length - outdoorCount;
@@ -263,44 +314,104 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
         </div>
       )}
 
-      {editing && <div className={`rounded-2xl border p-3 sm:p-4 space-y-3 ${zoneDrawing ? 'border-brand-olive bg-[#f0f1e5]' : 'border-brand-olive/30 bg-brand-olive/5'}`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-brand-olive/30 text-brand-ink"><PenTool className="h-5 w-5" /></span>
-            <div><h3 className="text-sm font-bold">Ko‘cha hududini o‘zingiz belgilang</h3>
-              <p className="text-xs text-muted-foreground">{zoneDrawing ? zoneClosed ? 'Nuqtalarni ushlab surib chegarani sozlang.' : `Xaritaga bosib chegaraning burchaklarini belgilang (${outdoorPolygon.length}/${MAX_OUTDOOR_VERTICES}).` : 'Xaritadagi istalgan joyni ko‘cha sifatida chizishingiz mumkin.'}</p></div>
+      {editing && (
+        <div className={`rounded-2xl border p-3 sm:p-4 space-y-3 transition-colors ${zoneMode ? 'border-brand-olive bg-[#f3f4e8]' : 'border-brand-olive/30 bg-brand-olive/5'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card border border-brand-olive/30 text-brand-ink">
+                <Sun className="h-5 w-5 text-[#969a55]" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold">Ko‘cha / terassa hududini sozlash</h3>
+                <p className="text-xs text-muted-foreground">
+                  {zoneMode
+                    ? outdoorBox
+                      ? 'Burchaklardagi doiralardan ushlab cho‘zing yoki o‘rtasidan ushlab suring. Yangi chizish uchun xaritada sichqonchani torting.'
+                      : 'Xaritada bosib torting — to‘rtburchak ko‘cha hududi chiziladi yoki tayyor andozalardan birini tanlang.'
+                    : outdoorPolygon.length
+                      ? 'Ko‘cha hududi belgilangan. Stollarni xaritada erkin joylashtiring.'
+                      : 'Xaritada alohida ko‘cha yoki terassa maydonini ajratish uchun bosing.'}
+                </p>
+              </div>
+            </div>
+            {!zoneMode ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => {
+                  setZoneMode(true);
+                  setSelectedNumber(null);
+                }}
+                className="min-h-11 rounded-xl border-brand-olive bg-card text-brand-ink font-semibold hover:bg-brand-olive/15"
+              >
+                <Sun className="h-4 w-4 mr-2 text-[#969a55]" />
+                {outdoorPolygon.length ? 'Ko‘cha hududini sozlash / cho‘zish' : 'Ko‘cha hududini chizish'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => setZoneMode(false)}
+                className="min-h-11 rounded-xl bg-primary hover:bg-primary-strong text-primary-foreground font-semibold"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                ✓ Tayyor · Stollarni joylashtirish
+              </Button>
+            )}
           </div>
-          {!zoneDrawing ? <Button type="button" variant="outline" disabled={saving}
-            onClick={() => { setZoneDrawing(true); setZoneClosed(outdoorPolygon.length >= 3); setSelectedNumber(null); }}
-            className="min-h-11 rounded-xl border-brand-olive bg-card text-brand-ink font-semibold"><PenTool className="h-4 w-4 mr-2" /> {outdoorPolygon.length ? 'Ko‘cha chegarasini tahrirlash' : 'Ko‘cha hududini chizish'}</Button>
-            : <Button type="button" variant="outline" disabled={saving || !zoneClosed || !validOutdoorPolygon(outdoorPolygon)}
-              onClick={() => setZoneDrawing(false)} className="min-h-11 rounded-xl bg-card font-semibold"><Check className="h-4 w-4 mr-2" /> Stollarni joylashtirish</Button>}
+
+          {zoneMode && (
+            <div className="border-t border-brand-olive/25 pt-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-brand-ink mr-1">Tezkor andozalar:</span>
+                {PRESET_ZONES.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => {
+                      setOutdoorPolygon(boxToPolygon(preset.box));
+                      setTempBox(null);
+                    }}
+                    className="min-h-9 text-xs rounded-xl bg-card hover:border-brand-olive hover:bg-brand-olive/15 font-semibold"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                {outdoorPolygon.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => {
+                      setOutdoorPolygon([]);
+                      setTempBox(null);
+                    }}
+                    className="min-h-9 text-xs rounded-xl bg-card text-destructive hover:bg-destructive/10 ml-auto font-semibold"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Hududni tozalash
+                  </Button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                💡 <strong>Maslahat:</strong> Andozalardan birini tanlab, so‘ng xaritadagi 4 ta burchakdan ushlab uni xohlagancha kengaytirishingiz yoki butunicha surishingiz mumkin.
+              </p>
+            </div>
+          )}
         </div>
-        {zoneDrawing && <div className="flex flex-wrap items-center gap-2 border-t border-brand-olive/25 pt-3">
-          <Button type="button" variant="outline" disabled={saving} onClick={() => { setOutdoorPolygon([]); setZoneClosed(false); }}
-            className="min-h-11 rounded-xl bg-card">Yangidan chizish</Button>
-          {!zoneClosed && <>
-            <Button type="button" variant="outline" disabled={saving || !outdoorPolygon.length}
-              onClick={() => setOutdoorPolygon((current) => current.slice(0, -1))} className="min-h-11 rounded-xl bg-card"><Undo2 className="h-4 w-4 mr-1.5" /> Oxirgi nuqtani qaytarish</Button>
-            <Button type="button" disabled={saving || outdoorPolygon.length < 3 || !validOutdoorPolygon(outdoorPolygon)}
-              onClick={() => setZoneClosed(true)} className="min-h-11 rounded-xl bg-primary text-primary-foreground"><Check className="h-4 w-4 mr-1.5" /> Hududni tugatish</Button>
-          </>}
-          {zoneClosed && outdoorPolygon.length > 0 && <Button type="button" variant="outline" disabled={saving}
-            onClick={() => { setOutdoorPolygon([]); setZoneClosed(true); setZoneDrawing(false); }}
-            className="min-h-11 rounded-xl bg-card">Ko‘cha belgisini bekor qilish</Button>}
-          <span className="text-xs text-muted-foreground">{zoneClosed ? 'Chegara tayyor. Nuqtalarni suring, keyin joylashuvni saqlang.' : '3–12 ta nuqta tanlang, «Hududni tugatish»ni bosing.'}</span>
-        </div>}
-      </div>}
+      )}
 
       {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      {editing && !zoneValid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Ko‘cha chegarasi tugallanmagan yoki chiziqlar kesishgan. Kamida 3 ta nuqtadan iborat kesishmaydigan hudud chizing.</p>}
+      {editing && !zoneValid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Ko‘cha chegarasi mos emas. Iltimos, andozalardan foydalaning yoki yangidan chizing.</p>}
       {editing && !validateTableLayout(shop.table_count, layout) && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring.</p>}
 
       <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Xarita hududlari">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-sand/60 bg-[#fbf6eb] px-3 py-2 font-semibold text-brand-ink"><Building2 className="h-4 w-4" aria-hidden="true" /> Do‘kon ichi · {indoorCount} stol</span>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-olive/40 bg-[#eef0e4] px-3 py-2 font-semibold text-brand-ink"><Sun className="h-4 w-4" aria-hidden="true" /> Ko‘cha / terassa · {outdoorCount} stol</span>
-        {editing && <span className="text-muted-foreground">{zoneDrawing ? 'Xaritadagi nuqtalar ko‘cha chegarasini belgilaydi.' : 'Stollarni joylashtiring yoki ko‘cha hududini chizing.'}</span>}
-        <span className="w-full text-[11px] text-muted-foreground">{outdoorPolygon.length ? 'Ko‘cha chegarasi siz chizgan shaklga asoslanadi. Stollar koordinatalari o‘z-o‘zidan o‘zgarmaydi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}</span>
+        {editing && <span className="text-muted-foreground">{zoneMode ? 'Xaritadagi burchaklar orqali ko‘cha chegarasini cho‘zing.' : 'Stollarni joylashtiring yoki ko‘cha hududini sozlang.'}</span>}
+        <span className="w-full text-[11px] text-muted-foreground">{outdoorPolygon.length ? 'Ko‘cha hududi belgilangan. Stollar koordinatalari o‘z-o‘zidan o‘zgarmaydi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}</span>
       </div>
 
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
@@ -309,7 +420,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
             <div ref={boardRef} aria-label="Do‘kon va qo‘lda belgilangan ko‘cha hududi xaritasi"
               className={`relative isolate w-full aspect-[10/7] sm:aspect-[16/10] overflow-visible rounded-[25px] border-[3px] shadow-inner ${editing ? 'border-brand-olive' : 'border-[#b8b087]'}`}
               style={{ backgroundColor: '#fbf6eb', backgroundImage: 'linear-gradient(rgba(208,177,127,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.14) 1px, transparent 1px)', backgroundSize: '34px 34px' }}>
-              {/* The street is a user-drawn polygon, not a hard-coded horizontal stripe. */}
+              {/* The street is a user-drawn polygon */}
               <svg aria-hidden="true" viewBox="0 0 1000 1000" preserveAspectRatio="none"
                 className="pointer-events-none absolute inset-0 z-[1] h-full w-full rounded-[22px] overflow-hidden">
                 <defs><pattern id="odina-outdoor-tiles" width="36" height="36" patternUnits="userSpaceOnUse">
@@ -319,22 +430,31 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 {outdoorPolygon.length >= 3 && <polygon points={zonePoints}
                   fill="url(#odina-outdoor-tiles)" stroke={validOutdoorPolygon(outdoorPolygon) ? '#969a55' : '#b45309'}
                   strokeWidth="5" strokeLinejoin="round" />}
-                {zoneDrawing && !zoneClosed && outdoorPolygon.length > 1 && <polyline points={zonePoints}
-                  fill="none" stroke="#777b3d" strokeWidth="6" strokeDasharray="12 8" strokeLinejoin="round" />}
+                {tempBox && <rect x={tempBox.x} y={tempBox.y} width={tempBox.width} height={tempBox.height}
+                  fill="rgba(172, 169, 93, 0.35)" stroke="#777b3d" strokeWidth="4" strokeDasharray="8 6" rx="10" />}
               </svg>
               <div className="pointer-events-none absolute z-[2] left-4 top-4 max-w-[54%] inline-flex items-center gap-1.5 rounded-xl border border-brand-sand/70 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
                 <Building2 className="h-4 w-4 shrink-0" /> <span className="truncate">{shop.name}</span>
               </div>
               <div className="pointer-events-none absolute z-[2] right-4 top-4 rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground">
-                {zoneDrawing ? 'KO‘CHA CHEGARASINI BELGILANG' : editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
+                {zoneMode ? (outdoorBox ? 'BURCHAKLARDAN USHLAB CHO‘ZING' : 'XARITADA TORTIB CHIZING') : editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
               </div>
-              {zoneDrawing && <button type="button" aria-label={zoneClosed ? 'Ko‘cha chegarasi nuqtalarini surib tahrirlang' : 'Ko‘cha chegarasiga yangi nuqta qo‘shish'}
-                onClick={addZonePoint} disabled={saving} style={{ touchAction: 'manipulation' }}
-                className={`absolute inset-0 z-30 h-full w-full rounded-[22px] touch-manipulation ${zoneClosed ? 'cursor-default' : 'cursor-crosshair'}`} />}
+
+              {/* Canvas drag-to-draw overlay in zoneMode */}
+              {zoneMode && (
+                <div
+                  onPointerDown={(event) => startDrag(event, 'zone-draw')}
+                  onPointerMove={(event) => onMove(event, 'zone-draw')}
+                  onPointerUp={stopDrag}
+                  onPointerCancel={stopDrag}
+                  style={{ touchAction: 'none' }}
+                  className="absolute inset-0 z-20 cursor-crosshair"
+                />
+              )}
 
               <button type="button" aria-label={`Kirish eshigi: ${WALLS.find((wall) => wall.side === entrance.side)?.label} devor${editing ? ', joyini o‘zgartirish' : ''}`}
                 title={editing ? 'Eshikni ushlab devor bo‘ylab suring' : 'Kirish eshigi'}
-                disabled={!editing || saving || zoneDrawing}
+                disabled={!editing || saving || zoneMode}
                 onPointerDown={(event) => startDrag(event, 'entrance')}
                 onPointerMove={(event) => onMove(event, 'entrance')}
                 onPointerUp={stopDrag}
@@ -351,27 +471,91 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 {editing && <Grip aria-hidden="true" className="h-3 w-3 shrink-0 opacity-65" />}
               </button>
 
-              {zoneDrawing && outdoorPolygon.map((point, index) => <button key={`street-point-${index}`}
-                type="button" disabled={saving}
-                aria-label={`Ko‘cha chegarasining ${index + 1}-nuqtasi, joyini suring yoki yo‘nalish tugmalaridan foydalaning`}
-                title={`${index + 1}-nuqta · surib o‘zgartiring`}
-                onPointerDown={(event) => startVertexDrag(event, index)}
-                onPointerMove={(event) => onMove(event, 'zone-vertex')}
-                onPointerUp={stopDrag} onPointerCancel={stopDrag}
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-                  event.preventDefault();
-                  const step = event.shiftKey ? 50 : 10;
-                  setOutdoorPolygon((current) => current.map((vertex, i) => i === index ? {
-                    x: clamp(vertex.x + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0), 0, 1000),
-                    y: clamp(vertex.y + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0), 0, 1000),
-                  } : vertex));
-                }}
-                style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
-                className="absolute z-40 flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white bg-[#aca95d] text-xs font-bold text-[#292c1f] shadow-[0_2px_12px_rgba(0,0,0,.30)] cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-olive select-none">
-                {index + 1}
-              </button>)}
+              {/* Outdoor Box Interactive Handles */}
+              {zoneMode && outdoorBox && (
+                <>
+                  {/* Top-Left NW */}
+                  <button
+                    type="button"
+                    title="Burchakdan ushlab cho‘zing"
+                    aria-label="Yuqori chap burchakni cho‘zish"
+                    onPointerDown={(e) => startDrag(e, 'zone-corner', 'nw')}
+                    onPointerMove={(e) => onMove(e, 'zone-corner')}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    style={{ left: `${outdoorBox.x / 10}%`, top: `${outdoorBox.y / 10}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
+                    className="absolute z-40 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#aca95d] text-white shadow-lg cursor-nwse-resize active:scale-125 transition-transform"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+
+                  {/* Top-Right NE */}
+                  <button
+                    type="button"
+                    title="Burchakdan ushlab cho‘zing"
+                    aria-label="Yuqori o‘ng burchakni cho‘zish"
+                    onPointerDown={(e) => startDrag(e, 'zone-corner', 'ne')}
+                    onPointerMove={(e) => onMove(e, 'zone-corner')}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    style={{ left: `${(outdoorBox.x + outdoorBox.width) / 10}%`, top: `${outdoorBox.y / 10}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
+                    className="absolute z-40 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#aca95d] text-white shadow-lg cursor-nesw-resize active:scale-125 transition-transform"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+
+                  {/* Bottom-Right SE */}
+                  <button
+                    type="button"
+                    title="Burchakdan ushlab cho‘zing"
+                    aria-label="Pastki o‘ng burchakni cho‘zish"
+                    onPointerDown={(e) => startDrag(e, 'zone-corner', 'se')}
+                    onPointerMove={(e) => onMove(e, 'zone-corner')}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    style={{ left: `${(outdoorBox.x + outdoorBox.width) / 10}%`, top: `${(outdoorBox.y + outdoorBox.height) / 10}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
+                    className="absolute z-40 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#aca95d] text-white shadow-lg cursor-nwse-resize active:scale-125 transition-transform"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+
+                  {/* Bottom-Left SW */}
+                  <button
+                    type="button"
+                    title="Burchakdan ushlab cho‘zing"
+                    aria-label="Pastki chap burchakni cho‘zish"
+                    onPointerDown={(e) => startDrag(e, 'zone-corner', 'sw')}
+                    onPointerMove={(e) => onMove(e, 'zone-corner')}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    style={{ left: `${outdoorBox.x / 10}%`, top: `${(outdoorBox.y + outdoorBox.height) / 10}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
+                    className="absolute z-40 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#aca95d] text-white shadow-lg cursor-nesw-resize active:scale-125 transition-transform"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+
+                  {/* Center Move Handle */}
+                  <button
+                    type="button"
+                    title="Ko‘cha hududini ushlab suring"
+                    aria-label="Ko‘cha hududini siljitish"
+                    onPointerDown={(e) => startDrag(e, 'zone-move')}
+                    onPointerMove={(e) => onMove(e, 'zone-move')}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    style={{
+                      left: `${(outdoorBox.x + outdoorBox.width / 2) / 10}%`,
+                      top: `${(outdoorBox.y + outdoorBox.height / 2) / 10}%`,
+                      transform: 'translate(-50%, -50%)',
+                      touchAction: 'none',
+                    }}
+                    className="absolute z-40 inline-flex items-center gap-1.5 rounded-full border-2 border-brand-olive bg-white/95 px-3 py-1.5 text-xs font-bold text-brand-ink shadow-md cursor-grab active:cursor-grabbing hover:bg-primary/20 select-none"
+                  >
+                    <Move className="h-3.5 w-3.5 text-brand-ink" />
+                    <span>Ko‘cha hududi · siljitish</span>
+                  </button>
+                </>
+              )}
 
               {layout.map((point) => {
                 const order = (shop.orders || []).find((row) => row.number === point.number);
@@ -385,14 +569,14 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                     type="button"
                     aria-label={`${point.number}-stol, ${isOccupied ? (isPaying ? 'To‘lov tekshirilmoqda' : `Band, ${Number(order.total || 0).toLocaleString('en-US')} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Ko‘rish va kassaga o‘tish'}`}
                     title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol${isOccupied ? ` — Band (${Number(order.total || 0).toLocaleString('en-US')} UZS)` : ' — Bo‘sh'}`}
-                    disabled={saving || zoneDrawing}
-                    onPointerDown={(event) => startDrag(event, point.number)}
-                    onPointerMove={(event) => onMove(event, point.number)}
+                    disabled={saving || zoneMode}
+                    onPointerDown={(event) => startDrag(event, 'table', point.number)}
+                    onPointerMove={(event) => onMove(event, 'table')}
                     onPointerUp={stopDrag}
                     onPointerCancel={stopDrag}
                     onKeyDown={(event) => keyboardMove(event, point)}
                     onClick={() => {
-                      if (zoneDrawing) return;
+                      if (zoneMode) return;
                       if (editing) setSelectedNumber(point.number);
                       else onOpen(shop.id, point.number);
                     }}
@@ -432,13 +616,13 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                   </button>
                 );
               })}
-              <div className="pointer-events-none absolute z-[2] bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">{shop.table_count} ta stol · {zoneDrawing ? 'Ko‘cha chegarasini chizing' : editing ? 'Stollarni kerakli joyga suring' : 'Stolni tanlang'}</div>
+              <div className="pointer-events-none absolute z-[2] bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">{shop.table_count} ta stol · {zoneMode ? 'Ko‘cha hududini cho‘zing yoki suring' : editing ? 'Stollarni kerakli joyga suring' : 'Stolni tanlang'}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {editing && !zoneDrawing && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/30 p-3 sm:p-4">
+      {editing && !zoneMode && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/30 p-3 sm:p-4">
         <div className="min-w-0">
           <p className="font-semibold text-sm">{chosen ? `${chosen.number}-stolni aniq joylashtirish` : 'Stolni tanlang'}</p>
           <p className="text-xs text-muted-foreground">{chosen ? 'Stolni suring yoki o‘lchamini alohida o‘zgartiring.' : 'Xaritadan stolni tanlang: joyi va o‘lchamini tahrirlaysiz.'}</p>
@@ -473,7 +657,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Bo‘sh / Band / To‘lov holati'}</span>
         <span className="inline-flex items-center gap-1.5"><DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— suring yoki devorni tanlang' : '— kirish joyi'}</span>
-        <span className="inline-flex items-center gap-1.5"><PenTool className="h-4 w-4 text-brand-ink" /> Ko‘cha — chegarani admin chizadi</span>
+        <span className="inline-flex items-center gap-1.5"><Sun className="h-4 w-4 text-brand-ink" /> Ko‘cha — to‘rtburchak hudud</span>
         <span className="inline-flex items-center gap-1.5">{editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />} {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Buyurtma to‘lovgacha stolda qoladi · bron keyingi bosqichda'}</span>
       </div>
     </section>
