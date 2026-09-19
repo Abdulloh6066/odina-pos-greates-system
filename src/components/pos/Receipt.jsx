@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer, ReceiptText } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
@@ -150,11 +150,6 @@ export default function Receipt({ open, sale, settings, onClose, onStaffTicket }
 
         <DialogFooter className="flex flex-wrap gap-2 no-print">
           <Button variant="outline" onClick={onClose} className="flex-1 min-w-[120px]">Yangi buyurtma</Button>
-          {canOfferStaffTicket && (
-            <Button variant="outline" onClick={() => onStaffTicket(sale)} className="flex-1 min-w-[120px]">
-              <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
-            </Button>
-          )}
           <Button onClick={handlePrint} className="flex-1 min-w-[120px] bg-primary text-primary-foreground hover:bg-primary-strong">
             <Printer className="w-4 h-4 mr-1.5" /> Chop etish
           </Button>
