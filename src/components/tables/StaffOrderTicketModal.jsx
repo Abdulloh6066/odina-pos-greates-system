@@ -7,30 +7,12 @@ import { staffTicketFromSale, staffTicketFromCustomerOrder } from '@/lib/staff-o
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-function printedCount(id, revision) {
-  if (!id || typeof window === 'undefined') return 0;
-  try {
-    return Number(sessionStorage.getItem('odina_staff_ticket_' + id + '_r' + (revision || 1))) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-function recordPrint(id, revision) {
-  if (!id || typeof window === 'undefined') return;
-  try {
-    const key = 'odina_staff_ticket_' + id + '_r' + (revision || 1);
-    sessionStorage.setItem(key, String(printedCount(id, revision) + 1));
-  } catch { /* private browsing can disable storage */ }
-}
-
 export default function StaffOrderTicketModal({
-  open, onClose, shop, shopId, tableNumber, order, mode = 'table', orderItems, forceReprint = false, autoPrint = false,
+  open, onClose, shop, shopId, tableNumber, order, mode = 'table', orderItems, autoPrint = false,
 }) {
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [prints, setPrints] = useState(0);
   const autoPrintedRef = useRef(false);
   const effectiveShopId = shop?.id || shopId;
 
@@ -38,14 +20,12 @@ export default function StaffOrderTicketModal({
     if (!open) {
       setTicket(null);
       setError('');
-      setPrints(0);
       return;
     }
     let active = true;
     const showTicket = (value) => {
       if (!active) return;
       setTicket(value);
-      setPrints(printedCount(value?.id, value?.revision));
       setError('');
     };
     setLoading(false);
@@ -97,17 +77,13 @@ export default function StaffOrderTicketModal({
     : mode === 'customer' ? (ticket?.fulfilment_type === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')
       : 'Oddiy buyurtma';
   const shopName = shop?.name || ticket?.shop_name || 'Odina';
-  const revision = ticket?.revision || 1;
-  const reprint = forceReprint || (mode === 'sale' && !!ticket?.table_number) || revision > 1 || prints > 0;
   const units = new Set(items.map((item) => item.unit_label || 'ta'));
   const totalUnit = units.size === 1 ? [...units][0] : 'birlik';
 
   const printTicket = useCallback(() => {
     if (loading || error || !items.length) return;
     window.print();
-    recordPrint(ticket?.id, revision);
-    setPrints(printedCount(ticket?.id, revision));
-  }, [loading, error, items.length, ticket?.id, revision]);
+  }, [loading, error, items.length]);
 
   useEffect(() => {
     if (!open) {
@@ -126,25 +102,13 @@ export default function StaffOrderTicketModal({
 
   const body = items.length > 0 && ticket && (
     <div className="font-mono text-xs leading-relaxed text-zinc-950">
-      <div className="text-center font-bold text-base uppercase break-words">{shopName}</div>
-      <div className="text-center font-extrabold text-[12px] tracking-wide">OSHXONA / XIZMAT CHEKI</div>
-      <div className="border-y-2 border-dashed border-zinc-900 my-3 py-1.5 text-center font-extrabold">
-        {reprint ? '*** QAYTA CHOP ETILDI ***' : '*** YANGI BUYURTMA ***'}
-        {revision > 1 && <div className="text-[10px]">Tahrir: #{revision}</div>}
-      </div>
       <div className="space-y-1 border-b border-dashed border-zinc-500 pb-2">
         <div className="flex justify-between gap-2 text-sm font-black">
-          <span>{displayTableNumber ? 'STOL:' : 'TURI:'}</span><span>{source}</span>
+          <span>TURI:</span><span>{source}</span>
         </div>
         <div className="flex justify-between gap-2"><span>Buyurtma №:</span><strong>#{ticket.number || displayTableNumber || '—'}</strong></div>
         <div className="flex justify-between gap-2"><span>Vaqt:</span><span>{formatUzbekistanDateTime(ticket.updated_at || ticket.started_at || Date.now())}</span></div>
-        {ticket.required_date && <div className="flex justify-between gap-2"><span>Topshirish:</span><strong>{ticket.required_date} {ticket.required_time}</strong></div>}
-        {ticket.customer_name && <div className="flex justify-between gap-2"><span>Mijoz:</span><strong className="text-right break-words">{ticket.customer_name}</strong></div>}
-        {ticket.customer_phone && <div className="flex justify-between gap-2"><span>Telefon:</span><strong>{ticket.customer_phone}</strong></div>}
-        {ticket.delivery_address && <div className="break-words"><strong>Manzil:</strong> {ticket.delivery_address}</div>}
         {ticket.opened_by_name && <div className="flex justify-between gap-2"><span>Buyurtma oluvchi:</span><strong className="text-right">{ticket.opened_by_name}</strong></div>}
-        {ticket.notes && <div className="break-words"><strong>Eslatma:</strong> {ticket.notes}</div>}
-        {ticket.offline_pending && <div className="font-bold">INTERNET YO‘Q · SERVERDA TASDIQLANMAGAN</div>}
       </div>
       <div className="py-2 text-[10px] font-bold uppercase tracking-wide">Mahsulotlar va miqdor</div>
       <div className="space-y-2">
@@ -154,17 +118,12 @@ export default function StaffOrderTicketModal({
               <span className="shrink-0 text-sm font-black">[ {item.quantity} {item.unit_label || 'ta'} ]</span>
               <span className="text-right break-words">{item.product_name}</span>
             </div>
-            {item.variant_name && <div className="text-right">Variant: {item.variant_name}</div>}
-            {item.notes && <div className="text-right italic">Eslatma: {item.notes}</div>}
           </div>
         ))}
       </div>
       <div className="border-t-2 border-dashed border-zinc-900 pt-2 text-right font-bold">
         Mahsulot turlari: {items.length} ta<br />
         Jami miqdor: {items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} {totalUnit}
-      </div>
-      <div className="mt-3 border-t border-dashed border-zinc-400 pt-2 text-center text-[10px]">
-        *** XIZMAT UCHUN (TO‘LOV EMAS) ***
       </div>
     </div>
   );
