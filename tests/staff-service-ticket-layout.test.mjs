@@ -56,6 +56,17 @@ test('real ticket component renders reference hierarchy with authentic order/tab
   assert.ok(html.indexOf('ХУРАСАН КАТТА') < html.lastIndexOf('2'), 'Real item quantity is not replaced with sample data');
 });
 
+test('one shop-wide ticket number is printed independently of table number and full sale ID', () => {
+  const table = render({ ...example, ticket_number: 110 });
+  assert.match(table, /BUYURTMA № #110/);
+  assert.match(table, /3-stol/);
+  assert.doesNotMatch(table, /BUYURTMA № #3/);
+  const sale = render({ ...example, table_number: null, number: 111 },
+    { tableNumber: undefined, mode: 'sale' });
+  assert.match(sale, /BUYURTMA № #111/);
+  assert.match(sale, /Olib ketish/);
+});
+
 test('ordinary sale does not falsely show a table, and reprints have only a discreet footer', () => {
   const ordinary = render({ ...example, table_number: null, number: 'OD-20260920-REAL' }, { tableNumber: undefined, mode: 'sale' });
   assert.match(ordinary, /BUYURTMA № #OD-20260920-REAL/);
