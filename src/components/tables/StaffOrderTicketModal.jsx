@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, Loader2, Printer, UtensilsCrossed } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -25,12 +25,13 @@ function recordPrint(id, revision) {
 }
 
 export default function StaffOrderTicketModal({
-  open, onClose, shop, shopId, tableNumber, order, mode = 'table', orderItems, forceReprint = false,
+  open, onClose, shop, shopId, tableNumber, order, mode = 'table', orderItems, forceReprint = false, autoPrint = false,
 }) {
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [prints, setPrints] = useState(0);
+  const autoPrintedRef = useRef(false);
   const effectiveShopId = shop?.id || shopId;
 
   useEffect(() => {
@@ -101,12 +102,27 @@ export default function StaffOrderTicketModal({
   const units = new Set(items.map((item) => item.unit_label || 'ta'));
   const totalUnit = units.size === 1 ? [...units][0] : 'birlik';
 
-  const printTicket = () => {
+  const printTicket = useCallback(() => {
     if (loading || error || !items.length) return;
     window.print();
     recordPrint(ticket?.id, revision);
     setPrints(printedCount(ticket?.id, revision));
-  };
+  }, [loading, error, items.length, ticket?.id, revision]);
+
+  useEffect(() => {
+    if (!open) {
+      autoPrintedRef.current = false;
+      return;
+    }
+    if (!autoPrint || loading || error || !items.length || !ticket || autoPrintedRef.current) return;
+    // Wait for the service-ticket portal to reach the DOM before opening the print dialog.
+    const frame = window.requestAnimationFrame(() => {
+      if (autoPrintedRef.current) return;
+      autoPrintedRef.current = true;
+      printTicket();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, autoPrint, loading, error, items.length, ticket, printTicket]);
 
   const body = items.length > 0 && ticket && (
     <div className="font-mono text-xs leading-relaxed text-zinc-950">
