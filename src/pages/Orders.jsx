@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { formatUZS } from '@/lib/pos';
-import { statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
 import OrderForm from '@/components/orders/OrderForm';
 import OrderDetail from '@/components/orders/OrderDetail';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
