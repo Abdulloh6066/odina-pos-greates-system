@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Armchair, ArrowLeft, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles, LayoutGrid, Map as MapIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { odinaConfirm } from '@/lib/odina-dialog';
 import { formatUZS } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
@@ -13,6 +14,7 @@ const MAX_TABLES = 30;
 const QUICK_COUNTS = [5, 6, 8, 10];
 
 export default function RestaurantTables() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [layoutEditing, setLayoutEditing] = useState(false);
@@ -38,7 +40,8 @@ export default function RestaurantTables() {
       setCanManage(result?.can_manage === true);
       setSelectedShopId((current) => available.some((shop) => shop.id === location.state?.shopId)
         ? location.state.shopId : available.some((shop) => shop.id === current)
-          ? current : (available[0]?.id || ''));
+          ? current : available.some((shop) => shop.id === user?.shop_id)
+            ? user.shop_id : (available.find((shop) => shop.is_main)?.id || available[0]?.id || ''));
     } catch (err) {
       setShops([]);
       setCanManage(false);
@@ -46,7 +49,7 @@ export default function RestaurantTables() {
     } finally {
       setLoading(false);
     }
-  }, [location.state?.shopId]);
+  }, [location.state?.shopId, user?.shop_id]);
 
   useEffect(() => { void load(); }, [load]);
   const selectedShop = shops.find((shop) => shop.id === selectedShopId);
@@ -97,6 +100,7 @@ export default function RestaurantTables() {
     if (shopId === selectedShopId || saving) return;
     if (layoutEditing && !(await odinaConfirm('Xaritadagi saqlanmagan o‘zgarishlar yo‘qoladi. Boshqa do‘konga o‘tasizmi?'))) return;
     setLayoutEditing(false);
+    setInspectTableNumber(null);
     setSelectedShopId(shopId);
   };
   const refresh = async () => {
@@ -183,10 +187,31 @@ export default function RestaurantTables() {
           </div>
 
           {canManage && shops.length > 1 && (
-            <div aria-label="Do‘kon tanlash" className="flex gap-2 flex-wrap">
-              {shops.map((shop) => <button key={shop.id} type="button" disabled={saving} onClick={() => void changeShop(shop.id)} aria-pressed={shop.id === selectedShopId} className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation ${shop.id === selectedShopId ? 'border-brand-olive bg-brand-olive/20 text-foreground' : 'border-border bg-card hover:bg-secondary'}`}>
-                {shop.name} <span className="ml-1 text-xs opacity-70">· {shop.table_count} ta</span>
-              </button>)}
+            <div aria-label="Do‘kon tanlash" className="flex gap-2 flex-wrap items-center">
+              <span className="text-xs font-semibold text-muted-foreground mr-1">Do‘kon:</span>
+              {shops.map((shop) => (
+                <button
+                  key={shop.id}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void changeShop(shop.id)}
+                  aria-pressed={shop.id === selectedShopId}
+                  className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation flex items-center gap-1.5 ${
+                    shop.id === selectedShopId
+                      ? 'border-brand-olive bg-brand-olive/20 text-foreground shadow-xs'
+                      : 'border-border bg-card hover:bg-secondary text-muted-foreground'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5 shrink-0 text-brand-ink" />
+                  <span>{shop.name}</span>
+                  {shop.is_main && (
+                    <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-brand-olive/20 text-brand-ink">
+                      Asosiy
+                    </span>
+                  )}
+                  <span className="ml-1 text-xs opacity-70">· {shop.table_count} ta</span>
+                </button>
+              ))}
             </div>
           )}
 

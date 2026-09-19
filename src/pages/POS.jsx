@@ -105,6 +105,24 @@ export default function POS() {
     checkoutRecordedAtRef.current = '';
   }, [tableKey]);
 
+  // Automatically clear an invalid table selection if the cashier changes the active shop.
+  useEffect(() => {
+    if (!selectedTable) return;
+    const activeShopId = shift?.shop_id || user?.shop_id;
+    if (activeShopId && selectedTable.shopId !== activeShopId) {
+      setCart([]);
+      setTableOrder(null);
+      setTableOrderLoading(false);
+      setTableOrderError('');
+      setTableSaveError('');
+      setDiscountCode('');
+      setDiscountPct(0);
+      setRoundingTarget(null);
+      setAdjustmentMode(null);
+      navigate('/pos', { replace: true });
+    }
+  }, [shift?.shop_id, user?.shop_id, selectedTable?.shopId]);
+
   // The server owns every open order. Reloading or switching devices restores
   // the exact unpaid items; nothing is recorded as revenue at this point.
   useEffect(() => {
@@ -289,7 +307,34 @@ export default function POS() {
       confirmLabel: 'Stollarni ochish', tone: 'warning',
     }))) return;
     setMobileCartOpen(false);
-    navigate('/tables', { state: { shopId: selectedTable?.shopId || shift?.shop_id || '' } });
+    navigate('/tables', { state: { shopId: selectedTable?.shopId || shift?.shop_id || user?.shop_id || '' } });
+  };
+
+  // Deselect the table immediately without full page reload.
+  // Existing saved orders on the server remain intact and are not deleted or marked paid.
+  const cancelTableSelection = async () => {
+    if (savingTableRef.current || tableOrderLoading) return;
+    if (tableCartDirty) {
+      const confirmed = await odinaConfirm({
+        title: 'Stol tanlovini bekor qilish',
+        description: 'Savatda saqlanmagan o‘zgarishlar bor. Stol tanlovini bekor qilsangiz, buyurtma saqlanmagan o‘zgarishlarsiz serverdagi asl holatida qoladi. Davom etasizmi?',
+        confirmLabel: 'Stolni bekor qilish',
+        tone: 'warning',
+      });
+      if (!confirmed) return;
+    }
+    resetCart();
+    setTableOrder(null);
+    setTableOrderLoading(false);
+    setTableOrderError('');
+    setTableSaveError('');
+    setDiscountCode('');
+    setDiscountPct(0);
+    setDiscountOwnerPin('');
+    setRoundingTarget(null);
+    setAdjustmentMode(null);
+    setMobileCartOpen(false);
+    navigate('/pos', { replace: true });
   };
 
   // This button finishes only the unpaid order's SAVE, never its payment.
@@ -948,7 +993,16 @@ export default function POS() {
               {tableSelectionError && <p role="alert" className="text-xs text-destructive">{tableSelectionError}</p>}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void cancelTableSelection()}
+              className="min-h-11 rounded-xl border-destructive/40 text-destructive hover:bg-destructive/10 font-semibold px-3.5 touch-manipulation"
+              aria-label="Stolni bekor qilish"
+            >
+              <X className="w-4 h-4 mr-1.5" /> Stolni bekor qilish
+            </Button>
             {tableCartDirty && !tableOrderLoading && <Button type="button" variant="outline" className="min-h-11" onClick={() => {
               setCart(tableOrder?.items || []);
               setTableSaveError('');
@@ -1054,7 +1108,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
+            onSaveTable={() => void saveAndStartNextOrder()} onCancelTable={() => void cancelTableSelection()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </div>
       </div>
@@ -1079,7 +1133,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveAndStartNextOrder()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
+            onSaveTable={() => void saveAndStartNextOrder()} onCancelTable={() => void cancelTableSelection()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </SheetContent>
       </Sheet>

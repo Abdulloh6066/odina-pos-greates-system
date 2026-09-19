@@ -3,7 +3,7 @@ import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../sha
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
 // Completed sales, payments and stock movements occur only in complete-sale.
-const ALLOWED_ROLES = new Set(["admin", "cashier"]);
+const ALLOWED_ROLES = new Set(["admin", "cashier", "manager"]);
 const MAX_TABLES = 30;
 const MAX_ORDER_ITEMS = 100;
 const ordersOf = (shop: any) => Array.isArray(shop?.restaurant_table_orders) ? shop.restaurant_table_orders : [];
@@ -103,6 +103,7 @@ const isShop = (shop: any) => Boolean(shop && shop.active !== false
 const safeShop = (shop: any) => ({
   id: String(shop.id),
   name: String(shop.name || "Do‘kon"),
+  is_main: Boolean(shop.is_main),
   table_count: Number.isInteger(shop.restaurant_table_count)
     && shop.restaurant_table_count >= 0 && shop.restaurant_table_count <= MAX_TABLES
     ? shop.restaurant_table_count : 0,
@@ -134,7 +135,7 @@ Deno.serve(async (req) => {
     const action = String(body?.action || "status");
 
     if (action === "status") {
-      if (role === "cashier") {
+      if (role === "cashier" || role !== "admin") {
         // Ignore arbitrary shop IDs from the browser; use the stored assignment.
         const assignedId = userShopId(actor);
         if (!assignedId) return Response.json({ error: "Kassirga do‘kon biriktirilmagan." }, { status: 403 });
@@ -142,13 +143,46 @@ Deno.serve(async (req) => {
         if (!isShop(assignedShop)) {
           return Response.json({ error: "Biriktirilgan do‘kon faol emas yoki topilmadi." }, { status: 403 });
         }
-        return Response.json({ can_manage: false, shops: [safeShop(assignedShop)] });
+        return Response.json({ can_manage: false, shops: [safeShop(assignedShop)], invalid_records: [] });
       }
 
-      const shops = await service.entities.Shop.list("name", 100);
+      const allShops = await service.entities.Shop.list("name", 100);
+      const activeShops = (allShops || []).filter(isShop);
+      const invalidRecords = (allShops || []).filter((s: any) => !s?.id || typeof s.id !== "string" || !s.id.trim()).map((s: any) => ({
+        issue: "missing_shop_id",
+        name: s?.name || "Nomsiz do‘kon",
+        table_count: s?.restaurant_table_count || 0,
+      }));
+
+      const requestedShopId = String(body?.shop_id || "").trim();
+      if (requestedShopId) {
+        const targetShop = activeShops.find((s: any) => s.id === requestedShopId);
+        if (!targetShop) {
+          return Response.json({ error: "So‘ralgan do‘kon topilmadi yoki faol emas." }, { status: 404 });
+        }
+        return Response.json({
+          can_manage: true,
+          shops: [safeShop(targetShop)],
+          available_shops: activeShops.map((s: any) => ({
+            id: String(s.id),
+            name: String(s.name || "Do‘kon"),
+            is_main: Boolean(s.is_main),
+            table_count: Number(s.restaurant_table_count || 0),
+          })),
+          invalid_records: invalidRecords,
+        });
+      }
+
       return Response.json({
         can_manage: true,
-        shops: (shops || []).filter(isShop).map(safeShop),
+        shops: activeShops.map(safeShop),
+        available_shops: activeShops.map((s: any) => ({
+          id: String(s.id),
+          name: String(s.name || "Do‘kon"),
+          is_main: Boolean(s.is_main),
+          table_count: Number(s.restaurant_table_count || 0),
+        })),
+        invalid_records: invalidRecords,
       });
     }
 
@@ -156,7 +190,7 @@ Deno.serve(async (req) => {
     if (action === "get_table_order" || action === "save_table_order" || action === "reconcile_table_payment") {
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
       if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
-      if (role === "cashier" && userShopId(actor) !== shop.id) {
+      if (role !== "admin" && userShopId(actor) !== shop.id) {
         return Response.json({ error: "Boshqa do‘kon stoliga ruxsat yo‘q." }, { status: 403 });
       }
       const number = body?.table_number;

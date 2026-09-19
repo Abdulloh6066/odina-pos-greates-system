@@ -143,3 +143,72 @@ test('Kassa selection stays a real authenticated completed sale with no prematur
   assert.match(pos, /Stol savdosini internet orqali tasdiqlash kerak/);
   assert.doesNotMatch(pos, /entities\.(Sale|SaleItem|Payment|StockMovement)\.create\(/);
 });
+
+const cancelAction = pos.slice(pos.indexOf('const cancelTableSelection = async () => {'), pos.indexOf('const saveAndStartNextOrder = async () => {')).trim();
+const exerciseCancelTable = async ({ dirty = false, confirmed = true } = {}) => {
+  const events = [];
+  const context = {
+    selectedTable: { number: 3, shopId: 'shop-1' },
+    tableOrderLoading: false,
+    savingTableRef: { current: false },
+    tableCartDirty: dirty,
+    odinaConfirm: async () => { events.push('confirm-prompt'); return confirmed; },
+    resetCart: () => events.push('reset-cart'),
+    setTableOrder: (next) => events.push(next === null ? 'clear-table-order' : 'wrong-order'),
+    setTableOrderLoading: () => events.push('clear-loading'),
+    setTableOrderError: () => events.push('clear-order-error'),
+    setTableSaveError: () => events.push('clear-save-error'),
+    setDiscountCode: () => events.push('clear-discount-code'),
+    setDiscountPct: () => events.push('clear-discount-pct'),
+    setDiscountOwnerPin: () => events.push('clear-discount-pin'),
+    setRoundingTarget: () => events.push('clear-rounding'),
+    setAdjustmentMode: () => events.push('clear-adjustment'),
+    setMobileCartOpen: () => events.push('close-mobile-sheet'),
+    navigate: (path, options) => events.push(`navigate:${path}:${options?.replace ? 'replace' : 'push'}`),
+  };
+  assert.ok(cancelAction.startsWith('const cancelTableSelection = async () => {'));
+  vm.runInNewContext(`${cancelAction}\nglobalThis.runCancel = cancelTableSelection;`, context);
+  await context.runCancel();
+  return events;
+};
+
+test('cashier can cancel selected table in Kassa via touch-friendly "Stolni bekor qilish" action without page reload', async () => {
+  assert.match(pos, /Stolni bekor qilish/);
+  assert.match(pos, /const cancelTableSelection = async \(\) =>/);
+  assert.match(pos, /navigate\('\/pos', \{ replace: true \}\)/);
+  assert.match(read('src/components/pos/Cart.jsx'), /onCancelTable/);
+  assert.match(read('src/components/pos/Cart.jsx'), /aria-label="Stolni bekor qilish"/);
+
+  // When clean, immediately resets cart and table state without server mutations or prompt
+  const cleanEvents = await exerciseCancelTable({ dirty: false });
+  assert.ok(!cleanEvents.includes('confirm-prompt'));
+  assert.ok(cleanEvents.includes('reset-cart'));
+  assert.ok(cleanEvents.includes('clear-table-order'));
+  assert.ok(cleanEvents.includes('navigate:/pos:replace'));
+
+  // When dirty, prompts confirmation before clearing
+  const rejectedEvents = await exerciseCancelTable({ dirty: true, confirmed: false });
+  assert.deepEqual(rejectedEvents, ['confirm-prompt']);
+
+  const confirmedEvents = await exerciseCancelTable({ dirty: true, confirmed: true });
+  assert.equal(confirmedEvents[0], 'confirm-prompt');
+  assert.ok(confirmedEvents.includes('reset-cart'));
+  assert.ok(confirmedEvents.includes('clear-table-order'));
+  assert.ok(confirmedEvents.includes('navigate:/pos:replace'));
+});
+
+test('invalid table selection is automatically cleared if active shop changes', () => {
+  assert.match(pos, /activeShopId && selectedTable\.shopId !== activeShopId/);
+  assert.match(pos, /navigate\('\/pos', \{ replace: true \}\)/);
+});
+
+test('central location and branch tables remain strictly isolated in backend and Stollar page', () => {
+  const tablesPage = read('src/pages/RestaurantTables.jsx');
+  assert.match(backend, /is_main: Boolean\(shop\.is_main\)/);
+  assert.match(backend, /invalid_records/);
+  assert.match(backend, /const requestedShopId = String\(body\?\.shop_id \|\| ""\)\.trim\(\);/);
+  assert.match(tablesPage, /shop\.is_main && \(\s*<span[^>]*>\s*Asosiy\s*<\/span>\s*\)/);
+  assert.match(tablesPage, /available\.some\(\(shop\) => shop\.id === user\?\.shop_id\)/);
+  assert.match(tablesPage, /setInspectTableNumber\(null\)/);
+});
+
