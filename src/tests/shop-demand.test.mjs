@@ -41,7 +41,7 @@ test('normalizeRequestItems: takroriy mahsulot va noto\'g\'ri miqdor rad etiladi
   assert.ok(L.normalizeRequestItems([{ product_id: 'p1', quantity: 1 }, { product_id: 'p1', quantity: 2 }], products).error, 'takroriy rad');
   assert.ok(L.normalizeRequestItems([{ product_id: 'p1', quantity: 0 }], products).error, 'nol miqdor rad');
   assert.ok(L.normalizeRequestItems([{ product_id: 'p1', quantity: 1.5 }], products).error, 'kasr miqdor rad');
-  assert.equal(L.normalizeRequestItems([], products).error, 'kamida bitta');
+  assert.match(L.normalizeRequestItems([], products).error, /kamida bitta mahsulot/i);
 });
 
 test('case 1: cashier faqat o\'z do\'koni talabini tahrirlay oladi (canEdit)', () => {
