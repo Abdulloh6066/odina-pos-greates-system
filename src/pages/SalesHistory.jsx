@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { RefundDialog } from '@/components/pos/KassaActionDialogs';
+import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 
 export default function SalesHistory() {
   const { user } = useOutletContext();
@@ -19,6 +20,7 @@ export default function SalesHistory() {
   const [search, setSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [selected, setSelected] = useState(null);
+  const [staffTicketSale, setStaffTicketSale] = useState(null);
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
 
@@ -124,7 +126,10 @@ export default function SalesHistory() {
         </div>
       )}
 
-      <SaleDetailDialog sale={selected} canRefund={role === 'admin'} onRefund={refundSale} onClose={() => setSelected(null)} />
+      <SaleDetailDialog sale={selected} canRefund={role === 'admin'} onRefund={refundSale}
+        onStaffTicket={(sale) => { setSelected(null); setStaffTicketSale(sale); }} onClose={() => setSelected(null)} />
+      <StaffOrderTicketModal open={!!staffTicketSale} mode="sale" order={staffTicketSale}
+        onClose={() => { setSelected(staffTicketSale); setStaffTicketSale(null); }} />
       <RefundDialog
         open={refundOpen}
         sale={selected}
@@ -136,7 +141,7 @@ export default function SalesHistory() {
   );
 }
 
-function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
+function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose }) {
   if (!sale) return null;
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onClose()}>
@@ -170,7 +175,12 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onClose }) {
             Qaytarilgan{sale.refund_reason ? `: ${sale.refund_reason}` : ''}
           </div>
         )}
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4">
+          {sale.status !== 'refunded' && sale.items?.length > 0 && (
+            <Button variant="outline" onClick={() => onStaffTicket(sale)} className="min-h-11 flex-1">
+              <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
+            </Button>
+          )}
           {canRefund && sale.status === 'completed' && (
             <Button variant="destructive" onClick={() => onRefund(sale)} className="flex-1">
               <RotateCcw className="w-4 h-4 mr-1.5" /> Qaytarish
