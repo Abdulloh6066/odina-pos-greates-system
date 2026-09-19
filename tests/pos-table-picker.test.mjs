@@ -17,7 +17,7 @@ test('Kassa opens the dedicated Stollar page instead of a large modal on desktop
   assert.match(app, /path="\/tables" element=\{<RoleRoute pageKey="tables">/);
   assert.match(pos, /Stollar sahifasini ochish/);
   assert.match(pos, /const goToTables = async \(\) =>/);
-  assert.match(pos, /navigate\('\/tables'\)/);
+  assert.match(pos, /navigate\('\/tables', \{ state: \{ shopId:/);
   assert.doesNotMatch(pos, /tablePickerOpen|<TableFloorplan|Kassa · Stollar xaritasi/);
   assert.match(page, /<TableFloorplan/);
   assert.match(page, /Yangi buyurtma · Kassa/);
@@ -35,7 +35,8 @@ test('dedicated map retains backend shop scoping, and navigation protects unsave
   assert.match(pos, /!selectedTable && cart\.length && !\(await odinaConfirm\(/);
   assert.match(page, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: shopId, table_number: String\(number\) \}\)\}`\)/);
   assert.match(pos, /const priorTableKey = useRef\(tableKey\)/);
-  assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/tables'\)/);
+  assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/tables', \{ state: \{ shopId:/);
+  assert.match(page, /available\.some\(\(shop\) => shop\.id === location\.state\?\.shopId\)/);
 });
 
 test('saving an unpaid table returns to clean POS only after server confirmation; failure preserves the cart', () => {
