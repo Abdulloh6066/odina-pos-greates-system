@@ -495,13 +495,23 @@ test('server saves each shop street polygon with CAS and owner permission, prese
   ];
   for (const request of invalid) assert.equal((await f.run(request)).status, 400);
   assert.equal(f.writes, 0);
+  // Mock an actual occupied table before the owner redraws the street. The
+  // layout edit must not overwrite its unpaid order or its checkout version.
+  f.as('cashier-2');
+  const unpaid = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-second', expected_revision: 0, items: [{ product_id: 'cake', quantity: 2 }] });
+  assert.equal(unpaid.status, 200, JSON.stringify(unpaid));
+  f.as('owner');
+  const openOrder = clone(f.db.Shop[1].restaurant_table_orders);
+  const orderVersion = f.db.Shop[1].restaurant_table_orders_version;
   const saved = await f.run(payload);
   assert.equal(saved.status, 200, JSON.stringify(saved));
   assert.deepEqual(saved.data.shop.outdoor_polygon, outdoor_polygon);
   assert.deepEqual(f.db.Shop[1].restaurant_outdoor_polygon, outdoor_polygon);
   assert.deepEqual(f.db.Shop[1].restaurant_table_layout, layout);
   assert.equal(f.db.Sale.length, 0);
-  assert.deepEqual(f.db.Shop[1].restaurant_table_orders || [], []);
+  assert.deepEqual(f.db.Shop[1].restaurant_table_orders, openOrder);
+  assert.equal(f.db.Shop[1].restaurant_table_orders_version, orderVersion);
   const writes = f.writes;
   assert.equal((await f.run(payload)).status, 409);
   assert.equal(f.writes, writes);
@@ -516,6 +526,8 @@ test('server saves each shop street polygon with CAS and owner permission, prese
   assert.deepEqual(oldClient.data.shop.outdoor_polygon, outdoor_polygon);
   assert.equal((await f.run({ action: 'set_table_count', shop_id: 'second-shop', table_count: 7 })).status, 200);
   assert.deepEqual((await f.run({ action: 'status' })).data.shops.find((shop) => shop.id === 'second-shop').outdoor_polygon, outdoor_polygon);
+  assert.deepEqual(f.db.Shop[1].restaurant_table_orders, openOrder);
+  assert.equal(f.db.Shop[1].restaurant_table_orders_version, orderVersion);
 });
 
 test('integration is a separate page with role guard and no pretend sales, stock or orders', () => {
