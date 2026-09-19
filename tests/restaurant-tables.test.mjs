@@ -278,6 +278,7 @@ test('unpaid orders survive navigation, preserve prices, and stay in their authe
   assert.equal(first.status, 200, JSON.stringify(first));
   assert.equal(first.data.order.total, 110000);
   assert.equal(first.data.order.revision, 1);
+  assert.equal(first.data.order.ticket_number, 1);
   assert.equal(first.data.order.items[0].price, 45000);
   assert.equal((await f.run({ action: 'status' })).data.shops[0].orders[0].state, 'occupied');
   assert.equal((await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 })).data.order.items.length, 2);
@@ -289,6 +290,7 @@ test('unpaid orders survive navigation, preserve prices, and stay in their authe
   assert.equal(savedAgain.status, 200, JSON.stringify(savedAgain));
   assert.equal(savedAgain.data.order.items[0].price, 45000);
   assert.equal(savedAgain.data.order.total, 155000);
+  assert.equal(savedAgain.data.order.ticket_number, 1, 'Editing a table must keep its original service ticket number');
   f.as('cashier-3');
   assert.equal((await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 })).data.order.revision, 2);
   const stale = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
@@ -302,6 +304,33 @@ test('unpaid orders survive navigation, preserve prices, and stay in their authe
   assert.equal((await f.run({ action: 'set_table_count', shop_id: 'second-shop', table_count: 1 })).status, 409);
   assert.equal(f.db.Shop[1].restaurant_table_orders.length, 1);
   assert.equal(f.db.Sale.length, 0);
+});
+
+test('all cashiers at one shop share service order numbering while another shop starts independently', async () => {
+  const f = fixture();
+  f.as('cashier-2');
+  const first = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 1,
+    shift_id: 'shift-second', expected_revision: 0, items: [{ product_id: 'cake', quantity: 1 }] });
+  assert.equal(first.status, 200, JSON.stringify(first));
+  assert.equal(first.data.order.ticket_number, 1);
+  f.as('cashier-3');
+  const second = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-other', expected_revision: 0, items: [{ product_id: 'coffee', quantity: 1 }] });
+  assert.equal(second.status, 200, JSON.stringify(second));
+  assert.equal(second.data.order.ticket_number, 2);
+  assert.equal(first.data.order.number, 1);
+  assert.equal(second.data.order.number, 2);
+  assert.equal(f.db.Shop[1].service_ticket_counter, 2);
+  f.as('owner');
+  const enabled = await f.run({ action: 'set_table_count', shop_id: 'central-shop', table_count: 3 });
+  assert.equal(enabled.status, 200);
+  f.as('cashier-1');
+  const central = await f.run({ action: 'save_table_order', shop_id: 'central-shop', table_number: 1,
+    shift_id: 'shift-main', expected_revision: 0, items: [{ product_id: 'cake', quantity: 1 }] });
+  assert.equal(central.status, 200, JSON.stringify(central));
+  assert.equal(central.data.order.ticket_number, 1);
+  assert.equal(f.db.Shop[0].service_ticket_counter, 1);
+  assert.equal(f.db.Sale.length, 0, 'Kitchen tickets do not create sales before payment');
 });
 
 test('simultaneous saves on the same table cannot silently overwrite one another', async () => {
