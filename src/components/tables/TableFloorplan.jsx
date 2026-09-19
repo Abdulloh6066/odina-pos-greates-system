@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, DoorOpen,
-  Edit3, Grip, Minus, MousePointer2, Plus, RotateCcw, Save, X,
+  Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, DoorOpen,
+  Edit3, Grip, Leaf, Minus, MousePointer2, Plus, RotateCcw, Save, Sun, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,10 @@ const WALLS = [
   { side: 'bottom', label: 'Pastki' },
   { side: 'left', label: 'Chap' },
 ];
+// Visual-only boundary: coordinates and order records remain unchanged.
+// Existing tables can be moved across the open passage in edit mode.
+const OUTDOOR_START = 620;
+
 const ARROWS = [
   { key: 'ArrowLeft', icon: ArrowLeft, label: 'Chapga surish' },
   { key: 'ArrowUp', icon: ArrowUp, label: 'Yuqoriga surish' },
@@ -163,6 +167,8 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   const payingCount = openOrders.filter((order) => order.state === 'paying').length;
   const unpaidTotal = openOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
   const verticalDoor = entrance.side === 'left' || entrance.side === 'right';
+  const indoorCount = layout.filter((point) => point.y < OUTDOOR_START).length;
+  const outdoorCount = layout.length - indoorCount;
 
   return (
     <section aria-label={`${shop.name} stollar xaritasi`} className="rounded-[28px] border border-border bg-card premium-shadow p-4 sm:p-6 space-y-4">
@@ -173,8 +179,8 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
             <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-brand-ink">{shop.name} · Zal rejasi</p>
             <h2 className="font-display text-xl sm:text-2xl font-semibold">Stollar xaritasi</h2>
             <p className="text-sm text-muted-foreground">{editing
-              ? 'Stol va eshikni ushlab suring. Eshik devorga avtomatik joylashadi.'
-              : 'Stolni tanlang — unga biriktirilgan Kassa ochiladi.'}</p>
+              ? 'Stollarni do‘kon ichi yoki ko‘cha hududiga suring. Eshikni ham o‘zingiz joylashtirasiz.'
+              : 'Do‘kon ichi va ko‘chadagi stollar bir xaritada. Stolni bosing — Kassa ochiladi.'}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -222,15 +228,42 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {editing && !valid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar kattaligi yoki joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring. Xaritadan tashqariga chiqmasin.</p>}
 
+      <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Xarita hududlari">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-sand/60 bg-[#fbf6eb] px-3 py-2 font-semibold text-brand-ink"><Building2 className="h-4 w-4" aria-hidden="true" /> Do‘kon ichi · {indoorCount} stol</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-olive/40 bg-[#eef0e4] px-3 py-2 font-semibold text-brand-ink"><Sun className="h-4 w-4" aria-hidden="true" /> Ko‘cha / terassa · {outdoorCount} stol</span>
+        {editing && <span className="text-muted-foreground">Chegara ochiq: stolni kerakli tomonga surib, joylashuvni saqlang.</span>}
+      </div>
+
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
         <div className="max-w-full overflow-x-auto overscroll-x-contain pb-2">
           <div className="relative min-w-[760px] w-full px-16 py-16">
-            <div ref={boardRef} aria-label="Stollar joylashuvini ko‘rsatuvchi xarita"
-              className={`relative w-full aspect-[10/7] sm:aspect-[16/10] rounded-[25px] border-[3px] shadow-inner ${editing ? 'border-brand-olive bg-[#f8f4e9]' : 'border-[#b8b087] bg-[#fbf8f0]'}`}
-              style={{ backgroundImage: 'radial-gradient(circle, rgba(172,169,93,.22) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
-              <div className="pointer-events-none absolute left-4 top-4 right-4 flex items-center justify-between gap-2">
-                <span className="rounded-full border border-brand-olive/30 bg-card/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-brand-ink">{shop.name}</span>
-                <span className="rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground">{editing ? 'JOYNI TANLANG' : 'STOLNI BOSING'}</span>
+            <div ref={boardRef} aria-label="Do‘kon ichi va ko‘chadagi stollar joylashuvini ko‘rsatuvchi xarita"
+              className={`relative isolate w-full aspect-[10/7] sm:aspect-[16/10] rounded-[25px] border-[3px] shadow-inner ${editing ? 'border-brand-olive' : 'border-[#b8b087]'}`}>
+              {/* Background is decorative only: existing coordinates, touch targets and sales never change. */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[62%] overflow-hidden rounded-t-[22px] bg-[#fbf6eb]"
+                style={{ backgroundImage: 'linear-gradient(rgba(208,177,127,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.14) 1px, transparent 1px)', backgroundSize: '34px 34px' }}>
+                <div className="absolute top-0 left-[17%] right-[17%] h-7 rounded-b-xl border-x-2 border-b-2 border-[#c1ab80] bg-[#e7dac1]/75 shadow-sm" />
+                <div className="absolute top-3 left-[26%] h-6 w-12 rounded border border-[#c1ab80] bg-white/65" />
+                <div className="absolute top-3 right-[26%] h-6 w-12 rounded border border-[#c1ab80] bg-white/65" />
+                <div className="absolute left-4 top-4 inline-flex max-w-[58%] items-center gap-1.5 rounded-xl border border-[#d0b17f]/65 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
+                  <Building2 className="h-4 w-4 shrink-0" /> <span className="truncate">{shop.name} · Ichkari</span>
+                </div>
+              </div>
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] overflow-hidden rounded-b-[22px] bg-[#eef0e4]"
+                style={{ backgroundImage: 'linear-gradient(45deg, rgba(172,169,93,.10) 25%, transparent 25%, transparent 75%, rgba(172,169,93,.10) 75%), linear-gradient(45deg, rgba(172,169,93,.10) 25%, transparent 25%, transparent 75%, rgba(172,169,93,.10) 75%)', backgroundSize: '30px 30px', backgroundPosition: '0 0, 15px 15px' }}>
+                <div className="absolute bottom-11 left-4 inline-flex items-center gap-1.5 rounded-xl border border-brand-olive/30 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
+                  <Sun className="h-4 w-4" /> KO‘CHA · TASHQI STOLLAR
+                </div>
+                <Leaf className="absolute bottom-3 left-5 h-5 w-5 text-brand-olive/70" />
+                <Leaf className="absolute bottom-3 right-5 h-5 w-5 text-brand-olive/70" />
+              </div>
+              <div aria-hidden="true" className="pointer-events-none absolute z-[1] inset-x-0 flex items-center justify-center" style={{ top: `${OUTDOOR_START / 10}%`, transform: 'translateY(-50%)' }}>
+                <div className="h-[3px] min-w-0 flex-1 bg-[#d0b17f]/85" />
+                <span className="whitespace-nowrap rounded-full border border-[#d0b17f] bg-card px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">Ochiq o‘tish</span>
+                <div className="h-[3px] min-w-0 flex-1 bg-[#d0b17f]/85" />
+              </div>
+              <div className="pointer-events-none absolute z-[2] right-4 top-4 rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground">
+                {editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
               </div>
 
               <button type="button" aria-label={`Kirish eshigi: ${WALLS.find((wall) => wall.side === entrance.side)?.label} devor${editing ? ', joyini o‘zgartirish' : ''}`}
@@ -278,7 +311,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 </span>}
               </button>;
               })}
-              <div className="pointer-events-none absolute bottom-3 left-4 right-4 text-center text-[10px] text-brand-ink/65">{shop.table_count} ta stol · {editing ? 'Surib joylashtiring' : 'Stolni tanlang'}</div>
+              <div className="pointer-events-none absolute bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">{shop.table_count} ta stol · {editing ? 'Ichkari yoki ko‘chaga suring' : 'Stolni tanlang'}</div>
             </div>
           </div>
         </div>
