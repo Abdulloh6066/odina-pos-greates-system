@@ -159,39 +159,35 @@ export default function StaffOrderTicketModal({
     return () => window.cancelAnimationFrame(frame);
   }, [open, autoPrint, loading, error, items.length, ticketOrder, handlePrint]);
 
-  // Content matching media_1789849369493.png exactly
+  // One shared, plain black-on-white layout for the screen preview and 80mm print.
+  // Identifiers and table labels come from the actual order, never sample text.
+  const displayOrderNumber = ticketOrder?.number ?? displayTableNumber ?? ticketOrder?.id ?? '—';
   const renderTicketContent = (isPrint = false) => (
-    <div className={isPrint ? "text-black" : "w-full max-w-[340px] bg-white text-black rounded-xl border border-zinc-200 shadow-sm p-5 font-sans leading-relaxed select-text"}>
-      {/* Optional Reprint Indicator */}
-      {isReprint && (
-        <div className={`border-2 border-black text-center font-black ${isPrint ? 'text-[11px] py-0.5 mb-2' : 'text-xs py-1 px-2 mb-3 tracking-wider'}`}>
-          *** QAYTA CHOP ETILDI (REPRINT #{revision}) ***
-        </div>
-      )}
-
-      {/* Row 1: BUYURTMA № #1 on left, 1-stol on right */}
-      <div className="flex justify-between items-baseline gap-2">
-        <span className={`font-black tracking-tight text-black ${isPrint ? 'text-base' : 'text-lg'}`}>
-          BUYURTMA № #{ticketOrder?.number || displayTableNumber || '1'}
+    <div className={isPrint
+      ? 'w-full min-w-0 bg-white text-black font-sans leading-snug'
+      : 'w-full max-w-[440px] min-w-0 bg-white text-black px-2 py-3 sm:px-3 font-sans leading-snug select-text'}>
+      {/* The reference has no large reprint banner obscuring the order number. */}
+      <div className="flex items-start justify-between gap-3">
+        <span className={`min-w-0 font-black tracking-tight text-black break-words ${isPrint ? 'text-[15px]' : 'text-lg sm:text-xl'}`}>
+          BUYURTMA № #{String(displayOrderNumber).replace(/^#/, '')}
         </span>
-        <span className={`font-black tracking-tight text-black shrink-0 ${isPrint ? 'text-base' : 'text-lg'}`}>
+        <span className={`shrink-0 text-right font-black tracking-tight text-black ${isPrint ? 'text-[15px]' : 'text-lg sm:text-xl'}`}>
           {source}
         </span>
       </div>
 
-      {/* Solid divider line */}
-      <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-2.5'}`} />
+      <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-3'}`} />
 
       {/* Row 2 & 3: Metadata */}
-      <div className={`space-y-1 text-black ${isPrint ? 'text-[11px]' : 'text-xs'}`}>
-        <div className="flex justify-between items-center">
-          <span className="font-black tracking-wider">VAQT</span>
-          <span className="font-bold tabular-nums">{formatUzbekistanDateTime(orderTime)}</span>
+      <div className={`space-y-1.5 text-black ${isPrint ? 'text-[11px]' : 'text-sm'}`}>
+        <div className="flex justify-between items-baseline gap-3">
+          <span className="shrink-0 font-black tracking-wide">VAQT</span>
+          <span className="min-w-0 text-right font-medium tabular-nums">{formatUzbekistanDateTime(orderTime)}</span>
         </div>
         {Boolean(ticketOrder?.opened_by_name) && (
-          <div className="flex justify-between items-center">
-            <span className="font-black tracking-wider">BUYURTMA OLUVCHI</span>
-            <span className="font-black">{ticketOrder.opened_by_name}</span>
+          <div className="flex justify-between items-baseline gap-3">
+            <span className="shrink-0 font-black tracking-wide">BUYURTMA OLUVCHI</span>
+            <span className="min-w-0 text-right font-black break-words">{ticketOrder.opened_by_name}</span>
           </div>
         )}
         {Boolean(ticketOrder?.customer_name) && (
@@ -215,17 +211,17 @@ export default function StaffOrderTicketModal({
       </div>
 
       {/* Solid divider line */}
-      <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-2.5'}`} />
+      <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-3'}`} />
 
       {/* Items Section */}
-      <div className={`pt-0.5 ${isPrint ? 'space-y-1.5' : 'space-y-2'}`}>
+      <div className={`pt-0.5 ${isPrint ? 'space-y-2' : 'space-y-3'}`}> 
         {items.map((item, idx) => (
           <div key={idx}>
             <div className="flex justify-between items-baseline gap-3">
-              <span className={`font-black text-black uppercase break-words flex-1 leading-snug ${isPrint ? 'text-[13px]' : 'text-base'}`}>
+              <span className={`min-w-0 font-black text-black uppercase break-words flex-1 leading-snug ${isPrint ? 'text-[13px]' : 'text-lg'}`}>
                 {item.product_name}
               </span>
-              <span className={`font-black text-black tabular-nums shrink-0 ${isPrint ? 'text-[15px]' : 'text-lg'}`}>
+              <span className={`font-black text-black tabular-nums shrink-0 ${isPrint ? 'text-[15px]' : 'text-xl'}`}>
                 {item.quantity}
               </span>
             </div>
@@ -245,12 +241,16 @@ export default function StaffOrderTicketModal({
           </div>
         ))}
       </div>
+      {/* Retain reprint traceability without the oversized boxed banner. */}
+      {isReprint && <p className={`text-right font-semibold text-black ${isPrint ? 'mt-2 text-[9px]' : 'mt-3 text-[10px]'}`}>
+        Qayta chop · {revision}-tahrir
+      </p>}
     </div>
   );
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md p-0 overflow-hidden bg-background border-border shadow-2xl rounded-2xl flex flex-col max-h-[92vh]">
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}> 
+      <DialogContent className="max-w-lg p-0 overflow-hidden bg-background border-border shadow-2xl rounded-2xl flex flex-col max-h-[92vh]">
         <DialogTitle className="sr-only">Xizmat cheki (Oshxona)</DialogTitle>
         <DialogDescription className="sr-only">
           Oshxona va xizmat xodimlari uchun buyurtma varaqasi.
@@ -284,7 +284,7 @@ export default function StaffOrderTicketModal({
         </div>
 
         {/* Modal Content / Preview Area */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-muted/30 flex flex-col items-center">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-white flex flex-col items-center">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
               <Loader2 className="w-7 h-7 animate-spin text-brand-olive" />
