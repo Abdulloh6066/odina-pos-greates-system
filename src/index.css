@@ -173,6 +173,7 @@
   body * { visibility: hidden !important; }
   .receipt-print, .receipt-print * { visibility: visible !important; }
   .receipt-print.table-precheck { display: block !important; }
+  .receipt-print.staff-order-ticket { display: block !important; }
   .receipt-print {
     position: absolute !important;
     left: 0; top: 0;
