@@ -36,6 +36,14 @@ export function validOutdoorPolygon(polygon) {
   }, 0));
   if (doubleArea < 20000) return false;
   for (let i = 0; i < polygon.length; i += 1) {
+    const previous = polygon[(i + polygon.length - 1) % polygon.length];
+    const current = polygon[i]; const next = polygon[(i + 1) % polygon.length];
+    const incomingX = current.x - previous.x; const incomingY = current.y - previous.y;
+    const outgoingX = next.x - current.x; const outgoingY = next.y - current.y;
+    if (cross(previous, current, next) === 0
+      && incomingX * outgoingX + incomingY * outgoingY < 0) return false;
+  }
+  for (let i = 0; i < polygon.length; i += 1) {
     for (let j = i + 1; j < polygon.length; j += 1) {
       if (j === i + 1 || (i === 0 && j === polygon.length - 1)) continue;
       if (segmentCrosses(polygon[i], polygon[(i + 1) % polygon.length],
