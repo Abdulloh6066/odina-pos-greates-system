@@ -219,7 +219,7 @@ test('central location and branch tables remain strictly isolated in backend and
 test('staff order ticket matches reference layout with table number, time, taker, no payment disclaimer, no prices', () => {
   const ticketModal = read('src/components/tables/StaffOrderTicketModal.jsx');
   const tableSheet = read('src/components/tables/TableDetailSheet.jsx');
-  assert.match(ticketModal, /BUYURTMA № #\{ticketOrder\?\.number \|\| tableNumber\}/);
+  assert.match(ticketModal, /BUYURTMA № #\{String\(displayOrderNumber\)\.replace\(\/\^#\//);
   assert.match(ticketModal, /\{tableNumber\}-stol/);
   assert.match(ticketModal, /VAQT/);
   assert.match(ticketModal, /BUYURTMA OLUVCHI/);
