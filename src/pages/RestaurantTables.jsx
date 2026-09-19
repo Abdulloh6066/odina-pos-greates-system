@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Armchair, ArrowLeft, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaConfirm } from '@/lib/odina-dialog';
@@ -12,6 +12,7 @@ const QUICK_COUNTS = [5, 6, 8, 10];
 
 export default function RestaurantTables() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [layoutEditing, setLayoutEditing] = useState(false);
   const [shops, setShops] = useState([]);
   const [selectedShopId, setSelectedShopId] = useState('');
@@ -31,8 +32,9 @@ export default function RestaurantTables() {
       const available = result?.shops || [];
       setShops(available);
       setCanManage(result?.can_manage === true);
-      setSelectedShopId((current) => available.some((shop) => shop.id === current)
-        ? current : (available[0]?.id || ''));
+      setSelectedShopId((current) => available.some((shop) => shop.id === location.state?.shopId)
+        ? location.state.shopId : available.some((shop) => shop.id === current)
+          ? current : (available[0]?.id || ''));
     } catch (err) {
       setShops([]);
       setCanManage(false);
@@ -40,7 +42,7 @@ export default function RestaurantTables() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [location.state?.shopId]);
 
   useEffect(() => { void load(); }, [load]);
   const selectedShop = shops.find((shop) => shop.id === selectedShopId);
