@@ -2,6 +2,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import {
   money, resolveAppUser, httpError, buildShiftStockReport,
   cleanupShiftStockSnapshots, creditBudgetBalance, rollbackBudgetBalance,
+  finishServiceTicketCycleIfLastShift,
 } from "../../shared/shift-close-helpers.ts";
 
 const SHIFT_CLOSE_V2_RUNTIME_VERSION = "shift-close-v2-2026-09-15-telegram";
@@ -273,6 +274,10 @@ export default async function(req) {
         budget_settled_by_id: user.id,
         budget_settled_by_name: userName,
       };
+      // Do not reset after this cashier alone: other open/closing shifts at
+      // the same shop keep the kitchen ticket sequence running past midnight.
+      await finishServiceTicketCycleIfLastShift(service, closingShift.shop_id)
+        .catch((error: any) => console.error("Service-ticket cycle close needs reconciliation:", error));
       await service.entities.ActionHistory.create({
         user_id: user.id,
         user_name: userName,
