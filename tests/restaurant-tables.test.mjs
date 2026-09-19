@@ -473,6 +473,7 @@ test('street geometry accepts custom shapes and excludes invalid intersections, 
     [{ x: 0, y: 0 }, { x: 100, y: 100 }],
     [{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 100 }],
     [{ x: 0, y: 0 }, { x: 1000, y: 1000 }, { x: 0, y: 1000 }, { x: 1000, y: 0 }],
+    [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 1000 }, { x: 0, y: 1000 }],
     [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }],
     [{ x: -1, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 300 }],
     [{ x: 0.5, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 300 }],
@@ -529,6 +530,7 @@ test('server saves each shop street polygon with CAS and owner permission, prese
   const invalid = [
     { ...payload, outdoor_polygon: [{ x: 1, y: 1 }, { x: 2, y: 2 }] },
     { ...payload, outdoor_polygon: [{ x: 0, y: 0 }, { x: 1000, y: 1000 }, { x: 0, y: 1000 }, { x: 1000, y: 0 }] },
+    { ...payload, outdoor_polygon: [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 1000 }, { x: 0, y: 1000 }] },
     { ...payload, outdoor_polygon: [{ x: -5, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 400 }] },
     { ...payload, outdoor_polygon: 'forged' },
   ];
