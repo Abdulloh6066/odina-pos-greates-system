@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import ProductCard from '@/components/pos/ProductCard';
-import POSCatalogPreview from '@/components/pos/POSCatalogPreview';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
@@ -24,19 +23,6 @@ import {
 } from '@/lib/offline-sales';
 
 export default function POS() {
-  const { user } = useOutletContext();
-  const location = useLocation();
-  const navigate = useNavigate();
-  if (new URLSearchParams(location.search).get('sinov') === '1') {
-    if (user?.role !== 'admin') {
-      return <div role="alert" className="odina-page p-6 text-sm">Kassa sinovi faqat egasi uchun. <Button type="button" variant="outline" onClick={() => navigate('/pos')}>Kassaga qaytish</Button></div>;
-    }
-    return <POSCatalogPreview onExit={() => navigate('/pos')} />;
-  }
-  return <LivePOS />;
-}
-
-function LivePOS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -982,16 +968,6 @@ function LivePOS() {
           <Armchair className="h-4 w-4 mr-2" /> Stollar sahifasini ochish
         </Button>
       </div>}
-
-      {!screenMode && !selectedTable && user?.role === 'admin' && (
-        <div className="mx-3 sm:mx-5 mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-2.5 text-sm">
-          <span>Yangi mahsulotlarni vaqtinchalik 5 000 UZS bilan ko‘rish</span>
-          <Button type="button" variant="outline" onClick={() => navigate('/pos?sinov=1')}
-            className="min-h-11 rounded-xl border-brand-olive/50 bg-card font-semibold text-brand-ink">
-            Kassa sinovi
-          </Button>
-        </div>
-      )}
 
       {!screenMode && !selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
