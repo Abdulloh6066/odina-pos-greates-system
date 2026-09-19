@@ -128,7 +128,7 @@ export default function SalesHistory() {
 
       <SaleDetailDialog sale={selected} canRefund={role === 'admin'} onRefund={refundSale}
         onStaffTicket={(sale) => { setSelected(null); setStaffTicketSale(sale); }} onClose={() => setSelected(null)} />
-      <StaffOrderTicketModal open={!!staffTicketSale} mode="sale" order={staffTicketSale}
+      <StaffOrderTicketModal open={!!staffTicketSale} mode="sale" order={staffTicketSale} forceReprint
         onClose={() => { setSelected(staffTicketSale); setStaffTicketSale(null); }} />
       <RefundDialog
         open={refundOpen}
