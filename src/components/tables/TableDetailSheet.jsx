@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Armchair, Clock, ShoppingBag, ArrowRight, CreditCard,
   Printer, AlertCircle, CheckCircle2
@@ -172,7 +173,7 @@ export default function TableDetailSheet({
               </div>
 
               {/* Printable Pre-check Section */}
-              <div ref={printRef} className="receipt-print table-precheck font-mono text-[12px] leading-relaxed hidden">
+              {createPortal(<div ref={printRef} className="receipt-print table-precheck font-mono text-[12px] leading-relaxed hidden">
                 <div className="text-center space-y-1">
                   <div className="font-display text-lg font-bold">{shop?.name || 'Odina'}</div>
                   <div className="text-[11px] font-bold uppercase tracking-wider">HISOB VARAQASI (PRE-CHECK)</div>
@@ -197,7 +198,7 @@ export default function TableDetailSheet({
                 <div className="text-center text-[10px] pt-1 text-muted-foreground">
                   Xizmatingizdan mamnunmiz! Ushbu varaq to‘lov hujjati hisoblanmaydi.
                 </div>
-              </div>
+              </div>, document.body)}
             </div>
           ) : (
             <div className="py-8 text-center space-y-3">
