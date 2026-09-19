@@ -125,7 +125,7 @@ export default function StaffOrderTicketModal({
     ? `${displayTableNumber}-stol`
     : mode === 'customer'
       ? (ticketOrder?.fulfilment_type === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')
-      : 'Oddiy buyurtma';
+      : 'Olib ketish';
   const orderTime = ticketOrder?.updated_at || ticketOrder?.started_at || Date.now();
   const revision = ticketOrder?.revision || 1;
   const orderId = ticketOrder?.id;
@@ -161,7 +161,8 @@ export default function StaffOrderTicketModal({
 
   // One shared, plain black-on-white layout for the screen preview and 80mm print.
   // Identifiers and table labels come from the actual order, never sample text.
-  const displayOrderNumber = ticketOrder?.number ?? displayTableNumber ?? ticketOrder?.id ?? '—';
+  const displayOrderNumber = ticketOrder?.ticket_number ?? ticketOrder?.number
+    ?? displayTableNumber ?? ticketOrder?.id ?? '—';
   const renderTicketContent = (isPrint = false) => (
     <div className={isPrint
       ? 'w-full min-w-0 bg-white text-black font-sans leading-snug'
