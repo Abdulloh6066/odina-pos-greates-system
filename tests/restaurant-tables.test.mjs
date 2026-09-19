@@ -456,6 +456,15 @@ test('owner draws and resizes a street zone; floor plan classifies tables by its
   assert.doesNotMatch(plan, /entities\.(Sale|Payment|Shop|ProductStock)\.(create|update|delete)/);
 });
 
+test('table pre-check is printable outside the clipped dialog without showing on screen', () => {
+  const detail = read('src/components/tables/TableDetailSheet.jsx');
+  const css = read('src/index.css');
+  assert.match(detail, /window\.print\(\)/);
+  assert.match(detail, /createPortal\(<div ref=\{printRef\} className="receipt-print table-precheck[^\"]*hidden"/);
+  assert.match(detail, /<\/div>, document\.body\)\}/);
+  assert.match(css, /@media print \{[\s\S]*?\.receipt-print\.table-precheck \{ display: block !important; \}/);
+});
+
 test('street geometry accepts custom shapes and excludes invalid intersections, duplicates or tiny zones', () => {
   const rightSide = [{ x: 500, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }, { x: 500, y: 1000 }];
   assert.equal(validOutdoorPolygon([]), true);
