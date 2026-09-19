@@ -9,6 +9,7 @@ import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import StaffOrderTicketModal from './StaffOrderTicketModal';
 
 export default function TableDetailSheet({
   open,
@@ -20,6 +21,7 @@ export default function TableDetailSheet({
 }) {
   const [loading, setLoading] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
+  const [staffTicketOpen, setStaffTicketOpen] = useState(false);
   const [error, setError] = useState('');
   const printRef = useRef(null);
 
@@ -73,7 +75,8 @@ export default function TableDetailSheet({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
+    <>
+    <Dialog open={open && !staffTicketOpen} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-[24px] border border-border bg-card shadow-2xl">
         {/* Header */}
         <div className="p-5 border-b border-border bg-brand-surface flex items-start justify-between gap-3">
@@ -255,6 +258,14 @@ export default function TableDetailSheet({
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
+                  onClick={() => setStaffTicketOpen(true)}
+                  className="flex-1 min-h-11 rounded-xl text-xs font-semibold"
+                >
+                  <Printer className="w-4 h-4 mr-1.5" /> Xizmat cheki
+                </Button>
+                <Button
+                  type="button"
                   variant="ghost"
                   onClick={onClose}
                   className="min-h-11 rounded-xl text-xs"
@@ -288,5 +299,8 @@ export default function TableDetailSheet({
         </div>
       </DialogContent>
     </Dialog>
+    <StaffOrderTicketModal open={open && staffTicketOpen} onClose={() => setStaffTicketOpen(false)}
+      shop={shop} shopId={shop?.id} tableNumber={tableNumber} order={tableOrder} />
+    </>
   );
 }
