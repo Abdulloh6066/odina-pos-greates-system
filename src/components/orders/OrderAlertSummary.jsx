@@ -1,5 +1,4 @@
 import React from 'react';
-import { AlertTriangle, Clock, Wallet, ChevronRight } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 
 function Chip({ label, value }) {

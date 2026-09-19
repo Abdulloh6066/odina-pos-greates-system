@@ -89,7 +89,7 @@ test('missing ingredient price is never treated as zero (flagged, not 0)', () =>
   const r = E.recipeCostFromMap([{ ingredient_id: 'i1', quantity: 100, ingredient_name_snapshot: 'Un', unit: 'g' }], costs);
   assert.equal(r.batchCost, 0, 'cost stays 0');
   assert.equal(r.hasAllPrices, false, 'flagged as missing price');
-  assert.deepEqual(r.missing, ['Un']);
+  assert.deepEqual(Array.from(r.missing), ['Un']);
 });
 
 test('weighted average across two purchases at different prices', () => {

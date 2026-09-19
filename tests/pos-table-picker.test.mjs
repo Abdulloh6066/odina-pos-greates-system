@@ -53,7 +53,7 @@ test('Kassa opens the dedicated Stollar page instead of a large modal on desktop
   assert.match(page, /<TableFloorplan/);
   assert.match(page, /Yangi buyurtma · Kassa/);
   assert.match(page, /onOpen=\{openTable\}/);
-  assert.match(floorplan, /if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
+  assert.match(floorplan, /if \(editing\)\s*setSelectedNumber\(point\.number\);\s*else\s*onOpen\(shop\.id, point\.number\)/);
   assert.doesNotMatch(pos, /entities\.Shop\.(update|create|delete)/);
 });
 
@@ -64,7 +64,7 @@ test('dedicated map retains backend shop scoping, and navigation protects unsave
   assert.match(backend, /shops: \[safeShop\(assignedShop\)\]/);
   assert.match(pos, /selectedTable && tableCartDirty && !\(await saveTableOrder\(\)\)/);
   assert.match(pos, /!selectedTable && cart\.length && !\(await odinaConfirm\(/);
-  assert.match(page, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: shopId, table_number: String\(number\) \}\)\}`\)/);
+  assert.match(page, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: selectedShop\.id, table_number: String\(number\) \}\)\}`\)/);
   assert.match(pos, /const priorTableKey = useRef\(tableKey\)/);
   assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/tables', \{ state: \{ shopId:/);
   assert.match(page, /available\.some\(\(shop\) => shop\.id === location\.state\?\.shopId\)/);
