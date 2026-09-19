@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import ProductCard from '@/components/pos/ProductCard';
+import POSCatalogPreview from '@/components/pos/POSCatalogPreview';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
@@ -23,6 +24,19 @@ import {
 } from '@/lib/offline-sales';
 
 export default function POS() {
+  const { user } = useOutletContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+  if (new URLSearchParams(location.search).get('sinov') === '1') {
+    if (user?.role !== 'admin') {
+      return <div role="alert" className="odina-page p-6 text-sm">Kassa sinovi faqat egasi uchun. <Button type="button" variant="outline" onClick={() => navigate('/pos')}>Kassaga qaytish</Button></div>;
+    }
+    return <POSCatalogPreview onExit={() => navigate('/pos')} />;
+  }
+  return <LivePOS />;
+}
+
+function LivePOS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
   const navigate = useNavigate();
   const location = useLocation();
