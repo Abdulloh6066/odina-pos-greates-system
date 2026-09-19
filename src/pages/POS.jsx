@@ -277,7 +277,11 @@ export default function POS() {
   // The operational floor plan has its own /tables page. Never discard a
   // table's unsaved edits when navigating away; keep an ordinary unsaved cart.
   const goToTables = async () => {
-    if (screenMode || savingTableRef.current || paying || tableOrderLoading || tableOrderError) return;
+    if (screenMode || savingTableRef.current || paying || tableOrderLoading) return;
+    if (selectedTable && tableOrderError) {
+      void odinaAlert('Stol buyurtmasi yuklanmagan. Avval buyurtmani yangilang; saqlanmagan mahsulotlar yo‘qolmasligi kerak.');
+      return;
+    }
     if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
     if (!selectedTable && cart.length && !(await odinaConfirm({
       title: 'Oddiy savat saqlanmagan',
@@ -893,6 +897,15 @@ export default function POS() {
           <Armchair className="h-4 w-4 mr-2" /> Stollar sahifasini ochish
         </Button>
       </div>}
+
+      {!screenMode && !selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
+        <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-ink" aria-hidden="true" />
+          <p className="flex-1"><strong>{location.state.savedTableNumber}-stol buyurtmasi saqlandi.</strong> To‘lov olinmadi. Kassa yangi buyurtmaga tayyor.</p>
+          <Button type="button" variant="ghost" size="icon" aria-label="Saqlash xabarini yopish"
+            onClick={() => navigate('/pos', { replace: true, state: null })} className="h-11 w-11 shrink-0 rounded-xl"><X className="h-4 w-4" /></Button>
+        </div>
+      )}
 
       <OfflineSalesBanner
         isOnline={isOnline}
