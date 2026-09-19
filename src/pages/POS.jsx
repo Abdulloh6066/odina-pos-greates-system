@@ -1050,37 +1050,6 @@ export default function POS() {
         </SheetContent>
       </Sheet>
 
-      {!screenMode && <Sheet open={tablePickerOpen} onOpenChange={setTablePickerOpen}>
-        <SheetContent side="bottom" className="h-[92dvh] overflow-y-auto rounded-t-[28px] p-4 sm:p-6">
-          <SheetTitle className="font-display text-xl font-bold pr-10">Kassa · Stollar xaritasi</SheetTitle>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">Bo‘sh stolga yangi buyurtma oching yoki band stolning hisobini davom ettiring. To‘lov faqat mehmon ketganda yakunlanadi.</p>
-          {tablePickerLoading ? <div role="status" className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Stollar yuklanmoqda…</div> : <>
-            {tablePickerError && <div role="alert" className="mb-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{tablePickerError}</div>}
-            {tablePickerShops.length > 1 && <div role="group" aria-label="Stollar do‘konini tanlash" className="mb-4 flex flex-wrap gap-2">
-              {tablePickerShops.map((shop) => <Button key={shop.id} type="button" variant={shop.id === tablePickerShopId ? 'default' : 'outline'}
-                onClick={() => setTablePickerShopId(shop.id)} className="min-h-11 rounded-xl">
-                {shop.name} · {shop.table_count} stol
-              </Button>)}
-            </div>}
-            {tablePickerShop && tablePickerShop.table_count > 0
-              ? <React.Suspense fallback={<div role="status" className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Zal xaritasi ochilmoqda…</div>}>
-                  <TableFloorplan key={`${tablePickerShop.id}:${tablePickerShop.layout_version}`} shop={tablePickerShop}
-                    canManage={false} onOpen={(shopId, number) => void chooseTableInPos(shopId, number)} />
-                </React.Suspense>
-              : !tablePickerError && <div className="rounded-2xl border border-dashed p-7 text-center text-sm text-muted-foreground">
-                  Bu do‘konda stol soni belgilanmagan. «Stollar» sahifasida admin sozlashi mumkin.
-                </div>}
-          </>}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => void openTablePicker()} disabled={tablePickerLoading} className="min-h-11 rounded-xl"><RefreshCw className="h-4 w-4 mr-1.5" /> Yangilash</Button>
-            {selectedTable && <Button type="button" variant="outline" onClick={async () => {
-              if (tableCartDirty && !(await saveTableOrder())) return;
-              setTablePickerOpen(false);
-              navigate('/pos');
-            }} className="min-h-11 rounded-xl">Oddiy savdoga o‘tish</Button>}
-          </div>
-        </SheetContent>
-      </Sheet>}
       <PaymentModal
         open={payOpen}
         total={total}
