@@ -5,7 +5,7 @@ import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
-import { buildTableLayout, entranceFromPoint, normalizeEntrance, nudgeEntrance, tablesOverlap, validateTableLayout } from '../src/lib/table-floorplan.js';
+import { buildTableLayout, entranceFromPoint, normalizeEntrance, normalizeOutdoorPolygon, nudgeEntrance, pointInOutdoorPolygon, tablesOverlap, validOutdoorPolygon, validateTableLayout } from '../src/lib/table-floorplan.js';
 
 const read = (path) => readFileSync(path, 'utf8');
 const clone = (value) => value == null ? value : structuredClone(value);
@@ -424,29 +424,98 @@ test('only admin saves entrance per shop with layout version checks and strict s
   assert.deepEqual(original.entrance, { side: 'top', offset: 500 });
 });
 
-test('indoor/outdoor background is purely visual; saved table coordinates, door and Kassa routing remain intact', () => {
+test('owner draws an arbitrary street polygon; floor plan uses its shape, not a fixed top/bottom split', () => {
   const plan = read('src/components/tables/TableFloorplan.jsx');
   const original = [
     { number: 1, x: 200, y: 300, size: 100 },
     { number: 2, x: 600, y: 750, size: 140 },
   ];
+  const polygon = [{ x: 500, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }, { x: 500, y: 1000 }];
   assert.deepEqual(buildTableLayout(2, original), original);
   assert.equal(validateTableLayout(2, original), true);
-  assert.match(plan, /const OUTDOOR_START = 620/);
-  assert.match(plan, /point\.y < OUTDOOR_START/);
-  assert.match(plan, /outdoorCount = layout\.length - indoorCount/);
+  assert.equal(pointInOutdoorPolygon(original[0], polygon), false);
+  assert.equal(pointInOutdoorPolygon(original[1], polygon), true);
+  assert.match(plan, /Ko‘cha hududini chizish/);
+  assert.match(plan, /Ko‘cha chegarasini tahrirlash/);
+  assert.match(plan, /Hududni tugatish/);
+  assert.match(plan, /startVertexDrag/);
+  assert.match(plan, /onClick=\{addZonePoint\}/);
+  assert.match(plan, /outdoor_polygon: outdoorPolygon/);
+  assert.match(plan, /pointInOutdoorPolygon\(point, outdoorPolygon\)/);
   assert.match(plan, /Do‘kon ichi · \{indoorCount\} stol/);
   assert.match(plan, /Ko‘cha \/ terassa · \{outdoorCount\} stol/);
-  assert.match(plan, /pointer-events-none absolute inset-x-0 top-0 h-\[62%\]/);
-  assert.match(plan, /pointer-events-none absolute inset-x-0 bottom-0 h-\[38%\]/);
-  assert.match(plan, /Ochiq o‘tish/);
-  assert.match(plan, /Eski joylashuv avtomatik o‘zgarmaydi/);
-  assert.match(plan, /layout_version: shop\.layout_version, layout, entrance/);
-  assert.match(plan, /if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
+  assert.match(plan, /<polygon points=\{zonePoints\}/);
+  assert.doesNotMatch(plan, /OUTDOOR_START|h-\[62%\]|h-\[38%\]|Ochiq o‘tish/);
+  assert.match(plan, /if \(zoneDrawing\) return; if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
   assert.doesNotMatch(plan, /entities\.(Sale|Payment|Shop|ProductStock)\.(create|update|delete)/);
-  const moved = original.map((row) => ({ ...row }));
-  moved[0].y = 740;
-  assert.equal(validateTableLayout(2, moved), true, 'An indoor table can be moved into the terrace without a database migration');
+});
+
+test('street geometry accepts custom shapes and excludes invalid intersections, duplicates or tiny zones', () => {
+  const rightSide = [{ x: 500, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }, { x: 500, y: 1000 }];
+  assert.equal(validOutdoorPolygon([]), true);
+  assert.deepEqual(normalizeOutdoorPolygon(undefined), []);
+  assert.equal(pointInOutdoorPolygon({ x: 500, y: 520 }, []), false);
+  assert.equal(validOutdoorPolygon(rightSide), true);
+  assert.equal(pointInOutdoorPolygon({ x: 900, y: 400 }, rightSide), true);
+  assert.equal(pointInOutdoorPolygon({ x: 200, y: 900 }, rightSide), false);
+  assert.equal(pointInOutdoorPolygon({ x: 500, y: 200 }, rightSide), true, 'a table on the outline counts as outdoor');
+  const concave = [{ x: 0, y: 0 }, { x: 800, y: 0 }, { x: 800, y: 200 },
+    { x: 200, y: 200 }, { x: 200, y: 800 }, { x: 0, y: 800 }];
+  assert.equal(validOutdoorPolygon(concave), true);
+  assert.equal(pointInOutdoorPolygon({ x: 100, y: 700 }, concave), true);
+  assert.equal(pointInOutdoorPolygon({ x: 700, y: 700 }, concave), false);
+  const bad = [
+    [{ x: 0, y: 0 }, { x: 100, y: 100 }],
+    [{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 100 }],
+    [{ x: 0, y: 0 }, { x: 1000, y: 1000 }, { x: 0, y: 1000 }, { x: 1000, y: 0 }],
+    [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }],
+    [{ x: -1, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 300 }],
+    [{ x: 0.5, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 300 }],
+    Array.from({ length: 13 }, (_, index) => ({ x: index * 60, y: index % 2 ? 200 : 0 })),
+  ];
+  for (const polygon of bad) {
+    assert.equal(validOutdoorPolygon(polygon), false);
+    assert.deepEqual(normalizeOutdoorPolygon(polygon), []);
+  }
+});
+
+test('server saves each shop street polygon with CAS and owner permission, preserving old clients and open orders', async () => {
+  const f = fixture();
+  const original = (await f.run({ action: 'status' })).data.shops.find((shop) => shop.id === 'second-shop');
+  assert.deepEqual(original.outdoor_polygon, []);
+  const layout = buildTableLayout(8);
+  const outdoor_polygon = [{ x: 0, y: 450 }, { x: 950, y: 450 }, { x: 950, y: 1000 }, { x: 0, y: 1000 }];
+  const payload = { action: 'set_table_layout', shop_id: 'second-shop', layout_version: 0,
+    layout, entrance: { side: 'top', offset: 500 }, outdoor_polygon };
+  const invalid = [
+    { ...payload, outdoor_polygon: [{ x: 1, y: 1 }, { x: 2, y: 2 }] },
+    { ...payload, outdoor_polygon: [{ x: 0, y: 0 }, { x: 1000, y: 1000 }, { x: 0, y: 1000 }, { x: 1000, y: 0 }] },
+    { ...payload, outdoor_polygon: [{ x: -5, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 400 }] },
+    { ...payload, outdoor_polygon: 'forged' },
+  ];
+  for (const request of invalid) assert.equal((await f.run(request)).status, 400);
+  assert.equal(f.writes, 0);
+  const saved = await f.run(payload);
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+  assert.deepEqual(saved.data.shop.outdoor_polygon, outdoor_polygon);
+  assert.deepEqual(f.db.Shop[1].restaurant_outdoor_polygon, outdoor_polygon);
+  assert.deepEqual(f.db.Shop[1].restaurant_table_layout, layout);
+  assert.equal(f.db.Sale.length, 0);
+  assert.deepEqual(f.db.Shop[1].restaurant_table_orders || [], []);
+  const writes = f.writes;
+  assert.equal((await f.run(payload)).status, 409);
+  assert.equal(f.writes, writes);
+  f.as('cashier-2');
+  assert.deepEqual((await f.run({ action: 'status' })).data.shops[0].outdoor_polygon, outdoor_polygon);
+  assert.equal((await f.run({ ...payload, layout_version: 1 })).status, 403);
+  f.as('cashier-1');
+  assert.equal((await f.run({ action: 'status' })).data.shops[0].outdoor_polygon.length, 0);
+  f.as('owner');
+  const oldClient = await f.run({ action: 'set_table_layout', shop_id: 'second-shop', layout_version: 1, layout });
+  assert.equal(oldClient.status, 200, JSON.stringify(oldClient));
+  assert.deepEqual(oldClient.data.shop.outdoor_polygon, outdoor_polygon);
+  assert.equal((await f.run({ action: 'set_table_count', shop_id: 'second-shop', table_count: 7 })).status, 200);
+  assert.deepEqual((await f.run({ action: 'status' })).data.shops.find((shop) => shop.id === 'second-shop').outdoor_polygon, outdoor_polygon);
 });
 
 test('integration is a separate page with role guard and no pretend sales, stock or orders', () => {
