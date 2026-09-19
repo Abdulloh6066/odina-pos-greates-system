@@ -389,7 +389,7 @@ test('entrance is a real draggable marker, only admin can edit, and tables still
   assert.match(floorplan, /disabled=\{!editing \|\| saving \|\| zoneDrawing\}/);
   assert.match(floorplan, /action: 'set_table_layout'/);
   assert.match(floorplan, /layout_version: shop\.layout_version, layout, entrance/);
-  assert.match(floorplan, /if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
+  assert.match(floorplan, /if \(editing\)\s*setSelectedNumber\(point\.number\);\s*else\s*onOpen\(shop\.id, point\.number\)/);
   assert.ok(page.indexOf('tableCount > 0 && <TableFloorplan') < page.indexOf('tracking-wider text-brand-ink uppercase">Do‘kon stollari'));
   assert.doesNotMatch(floorplan, /pointer-events-none absolute left-1\/2 top-0/);
 });
