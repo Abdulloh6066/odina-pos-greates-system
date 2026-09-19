@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, Check,
   Coffee, DoorOpen, Edit3, Grip, Layers, Maximize2, Minus, MousePointer2,
-  Move, Plus, RotateCcw, Save, Sliders, Sun, Trash2, X,
+  Move, Plus, RotateCcw, Save, Sliders, Sun, Trash2, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -78,6 +78,7 @@ export default function TableFloorplan({
   });
 
   const [zoneMode, setZoneMode] = useState(false);
+  const [isLargeCanvas, setIsLargeCanvas] = useState(false);
   const [tempBox, setTempBox] = useState(null);
   const [editing, setEditing] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
@@ -338,11 +339,8 @@ export default function TableFloorplan({
     setError('');
     try {
       const response = await base44.functions.invoke('restaurant-tables', {
-        action: 'set_table_layout',
-        shop_id: shop.id,
-        layout_version: shop.layout_version,
-        layout,
-        entrance,
+        action: 'set_table_layout', shop_id: shop.id,
+        layout_version: shop.layout_version, layout, entrance,
         outdoor_polygon: outdoorPolygon,
       });
       const result = response?.data || response;
@@ -431,6 +429,17 @@ export default function TableFloorplan({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Canvas size expander */}
+          <button
+            type="button"
+            onClick={() => setIsLargeCanvas((prev) => !prev)}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all"
+            title={isLargeCanvas ? 'Standart o‘lchamga qaytish' : 'Xaritani kattalashtirish (Keng bino va ko‘cha)'}
+          >
+            {isLargeCanvas ? <ZoomOut className="h-3.5 w-3.5" /> : <ZoomIn className="h-3.5 w-3.5" />}
+            <span>{isLargeCanvas ? 'Standart xarita' : 'Katta xarita'}</span>
+          </button>
+
           <span role="status" className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
             editing && dirty ? 'border-amber-300 bg-amber-50 text-amber-900' : editing ? 'border-brand-olive/30 bg-brand-olive/10 text-brand-ink' : 'border-brand-olive/30 bg-brand-olive/10 text-brand-ink'
           }`}>
@@ -511,17 +520,9 @@ export default function TableFloorplan({
             <label htmlFor="entrance-position" className="text-xs font-semibold whitespace-nowrap">
               Eshikning devordagi joyi
             </label>
-            <input
-              id="entrance-position"
-              type="range"
-              min="150"
-              max="850"
-              step="10"
-              value={entrance.offset}
-              disabled={saving}
+            <input id="entrance-position" type="range" min="150" max="850" step="10" value={entrance.offset} disabled={saving}
               onChange={(event) => setEntrance((previous) => ({ ...previous, offset: Number(event.target.value) }))}
-              className="min-w-[120px] flex-1 accent-[#ACA95D]"
-            />
+              className="min-w-[120px] flex-1 accent-[#ACA95D]" />
             <span className="w-11 text-right text-xs font-bold tabular-nums text-brand-ink">
               {entrance.offset / 10}%
             </span>
@@ -532,7 +533,7 @@ export default function TableFloorplan({
         </div>
       )}
 
-      {/* Street & Fence Configuration (Customizable Walls & Terraces) */}
+      {/* Street & Coffee Shop Custom Architecture Toolbar */}
       {editing && (
         <div className={`rounded-2xl border p-3 sm:p-4 space-y-4 transition-colors ${zoneMode ? 'border-brand-olive bg-[#f3f4e8]' : 'border-brand-olive/30 bg-brand-olive/5'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -579,11 +580,11 @@ export default function TableFloorplan({
             )}
           </div>
 
-          {/* Street Side & Custom Wall Controls */}
+          {/* Street Side & Custom Coffee Shop Building Controls */}
           <div className="space-y-3 border-t border-brand-olive/20 pt-3">
             <div className="space-y-1.5">
               <span className="text-xs font-bold text-brand-ink flex items-center gap-1.5">
-                <Sliders className="h-3.5 w-3.5 text-brand-ink" /> Ko‘cha qaysi tomonda joylashgan?
+                <Sliders className="h-3.5 w-3.5 text-brand-ink" /> Ko‘cha qayerda joylashgan?
               </span>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {STREET_SIDES.map((side) => (
@@ -605,7 +606,7 @@ export default function TableFloorplan({
               </div>
             </div>
 
-            {/* Custom Street Walls & Fences Selector */}
+            {/* Custom Street Walls & Fences Selector ("kochani devorlarini ham ozim qiladigan bolsin") */}
             {streetSide !== 'none' && (
               <div className="space-y-2.5 rounded-xl border border-brand-olive/25 bg-card/80 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -655,7 +656,7 @@ export default function TableFloorplan({
 
                 <div className="flex flex-wrap items-center gap-3 pt-1">
                   <label htmlFor="street-depth-slider" className="text-xs font-semibold whitespace-nowrap">
-                    Ko‘cha chuqurligi:
+                    Bino va ko‘cha nisbati (chuqurligi):
                   </label>
                   <input
                     id="street-depth-slider"
@@ -670,6 +671,9 @@ export default function TableFloorplan({
                   />
                   <span className="w-11 text-right text-xs font-bold tabular-nums text-brand-ink">
                     {Math.round(streetDepth / 10)}%
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    (Xaritadagi bino devori tutqichini ushlab ham surish mumkin)
                   </span>
                 </div>
               </div>
@@ -732,44 +736,53 @@ export default function TableFloorplan({
         </span>
         {editing && (
           <span className="text-muted-foreground">
-            {zoneMode ? 'Xaritadagi burchaklar orqali ko‘cha chegarasini cho‘zing.' : 'Stollarni joylashtiring yoki ko‘cha hududini sozlang.'}
+            {zoneMode ? 'Xaritadagi burchaklar orqali ko‘cha chegarasini cho‘zing.' : 'Stollarni xohlagan joyingizga (zal ichi yoki ko‘chaga) erkin surib qo‘ying.'}
           </span>
         )}
         <span className="w-full text-[11px] text-muted-foreground">
-          {outdoorPolygon.length ? 'Ko‘cha hududi belgilangan. Stollar koordinatalari o‘z-o‘zidan o‘zgarmaydi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}
+          {outdoorPolygon.length ? 'Ko‘cha va do‘kon zali belgilangan. Stollar erkin harakatlanadi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}
         </span>
       </div>
 
-      {/* Map Board */}
-      <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
-        <div className="max-w-full overflow-x-auto overscroll-x-contain pb-2">
-          <div className="relative min-w-[760px] w-full px-16 py-16">
+      {/* Big Map Board (Free Open Space without trapping green border) */}
+      <div className="rounded-2xl border border-border/80 bg-[#f4f1e8] p-1.5 sm:p-2 shadow-inner">
+        <div className="max-w-full overflow-x-auto overscroll-x-contain">
+          <div className={`relative w-full ${isLargeCanvas ? 'min-w-[980px] min-h-[620px] aspect-[16/9]' : 'min-w-[760px] aspect-[16/10]'}`}>
             <div
               ref={boardRef}
               aria-label="Do‘kon va qo‘lda belgilangan ko‘cha hududi xaritasi"
-              className={`relative isolate w-full aspect-[10/7] sm:aspect-[16/10] overflow-visible rounded-[25px] border-[3px] shadow-inner ${
-                editing ? 'border-brand-olive' : 'border-[#b8b087]'
-              }`}
+              className="relative isolate w-full h-full overflow-visible rounded-[20px] border-2 border-[#cfc8b0] bg-[#fbf6eb] shadow-sm"
               style={{
-                backgroundColor: '#fbf6eb',
-                backgroundImage: 'linear-gradient(rgba(208,177,127,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.14) 1px, transparent 1px)',
-                backgroundSize: '34px 34px',
+                backgroundImage: 'radial-gradient(rgba(172,169,93,.15) 1.5px, transparent 1.5px)',
+                backgroundSize: '28px 28px',
               }}
             >
-              {/* SVG Layer: Street tiles, dividing wall, and perimeter fences */}
+              {/* SVG Layer: Street, Coffee Shop Building Walls, Doors & Decor */}
               <svg
                 aria-hidden="true"
                 viewBox="0 0 1000 1000"
                 preserveAspectRatio="none"
-                className="pointer-events-none absolute inset-0 z-[1] h-full w-full rounded-[22px] overflow-hidden"
+                className="pointer-events-none absolute inset-0 z-[1] h-full w-full rounded-[18px] overflow-hidden"
               >
                 <defs>
+                  {/* Street Cobblestone Floor Pattern */}
                   <pattern id="odina-outdoor-tiles" width="36" height="36" patternUnits="userSpaceOnUse">
                     <rect width="36" height="36" fill="#e8edda" />
-                    <path d="M0 0H36M0 0V36" fill="none" stroke="#aca95d" strokeOpacity=".20" strokeWidth="2" />
+                    <rect x="2" y="2" width="14" height="14" rx="2" fill="#dfe6d0" stroke="#aca95d" strokeOpacity=".25" strokeWidth="1" />
+                    <rect x="18" y="2" width="16" height="14" rx="2" fill="#e4ebd5" stroke="#aca95d" strokeOpacity=".25" strokeWidth="1" />
+                    <rect x="2" y="18" width="16" height="16" rx="2" fill="#e4ebd5" stroke="#aca95d" strokeOpacity=".25" strokeWidth="1" />
+                    <rect x="20" y="18" width="14" height="16" rx="2" fill="#dfe6d0" stroke="#aca95d" strokeOpacity=".25" strokeWidth="1" />
+                  </pattern>
+
+                  {/* Coffee Shop Parquet Floor Pattern */}
+                  <pattern id="shop-parquet" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <rect width="40" height="40" fill="#fdfbf7" />
+                    <line x1="0" y1="20" x2="40" y2="20" stroke="#d5c8a8" strokeOpacity=".3" strokeWidth="1" />
+                    <line x1="20" y1="0" x2="20" y2="40" stroke="#d5c8a8" strokeOpacity=".3" strokeWidth="1" />
                   </pattern>
                 </defs>
 
+                {/* 1. Street Area Polygon */}
                 {outdoorPolygon.length >= 3 && (
                   <polygon points={zonePoints}
                     fill="url(#odina-outdoor-tiles)"
@@ -779,6 +792,7 @@ export default function TableFloorplan({
                   />
                 )}
 
+                {/* Freehand box when drawing */}
                 {tempBox && (
                   <rect
                     x={tempBox.x}
@@ -793,87 +807,153 @@ export default function TableFloorplan({
                   />
                 )}
 
-                {/* Dividing Wall & Swing Arc */}
+                {/* 2. Coffee Shop Building Walls & Door Swing Arc ("this will be our coffee shop") */}
                 {finishedZone && streetSide !== 'none' && (
                   <>
                     {streetSide === 'top' && (
-                      <g id="dividing-wall-top">
-                        <line x1="0" y1={streetDepth + 4} x2="1000" y2={streetDepth + 4} stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        <line x1="0" y1={streetDepth} x2={Math.max(0, entrance.offset - 50)} y2={streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <line x1={Math.min(1000, entrance.offset + 50)} y1={streetDepth} x2="1000" y2={streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <rect x={entrance.offset - 52} y={streetDepth - 8} width="5" height="16" fill="#8c734b" rx="1" />
-                        <rect x={entrance.offset + 47} y={streetDepth - 8} width="5" height="16" fill="#8c734b" rx="1" />
-                        <path d={`M ${entrance.offset - 48} ${streetDepth} A 48 48 0 0 0 ${entrance.offset} ${streetDepth + 48}`} fill="none" stroke="#aca95d" strokeWidth="2" strokeDasharray="4 3" />
-                        <line x1={entrance.offset} y1={streetDepth} x2={entrance.offset} y2={streetDepth + 46} stroke="#8c734b" strokeWidth="4" strokeLinecap="round" />
+                      <g id="coffee-shop-building-top">
+                        {/* Coffee Shop Indoor Parquet Floor */}
+                        <rect x="25" y={streetDepth} width="950" height={975 - streetDepth} fill="url(#shop-parquet)" rx="4" />
+                        
+                        {/* Shadow under front dividing wall */}
+                        <line x1="25" y1={streetDepth + 5} x2="975" y2={streetDepth + 5} stroke="rgba(0,0,0,0.15)" strokeWidth="16" />
+                        
+                        {/* Front Dividing Wall (with entrance door gap) */}
+                        <line x1="25" y1={streetDepth} x2={Math.max(35, entrance.offset - 50)} y2={streetDepth} stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1={Math.min(965, entrance.offset + 50)} y1={streetDepth} x2="975" y2={streetDepth} stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        
+                        {/* Coffee shop left, right, and bottom building walls */}
+                        <line x1="25" y1={streetDepth} x2="25" y2="975" stroke="#4a4637" strokeWidth="10" />
+                        <line x1="975" y1={streetDepth} x2="975" y2="975" stroke="#4a4637" strokeWidth="10" />
+                        <line x1="25" y1="975" x2="975" y2="975" stroke="#4a4637" strokeWidth="10" />
+
+                        {/* Door Jambs */}
+                        <rect x={entrance.offset - 52} y={streetDepth - 9} width="6" height="18" fill="#8c734b" rx="1" />
+                        <rect x={entrance.offset + 46} y={streetDepth - 9} width="6" height="18" fill="#8c734b" rx="1" />
+
+                        {/* Door Opening Swing Arc (into the coffee shop) */}
+                        <path d={`M ${entrance.offset - 48} ${streetDepth} A 48 48 0 0 0 ${entrance.offset} ${streetDepth + 48}`} fill="none" stroke="#aca95d" strokeWidth="2.5" strokeDasharray="5 4" />
+                        {/* Door Leaf */}
+                        <line x1={entrance.offset} y1={streetDepth} x2={entrance.offset} y2={streetDepth + 46} stroke="#8c734b" strokeWidth="4.5" strokeLinecap="round" />
+
+                        {/* Corner Pillars */}
+                        <rect x="18" y={streetDepth - 7} width="14" height="14" fill="#363327" rx="2" />
+                        <rect x="968" y={streetDepth - 7} width="14" height="14" fill="#363327" rx="2" />
+                        <rect x="18" y="968" width="14" height="14" fill="#363327" rx="2" />
+                        <rect x="968" y="968" width="14" height="14" fill="#363327" rx="2" />
                       </g>
                     )}
 
                     {streetSide === 'bottom' && (
-                      <g id="dividing-wall-bottom">
-                        <line x1="0" y1={1000 - streetDepth + 4} x2="1000" y2={1000 - streetDepth + 4} stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        <line x1="0" y1={1000 - streetDepth} x2={Math.max(0, entrance.offset - 50)} y2={1000 - streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <line x1={Math.min(1000, entrance.offset + 50)} y1={1000 - streetDepth} x2="1000" y2={1000 - streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <rect x={entrance.offset - 52} y={1000 - streetDepth - 8} width="5" height="16" fill="#8c734b" rx="1" />
-                        <rect x={entrance.offset + 47} y={1000 - streetDepth - 8} width="5" height="16" fill="#8c734b" rx="1" />
-                        <path d={`M ${entrance.offset - 48} ${1000 - streetDepth} A 48 48 0 0 1 ${entrance.offset} ${1000 - streetDepth - 48}`} fill="none" stroke="#aca95d" strokeWidth="2" strokeDasharray="4 3" />
-                        <line x1={entrance.offset} y1={1000 - streetDepth} x2={entrance.offset} y2={1000 - streetDepth - 46} stroke="#8c734b" strokeWidth="4" strokeLinecap="round" />
+                      <g id="coffee-shop-building-bottom">
+                        <rect x="25" y="25" width="950" height={975 - streetDepth} fill="url(#shop-parquet)" rx="4" />
+                        <line x1="25" y1={1000 - streetDepth + 5} x2="975" y2={1000 - streetDepth + 5} stroke="rgba(0,0,0,0.15)" strokeWidth="16" />
+                        <line x1="25" y1={1000 - streetDepth} x2={Math.max(35, entrance.offset - 50)} y2={1000 - streetDepth} stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1={Math.min(965, entrance.offset + 50)} y1={1000 - streetDepth} x2="975" y2={1000 - streetDepth} stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1="25" y1="25" x2="25" y2={1000 - streetDepth} stroke="#4a4637" strokeWidth="10" />
+                        <line x1="975" y1="25" x2="975" y2={1000 - streetDepth} stroke="#4a4637" strokeWidth="10" />
+                        <line x1="25" y1="25" x2="975" y2="25" stroke="#4a4637" strokeWidth="10" />
+                        <rect x={entrance.offset - 52} y={1000 - streetDepth - 9} width="6" height="18" fill="#8c734b" rx="1" />
+                        <rect x={entrance.offset + 46} y={1000 - streetDepth - 9} width="6" height="18" fill="#8c734b" rx="1" />
+                        <path d={`M ${entrance.offset - 48} ${1000 - streetDepth} A 48 48 0 0 1 ${entrance.offset} ${1000 - streetDepth - 48}`} fill="none" stroke="#aca95d" strokeWidth="2.5" strokeDasharray="5 4" />
+                        <line x1={entrance.offset} y1={1000 - streetDepth} x2={entrance.offset} y2={1000 - streetDepth - 46} stroke="#8c734b" strokeWidth="4.5" strokeLinecap="round" />
                       </g>
                     )}
 
                     {streetSide === 'right' && (
-                      <g id="dividing-wall-right">
-                        <line x1={1000 - streetDepth + 4} y1="0" x2={1000 - streetDepth + 4} y2="1000" stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        <line x1={1000 - streetDepth} y1="0" x2={Math.max(0, entrance.offset - 50)} y2={1000 - streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <line x1={Math.min(1000, entrance.offset + 50)} y1={1000 - streetDepth} x2="1000" y2={1000 - streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <rect x={1000 - streetDepth - 8} y={entrance.offset - 52} width="16" height="5" fill="#8c734b" rx="1" />
-                        <rect x={1000 - streetDepth - 8} y={entrance.offset + 47} width="16" height="5" fill="#8c734b" rx="1" />
-                        <path d={`M ${1000 - streetDepth} ${entrance.offset - 48} A 48 48 0 0 0 ${1000 - streetDepth - 48} ${entrance.offset}`} fill="none" stroke="#aca95d" strokeWidth="2" strokeDasharray="4 3" />
-                        <line x1={1000 - streetDepth} y1={entrance.offset} x2={1000 - streetDepth - 46} y2={entrance.offset} stroke="#8c734b" strokeWidth="4" strokeLinecap="round" />
+                      <g id="coffee-shop-building-right">
+                        <rect x="25" y="25" width={975 - streetDepth} height="950" fill="url(#shop-parquet)" rx="4" />
+                        <line x1={1000 - streetDepth + 5} y1="25" x2={1000 - streetDepth + 5} y2="975" stroke="rgba(0,0,0,0.15)" strokeWidth="16" />
+                        <line x1={1000 - streetDepth} y1="25" x2={1000 - streetDepth} y2={Math.max(35, entrance.offset - 50)} stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1={1000 - streetDepth} y1={Math.min(965, entrance.offset + 50)} x2={1000 - streetDepth} y2="975" stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1="25" y1="25" x2="25" y2="975" stroke="#4a4637" strokeWidth="10" />
+                        <line x1="25" y1="25" x2={1000 - streetDepth} y2="25" stroke="#4a4637" strokeWidth="10" />
+                        <line x1="25" y1="975" x2={1000 - streetDepth} y2="975" stroke="#4a4637" strokeWidth="10" />
+                        <rect x={1000 - streetDepth - 9} y={entrance.offset - 52} width="18" height="6" fill="#8c734b" rx="1" />
+                        <rect x={1000 - streetDepth - 9} y={entrance.offset + 46} width="18" height="6" fill="#8c734b" rx="1" />
+                        <path d={`M ${1000 - streetDepth} ${entrance.offset - 48} A 48 48 0 0 0 ${1000 - streetDepth - 48} ${entrance.offset}`} fill="none" stroke="#aca95d" strokeWidth="2.5" strokeDasharray="5 4" />
+                        <line x1={1000 - streetDepth} y1={entrance.offset} x2={1000 - streetDepth - 46} y2={entrance.offset} stroke="#8c734b" strokeWidth="4.5" strokeLinecap="round" />
                       </g>
                     )}
 
                     {streetSide === 'left' && (
-                      <g id="dividing-wall-left">
-                        <line x1={streetDepth + 4} y1="0" x2={streetDepth + 4} y2="1000" stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        <line x1={streetDepth} y1="0" x2={Math.max(0, entrance.offset - 50)} y2={streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <line x1={streetDepth} y1={Math.min(1000, entrance.offset + 50)} x2={streetDepth} y2="1000" stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <rect x={streetDepth - 8} y={entrance.offset - 52} width="16" height="5" fill="#8c734b" rx="1" />
-                        <rect x={streetDepth - 8} y={entrance.offset + 47} width="16" height="5" fill="#8c734b" rx="1" />
-                        <path d={`M ${streetDepth} ${entrance.offset - 48} A 48 48 0 0 1 ${streetDepth + 48} ${entrance.offset}`} fill="none" stroke="#aca95d" strokeWidth="2" strokeDasharray="4 3" />
-                        <line x1={streetDepth} y1={entrance.offset} x2={streetDepth + 46} y2={entrance.offset} stroke="#8c734b" strokeWidth="4" strokeLinecap="round" />
+                      <g id="coffee-shop-building-left">
+                        <rect x={streetDepth} y="25" width={975 - streetDepth} height="950" fill="url(#shop-parquet)" rx="4" />
+                        <line x1={streetDepth + 5} y1="25" x2={streetDepth + 5} y2="975" stroke="rgba(0,0,0,0.15)" strokeWidth="16" />
+                        <line x1={streetDepth} y1="25" x2={streetDepth} y2={Math.max(35, entrance.offset - 50)} stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1={streetDepth} y1={Math.min(965, entrance.offset + 50)} x2={streetDepth} y2="975" stroke="#4a4637" strokeWidth="14" strokeLinecap="square" />
+                        <line x1="975" y1="25" x2="975" y2="975" stroke="#4a4637" strokeWidth="10" />
+                        <line x1={streetDepth} y1="25" x2="975" y2="25" stroke="#4a4637" strokeWidth="10" />
+                        <line x1={streetDepth} y1="975" x2="975" y2="975" stroke="#4a4637" strokeWidth="10" />
+                        <rect x={streetDepth - 9} y={entrance.offset - 52} width="18" height="6" fill="#8c734b" rx="1" />
+                        <rect x={streetDepth - 9} y={entrance.offset + 46} width="18" height="6" fill="#8c734b" rx="1" />
+                        <path d={`M ${streetDepth} ${entrance.offset - 48} A 48 48 0 0 1 ${streetDepth + 48} ${entrance.offset}`} fill="none" stroke="#aca95d" strokeWidth="2.5" strokeDasharray="5 4" />
+                        <line x1={streetDepth} y1={entrance.offset} x2={streetDepth + 46} y2={entrance.offset} stroke="#8c734b" strokeWidth="4.5" strokeLinecap="round" />
                       </g>
                     )}
                   </>
                 )}
 
-                {/* Perimeter Fence */}
+                {/* 3. Street Perimeter Fences ("this will be our street" boundary) */}
                 {finishedZone && streetSide !== 'none' && (
                   <g id="street-perimeter-fence">
                     {streetSide === 'top' && (
                       <>
                         {fenceEnclosure !== 'front_open' && (
                           fenceStyle === 'railing' ? (
-                            <line x1="0" y1="4" x2="1000" y2="4" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
+                            <line x1="0" y1="6" x2="1000" y2="6" stroke="#845e3c" strokeWidth="8" strokeDasharray="18 8" />
                           ) : fenceStyle === 'walled' ? (
-                            <line x1="0" y1="5" x2="1000" y2="5" stroke="#786c5e" strokeWidth="10" />
+                            <line x1="0" y1="6" x2="1000" y2="6" stroke="#786c5e" strokeWidth="12" />
                           ) : fenceStyle === 'glass' ? (
-                            <line x1="0" y1="4" x2="1000" y2="4" stroke="#38bdf8" strokeWidth="5" strokeDasharray="90 8" />
+                            <line x1="0" y1="5" x2="1000" y2="5" stroke="#38bdf8" strokeWidth="6" strokeDasharray="90 8" />
                           ) : (
-                            <line x1="0" y1="3" x2="1000" y2="3" stroke="#a8a29e" strokeWidth="5" strokeDasharray="20 10" />
+                            <line x1="0" y1="4" x2="1000" y2="4" stroke="#a8a29e" strokeWidth="6" strokeDasharray="24 12" />
                           )
                         )}
-                        <circle cx="16" cy="16" r="10" fill="#758249" />
-                        <circle cx="984" cy="16" r="10" fill="#758249" />
+                        {/* Street Corner Flower Planters / Lamps */}
+                        <circle cx="24" cy="24" r="12" fill="#5b6e3b" />
+                        <circle cx="976" cy="24" r="12" fill="#5b6e3b" />
                       </>
                     )}
                   </g>
                 )}
               </svg>
 
-              <div className="pointer-events-none absolute z-[2] left-4 top-4 max-w-[54%] inline-flex items-center gap-1.5 rounded-xl border border-brand-sand/70 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
-                <Building2 className="h-4 w-4 shrink-0" /> <span className="truncate">{shop.name}</span>
+              {/* Coffee Shop Inner Plaque ("this will be our coffee shop") */}
+              <div
+                className={`pointer-events-none absolute z-[2] inline-flex items-center gap-2 rounded-xl border border-[#d5c8a8] bg-white/95 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-ink shadow-sm ${
+                  streetSide === 'top'
+                    ? 'left-8 bottom-6'
+                    : streetSide === 'bottom'
+                      ? 'left-8 top-6'
+                      : streetSide === 'right'
+                        ? 'left-8 top-6'
+                        : 'right-8 top-6'
+                }`}
+              >
+                <Coffee className="h-4 w-4 text-[#8c734b] shrink-0" />
+                <span className="truncate">{shop.name} · Qahvaxona zali (Do‘kon)</span>
               </div>
-              <div className="pointer-events-none absolute z-[2] right-4 top-4 rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground">
+
+              {/* Street Outer Plaque ("this will be our street") */}
+              {finishedZone && streetSide !== 'none' && (
+                <div
+                  className={`pointer-events-none absolute z-[2] inline-flex items-center gap-1.5 rounded-xl border border-brand-olive/40 bg-white/95 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#656b2a] shadow-sm ${
+                    streetSide === 'top'
+                      ? 'left-8 top-6'
+                      : streetSide === 'bottom'
+                        ? 'left-8 bottom-6'
+                        : streetSide === 'right'
+                          ? 'right-8 top-6'
+                          : 'left-8 top-6'
+                  }`}
+                >
+                  <Sun className="h-4 w-4 text-[#969a55] shrink-0" />
+                  <span>Ko‘cha / Terassa ({outdoorCount} ta stol)</span>
+                </div>
+              )}
+
+              <div className="pointer-events-none absolute z-[2] right-6 bottom-6 rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground shadow-xs">
                 {zoneMode ? (outdoorBox ? 'BURCHAKLARDAN USHLAB CHO‘ZING' : 'XARITADA TORTIB CHIZING') : editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
               </div>
 
@@ -889,7 +969,7 @@ export default function TableFloorplan({
                 />
               )}
 
-              {/* Entrance Door */}
+              {/* Entrance Door (On the Coffee Shop Wall) */}
               <button
                 type="button"
                 aria-label={`Kirish eshigi: ${WALLS.find((wall) => wall.side === entrance.side)?.label} devor${editing ? ', joyini o‘zgartirish' : ''}`}
@@ -905,20 +985,20 @@ export default function TableFloorplan({
                   setEntrance((previous) => nudgeEntrance(previous, event.key, event.shiftKey ? 50 : 20));
                 }}
                 style={{ ...doorPositionStyle, touchAction: editing ? 'none' : 'manipulation' }}
-                className={`absolute z-25 flex items-center justify-center gap-1.5 border-2 border-brand-olive bg-card text-brand-ink font-bold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive ${
-                  verticalWall ? 'h-16 w-16 flex-col rounded-2xl text-[10px]' : 'h-12 min-w-[118px] rounded-xl text-xs'
-                } ${editing ? 'cursor-grab active:cursor-grabbing ring-4 ring-primary/30' : 'cursor-default'}`}
+                className={`absolute z-30 flex items-center justify-center gap-1.5 border-2 border-brand-olive bg-card text-brand-ink font-bold shadow-lg select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive ${
+                  verticalWall ? 'h-16 w-16 flex-col rounded-2xl text-[10px]' : 'h-11 min-w-[110px] rounded-xl text-xs'
+                } ${editing ? 'cursor-grab active:cursor-grabbing ring-4 ring-primary/40' : 'cursor-default'}`}
               >
-                <DoorOpen aria-hidden="true" className="h-5 w-5 shrink-0" />
+                <DoorOpen aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-ink" />
                 <span>Eshik</span>
                 {editing && <Grip aria-hidden="true" className="h-3 w-3 shrink-0 opacity-65" />}
               </button>
 
-              {/* Interactive Wall Move Handle (In Edit Mode) */}
+              {/* Interactive Wall Move Handle (Drag to make coffee shop bigger/smaller) */}
               {editing && finishedZone && wallHandleStyle && !zoneMode && (
                 <button
                   type="button"
-                  title="Devorni ushlab suring (zal va ko‘cha chuqurligini o‘zgartirish)"
+                  title="Qahvaxona devorini ushlab suring (bino va ko‘cha hajmini o‘zgartirish)"
                   aria-label="Bino devorini surish"
                   onPointerDown={(e) => startDrag(e, 'wall-move')}
                   onPointerMove={(e) => onMove(e, 'wall-move')}
@@ -928,7 +1008,7 @@ export default function TableFloorplan({
                     ...wallHandleStyle,
                     touchAction: 'none',
                   }}
-                  className={`absolute z-35 inline-flex items-center gap-1.5 rounded-full border-2 border-brand-olive bg-[#4d493a] text-white px-3 py-1 text-[11px] font-bold shadow-xl cursor-grab active:cursor-grabbing hover:scale-105 transition-transform select-none ${
+                  className={`absolute z-35 inline-flex items-center gap-1.5 rounded-full border-2 border-brand-olive bg-[#4a4637] text-white px-3 py-1 text-[11px] font-bold shadow-xl cursor-grab active:cursor-grabbing hover:scale-105 transition-transform select-none ${
                     verticalWall ? 'cursor-col-resize' : 'cursor-row-resize'
                   }`}
                 >
@@ -1018,7 +1098,7 @@ export default function TableFloorplan({
                 </>
               )}
 
-              {/* Tables: Freely Draggable Across the Whole Floor & Street */}
+              {/* Tables: Freely Draggable Everywhere between Coffee Shop and Street */}
               {layout.map((point) => {
                 const order = (shop.orders || []).find((row) => row.number === point.number);
                 const isOccupied = Boolean(order);
@@ -1032,7 +1112,7 @@ export default function TableFloorplan({
                     type="button"
                     aria-label={`${point.number}-stol, ${isOccupied ? (isPaying ? 'To‘lov tekshirilmoqda' : `Band, ${Number(order.total || 0).toLocaleString('en-US')} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Ko‘rish va kassaga o‘tish'}`}
                     title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol${isOccupied ? ` — Band (${Number(order.total || 0).toLocaleString('en-US')} UZS)` : ' — Bo‘sh'}`}
-                    disabled={saving || zoneMode}
+                    disabled={saving}
                     onPointerDown={(event) => startDrag(event, 'table', point.number)}
                     onPointerMove={(event) => onMove(event, 'table')}
                     onPointerUp={stopDrag}
@@ -1051,33 +1131,33 @@ export default function TableFloorplan({
                       transform: 'translate(-50%, -50%)',
                       touchAction: editing ? 'none' : 'manipulation',
                     }}
-                    className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-all ${
+                    className={`absolute z-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-all ${
                       editing
                         ? selectedNumber === point.number
-                          ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20'
+                          ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/25 shadow-xl scale-105'
                           : isTableOutdoor
                             ? 'cursor-grab active:cursor-grabbing bg-[#f4f7ee] border-[#969a55] text-foreground hover:bg-primary/40'
                             : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
                         : isSelected
-                          ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/50 shadow-xl scale-105 z-20'
+                          ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/50 shadow-xl scale-105 z-25'
                           : isOccupied
                             ? isPaying
                               ? 'cursor-pointer bg-[#FECD7C] border-amber-600 text-brand-ink ring-2 ring-amber-500/60 shadow-md hover:scale-105'
                               : 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-2 ring-brand-olive/40 shadow-md hover:scale-105'
                             : isTableOutdoor
-                              ? 'cursor-pointer bg-[#f7f9f2] border-[#969a55]/70 text-foreground hover:bg-primary/30 hover:shadow-lg'
+                              ? 'cursor-pointer bg-[#f7f9f2] border-[#969a55]/80 text-foreground hover:bg-primary/30 hover:shadow-lg'
                               : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'
                     }`}
                   >
                     {editing ? (
                       <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" />
                     ) : isTableOutdoor ? (
-                      <Coffee aria-hidden="true" className="h-5 w-5 text-[#777b3d]" />
+                      <Coffee aria-hidden="true" className="h-5 w-5 text-[#656b2a]" />
                     ) : (
                       <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />
                     )}
-                    <span className="text-xs">{point.number}-stol</span>
-                    {isTableOutdoor && !editing && (
+                    <span className="text-xs font-bold leading-tight">{point.number}-stol</span>
+                    {isTableOutdoor && (
                       <span className="text-[9px] font-bold text-[#656b2a] leading-none">Ko‘cha</span>
                     )}
                     {!editing && isOccupied && (
@@ -1089,7 +1169,7 @@ export default function TableFloorplan({
                 );
               })}
               <div className="pointer-events-none absolute z-[2] bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">
-                {shop.table_count} ta stol · {zoneMode ? 'Ko‘cha hududini cho‘zing yoki suring' : editing ? 'Stollarni kerakli joyga suring' : 'Stolni tanlang'}
+                {shop.table_count} ta stol · {zoneMode ? 'Ko‘cha hududini cho‘zing yoki suring' : editing ? 'Stollarni erkin surib qo‘ying' : 'Stolni tanlang'}
               </div>
             </div>
           </div>
@@ -1103,7 +1183,7 @@ export default function TableFloorplan({
             <p className="font-semibold text-sm">
               {chosen
                 ? `${chosen.number}-stolni aniq joylashtirish (${
-                    finishedZone && pointInOutdoorPolygon(chosen, outdoorPolygon) ? '🌿 Ko‘chada' : '🏛️ Zal ichida'
+                    finishedZone && pointInOutdoorPolygon(chosen, outdoorPolygon) ? '🌿 Ko‘chada' : '☕ Qahvaxona ichida'
                   })`
                 : 'Stolni tanlang'}
             </p>
