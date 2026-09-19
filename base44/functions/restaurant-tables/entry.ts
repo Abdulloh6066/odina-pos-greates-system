@@ -49,6 +49,47 @@ const validateLayout = (layout: any, count: number) => {
   }
   return !layout.some((point: any, i: number) => layout.some((other: any, j: number) => i < j && overlaps(point, other)));
 };
+// Never trust a drawn zone from the browser. Empty means no outdoor zone yet.
+// Keep this validation in the protected function, not just in the visual editor.
+const cross = (a: any, b: any, c: any) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+const onSegment = (a: any, b: any, p: any) => cross(a, b, p) === 0
+  && p.x >= Math.min(a.x, b.x) && p.x <= Math.max(a.x, b.x)
+  && p.y >= Math.min(a.y, b.y) && p.y <= Math.max(a.y, b.y);
+const segmentsCross = (a: any, b: any, c: any, d: any) => {
+  const abC = cross(a, b, c); const abD = cross(a, b, d);
+  const cdA = cross(c, d, a); const cdB = cross(c, d, b);
+  return (abC === 0 && onSegment(a, b, c)) || (abD === 0 && onSegment(a, b, d))
+    || (cdA === 0 && onSegment(c, d, a)) || (cdB === 0 && onSegment(c, d, b))
+    || ((abC > 0) !== (abD > 0) && (cdA > 0) !== (cdB > 0));
+};
+const validOutdoorPolygon = (polygon: any) => {
+  if (!Array.isArray(polygon)) return false;
+  if (polygon.length === 0) return true;
+  if (polygon.length < 3 || polygon.length > 12) return false;
+  const seen = new Set<string>();
+  for (const point of polygon) {
+    if (!point || !Number.isInteger(point.x) || !Number.isInteger(point.y)
+      || point.x < 0 || point.x > 1000 || point.y < 0 || point.y > 1000) return false;
+    const key = `${point.x}:${point.y}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  const doubleArea = Math.abs(polygon.reduce((sum: number, p: any, i: number) => {
+    const next = polygon[(i + 1) % polygon.length];
+    return sum + p.x * next.y - next.x * p.y;
+  }, 0));
+  if (doubleArea < 20000) return false;
+  for (let i = 0; i < polygon.length; i += 1) {
+    for (let j = i + 1; j < polygon.length; j += 1) {
+      if (j === i + 1 || (i === 0 && j === polygon.length - 1)) continue;
+      if (segmentsCross(polygon[i], polygon[(i + 1) % polygon.length],
+        polygon[j], polygon[(j + 1) % polygon.length])) return false;
+    }
+  }
+  return true;
+};
+const cleanOutdoorPolygon = (polygon: any) => validOutdoorPolygon(polygon)
+  ? polygon.map(({ x, y }: any) => ({ x, y })) : [];
 const isShop = (shop: any) => Boolean(shop && shop.active !== false
   && shop.location_type === "shop" && shop.allows_pos !== false);
 const safeShop = (shop: any) => ({
@@ -58,6 +99,7 @@ const safeShop = (shop: any) => ({
     && shop.restaurant_table_count >= 0 && shop.restaurant_table_count <= MAX_TABLES
     ? shop.restaurant_table_count : 0,
   entrance: cleanEntrance(shop.restaurant_entrance),
+  outdoor_polygon: cleanOutdoorPolygon(shop.restaurant_outdoor_polygon),
   orders: ordersOf(shop).filter((order: any) => Number.isInteger(order.number))
     .map(orderSummary).sort((a: any, b: any) => a.number - b.number),
   layout_version: Number.isInteger(shop.restaurant_table_layout_version)
@@ -222,6 +264,13 @@ Deno.serve(async (req) => {
       if (!validEntrance(entrance)) {
         return Response.json({ error: "Eshik joylashuvi noto‘g‘ri. Devorni va joyini qayta tanlang." }, { status: 400 });
       }
+      // A stale browser that knows only tables and entrance must preserve the
+      // outdoor zone. Modern clients send it explicitly and are validated here.
+      const outdoorPolygon = body?.outdoor_polygon === undefined
+        ? current.outdoor_polygon : body.outdoor_polygon;
+      if (!validOutdoorPolygon(outdoorPolygon)) {
+        return Response.json({ error: "Ko‘cha hududi noto‘g‘ri. Kamida uchta nuqta tanlang, chiziqlar kesishmasin." }, { status: 400 });
+      }
       const layout = body?.layout;
       // Old browser tabs that omit size must not reset sizes saved by a newer tab.
       const existingSizes = new Map((current.layout || []).map((row: any) => [row.number, row.size]));
@@ -237,7 +286,9 @@ Deno.serve(async (req) => {
         : { restaurant_table_layout_version: version };
       const updated = await service.entities.Shop.updateMany(
         { id: shop.id, ...expectedVersion, restaurant_table_count: current.table_count },
-        { $set: { restaurant_table_layout: clean, restaurant_entrance: cleanEntrance(entrance) }, $inc: { restaurant_table_layout_version: 1 } },
+        { $set: { restaurant_table_layout: clean, restaurant_entrance: cleanEntrance(entrance),
+          restaurant_outdoor_polygon: cleanOutdoorPolygon(outdoorPolygon) },
+          $inc: { restaurant_table_layout_version: 1 } },
       );
       if (!updated?.success || Number(updated.updated || 0) !== 1) {
         return Response.json({ error: "Stollar soni yoki xarita o‘zgardi. Yangilang va qayta urinib ko‘ring." }, { status: 409 });
