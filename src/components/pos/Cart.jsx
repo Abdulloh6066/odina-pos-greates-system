@@ -109,10 +109,11 @@ export default function Cart({
         </div>
         {tableMode && <div className="rounded-xl border border-brand-olive/30 bg-brand-olive/5 p-3 space-y-2">
           <p className="text-xs font-medium text-brand-ink">{tableDirty ? '● Buyurtmada saqlanmagan o‘zgarishlar bor' : tableSaved ? '✓ Buyurtma serverda saqlangan · hali to‘lanmagan' : 'Mahsulotlarni qo‘shing, keyin buyurtmani saqlang'}</p>
+          {(discountCode || roundingTarget !== null) && <p className="text-xs text-muted-foreground">Chegirma stolga saqlanmaydi; mehmon ketganda to‘lovda qayta qo‘llang.</p>}
           <Button type="button" variant="outline" onClick={onSaveTable}
-            disabled={locked || !tableDirty || cart.length === 0 || savingTable}
+            disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
             className="w-full min-h-12 rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
-            {savingTable ? 'Saqlanmoqda…' : 'Buyurtmani stolga saqlash'}
+            {savingTable ? 'Saqlanmoqda…' : tableDirty ? 'Stolga saqlash → Yangi buyurtma' : 'Yangi buyurtmaga o‘tish'}
           </Button>
         </div>}
         <Button
