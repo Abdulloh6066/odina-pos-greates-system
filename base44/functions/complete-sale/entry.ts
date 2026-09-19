@@ -17,6 +17,7 @@ import {
   resolveAppUser, SHIFT_STOCK_ROW_LIMIT, stockMovementTime,
   buildShiftStockReport, cleanupShiftStockSnapshots,
   BUDGET_ACCOUNT_LABELS, creditBudgetBalance, rollbackBudgetBalance,
+  allocateServiceTicketNumber, finishServiceTicketCycleIfLastShift,
 } from "../../shared/shift-close-helpers.ts";
 import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
 
@@ -545,6 +546,10 @@ export default async function(req) {
           budget_settled_by_id: user.id,
           budget_settled_by_name: userName,
         };
+        // A single cashier closing is not the end of a shop-wide service
+        // numbering cycle while any other shift remains open or closing.
+        await finishServiceTicketCycleIfLastShift(service, closingShift.shop_id)
+          .catch((error: any) => console.error("Service-ticket cycle close needs reconciliation:", error));
         await service.entities.ActionHistory.create({
           user_id: user.id,
           user_name: userName,
@@ -1339,8 +1344,14 @@ export default async function(req) {
       stockChanges.push({ ...plan, stockRecord });
     }
 
+    // A table keeps its FIRST saved service number through all edits and
+    // payment. An ordinary takeout sale claims one number from the same shop
+    // counter. Sale.sale_number remains the original immutable finance ID.
+    const serviceTicketNumber = Number.isSafeInteger(tableOrder?.ticket_number) && tableOrder.ticket_number > 0
+      ? tableOrder.ticket_number : await allocateServiceTicketNumber(service, shift.shop_id);
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
+      service_ticket_number: serviceTicketNumber,
       idempotency_key: idempotencyKey || undefined,
       request_fingerprint: requestFingerprint || undefined,
       sold_at: soldAt,
