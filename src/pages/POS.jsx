@@ -1164,7 +1164,7 @@ export default function POS() {
         offline={checkoutOffline || (!isOnline && !selectedTable)}
       />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings}
-        onStaffTicket={(sale) => { setReceiptOpen(false); setStaffTicket({ mode: 'sale', order: sale }); }}
+        onStaffTicket={(sale) => { setReceiptOpen(false); setStaffTicket({ mode: 'sale', order: sale, autoPrint: true }); }}
         onClose={() => {
         setReceiptOpen(false);
         if (selectedTable && !lastSale?.offline_pending) {
@@ -1173,7 +1173,7 @@ export default function POS() {
       }} />
       <StaffOrderTicketModal open={!!staffTicket} onClose={() => setStaffTicket(null)}
         mode={staffTicket?.mode} order={staffTicket?.order} shop={staffTicket?.shop}
-        shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} />
+        shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} autoPrint={staffTicket?.autoPrint} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
