@@ -5,6 +5,11 @@
     "sale_number": {
       "type": "string"
     },
+    "service_ticket_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Oshxona xizmat chekining savdo paytida saqlangan do\u2018kon bo\u2018yicha raqami; asl sale_number o\u2018zgarmaydi"
+    },
     "idempotency_key": {
       "type": "string",
       "maxLength": 128,
