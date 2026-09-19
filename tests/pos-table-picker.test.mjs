@@ -4,12 +4,43 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { transformSync } from 'esbuild';
 
 const read = (path) => readFileSync(path, 'utf8');
 const pos = read('src/pages/POS.jsx');
 const floorplan = read('src/components/tables/TableFloorplan.jsx');
 const backend = read('base44/functions/restaurant-tables/entry.ts');
 const checkout = read('base44/functions/complete-sale/entry.ts');
+
+// Vite's production build can accept an icon that was accidentally removed
+// from imports, while the Kassa crashes at runtime when the status banner
+// renders. Execute the real JSX banner with icons available ONLY if imported.
+test('Kassa renders offline and sync-status banners without missing icon runtime errors', () => {
+  const lucideImport = pos.match(/import \{([^}]+)\} from 'lucide-react';/);
+  assert.ok(lucideImport, 'POS must import its visible status icons');
+  const icons = Object.fromEntries(lucideImport[1].split(',').map((name) => name.trim())
+    .filter(Boolean).map((name) => [name, () => null]));
+  const start = pos.indexOf('function OfflineSalesBanner(');
+  const end = pos.indexOf('\nfunction CatTab(', start);
+  assert.ok(start >= 0 && end > start, 'Expected the real POS status banner');
+  const code = transformSync(`${pos.slice(start, end)}\nglobalThis.renderBanner = OfflineSalesBanner;`,
+    { loader: 'jsx', jsx: 'transform' }).code;
+  const context = {
+    ...icons,
+    React: { createElement: (type, props, ...children) => ({ type, props, children }) },
+    Button: () => null,
+  };
+  vm.runInNewContext(code, context);
+  const cases = [
+    { isOnline: false, records: [], syncing: false },
+    { isOnline: true, records: [{ status: 'pending' }], syncing: true },
+    { isOnline: true, records: [{ status: 'pending' }], syncing: false },
+    { isOnline: true, records: [], syncing: false, storageError: 'Mock storage error' },
+  ];
+  for (const state of cases) {
+    assert.equal(context.renderBanner({ ...state, onRetry: () => {} })?.type, 'div');
+  }
+});
 
 test('Kassa opens the dedicated Stollar page instead of a large modal on desktop and touch devices', () => {
   const page = read('src/pages/RestaurantTables.jsx');
