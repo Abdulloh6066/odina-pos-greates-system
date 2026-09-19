@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -10,6 +10,7 @@ import ProductCard from '@/components/pos/ProductCard';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
+import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -70,6 +71,7 @@ export default function POS() {
   const checkoutRecordedAtRef = useRef('');
   const [lastSale, setLastSale] = useState(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [staffTicket, setStaffTicket] = useState(null);
 
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
@@ -346,6 +348,8 @@ export default function POS() {
     if (tableCartDirty && !(await saveTableOrder())) return;
     if (!tableCartDirty && !tableOrder?.id) return;
     const savedNumber = selectedTable.number;
+    const savedShopId = selectedTable.shopId;
+    const savedShop = tableShop;
     resetCart();
     setTableOrder(null);
     setTableSaveError('');
@@ -353,7 +357,8 @@ export default function POS() {
     setShowFav(false);
     setSearch('');
     setMobileCartOpen(false);
-    navigate('/pos', { replace: true, state: { savedTableNumber: savedNumber } });
+    navigate('/pos', { replace: true, state: { savedTableNumber: savedNumber, savedShopId } });
+    setStaffTicket({ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber });
   };
 
   const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
@@ -968,6 +973,13 @@ export default function POS() {
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-ink" aria-hidden="true" />
           <p className="flex-1"><strong>{location.state.savedTableNumber}-stol buyurtmasi saqlandi.</strong> To‘lov olinmadi. Kassa yangi buyurtmaga tayyor.</p>
+          <Button type="button" variant="outline" onClick={() => setStaffTicket({
+            mode: 'table', shopId: location.state.savedShopId || shift?.shop_id,
+            shop: shops.find((item) => item.id === (location.state.savedShopId || shift?.shop_id)),
+            tableNumber: location.state.savedTableNumber,
+          })} className="min-h-11 shrink-0 rounded-xl text-xs font-semibold">
+            <ReceiptText className="h-4 w-4 mr-1.5" /> Xizmat cheki
+          </Button>
           <Button type="button" variant="ghost" size="icon" aria-label="Saqlash xabarini yopish"
             onClick={() => navigate('/pos', { replace: true, state: null })} className="h-11 w-11 shrink-0 rounded-xl"><X className="h-4 w-4" /></Button>
         </div>
@@ -1008,6 +1020,11 @@ export default function POS() {
               setTableSaveError('');
               setDiscountCode(''); setDiscountPct(0); setRoundingTarget(null); setAdjustmentMode(null);
             }}>Saqlangan holatga qaytish</Button>}
+            {tableOrder?.items?.length > 0 && !tableCartDirty && <Button type="button" variant="outline"
+              onClick={() => setStaffTicket({ mode: 'table', shop: tableShop, shopId: selectedTable.shopId, tableNumber: selectedTable.number })}
+              className="min-h-11 rounded-xl font-semibold text-brand-ink">
+              <ReceiptText className="h-4 w-4 mr-1.5" /> Xizmat cheki
+            </Button>}
             {tableOrder?.state === 'paying' && <Button type="button" variant="outline" className="min-h-11 border-amber-500" onClick={() => void reconcileTablePayment()}>To‘lovni tekshirish</Button>}
             {(tableOrderError || tableSaveError) && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
@@ -1146,12 +1163,17 @@ export default function POS() {
         loading={paying}
         offline={checkoutOffline || (!isOnline && !selectedTable)}
       />
-      <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => {
+      <Receipt open={receiptOpen} sale={lastSale} settings={settings}
+        onStaffTicket={(sale) => { setReceiptOpen(false); setStaffTicket({ mode: 'sale', order: sale }); }}
+        onClose={() => {
         setReceiptOpen(false);
         if (selectedTable && !lastSale?.offline_pending) {
           navigate('/tables', { state: { shopId: lastSale?.shop_id || selectedTable.shopId } });
         }
       }} />
+      <StaffOrderTicketModal open={!!staffTicket} onClose={() => setStaffTicket(null)}
+        mode={staffTicket?.mode} order={staffTicket?.order} shop={staffTicket?.shop}
+        shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
