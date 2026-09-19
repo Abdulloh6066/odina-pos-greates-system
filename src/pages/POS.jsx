@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, Armchair, ArrowLeft, CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -20,9 +20,6 @@ import {
   isRetryableSyncError,
   syncErrorMessage,
 } from '@/lib/offline-sales';
-
-// Load the larger floor-plan component only when the cashier opens its picker.
-const TableFloorplan = React.lazy(() => import('@/components/tables/TableFloorplan'));
 
 export default function POS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
@@ -83,11 +80,6 @@ export default function POS() {
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
-  const [tablePickerOpen, setTablePickerOpen] = useState(false);
-  const [tablePickerLoading, setTablePickerLoading] = useState(false);
-  const [tablePickerError, setTablePickerError] = useState('');
-  const [tablePickerShops, setTablePickerShops] = useState([]);
-  const [tablePickerShopId, setTablePickerShopId] = useState('');
   const [tableOrder, setTableOrder] = useState(null);
   const [tableOrderLoading, setTableOrderLoading] = useState(false);
   const [tableOrderError, setTableOrderError] = useState('');
@@ -282,55 +274,38 @@ export default function POS() {
     return () => unsubscribe?.();
   }, [user?.id]);
 
-  // The POS table picker uses the same server-scoped map as the Stollar page.
-  // The backend limits cashiers to their assigned shop; an open shift further
-  // restricts the picker to its shop. This is read-only until a table is tapped.
-  const openTablePicker = async () => {
-    if (screenMode) return;
-    if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
-    setTablePickerOpen(true);
-    setTablePickerLoading(true);
-    setTablePickerError('');
-    try {
-      const response = await base44.functions.invoke('restaurant-tables', { action: 'status' });
-      const result = response?.data || response;
-      if (!Array.isArray(result?.shops)) throw new Error('Stollar javobi noto‘g‘ri.');
-      const available = shift
-        ? result.shops.filter((shop) => shop.id === shift.shop_id)
-        : result.shops;
-      setTablePickerShops(available);
-      setTablePickerShopId((previous) => available.some((shop) => shop.id === previous) ? previous
-        : available.some((shop) => shop.id === selectedTable?.shopId) ? selectedTable.shopId
-          : available[0]?.id || '');
-      if (!available.length) setTablePickerError('Bu smena do‘koni uchun stollar topilmadi. Do‘kon biriktirilishini tekshiring.');
-    } catch (error) {
-      setTablePickerShops([]);
-      setTablePickerShopId('');
-      setTablePickerError(error?.response?.data?.error || error?.data?.error || error?.message || 'Stollar xaritasini yuklab bo‘lmadi.');
-    } finally {
-      setTablePickerLoading(false);
-    }
-  };
-  const chooseTableInPos = async (shopId, number) => {
-    if (tablePickerLoading || (selectedTable?.shopId === shopId && selectedTable?.number === number)) {
-      setTablePickerOpen(false);
-      return;
-    }
-    if (shift && shift.shop_id !== shopId) {
-      void odinaAlert('Bu stol joriy smenaning do‘koniga tegishli emas.');
-      return;
-    }
-    if (selectedTable && tableOrderLoading) return;
+  // The operational floor plan has its own /tables page. Never discard a
+  // table's unsaved edits when navigating away; keep an ordinary unsaved cart.
+  const goToTables = async () => {
+    if (screenMode || savingTableRef.current || paying || tableOrderLoading || tableOrderError) return;
     if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
     if (!selectedTable && cart.length && !(await odinaConfirm({
       title: 'Oddiy savat saqlanmagan',
-      description: 'Stolga o‘tsangiz oddiy savat o‘chadi. Avval uning savdosini yakunlang yoki tasdiqlang.',
-      confirmLabel: 'Stolga o‘tish', tone: 'warning',
+      description: 'Stollar sahifasiga o‘tsangiz oddiy savat o‘chadi. Avval savdoni yakunlang yoki tasdiqlang.',
+      confirmLabel: 'Stollarni ochish', tone: 'warning',
     }))) return;
-    setTablePickerOpen(false);
-    navigate(`/pos?${new URLSearchParams({ table_shop: shopId, table_number: String(number) })}`);
+    setMobileCartOpen(false);
+    navigate('/tables');
   };
-  const tablePickerShop = tablePickerShops.find((shop) => shop.id === tablePickerShopId);
+
+  // This button finishes only the unpaid order's SAVE, never its payment.
+  // Leave this table only after the server confirms the write; a failed save
+  // keeps the cart on screen for retry without creating a new sale.
+  const saveAndStartNextOrder = async () => {
+    if (!selectedTable || tableOrderLoading || savingTableRef.current || paying
+      || tableOrderError || tableOrder?.state === 'paying') return;
+    if (tableCartDirty && !(await saveTableOrder())) return;
+    if (!tableCartDirty && !tableOrder?.id) return;
+    const savedNumber = selectedTable.number;
+    resetCart();
+    setTableOrder(null);
+    setTableSaveError('');
+    setActiveCat('all');
+    setShowFav(false);
+    setSearch('');
+    setMobileCartOpen(false);
+    navigate('/pos', { replace: true, state: { savedTableNumber: savedNumber } });
+  };
 
   const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
   const tableSelectionError = tableQuery.invalid && !screenMode
