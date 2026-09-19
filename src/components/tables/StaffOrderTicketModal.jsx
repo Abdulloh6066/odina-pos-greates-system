@@ -101,29 +101,39 @@ export default function StaffOrderTicketModal({
   }, [open, autoPrint, loading, error, items.length, ticket, printTicket]);
 
   const body = items.length > 0 && ticket && (
-    <div className="font-mono text-xs leading-relaxed text-zinc-950">
-      <div className="space-y-1 border-b border-dashed border-zinc-500 pb-2">
-        <div className="flex justify-between gap-2 text-sm font-black">
-          <span>TURI:</span><span>{source}</span>
+    <div className="font-mono text-xs leading-snug text-zinc-950">
+      <div className="border-b border-zinc-900 pb-3 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-[10px] font-semibold">TURI</span>
+          <strong className="min-w-0 text-right text-sm leading-tight">{source}</strong>
         </div>
-        <div className="flex justify-between gap-2"><span>Buyurtma №:</span><strong>#{ticket.number || displayTableNumber || '—'}</strong></div>
-        <div className="flex justify-between gap-2"><span>Vaqt:</span><span>{formatUzbekistanDateTime(ticket.updated_at || ticket.started_at || Date.now())}</span></div>
-        {ticket.opened_by_name && <div className="flex justify-between gap-2"><span>Buyurtma oluvchi:</span><strong className="text-right">{ticket.opened_by_name}</strong></div>}
+        <div>
+          <div className="text-[10px] font-semibold">BUYURTMA №</div>
+          <strong className="block break-all text-[11px] leading-snug">#{ticket.number || displayTableNumber || '—'}</strong>
+        </div>
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-[10px] font-semibold">VAQT</span>
+          <span className="min-w-0 text-right">{formatUzbekistanDateTime(ticket.updated_at || ticket.started_at || Date.now())}</span>
+        </div>
+        {ticket.opened_by_name && (
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 text-[10px] font-semibold">BUYURTMA OLUVCHI</span>
+            <strong className="min-w-0 text-right break-words">{ticket.opened_by_name}</strong>
+          </div>
+        )}
       </div>
-      <div className="py-2 text-[10px] font-bold uppercase tracking-wide">Mahsulotlar va miqdor</div>
-      <div className="space-y-2">
+      <div className="py-3 text-[10px] font-bold tracking-wide">MAHSULOTLAR VA MIQDOR</div>
+      <div>
         {items.map((item, index) => (
-          <div key={index} className="border-b border-dashed border-zinc-300 pb-2 break-inside-avoid">
-            <div className="flex justify-between gap-2 font-bold">
-              <span className="shrink-0 text-sm font-black">[ {item.quantity} {item.unit_label || 'ta'} ]</span>
-              <span className="text-right break-words">{item.product_name}</span>
-            </div>
+          <div key={index} className="flex items-start justify-between gap-3 border-b border-dashed border-zinc-400 py-2.5 break-inside-avoid">
+            <span className="min-w-0 flex-1 break-words text-sm font-bold leading-tight">{item.product_name}</span>
+            <strong className="shrink-0 border border-zinc-900 px-2 py-1 text-sm leading-none">{item.quantity} {item.unit_label || 'ta'}</strong>
           </div>
         ))}
       </div>
-      <div className="border-t-2 border-dashed border-zinc-900 pt-2 text-right font-bold">
-        Mahsulot turlari: {items.length} ta<br />
-        Jami miqdor: {items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} {totalUnit}
+      <div className="border-t border-zinc-900 pt-3 mt-2 space-y-1">
+        <div className="flex justify-between gap-3"><span>Mahsulot turlari</span><strong>{items.length} ta</strong></div>
+        <div className="flex justify-between gap-3 text-sm font-black"><span>Jami miqdor</span><span>{items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} {totalUnit}</span></div>
       </div>
     </div>
   );
