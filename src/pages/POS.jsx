@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, Armchair, ArrowLeft, CheckCircle2, X } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
