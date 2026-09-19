@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, DoorOpen,
-  Edit3, Grip, Leaf, Minus, MousePointer2, Plus, RotateCcw, Save, Sun, X,
+  Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, Check, DoorOpen,
+  Edit3, Grip, Minus, MousePointer2, PenTool, Plus, RotateCcw, Save, Sun, Undo2, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import {
-  buildTableLayout, clamp, entranceFromPoint, normalizeEntrance,
-  nudgeEntrance, tableBounds, tableSize, TABLE_SIZES, validateTableLayout,
+  buildTableLayout, clamp, entranceFromPoint, normalizeEntrance, normalizeOutdoorPolygon,
+  nudgeEntrance, pointInOutdoorPolygon, tableBounds, tableSize, TABLE_SIZES,
+  validOutdoorPolygon, MAX_OUTDOOR_VERTICES, validateTableLayout,
 } from '@/lib/table-floorplan';
 
 const WALLS = [
@@ -16,10 +17,6 @@ const WALLS = [
   { side: 'bottom', label: 'Pastki' },
   { side: 'left', label: 'Chap' },
 ];
-// Visual-only boundary: coordinates and order records remain unchanged.
-// Existing tables can be moved across the open passage in edit mode.
-const OUTDOOR_START = 620;
-
 const ARROWS = [
   { key: 'ArrowLeft', icon: ArrowLeft, label: 'Chapga surish' },
   { key: 'ArrowUp', icon: ArrowUp, label: 'Yuqoriga surish' },
@@ -46,8 +43,15 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
     () => normalizeEntrance(shop.entrance),
     [shop.id, shop.layout_version, shop.entrance?.side, shop.entrance?.offset],
   );
+  const defaultOutdoor = useMemo(
+    () => normalizeOutdoorPolygon(shop.outdoor_polygon),
+    [shop.id, shop.layout_version, shop.outdoor_polygon],
+  );
   const [layout, setLayout] = useState(defaultLayout);
   const [entrance, setEntrance] = useState(defaultEntrance);
+  const [outdoorPolygon, setOutdoorPolygon] = useState(defaultOutdoor);
+  const [zoneDrawing, setZoneDrawing] = useState(false);
+  const [zoneClosed, setZoneClosed] = useState(true);
   const [editing, setEditing] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -58,18 +62,23 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   useEffect(() => {
     setLayout(defaultLayout);
     setEntrance(defaultEntrance);
+    setOutdoorPolygon(defaultOutdoor);
+    setZoneDrawing(false);
+    setZoneClosed(true);
     setEditing(false);
     setSelectedNumber(null);
     setError('');
     dragging.current = null;
-  }, [defaultLayout, defaultEntrance]);
+  }, [defaultLayout, defaultEntrance, defaultOutdoor]);
 
   const tableDirty = layout.some((point, index) =>
     point.x !== defaultLayout[index]?.x || point.y !== defaultLayout[index]?.y
     || tableSize(point) !== tableSize(defaultLayout[index]));
   const entranceDirty = entrance.side !== defaultEntrance.side || entrance.offset !== defaultEntrance.offset;
-  const dirty = tableDirty || entranceDirty;
-  const valid = validateTableLayout(shop.table_count, layout);
+  const zoneDirty = JSON.stringify(outdoorPolygon) !== JSON.stringify(defaultOutdoor);
+  const dirty = tableDirty || entranceDirty || zoneDirty;
+  const zoneValid = validOutdoorPolygon(outdoorPolygon) && (!zoneDrawing || zoneClosed);
+  const valid = validateTableLayout(shop.table_count, layout) && zoneValid;
   useEffect(() => { onEditingChange?.(editing && dirty); }, [editing, dirty, onEditingChange]);
 
   const place = (number, x, y) => {
@@ -107,7 +116,12 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
     const position = pointerCoordinates(event);
     if (!position) return;
     if (target === 'entrance') setEntrance(entranceFromPoint(position.x, position.y));
-    else place(target, position.x, position.y);
+    else if (target === 'zone-vertex') {
+      const vertexIndex = dragging.current.index;
+      setOutdoorPolygon((current) => current.map((point, index) => index === vertexIndex
+        ? { x: clamp(Math.round(position.x / 5) * 5, 0, 1000),
+          y: clamp(Math.round(position.y / 5) * 5, 0, 1000) } : point));
+    } else place(target, position.x, position.y);
   };
   const startDrag = (event, target) => {
     if (!editing || saving) return;
@@ -116,6 +130,23 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
     if (target !== 'entrance') setSelectedNumber(target);
     else setSelectedNumber(null);
     event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const startVertexDrag = (event, index) => {
+    if (!editing || !zoneDrawing || saving) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragging.current = { target: 'zone-vertex', index, pointerId: event.pointerId };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const addZonePoint = (event) => {
+    if (!editing || !zoneDrawing || zoneClosed || saving) return;
+    const position = pointerCoordinates(event);
+    if (!position) return;
+    const point = { x: clamp(Math.round(position.x / 5) * 5, 0, 1000),
+      y: clamp(Math.round(position.y / 5) * 5, 0, 1000) };
+    setOutdoorPolygon((current) => current.length >= MAX_OUTDOOR_VERTICES
+      || current.some((vertex) => vertex.x === point.x && vertex.y === point.y)
+      ? current : [...current, point]);
   };
   const stopDrag = (event) => {
     if (dragging.current?.pointerId === event.pointerId) dragging.current = null;
@@ -132,6 +163,9 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   const reset = () => {
     setLayout(defaultLayout);
     setEntrance(defaultEntrance);
+    setOutdoorPolygon(defaultOutdoor);
+    setZoneDrawing(false);
+    setZoneClosed(true);
     setSelectedNumber(null);
     setError('');
   };
@@ -147,6 +181,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       const response = await base44.functions.invoke('restaurant-tables', {
         action: 'set_table_layout', shop_id: shop.id,
         layout_version: shop.layout_version, layout, entrance,
+        outdoor_polygon: outdoorPolygon,
       });
       const result = response?.data || response;
       if (!result?.ok || result?.shop?.id !== shop.id) throw new Error('Xarita saqlangani tasdiqlanmadi.');
@@ -167,8 +202,11 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
   const payingCount = openOrders.filter((order) => order.state === 'paying').length;
   const unpaidTotal = openOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
   const verticalDoor = entrance.side === 'left' || entrance.side === 'right';
-  const indoorCount = layout.filter((point) => point.y < OUTDOOR_START).length;
-  const outdoorCount = layout.length - indoorCount;
+  const finishedZone = zoneClosed && outdoorPolygon.length >= 3 && validOutdoorPolygon(outdoorPolygon);
+  const outdoorCount = finishedZone
+    ? layout.filter((point) => pointInOutdoorPolygon(point, outdoorPolygon)).length : 0;
+  const indoorCount = layout.length - outdoorCount;
+  const zonePoints = outdoorPolygon.map((point) => `${point.x},${point.y}`).join(' ');
 
   return (
     <section aria-label={`${shop.name} stollar xaritasi`} className="rounded-[28px] border border-border bg-card premium-shadow p-4 sm:p-6 space-y-4">
