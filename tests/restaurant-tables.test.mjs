@@ -46,9 +46,23 @@ function fixture() {
   }; 
   let currentId = 'owner';
   let writes = 0;
+  const matchesValue = (actual, expected) => {
+    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
+      if ('$exists' in expected) return expected.$exists ? actual !== undefined : actual === undefined;
+      if ('$in' in expected) return expected.$in.includes(actual ?? null);
+      if ('$ne' in expected) return actual !== expected.$ne;
+    }
+    return actual === expected;
+  };
+  const matches = (row, query) => (!query.$or || query.$or.some((branch) => matches(row, branch)))
+    && Object.entries(query).filter(([key]) => key !== '$or')
+      .every(([key, expected]) => matchesValue(row[key], expected));
   const entities = {
     User: { get: async (id) => clone(db.User.find((user) => user.id === id) || null) },
-    Shift: { get: async (id) => clone(db.Shift.find((shift) => shift.id === id) || null) },
+    Shift: {
+      get: async (id) => clone(db.Shift.find((shift) => shift.id === id) || null),
+      filter: async (query) => clone(db.Shift.filter((shift) => matches(shift, query))),
+    },
     Product: { get: async (id) => clone(db.Product.find((product) => product.id === id) || null) },
     Sale: { filter: async (query) => clone(db.Sale.filter((sale) => Object.entries(query).every(([key, value]) => sale[key] === value))) },
     Shop: {
@@ -63,26 +77,7 @@ function fixture() {
       },
       updateMany: async (query, update) => {
         const shop = db.Shop.find((row) => row.id === query.id);
-        if (!shop) return { success: true, updated: 0 };
-        const expectedCount = query.restaurant_table_count;
-        if (expectedCount !== undefined && (typeof expectedCount === 'object'
-          ? !expectedCount.$in.includes(shop.restaurant_table_count ?? null)
-          : shop.restaurant_table_count !== expectedCount)) return { success: true, updated: 0 };
-        const layoutExpectation = query.restaurant_table_layout_version;
-        if (layoutExpectation !== undefined && (typeof layoutExpectation === 'object'
-          ? !layoutExpectation.$in.includes(shop.restaurant_table_layout_version ?? null)
-          : shop.restaurant_table_layout_version !== layoutExpectation)) return { success: true, updated: 0 };
-        const versionField = query.restaurant_table_orders_version !== undefined
-          || query.$or?.some((condition) => Object.hasOwn(condition, 'restaurant_table_orders_version'))
-          ? 'restaurant_table_orders_version' : 'restaurant_table_layout_version';
-        const version = Number(shop[versionField] || 0);
-        const versionMatches = query[versionField] !== undefined
-          ? version === query[versionField]
-          : Array.isArray(query.$or) && query.$or.some((condition) => (
-            condition[versionField] === version
-            || (condition[versionField]?.$exists === false && shop[versionField] === undefined)
-          ));
-        if (!versionMatches) return { success: true, updated: 0 };
+        if (!shop || !matches(shop, query)) return { success: true, updated: 0 };
         writes++;
         Object.assign(shop, clone(update.$set || {}));
         for (const [field, amount] of Object.entries(update.$inc || {})) {
@@ -103,7 +98,12 @@ function fixture() {
   let handler;
   const source = read('base44/functions/restaurant-tables/entry.ts')
     .replace(/^import .*;\s*$/gm, '');
-  const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+  const helperSource = read('base44/shared/shift-close-helpers.ts')
+    .slice(read('base44/shared/shift-close-helpers.ts').indexOf('const serviceTicketVersion = '),
+      read('base44/shared/shift-close-helpers.ts').indexOf('export const money = '))
+    .replace(/export /g, '');
+  const code = ts.transpileModule(helperSource + '\n' + source,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
   vm.runInNewContext(code, {
     Deno: { serve: (callback) => { handler = callback; } },
     createClientFromRequest: () => client,
@@ -112,6 +112,7 @@ function fixture() {
     userShopId: (user) => user?.shop_id || '',
     userLabel: (user) => user?.email || 'Xodim',
     Response, console, Date, Set, Number, String, crypto: webcrypto,
+    httpError: (message, status) => Object.assign(new Error(message), { status }),
   });
   assert.equal(typeof handler, 'function');
   return {
