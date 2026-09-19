@@ -334,7 +334,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
 
               <button type="button" aria-label={`Kirish eshigi: ${WALLS.find((wall) => wall.side === entrance.side)?.label} devor${editing ? ', joyini o‘zgartirish' : ''}`}
                 title={editing ? 'Eshikni ushlab devor bo‘ylab suring' : 'Kirish eshigi'}
-                disabled={!editing || saving}
+                disabled={!editing || saving || zoneDrawing}
                 onPointerDown={(event) => startDrag(event, 'entrance')}
                 onPointerMove={(event) => onMove(event, 'entrance')}
                 onPointerUp={stopDrag}
@@ -351,18 +351,40 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 {editing && <Grip aria-hidden="true" className="h-3 w-3 shrink-0 opacity-65" />}
               </button>
 
+              {zoneDrawing && outdoorPolygon.map((point, index) => <button key={`street-point-${index}`}
+                type="button" disabled={saving}
+                aria-label={`Ko‘cha chegarasining ${index + 1}-nuqtasi, joyini suring yoki yo‘nalish tugmalaridan foydalaning`}
+                title={`${index + 1}-nuqta · surib o‘zgartiring`}
+                onPointerDown={(event) => startVertexDrag(event, index)}
+                onPointerMove={(event) => onMove(event, 'zone-vertex')}
+                onPointerUp={stopDrag} onPointerCancel={stopDrag}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+                  event.preventDefault();
+                  const step = event.shiftKey ? 50 : 10;
+                  setOutdoorPolygon((current) => current.map((vertex, i) => i === index ? {
+                    x: clamp(vertex.x + (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0), 0, 1000),
+                    y: clamp(vertex.y + (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0), 0, 1000),
+                  } : vertex));
+                }}
+                style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, transform: 'translate(-50%, -50%)', touchAction: 'none' }}
+                className="absolute z-40 flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-white bg-[#aca95d] text-xs font-bold text-[#292c1f] shadow-[0_2px_12px_rgba(0,0,0,.30)] cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-olive select-none">
+                {index + 1}
+              </button>)}
+
               {layout.map((point) => {
                 const order = (shop.orders || []).find((row) => row.number === point.number);
                 return <button key={point.number} type="button"
                 aria-label={`${point.number}-stol, ${order ? (order.state === 'paying' ? 'To‘lov tekshirilmoqda' : `Band, ${order.total} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Kassaga o‘tish'}`}
                 title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol — Kassaga o‘tish`}
-                disabled={saving}
+                disabled={saving || zoneDrawing}
                 onPointerDown={(event) => startDrag(event, point.number)}
                 onPointerMove={(event) => onMove(event, point.number)}
                 onPointerUp={stopDrag}
                 onPointerCancel={stopDrag}
                 onKeyDown={(event) => keyboardMove(event, point)}
-                onClick={() => { if (editing) setSelectedNumber(point.number); else onOpen(shop.id, point.number); }}
+                onClick={() => { if (zoneDrawing) return; if (editing) setSelectedNumber(point.number); else onOpen(shop.id, point.number); }}
                 style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, width: `${Math.round(68 * tableSize(point) / 100)}px`, height: `${Math.round(68 * tableSize(point) / 100)}px`, transform: 'translate(-50%, -50%)', touchAction: editing ? 'none' : 'manipulation' }}
                 className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow] ${editing
                   ? selectedNumber === point.number ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20' : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
@@ -377,13 +399,13 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 </span>}
               </button>;
               })}
-              <div className="pointer-events-none absolute bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">{shop.table_count} ta stol · {editing ? 'Ichkari yoki ko‘chaga suring' : 'Stolni tanlang'}</div>
+              <div className="pointer-events-none absolute z-[2] bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">{shop.table_count} ta stol · {zoneDrawing ? 'Ko‘cha chegarasini chizing' : editing ? 'Stollarni kerakli joyga suring' : 'Stolni tanlang'}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {editing && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/30 p-3 sm:p-4">
+      {editing && !zoneDrawing && <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/30 p-3 sm:p-4">
         <div className="min-w-0">
           <p className="font-semibold text-sm">{chosen ? `${chosen.number}-stolni aniq joylashtirish` : 'Stolni tanlang'}</p>
           <p className="text-xs text-muted-foreground">{chosen ? 'Stolni suring yoki o‘lchamini alohida o‘zgartiring.' : 'Xaritadan stolni tanlang: joyi va o‘lchamini tahrirlaysiz.'}</p>
@@ -418,6 +440,7 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Bo‘sh / Band / To‘lov holati'}</span>
         <span className="inline-flex items-center gap-1.5"><DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— suring yoki devorni tanlang' : '— kirish joyi'}</span>
+        <span className="inline-flex items-center gap-1.5"><PenTool className="h-4 w-4 text-brand-ink" /> Ko‘cha — chegarani admin chizadi</span>
         <span className="inline-flex items-center gap-1.5">{editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />} {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Buyurtma to‘lovgacha stolda qoladi · bron keyingi bosqichda'}</span>
       </div>
     </section>
