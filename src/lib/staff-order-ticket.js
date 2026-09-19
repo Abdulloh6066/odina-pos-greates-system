@@ -4,7 +4,7 @@ export function staffTicketFromSale(sale) {
   if (!sale) return null;
   return {
     id: sale.id || sale.idempotency_key,
-    number: sale.sale_number || String(sale.id || '').slice(-6).toUpperCase(),
+    number: sale.service_ticket_number ?? sale.sale_number ?? String(sale.id || '').slice(-6).toUpperCase(),
     started_at: sale.sold_at || sale.created_date || sale.created_at,
     shop_name: sale.shop_name,
     table_number: Number.isInteger(sale.table_number_snapshot) ? sale.table_number_snapshot : null,
