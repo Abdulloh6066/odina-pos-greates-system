@@ -9,9 +9,9 @@ import { Image } from '@/components/ui/image';
 import OrderPaymentDialog from '@/components/orders/OrderPaymentDialog';
 import OrderCompleteDialog from '@/components/orders/OrderCompleteDialog';
 import { useAuth } from '@/lib/AuthContext';
-import { Calendar, Clock, Phone, MapPin, Store, User, CreditCard, Truck, PackageCheck, Repeat2 } from 'lucide-react';
+import { Calendar, Clock, Phone, MapPin, Store, User, CreditCard, Truck, PackageCheck, Repeat2, ReceiptText } from 'lucide-react';
 
-export default function OrderDetail({ order, onClose, onPaid, onRepeat }) {
+export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffTicket }) {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -139,7 +139,9 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat }) {
               const canRepeat = user?.role === 'admin' || user?.role === 'cashier';
               const handoffLabel = order.fulfilment_type === 'delivery' ? 'Yuborildi' : 'Olib ketildi';
               const showPay = order.remaining_balance > 0 && order.order_status !== 'bekor_qilindi';
-              if (!canComplete && !showPay && !canRepeat) return null;
+              const canPrint = items.length > 0 && order.order_status !== 'bekor_qilindi'
+                && (user?.role === 'admin' || (user?.role === 'cashier' && user?.shop_id === order.shop_id));
+              if (!canComplete && !showPay && !canRepeat && !canPrint) return null;
               return (
                 <div className="flex flex-wrap justify-end gap-2 sticky bottom-0 bg-card pt-3">
                   {canRepeat && (
@@ -147,6 +149,9 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat }) {
                       <Repeat2 className="w-4 h-4" /> Qayta buyurtma
                     </Button>
                   )}
+                  {canPrint && <Button variant="outline" onClick={() => onStaffTicket(order, items)} className="min-h-11">
+                    <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
+                  </Button>}
                   {showPay && <Button variant="outline" onClick={() => setPayOpen(true)}>To‘lov qo‘shish</Button>}
                   {canComplete && (
                     <Button onClick={() => setCompleteOpen(true)}>
