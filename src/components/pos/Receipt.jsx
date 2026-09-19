@@ -25,6 +25,11 @@ export default function Receipt({ open, sale, settings, onClose, onStaffTicket }
     if (askStaffTicket) questionRef.current?.scrollIntoView({ block: 'nearest' });
   }, [askStaffTicket]);
 
+  useEffect(() => () => {
+    if (afterPrintRef.current) window.removeEventListener('afterprint', afterPrintRef.current);
+    document.body.classList.remove('odina-sale-printing');
+  }, []);
+
   if (!sale) return null;
 
   const handlePrint = () => {
