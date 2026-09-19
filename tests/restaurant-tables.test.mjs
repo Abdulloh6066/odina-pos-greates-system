@@ -386,7 +386,7 @@ test('entrance is a real draggable marker, only admin can edit, and tables still
   assert.match(floorplan, /setEntrance\(entranceFromPoint/);
   assert.match(floorplan, /id="entrance-position" type="range"/);
   assert.match(floorplan, /Eshikning devordagi joyi/);
-  assert.match(floorplan, /disabled=\{!editing \|\| saving \|\| zoneDrawing\}/);
+  assert.match(floorplan, /disabled=\{!editing \|\| saving \|\| zoneMode\}/);
   assert.match(floorplan, /action: 'set_table_layout'/);
   assert.match(floorplan, /layout_version: shop\.layout_version, layout, entrance/);
   assert.match(floorplan, /if \(editing\)\s*setSelectedNumber\(point\.number\);\s*else\s*onOpen\(shop\.id, point\.number\)/);
@@ -429,7 +429,7 @@ test('only admin saves entrance per shop with layout version checks and strict s
   assert.deepEqual(original.entrance, { side: 'top', offset: 500 });
 });
 
-test('owner draws an arbitrary street polygon; floor plan uses its shape, not a fixed top/bottom split', () => {
+test('owner draws and resizes a street zone; floor plan classifies tables by its shape', () => {
   const plan = read('src/components/tables/TableFloorplan.jsx');
   const original = [
     { number: 1, x: 200, y: 300, size: 100 },
@@ -441,17 +441,18 @@ test('owner draws an arbitrary street polygon; floor plan uses its shape, not a 
   assert.equal(pointInOutdoorPolygon(original[0], polygon), false);
   assert.equal(pointInOutdoorPolygon(original[1], polygon), true);
   assert.match(plan, /Ko‘cha hududini chizish/);
-  assert.match(plan, /Ko‘cha chegarasini tahrirlash/);
-  assert.match(plan, /Hududni tugatish/);
-  assert.match(plan, /startVertexDrag/);
-  assert.match(plan, /onClick=\{addZonePoint\}/);
+  assert.match(plan, /Ko‘cha hududini sozlash \/ cho‘zish/);
+  assert.match(plan, /setOutdoorPolygon\(boxToPolygon\(preset\.box\)\)/);
+  assert.match(plan, /startDrag\(event, 'zone-draw'\)/);
+  assert.match(plan, /startDrag\(e, 'zone-corner', 'nw'\)/);
+  assert.match(plan, /startDrag\(e, 'zone-move'\)/);
   assert.match(plan, /outdoor_polygon: outdoorPolygon/);
   assert.match(plan, /pointInOutdoorPolygon\(point, outdoorPolygon\)/);
   assert.match(plan, /Do‘kon ichi · \{indoorCount\} stol/);
   assert.match(plan, /Ko‘cha \/ terassa · \{outdoorCount\} stol/);
   assert.match(plan, /<polygon points=\{zonePoints\}/);
   assert.doesNotMatch(plan, /OUTDOOR_START|h-\[62%\]|h-\[38%\]|Ochiq o‘tish/);
-  assert.match(plan, /if \(zoneDrawing\) return; if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
+  assert.match(plan, /if \(zoneMode\) return;\s*if \(editing\) setSelectedNumber\(point\.number\);\s*else onOpen\(shop\.id, point\.number\)/);
   assert.doesNotMatch(plan, /entities\.(Sale|Payment|Shop|ProductStock)\.(create|update|delete)/);
 });
 
