@@ -34,7 +34,7 @@ const entranceStyle = (entrance) => {
   }
 };
 
-export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEditingChange }) {
+export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEditingChange, selectedViewNumber = null }) {
   const defaultLayout = useMemo(
     () => buildTableLayout(shop.table_count, shop.layout),
     [shop.id, shop.table_count, shop.layout_version],
@@ -386,12 +386,14 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
                 onKeyDown={(event) => keyboardMove(event, point)}
                 onClick={() => { if (zoneDrawing) return; if (editing) setSelectedNumber(point.number); else onOpen(shop.id, point.number); }}
                 style={{ left: `${point.x / 10}%`, top: `${point.y / 10}%`, width: `${Math.round(68 * tableSize(point) / 100)}px`, height: `${Math.round(68 * tableSize(point) / 100)}px`, transform: 'translate(-50%, -50%)', touchAction: editing ? 'none' : 'manipulation' }}
-                className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow] ${editing
+                className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-[background-color,border-color,box-shadow,transform] ${editing
                   ? selectedNumber === point.number ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20' : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
-                  : order ? order.state === 'paying'
-                    ? 'cursor-pointer bg-[#FECD7C]/45 border-amber-600 text-foreground ring-2 ring-amber-400/40'
-                    : 'cursor-pointer bg-[#FECD7C]/30 border-brand-olive text-foreground ring-2 ring-brand-olive/25 hover:shadow-lg'
-                    : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'}`}>
+                  : selectedViewNumber === point.number
+                    ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/40 shadow-xl scale-105 z-20'
+                    : order ? order.state === 'paying'
+                      ? 'cursor-pointer bg-[#FECD7C]/45 border-amber-600 text-foreground ring-2 ring-amber-400/40'
+                      : 'cursor-pointer bg-[#FECD7C]/30 border-brand-olive text-foreground ring-2 ring-brand-olive/25 hover:shadow-lg'
+                      : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'}`}>
                 {editing ? <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" /> : <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />}
                 <span className="text-xs">{point.number}-stol</span>
                 {!editing && <span className="pointer-events-none absolute top-full mt-1 rounded-lg border border-border bg-card/95 px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap shadow-sm">

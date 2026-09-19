@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Armchair, ArrowLeft, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { Armchair, ArrowLeft, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles, LayoutGrid, Map as MapIcon, CreditCard, ShoppingBag } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaConfirm } from '@/lib/odina-dialog';
+import { formatUZS } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import TableFloorplan from '@/components/tables/TableFloorplan';
+import TableDetailSheet from '@/components/tables/TableDetailSheet';
 
 const MAX_TABLES = 30;
 const QUICK_COUNTS = [5, 6, 8, 10];
@@ -14,6 +16,8 @@ export default function RestaurantTables() {
   const navigate = useNavigate();
   const location = useLocation();
   const [layoutEditing, setLayoutEditing] = useState(false);
+  const [viewMode, setViewMode] = useState('map'); // 'map' | 'grid'
+  const [inspectTableNumber, setInspectTableNumber] = useState(null);
   const [shops, setShops] = useState([]);
   const [selectedShopId, setSelectedShopId] = useState('');
   const [canManage, setCanManage] = useState(false);
@@ -105,7 +109,7 @@ export default function RestaurantTables() {
     setNotice(`${updatedShop.name}: stollar joylashuvi saqlandi.`);
   };
   const openTable = (shopId, number) => {
-    navigate(`/pos?${new URLSearchParams({ table_shop: shopId, table_number: String(number) })}`);
+    setInspectTableNumber(number);
   };
   const startNewOrder = async () => {
     if (layoutEditing && !(await odinaConfirm('Saqlanmagan xarita joylashuvi yo‘qolishi mumkin. Kassaga o‘tasizmi?'))) return;
@@ -140,10 +144,42 @@ export default function RestaurantTables() {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-brand-olive/25 bg-brand-olive/5 px-4 py-3 text-sm text-brand-ink">
-            <Armchair className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <span className="font-semibold">Stolni bosing → Kassa.</span>
-            <span className="text-muted-foreground">Buyurtma to‘lovgacha stolda qoladi. Saqlagach Kassa yangi savat bilan ochiladi.</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 rounded-2xl border border-brand-olive/25 bg-brand-olive/5 px-4 py-3 text-sm text-brand-ink">
+              <Armchair className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="font-semibold">Stolni bosing → Ma’lumot va Kassa.</span>
+              <span className="hidden sm:inline text-muted-foreground">Buyurtma to‘lovgacha stolda saqlanadi.</span>
+            </div>
+
+            {/* View Mode Switcher: Map vs Grid */}
+            {selectedShop && tableCount > 0 && !layoutEditing && (
+              <div className="inline-flex items-center gap-1 p-1 rounded-2xl border border-border bg-card shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('map')}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all touch-manipulation ${
+                    viewMode === 'map'
+                      ? 'bg-brand-olive/15 text-brand-ink border border-brand-olive/30 shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                  <span>Zal xaritasi</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all touch-manipulation ${
+                    viewMode === 'grid'
+                      ? 'bg-brand-olive/15 text-brand-ink border border-brand-olive/30 shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Tezkor ro‘yxat</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {canManage && shops.length > 1 && (
@@ -155,14 +191,93 @@ export default function RestaurantTables() {
           )}
 
           {selectedShop && <>
-            {tableCount > 0 && <TableFloorplan
-              key={`${selectedShop.id}:${selectedShop.layout_version}:${selectedShop.table_count}`}
-              shop={selectedShop}
-              canManage={canManage}
-              onSaved={updateLayout}
-              onOpen={openTable}
-              onEditingChange={setLayoutEditing}
-            />}
+            {tableCount > 0 && (viewMode === 'map' || layoutEditing) && (
+              <TableFloorplan
+                key={`${selectedShop.id}:${selectedShop.layout_version}:${selectedShop.table_count}`}
+                shop={selectedShop}
+                canManage={canManage}
+                onSaved={updateLayout}
+                onOpen={openTable}
+                onEditingChange={setLayoutEditing}
+                selectedViewNumber={inspectTableNumber}
+              />
+            )}
+
+            {tableCount > 0 && viewMode === 'grid' && !layoutEditing && (
+              <div className="rounded-[28px] border border-border bg-card premium-shadow p-4 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+                  <div>
+                    <h3 className="font-display font-semibold text-lg">Stollar ro‘yxati</h3>
+                    <p className="text-xs text-muted-foreground">Stol kartochkasini bosing — hisob ma’lumotlari va buyurtmalar ko‘rinadi.</p>
+                  </div>
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-brand-olive/15 text-brand-ink">
+                    {tableCount} ta stol
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: tableCount }, (_, i) => {
+                    const number = i + 1;
+                    const order = (selectedShop.orders || []).find((row) => row.number === number);
+                    const isOccupied = Boolean(order && order.state !== 'empty');
+                    const isPaying = order?.state === 'paying';
+                    const isSelected = inspectTableNumber === number;
+                    return (
+                      <button
+                        key={number}
+                        type="button"
+                        onClick={() => setInspectTableNumber(number)}
+                        className={`p-4 rounded-2xl border text-left flex flex-col justify-between min-h-[120px] transition-all touch-manipulation hover:shadow-md relative ${
+                          isSelected
+                            ? 'border-brand-olive bg-[#FECD7C]/40 ring-4 ring-brand-olive/30 shadow-md scale-[1.02]'
+                            : isOccupied
+                              ? isPaying
+                                ? 'border-amber-400 bg-amber-50/80 hover:bg-amber-100/80'
+                                : 'border-brand-olive/60 bg-[#FECD7C]/25 hover:bg-[#FECD7C]/35'
+                              : 'border-border bg-[#fbf8f0] hover:bg-[#f5f1e5]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1 w-full">
+                          <span className="font-display font-bold text-base text-foreground flex items-center gap-1.5">
+                            <Armchair className="w-4 h-4 text-brand-ink" />
+                            {number}-stol
+                          </span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                            isOccupied
+                              ? isPaying
+                                ? 'bg-amber-100 border-amber-300 text-amber-900'
+                              : 'bg-[#FECD7C]/60 border-brand-olive text-brand-ink'
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          }`}>
+                            {isOccupied ? (isPaying ? 'To‘lovda' : 'Band') : 'Bo‘sh'}
+                          </span>
+                        </div>
+                        <div className="mt-3">
+                          {isOccupied ? (
+                            <div>
+                              <div className="text-sm font-bold text-brand-ink tabular-nums">
+                                {formatUZS(order?.total || 0)}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                {order?.item_count ? `${order.item_count} ta mahsulot` : 'Buyurtma bor'}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">
+                              Bo‘sh stol
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && (
+                          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-brand-olive text-[#292c1f] flex items-center justify-center text-[10px] font-bold shadow">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="odina-panel border border-border rounded-2xl bg-card premium-shadow p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="space-y-1">
@@ -201,6 +316,21 @@ export default function RestaurantTables() {
           </>}
           <div className="rounded-xl border border-brand-olive/25 bg-brand-olive/5 p-4 text-sm text-muted-foreground"><strong className="text-foreground">Stol buyurtmalari:</strong> mahsulotlar stolda to‘lovgacha saqlanadi, boshqa kassirdan qayta ochib davom ettirish mumkin. Daromad va ombor qoldig‘i faqat yakuniy to‘lovda yoziladi. Bron qilish hali qo‘shilmagan.</div>
         </div>
+      )}
+
+      {selectedShop && (
+        <TableDetailSheet
+          open={Boolean(inspectTableNumber)}
+          onClose={() => setInspectTableNumber(null)}
+          tableNumber={inspectTableNumber}
+          shop={selectedShop}
+          onOpenPos={(number) => {
+            navigate(`/pos?${new URLSearchParams({ table_shop: selectedShop.id, table_number: String(number) })}`);
+          }}
+          onPayDirect={(number) => {
+            navigate(`/pos?${new URLSearchParams({ table_shop: selectedShop.id, table_number: String(number), action: 'pay' })}`);
+          }}
+        />
       )}
     </div>
   );

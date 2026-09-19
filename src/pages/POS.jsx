@@ -618,6 +618,27 @@ export default function POS() {
     setPayOpen(false);
   };
 
+  const autoPayProcessedRef = useRef(false);
+  useEffect(() => {
+    autoPayProcessedRef.current = false;
+  }, [tableKey]);
+
+  useEffect(() => {
+    if (autoPayProcessedRef.current) return;
+    const query = new URLSearchParams(location.search);
+    if (
+      query.get('action') === 'pay' &&
+      selectedTable &&
+      !tableOrderLoading &&
+      tableOrder?.id &&
+      tableOrder.state === 'occupied' &&
+      cart.length > 0
+    ) {
+      autoPayProcessedRef.current = true;
+      void openCheckout();
+    }
+  }, [selectedTable, tableOrderLoading, tableOrder?.id, tableOrder?.state, cart.length, location.search]);
+
   const finishQueuedSale = (record) => {
     setLastSale(record.local_sale);
     setPayOpen(false);
