@@ -424,6 +424,31 @@ test('only admin saves entrance per shop with layout version checks and strict s
   assert.deepEqual(original.entrance, { side: 'top', offset: 500 });
 });
 
+test('indoor/outdoor background is purely visual; saved table coordinates, door and Kassa routing remain intact', () => {
+  const plan = read('src/components/tables/TableFloorplan.jsx');
+  const original = [
+    { number: 1, x: 200, y: 300, size: 100 },
+    { number: 2, x: 600, y: 750, size: 140 },
+  ];
+  assert.deepEqual(buildTableLayout(2, original), original);
+  assert.equal(validateTableLayout(2, original), true);
+  assert.match(plan, /const OUTDOOR_START = 620/);
+  assert.match(plan, /point\.y < OUTDOOR_START/);
+  assert.match(plan, /outdoorCount = layout\.length - indoorCount/);
+  assert.match(plan, /Do‘kon ichi · \{indoorCount\} stol/);
+  assert.match(plan, /Ko‘cha \/ terassa · \{outdoorCount\} stol/);
+  assert.match(plan, /pointer-events-none absolute inset-x-0 top-0 h-\[62%\]/);
+  assert.match(plan, /pointer-events-none absolute inset-x-0 bottom-0 h-\[38%\]/);
+  assert.match(plan, /Ochiq o‘tish/);
+  assert.match(plan, /Eski joylashuv avtomatik o‘zgarmaydi/);
+  assert.match(plan, /layout_version: shop\.layout_version, layout, entrance/);
+  assert.match(plan, /if \(editing\) setSelectedNumber\(point\.number\); else onOpen\(shop\.id, point\.number\)/);
+  assert.doesNotMatch(plan, /entities\.(Sale|Payment|Shop|ProductStock)\.(create|update|delete)/);
+  const moved = original.map((row) => ({ ...row }));
+  moved[0].y = 740;
+  assert.equal(validateTableLayout(2, moved), true, 'An indoor table can be moved into the terrace without a database migration');
+});
+
 test('integration is a separate page with role guard and no pretend sales, stock or orders', () => {
   const shop = JSON.parse(read('base44/entities/Shop.jsonc'));
   const fn = JSON.parse(read('base44/functions/restaurant-tables/function.jsonc'));
