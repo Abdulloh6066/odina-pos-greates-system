@@ -25,7 +25,7 @@ function recordPrint(id, revision) {
 }
 
 export default function StaffOrderTicketModal({
-  open, onClose, shop, shopId, tableNumber, order, mode = 'table', orderItems,
+  open, onClose, shop, shopId, tableNumber, order, mode = 'table', orderItems, forceReprint = false,
 }) {
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -97,7 +97,7 @@ export default function StaffOrderTicketModal({
       : 'Oddiy buyurtma';
   const shopName = shop?.name || ticket?.shop_name || 'Odina';
   const revision = ticket?.revision || 1;
-  const reprint = revision > 1 || prints > 0;
+  const reprint = forceReprint || (mode === 'sale' && !!ticket?.table_number) || revision > 1 || prints > 0;
   const units = new Set(items.map((item) => item.unit_label || 'ta'));
   const totalUnit = units.size === 1 ? [...units][0] : 'birlik';
 
