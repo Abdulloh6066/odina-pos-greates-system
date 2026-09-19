@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, Check,
-  DoorOpen, Edit3, Grip, Maximize2, Minus, MousePointer2, Move, Plus,
-  RotateCcw, Save, Sun, Trash2, X, Sliders, Layers, Coffee, Sparkles,
+  Coffee, DoorOpen, Edit3, Grip, Layers, Maximize2, Minus, MousePointer2,
+  Move, Plus, RotateCcw, Save, Sliders, Sun, Trash2, X,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,13 @@ import {
   PRESET_ZONES, STREET_SIDES, FENCE_STYLES, FENCE_ENCLOSURES,
   generateStreetPolygon, detectStreetConfig,
 } from '@/lib/table-floorplan';
+
+const WALLS = [
+  { side: 'top', label: 'Yuqori' },
+  { side: 'right', label: 'O‘ng' },
+  { side: 'bottom', label: 'Pastki' },
+  { side: 'left', label: 'Chap' },
+];
 
 const ARROWS = [
   { key: 'ArrowLeft', icon: ArrowLeft, label: 'Chapga surish' },
@@ -70,7 +77,7 @@ export default function TableFloorplan({
     }
   });
 
-  const [customZoneMode, setCustomZoneMode] = useState(false);
+  const [zoneMode, setZoneMode] = useState(false);
   const [tempBox, setTempBox] = useState(null);
   const [editing, setEditing] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState(null);
@@ -79,7 +86,6 @@ export default function TableFloorplan({
   const boardRef = useRef(null);
   const dragging = useRef(null);
 
-  // Sync state when shop changes
   useEffect(() => {
     setLayout(defaultLayout);
     setEntrance(defaultEntrance);
@@ -93,7 +99,7 @@ export default function TableFloorplan({
       const savedEnclosure = localStorage.getItem(enclosureStorageKey);
       if (savedEnclosure) setFenceEnclosure(savedEnclosure);
     } catch {}
-    setCustomZoneMode(false);
+    setZoneMode(false);
     setTempBox(null);
     setEditing(false);
     setSelectedNumber(null);
@@ -101,7 +107,6 @@ export default function TableFloorplan({
     dragging.current = null;
   }, [defaultLayout, defaultEntrance, defaultOutdoor, fenceStorageKey, enclosureStorageKey]);
 
-  // Persist fence preference locally
   const handleFenceStyleChange = (style) => {
     setFenceStyle(style);
     try {
@@ -116,7 +121,6 @@ export default function TableFloorplan({
     } catch {}
   };
 
-  // Change street side & update outdoor polygon
   const handleStreetSideChange = (newSide) => {
     setStreetSide(newSide);
     if (newSide === 'none') {
@@ -124,14 +128,12 @@ export default function TableFloorplan({
     } else {
       const poly = generateStreetPolygon(newSide, streetDepth);
       setOutdoorPolygon(poly);
-      // Align entrance side to match the street boundary wall
       if (['top', 'bottom', 'left', 'right'].includes(newSide)) {
         setEntrance((prev) => ({ ...prev, side: newSide }));
       }
     }
   };
 
-  // Adjust street depth & sync polygon
   const handleStreetDepthChange = (depth) => {
     const clampedDepth = clamp(depth, 200, 650);
     setStreetDepth(clampedDepth);
@@ -198,7 +200,6 @@ export default function TableFloorplan({
     if (!position) return;
 
     if (target === 'entrance') {
-      // Entrance slides along dividing wall
       if (streetSide === 'top' || streetSide === 'bottom') {
         const offset = clamp(Math.round(position.x / 10) * 10, 150, 850);
         setEntrance((prev) => ({ ...prev, offset }));
@@ -209,7 +210,6 @@ export default function TableFloorplan({
         setEntrance(entranceFromPoint(position.x, position.y));
       }
     } else if (target === 'wall-move') {
-      // User is dragging the dividing wall handle directly on the canvas!
       if (streetSide === 'top') {
         handleStreetDepthChange(Math.round(position.y));
       } else if (streetSide === 'bottom') {
@@ -321,7 +321,7 @@ export default function TableFloorplan({
     const detected = detectStreetConfig(defaultOutdoor, defaultEntrance);
     setStreetSide(detected.side);
     setStreetDepth(detected.depth);
-    setCustomZoneMode(false);
+    setZoneMode(false);
     setTempBox(null);
     setSelectedNumber(null);
     setError('');
@@ -363,12 +363,12 @@ export default function TableFloorplan({
   const payingCount = openOrders.filter((order) => order.state === 'paying').length;
   const unpaidTotal = openOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
 
-  const hasOutdoorStreet = outdoorPolygon.length >= 3 && validOutdoorPolygon(outdoorPolygon) && streetSide !== 'none';
-  const outdoorCount = hasOutdoorStreet
+  const finishedZone = outdoorPolygon.length >= 3 && validOutdoorPolygon(outdoorPolygon);
+  const outdoorCount = finishedZone
     ? layout.filter((point) => pointInOutdoorPolygon(point, outdoorPolygon)).length : 0;
   const indoorCount = layout.length - outdoorCount;
+  const zonePoints = outdoorPolygon.map((point) => `${point.x},${point.y}`).join(' ');
 
-  // Door position calculation along the dividing wall
   const doorPositionStyle = useMemo(() => {
     const offsetPercent = `${entrance.offset / 10}%`;
     const depthPercent = `${streetDepth / 10}%`;
@@ -384,7 +384,6 @@ export default function TableFloorplan({
       case 'left':
         return { left: depthPercent, top: offsetPercent, transform: 'translate(-50%, -50%)' };
       default:
-        // Shop only, outer perimeter
         switch (entrance.side) {
           case 'right': return { left: '100%', top: offsetPercent, transform: 'translate(-50%, -50%)' };
           case 'bottom': return { left: offsetPercent, top: '100%', transform: 'translate(-50%, -50%)' };
@@ -394,7 +393,6 @@ export default function TableFloorplan({
     }
   }, [streetSide, streetDepth, entrance.offset, entrance.side]);
 
-  // Wall move handle position
   const wallHandleStyle = useMemo(() => {
     switch (streetSide) {
       case 'top':
@@ -427,8 +425,8 @@ export default function TableFloorplan({
             <h2 className="font-display text-xl sm:text-2xl font-semibold">Stollar xaritasi</h2>
             <p className="text-sm text-muted-foreground">
               {editing
-                ? 'Stollarni bino ichi yoki ko‘chaga erkin suring. Devor va to‘siqlarni o‘zingiz sozlang.'
-                : 'Bino zali va tashqi terassa bir xaritada. Stolni bosing — Kassa va hisob ochiladi.'}
+                ? 'Stollarni do‘kon ichi yoki ko‘cha hududiga suring. Eshikni ham o‘zingiz joylashtirasiz.'
+                : 'Do‘kon ichi va ko‘chadagi stollar bir xaritada. Stolni bosing — Kassa ochiladi.'}
             </p>
           </div>
         </div>
@@ -436,7 +434,7 @@ export default function TableFloorplan({
           <span role="status" className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
             editing && dirty ? 'border-amber-300 bg-amber-50 text-amber-900' : editing ? 'border-brand-olive/30 bg-brand-olive/10 text-brand-ink' : 'border-brand-olive/30 bg-brand-olive/10 text-brand-ink'
           }`}>
-            {editing && dirty ? '● Saqlanmagan o‘zgarishlar' : editing ? '● Tahrirlash rejimi' : '✓ Ko‘rish rejimi'}
+            {editing && dirty ? '● Saqlanmagan' : editing ? '● Tahrirlash' : '✓ Ko‘rish'}
           </span>
           {canManage && (editing ? (
             <>
@@ -444,7 +442,7 @@ export default function TableFloorplan({
                 <X className="mr-1.5 h-4 w-4" /> Bekor qilish
               </Button>
               <Button type="button" onClick={save} disabled={saving || !dirty || !valid} className="min-h-11 rounded-xl bg-primary hover:bg-primary-strong text-primary-foreground">
-                <Save className="mr-1.5 h-4 w-4" /> {saving ? 'Saqlanmoqda…' : 'O‘zgarishlarni saqlash'}
+                <Save className="mr-1.5 h-4 w-4" /> {saving ? 'Saqlanmoqda…' : 'Joylashuvni saqlash'}
               </Button>
             </>
           ) : (
@@ -455,150 +453,63 @@ export default function TableFloorplan({
         </div>
       </div>
 
-      {/* Real-time Floorplan Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" aria-label="Zal va ko‘cha statistikasi">
-        <div className="rounded-xl border border-border bg-[#fbf8f0] p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Armchair className="w-3.5 h-3.5" /> Jami stollar</p>
-          <p className="text-xl font-bold tabular-nums">{shop.table_count}</p>
+      {/* Real-time Floorplan Status in View Mode */}
+      {!editing && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Zal holati">
+          <div className="rounded-xl border border-border bg-[#fbf8f0] p-3">
+            <p className="text-[11px] text-muted-foreground">Bo‘sh</p>
+            <p className="text-xl font-bold tabular-nums">{Math.max(0, shop.table_count - openOrders.length)}</p>
+          </div>
+          <div className="rounded-xl border border-brand-olive/35 bg-brand-olive/10 p-3">
+            <p className="text-[11px] text-muted-foreground">Band</p>
+            <p className="text-xl font-bold tabular-nums">{occupiedCount}</p>
+          </div>
+          <div className="rounded-xl border border-amber-300/70 bg-[#FECD7C]/20 p-3">
+            <p className="text-[11px] text-muted-foreground">To‘lovda</p>
+            <p className="text-xl font-bold tabular-nums">{payingCount}</p>
+          </div>
+          <div className="rounded-xl border border-brand-sand/50 bg-card p-3">
+            <p className="text-[11px] text-muted-foreground">Ochiq hisoblar</p>
+            <p className="text-lg font-bold tabular-nums text-brand-ink">
+              {unpaidTotal.toLocaleString('en-US')} <span className="text-xs">UZS</span>
+            </p>
+          </div>
         </div>
-        <div className="rounded-xl border border-brand-sand/60 bg-[#fbf6eb] p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Building2 className="w-3.5 h-3.5" /> Do‘kon ichi</p>
-          <p className="text-xl font-bold tabular-nums text-brand-ink">{indoorCount} ta</p>
-        </div>
-        <div className="rounded-xl border border-brand-olive/40 bg-[#eef0e4] p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Sun className="w-3.5 h-3.5 text-[#969a55]" /> Ko‘cha / terassa</p>
-          <p className="text-xl font-bold tabular-nums text-brand-ink">{outdoorCount} ta</p>
-        </div>
-        <div className="rounded-xl border border-brand-olive/35 bg-brand-olive/10 p-3">
-          <p className="text-[11px] text-muted-foreground">Band stollar</p>
-          <p className="text-xl font-bold tabular-nums text-brand-ink">{occupiedCount}</p>
-        </div>
-        <div className="rounded-xl border border-amber-300/70 bg-[#FECD7C]/20 p-3 col-span-2 sm:col-span-1">
-          <p className="text-[11px] text-muted-foreground">Kutilayotgan tushum</p>
-          <p className="text-base sm:text-lg font-bold tabular-nums text-brand-ink">
-            {unpaidTotal.toLocaleString('en-US')} <span className="text-xs">UZS</span>
-          </p>
-        </div>
-      </div>
+      )}
 
-      {/* Editing Toolbar */}
+      {/* Entrance Door Controls in Edit Mode */}
       {editing && (
-        <div className="rounded-2xl border border-brand-olive/30 bg-brand-olive/5 p-3.5 sm:p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-olive/20 pb-2">
-            <span className="inline-flex items-center gap-2 text-sm font-bold text-brand-ink">
-              <Sliders className="h-4 w-4" /> Bino va ko‘cha devorlarini sozlash
+        <div className="rounded-2xl border border-brand-olive/30 bg-brand-olive/5 p-3 sm:p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold">
+              <DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik qayerda?
             </span>
-            <span className="text-xs text-muted-foreground">
-              Ko‘cha tomoni, devor turi va to‘siqlarni xohlagancha o‘zgartiring
-            </span>
+            <span className="text-xs text-muted-foreground">Devorni tanlang yoki xaritadagi eshikni suring</span>
           </div>
-
-          {/* 1. Street Side Selector */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-brand-ink flex items-center gap-1.5">
-              <Sun className="h-3.5 w-3.5 text-[#969a55]" /> Ko‘cha / terassa qaysi tomonda?
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" role="group">
-              {STREET_SIDES.map((side) => (
-                <button
-                  key={side.id}
-                  type="button"
-                  disabled={saving}
-                  onClick={() => handleStreetSideChange(side.id)}
-                  aria-pressed={streetSide === side.id}
-                  className={`min-h-11 rounded-xl border px-3 text-xs font-semibold transition-all touch-manipulation flex flex-col items-center justify-center gap-0.5 ${
-                    streetSide === side.id
-                      ? 'border-brand-olive bg-primary text-foreground shadow-sm ring-2 ring-brand-olive/25 font-bold'
-                      : 'border-border bg-card hover:border-brand-olive/60'
-                  }`}
-                >
-                  <span>{side.label}</span>
-                  <span className="text-[10px] opacity-70 font-normal">{side.description.split(',')[0]}</span>
-                </button>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="group" aria-label="Eshik devorini tanlash">
+            {WALLS.map((wall) => (
+              <button
+                key={wall.side}
+                type="button"
+                disabled={saving}
+                aria-pressed={entrance.side === wall.side}
+                onClick={() => {
+                  setEntrance((previous) => ({ ...previous, side: wall.side }));
+                  setSelectedNumber(null);
+                }}
+                className={`min-h-11 rounded-xl border px-3 text-sm font-semibold transition-colors touch-manipulation ${
+                  entrance.side === wall.side
+                    ? 'border-brand-olive bg-primary/60 text-foreground shadow-sm'
+                    : 'border-border bg-card hover:border-brand-olive/60'
+                }`}
+              >
+                {wall.label} devor
+              </button>
+            ))}
           </div>
-
-          {/* 2. Street Walls & Fence Customization (User's special request!) */}
-          {streetSide !== 'none' && (
-            <div className="space-y-3 rounded-xl border border-brand-olive/25 bg-card/80 p-3 sm:p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold text-brand-ink flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-brand-ink" /> Ko‘cha atrofi devorlari va to‘siqlari (O‘zingiz tanlang)
-                </span>
-                <span className="text-[11px] text-muted-foreground">Devor turi xaritada darhol aks etadi</span>
-              </div>
-
-              {/* Fence Style */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {FENCE_STYLES.map((style) => (
-                  <button
-                    key={style.id}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => handleFenceStyleChange(style.id)}
-                    className={`min-h-11 rounded-xl border px-3 py-2 text-xs font-semibold transition-all text-left ${
-                      fenceStyle === style.id
-                        ? 'border-brand-olive bg-brand-olive/20 text-brand-ink shadow-xs ring-2 ring-brand-olive/30 font-bold'
-                        : 'border-border bg-background hover:bg-muted/40'
-                    }`}
-                  >
-                    <p className="font-bold">{style.label}</p>
-                    <p className="text-[10px] opacity-75 font-normal truncate">{style.description}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Fence Enclosure Sides */}
-              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50">
-                <span className="text-xs font-semibold text-brand-ink mr-1">To‘siq o‘rnatilishi:</span>
-                {FENCE_ENCLOSURES.map((enc) => (
-                  <button
-                    key={enc.id}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => handleFenceEnclosureChange(enc.id)}
-                    className={`min-h-8 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                      fenceEnclosure === enc.id
-                        ? 'border-brand-olive bg-primary text-foreground font-bold'
-                        : 'border-border bg-background hover:border-brand-olive/50'
-                    }`}
-                  >
-                    {enc.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Street Depth Slider */}
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <label htmlFor="street-depth-slider" className="text-xs font-semibold whitespace-nowrap">
-                  Ko‘cha hududi chuqurligi (nisbati):
-                </label>
-                <input
-                  id="street-depth-slider"
-                  type="range"
-                  min="200"
-                  max="650"
-                  step="10"
-                  value={streetDepth}
-                  disabled={saving}
-                  onChange={(e) => handleStreetDepthChange(Number(e.target.value))}
-                  className="min-w-[120px] flex-1 accent-[#ACA95D]"
-                />
-                <span className="w-12 text-right text-xs font-bold tabular-nums text-brand-ink">
-                  {Math.round(streetDepth / 10)}%
-                </span>
-                <span className="text-[11px] text-muted-foreground w-full sm:w-auto">
-                  (Xaritadagi devor ustidagi tutqichni ham surishingiz mumkin)
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* 3. Entrance Door Position */}
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
-            <label htmlFor="entrance-position" className="text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
-              <DoorOpen className="h-4 w-4 text-brand-ink" /> Kirish eshigining devordagi o‘rni:
+            <label htmlFor="entrance-position" className="text-xs font-semibold whitespace-nowrap">
+              Eshikning devordagi joyi
             </label>
             <input
               id="entrance-position"
@@ -611,75 +522,241 @@ export default function TableFloorplan({
               onChange={(event) => setEntrance((previous) => ({ ...previous, offset: Number(event.target.value) }))}
               className="min-w-[120px] flex-1 accent-[#ACA95D]"
             />
-            <span className="w-12 text-right text-xs font-bold tabular-nums text-brand-ink">
+            <span className="w-11 text-right text-xs font-bold tabular-nums text-brand-ink">
               {entrance.offset / 10}%
             </span>
-            <span className="text-[11px] text-muted-foreground">
-              (Eshikni xaritada devor bo‘ylab to‘g‘ridan-to‘g‘ri ushlab surish ham mumkin)
-            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Eshikni devor bo‘ylab suring, yuqoridagi slayderdan foydalaning yoki klaviaturada yo‘nalish tugmalarini bosing.
+          </p>
+        </div>
+      )}
+
+      {/* Street & Fence Configuration (Customizable Walls & Terraces) */}
+      {editing && (
+        <div className={`rounded-2xl border p-3 sm:p-4 space-y-4 transition-colors ${zoneMode ? 'border-brand-olive bg-[#f3f4e8]' : 'border-brand-olive/30 bg-brand-olive/5'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card border border-brand-olive/30 text-brand-ink">
+                <Sun className="h-5 w-5 text-[#969a55]" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold">Ko‘cha / terassa hududini sozlash</h3>
+                <p className="text-xs text-muted-foreground">
+                  {zoneMode
+                    ? outdoorBox
+                      ? 'Burchaklardagi doiralardan ushlab cho‘zing yoki o‘rtasidan ushlab suring. Yangi chizish uchun xaritada sichqonchani torting.'
+                      : 'Xaritada bosib torting — to‘rtburchak ko‘cha hududi chiziladi yoki tayyor andozalardan birini tanlang.'
+                    : outdoorPolygon.length
+                      ? 'Ko‘cha hududi belgilangan. Stollarni xaritada erkin joylashtiring.'
+                      : 'Xaritada alohida ko‘cha yoki terassa maydonini ajratish uchun bosing.'}
+                </p>
+              </div>
+            </div>
+            {!zoneMode ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => {
+                  setZoneMode(true);
+                  setSelectedNumber(null);
+                }}
+                className="min-h-11 rounded-xl border-brand-olive bg-card text-brand-ink font-semibold hover:bg-brand-olive/15"
+              >
+                <Sun className="h-4 w-4 mr-2 text-[#969a55]" />
+                {outdoorPolygon.length ? 'Ko‘cha hududini sozlash / cho‘zish' : 'Ko‘cha hududini chizish'}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={() => setZoneMode(false)}
+                className="min-h-11 rounded-xl bg-primary hover:bg-primary-strong text-primary-foreground font-semibold"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                ✓ Tayyor · Stollarni joylashtirish
+              </Button>
+            )}
           </div>
 
-          {/* Freeform Box Drawing Toggle (optional advanced custom terrace) */}
-          <div className="flex items-center justify-between pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setCustomZoneMode((prev) => !prev)}
-              className="text-xs text-muted-foreground hover:text-foreground h-8"
-            >
-              <Maximize2 className="h-3.5 w-3.5 mr-1" />
-              {customZoneMode ? 'Devorli rejimga qaytish' : 'Qo‘lda erkin shakl / to‘rtburchak chizish (ixtiyoriy)'}
-            </Button>
-            {outdoorPolygon.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOutdoorPolygon([]);
-                  setStreetSide('none');
-                }}
-                className="text-xs text-destructive hover:underline inline-flex items-center gap-1"
-              >
-                <Trash2 className="h-3 w-3" /> Ko‘cha hududini olib tashlash
-              </button>
+          {/* Street Side & Custom Wall Controls */}
+          <div className="space-y-3 border-t border-brand-olive/20 pt-3">
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold text-brand-ink flex items-center gap-1.5">
+                <Sliders className="h-3.5 w-3.5 text-brand-ink" /> Ko‘cha qaysi tomonda joylashgan?
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {STREET_SIDES.map((side) => (
+                  <button
+                    key={side.id}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => handleStreetSideChange(side.id)}
+                    aria-pressed={streetSide === side.id}
+                    className={`min-h-10 rounded-xl border px-3 text-xs font-semibold transition-all flex flex-col items-center justify-center ${
+                      streetSide === side.id
+                        ? 'border-brand-olive bg-primary text-foreground font-bold shadow-xs'
+                        : 'border-border bg-card hover:border-brand-olive/60'
+                    }`}
+                  >
+                    <span>{side.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Street Walls & Fences Selector */}
+            {streetSide !== 'none' && (
+              <div className="space-y-2.5 rounded-xl border border-brand-olive/25 bg-card/80 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-brand-ink flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-brand-ink" /> Ko‘cha devorlari va to‘siqlari (O‘zingiz sozlang)
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">To‘siq turi darhol xaritada chiziladi</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {FENCE_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => handleFenceStyleChange(style.id)}
+                      className={`min-h-10 rounded-xl border px-2.5 py-1.5 text-xs font-semibold text-left transition-all ${
+                        fenceStyle === style.id
+                          ? 'border-brand-olive bg-brand-olive/20 text-brand-ink font-bold shadow-xs'
+                          : 'border-border bg-background hover:bg-muted/40'
+                      }`}
+                    >
+                      <p className="font-bold truncate">{style.label}</p>
+                      <p className="text-[10px] opacity-75 font-normal truncate">{style.description}</p>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50">
+                  <span className="text-xs font-semibold text-brand-ink mr-1">To‘siq o‘rnatilishi:</span>
+                  {FENCE_ENCLOSURES.map((enc) => (
+                    <button
+                      key={enc.id}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => handleFenceEnclosureChange(enc.id)}
+                      className={`min-h-7 rounded-lg border px-2.5 py-0.5 text-[11px] font-semibold transition-all ${
+                        fenceEnclosure === enc.id
+                          ? 'border-brand-olive bg-primary text-foreground font-bold'
+                          : 'border-border bg-background hover:border-brand-olive/50'
+                      }`}
+                    >
+                      {enc.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <label htmlFor="street-depth-slider" className="text-xs font-semibold whitespace-nowrap">
+                    Ko‘cha chuqurligi:
+                  </label>
+                  <input
+                    id="street-depth-slider"
+                    type="range"
+                    min="200"
+                    max="650"
+                    step="10"
+                    value={streetDepth}
+                    disabled={saving}
+                    onChange={(e) => handleStreetDepthChange(Number(e.target.value))}
+                    className="min-w-[120px] flex-1 accent-[#ACA95D]"
+                  />
+                  <span className="w-11 text-right text-xs font-bold tabular-nums text-brand-ink">
+                    {Math.round(streetDepth / 10)}%
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Presets Toolbar */}
+            {zoneMode && (
+              <div className="border-t border-brand-olive/25 pt-2 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-brand-ink mr-1">Tezkor andozalar:</span>
+                  {PRESET_ZONES.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => {
+                        setOutdoorPolygon(boxToPolygon(preset.box));
+                        setTempBox(null);
+                      }}
+                      className="min-h-9 text-xs rounded-xl bg-card hover:border-brand-olive hover:bg-brand-olive/15 font-semibold"
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                  {outdoorPolygon.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => {
+                        setOutdoorPolygon([]);
+                        setTempBox(null);
+                        setStreetSide('none');
+                      }}
+                      className="min-h-9 text-xs rounded-xl bg-card text-destructive hover:bg-destructive/10 ml-auto font-semibold"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      Hududni tozalash
+                    </Button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {editing && !zoneValid && (
-        <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Ko‘cha chegarasi mos emas. Iltimos, andozalardan foydalaning yoki ko‘cha tomonini tanlang.
-        </p>
-      )}
-      {editing && !validateTableLayout(shop.table_count, layout) && (
-        <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Stollar joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki o‘lchamini kichraytiring.
-        </p>
-      )}
+      {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+      {editing && !zoneValid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Ko‘cha chegarasi mos emas. Iltimos, andozalardan foydalaning yoki yangidan chizing.</p>}
+      {editing && !validateTableLayout(shop.table_count, layout) && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring.</p>}
 
-      {/* Interactive Map Board */}
+      {/* Areas Indicator */}
+      <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Xarita hududlari">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-sand/60 bg-[#fbf6eb] px-3 py-2 font-semibold text-brand-ink">
+          <Building2 className="h-4 w-4" aria-hidden="true" /> Do‘kon ichi · {indoorCount} stol
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-olive/40 bg-[#eef0e4] px-3 py-2 font-semibold text-brand-ink">
+          <Sun className="h-4 w-4" aria-hidden="true" /> Ko‘cha / terassa · {outdoorCount} stol
+        </span>
+        {editing && (
+          <span className="text-muted-foreground">
+            {zoneMode ? 'Xaritadagi burchaklar orqali ko‘cha chegarasini cho‘zing.' : 'Stollarni joylashtiring yoki ko‘cha hududini sozlang.'}
+          </span>
+        )}
+        <span className="w-full text-[11px] text-muted-foreground">
+          {outdoorPolygon.length ? 'Ko‘cha hududi belgilangan. Stollar koordinatalari o‘z-o‘zidan o‘zgarmaydi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}
+        </span>
+      </div>
+
+      {/* Map Board */}
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
         <div className="max-w-full overflow-x-auto overscroll-x-contain pb-2">
-          <div className="relative min-w-[760px] w-full px-14 py-14">
+          <div className="relative min-w-[760px] w-full px-16 py-16">
             <div
               ref={boardRef}
-              aria-label="Do‘kon zali va ko‘cha xaritasi"
+              aria-label="Do‘kon va qo‘lda belgilangan ko‘cha hududi xaritasi"
               className={`relative isolate w-full aspect-[10/7] sm:aspect-[16/10] overflow-visible rounded-[25px] border-[3px] shadow-inner ${
                 editing ? 'border-brand-olive' : 'border-[#b8b087]'
               }`}
               style={{
                 backgroundColor: '#fbf6eb',
-                backgroundImage: 'linear-gradient(rgba(208,177,127,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.12) 1px, transparent 1px)',
+                backgroundImage: 'linear-gradient(rgba(208,177,127,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.14) 1px, transparent 1px)',
                 backgroundSize: '34px 34px',
               }}
             >
-              {/* SVG Map Architecture: Ground, Walls, Doors, Fence */}
+              {/* SVG Layer: Street tiles, dividing wall, and perimeter fences */}
               <svg
                 aria-hidden="true"
                 viewBox="0 0 1000 1000"
@@ -687,43 +764,21 @@ export default function TableFloorplan({
                 className="pointer-events-none absolute inset-0 z-[1] h-full w-full rounded-[22px] overflow-hidden"
               >
                 <defs>
-                  {/* Street Cobblestone Floor Pattern */}
-                  <pattern id="street-cobblestone" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <rect width="40" height="40" fill="#e8edda" />
-                    <rect x="2" y="2" width="16" height="16" rx="3" fill="#dde4cc" stroke="#aca95d" strokeOpacity=".3" strokeWidth="1" />
-                    <rect x="20" y="2" width="18" height="16" rx="3" fill="#e2e8d3" stroke="#aca95d" strokeOpacity=".3" strokeWidth="1" />
-                    <rect x="2" y="20" width="18" height="18" rx="3" fill="#e2e8d3" stroke="#aca95d" strokeOpacity=".3" strokeWidth="1" />
-                    <rect x="22" y="20" width="16" height="18" rx="3" fill="#dde4cc" stroke="#aca95d" strokeOpacity=".3" strokeWidth="1" />
-                  </pattern>
-
-                  {/* Wood deck pattern */}
-                  <pattern id="wood-deck" width="60" height="16" patternUnits="userSpaceOnUse">
-                    <rect width="60" height="16" fill="#ded7be" />
-                    <line x1="0" y1="16" x2="60" y2="16" stroke="#bdae8e" strokeWidth="1.5" />
-                    <line x1="28" y1="0" x2="28" y2="16" stroke="#bdae8e" strokeWidth="1" />
-                  </pattern>
-
-                  {/* Brick Wall Texture */}
-                  <pattern id="brick-wall" width="24" height="12" patternUnits="userSpaceOnUse">
-                    <rect width="24" height="12" fill="#4d493a" />
-                    <rect x="1" y="1" width="10" height="4" fill="#635e4d" />
-                    <rect x="13" y="1" width="10" height="4" fill="#5a5544" />
-                    <rect x="7" y="7" width="10" height="4" fill="#635e4d" />
+                  <pattern id="odina-outdoor-tiles" width="36" height="36" patternUnits="userSpaceOnUse">
+                    <rect width="36" height="36" fill="#e8edda" />
+                    <path d="M0 0H36M0 0V36" fill="none" stroke="#aca95d" strokeOpacity=".20" strokeWidth="2" />
                   </pattern>
                 </defs>
 
-                {/* 1. Outdoor Street Ground Area */}
-                {hasOutdoorStreet && (
-                  <polygon
-                    points={outdoorPolygon.map((p) => `${p.x},${p.y}`).join(' ')}
-                    fill={fenceStyle === 'railing' ? 'url(#wood-deck)' : 'url(#street-cobblestone)'}
+                {outdoorPolygon.length >= 3 && (
+                  <polygon points={zonePoints}
+                    fill="url(#odina-outdoor-tiles)"
                     stroke={validOutdoorPolygon(outdoorPolygon) ? '#969a55' : '#b45309'}
-                    strokeWidth="2"
+                    strokeWidth="5"
                     strokeLinejoin="round"
                   />
                 )}
 
-                {/* Temp box when drawing freely */}
                 {tempBox && (
                   <rect
                     x={tempBox.x}
@@ -738,29 +793,21 @@ export default function TableFloorplan({
                   />
                 )}
 
-                {/* 2. Physical Dividing Wall with Door Cutout & Door Swing Arc */}
-                {hasOutdoorStreet && (
+                {/* Dividing Wall & Swing Arc */}
+                {finishedZone && streetSide !== 'none' && (
                   <>
-                    {/* Top Street: Horizontal dividing wall at y = streetDepth */}
                     {streetSide === 'top' && (
                       <g id="dividing-wall-top">
-                        {/* Shadow */}
-                        <line x1="0" y1={streetDepth + 5} x2="1000" y2={streetDepth + 5} stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        {/* Wall Left of Door */}
+                        <line x1="0" y1={streetDepth + 4} x2="1000" y2={streetDepth + 4} stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
                         <line x1="0" y1={streetDepth} x2={Math.max(0, entrance.offset - 50)} y2={streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        {/* Wall Right of Door */}
                         <line x1={Math.min(1000, entrance.offset + 50)} y1={streetDepth} x2="1000" y2={streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        {/* Door Jambs */}
                         <rect x={entrance.offset - 52} y={streetDepth - 8} width="5" height="16" fill="#8c734b" rx="1" />
                         <rect x={entrance.offset + 47} y={streetDepth - 8} width="5" height="16" fill="#8c734b" rx="1" />
-                        {/* Door Opening Swing Arc */}
                         <path d={`M ${entrance.offset - 48} ${streetDepth} A 48 48 0 0 0 ${entrance.offset} ${streetDepth + 48}`} fill="none" stroke="#aca95d" strokeWidth="2" strokeDasharray="4 3" />
-                        {/* Door Leaf */}
                         <line x1={entrance.offset} y1={streetDepth} x2={entrance.offset} y2={streetDepth + 46} stroke="#8c734b" strokeWidth="4" strokeLinecap="round" />
                       </g>
                     )}
 
-                    {/* Bottom Street: Horizontal dividing wall at y = 1000 - streetDepth */}
                     {streetSide === 'bottom' && (
                       <g id="dividing-wall-bottom">
                         <line x1="0" y1={1000 - streetDepth + 4} x2="1000" y2={1000 - streetDepth + 4} stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
@@ -773,12 +820,11 @@ export default function TableFloorplan({
                       </g>
                     )}
 
-                    {/* Right Street: Vertical dividing wall at x = 1000 - streetDepth */}
                     {streetSide === 'right' && (
                       <g id="dividing-wall-right">
                         <line x1={1000 - streetDepth + 4} y1="0" x2={1000 - streetDepth + 4} y2="1000" stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        <line x1={1000 - streetDepth} y1="0" x2={1000 - streetDepth} y2={Math.max(0, entrance.offset - 50)} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
-                        <line x1={1000 - streetDepth} y1={Math.min(1000, entrance.offset + 50)} x2={1000 - streetDepth} y2="1000" stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
+                        <line x1={1000 - streetDepth} y1="0" x2={Math.max(0, entrance.offset - 50)} y2={1000 - streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
+                        <line x1={Math.min(1000, entrance.offset + 50)} y1={1000 - streetDepth} x2="1000" y2={1000 - streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
                         <rect x={1000 - streetDepth - 8} y={entrance.offset - 52} width="16" height="5" fill="#8c734b" rx="1" />
                         <rect x={1000 - streetDepth - 8} y={entrance.offset + 47} width="16" height="5" fill="#8c734b" rx="1" />
                         <path d={`M ${1000 - streetDepth} ${entrance.offset - 48} A 48 48 0 0 0 ${1000 - streetDepth - 48} ${entrance.offset}`} fill="none" stroke="#aca95d" strokeWidth="2" strokeDasharray="4 3" />
@@ -786,11 +832,10 @@ export default function TableFloorplan({
                       </g>
                     )}
 
-                    {/* Left Street: Vertical dividing wall at x = streetDepth */}
                     {streetSide === 'left' && (
                       <g id="dividing-wall-left">
                         <line x1={streetDepth + 4} y1="0" x2={streetDepth + 4} y2="1000" stroke="rgba(0,0,0,0.12)" strokeWidth="16" />
-                        <line x1={streetDepth} y1="0" x2={streetDepth} y2={Math.max(0, entrance.offset - 50)} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
+                        <line x1={streetDepth} y1="0" x2={Math.max(0, entrance.offset - 50)} y2={streetDepth} stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
                         <line x1={streetDepth} y1={Math.min(1000, entrance.offset + 50)} x2={streetDepth} y2="1000" stroke="#4d493a" strokeWidth="12" strokeLinecap="square" />
                         <rect x={streetDepth - 8} y={entrance.offset - 52} width="16" height="5" fill="#8c734b" rx="1" />
                         <rect x={streetDepth - 8} y={entrance.offset + 47} width="16" height="5" fill="#8c734b" rx="1" />
@@ -801,13 +846,11 @@ export default function TableFloorplan({
                   </>
                 )}
 
-                {/* 3. Street Perimeter Fencing/Walls ("kochani devoralrini ham ozim qiladigan bolsin") */}
-                {hasOutdoorStreet && (
+                {/* Perimeter Fence */}
+                {finishedZone && streetSide !== 'none' && (
                   <g id="street-perimeter-fence">
-                    {/* Render fence lines based on fenceStyle and fenceEnclosure */}
                     {streetSide === 'top' && (
                       <>
-                        {/* Top Outer Edge */}
                         {fenceEnclosure !== 'front_open' && (
                           fenceStyle === 'railing' ? (
                             <line x1="0" y1="4" x2="1000" y2="4" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
@@ -819,108 +862,23 @@ export default function TableFloorplan({
                             <line x1="0" y1="3" x2="1000" y2="3" stroke="#a8a29e" strokeWidth="5" strokeDasharray="20 10" />
                           )
                         )}
-                        {/* Left Wing Fence */}
-                        {fenceStyle === 'railing' ? (
-                          <line x1="4" y1="0" x2="4" y2={streetDepth} stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        ) : fenceStyle === 'walled' ? (
-                          <line x1="5" y1="0" x2="5" y2={streetDepth} stroke="#786c5e" strokeWidth="10" />
-                        ) : fenceStyle === 'glass' ? (
-                          <line x1="4" y1="0" x2="4" y2={streetDepth} stroke="#38bdf8" strokeWidth="5" strokeDasharray="90 8" />
-                        ) : (
-                          <line x1="3" y1="0" x2="3" y2={streetDepth} stroke="#a8a29e" strokeWidth="5" strokeDasharray="20 10" />
-                        )}
-                        {/* Right Wing Fence */}
-                        {fenceStyle === 'railing' ? (
-                          <line x1="996" y1="0" x2="996" y2={streetDepth} stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        ) : fenceStyle === 'walled' ? (
-                          <line x1="995" y1="0" x2="995" y2={streetDepth} stroke="#786c5e" strokeWidth="10" />
-                        ) : fenceStyle === 'glass' ? (
-                          <line x1="996" y1="0" x2="996" y2={streetDepth} stroke="#38bdf8" strokeWidth="5" strokeDasharray="90 8" />
-                        ) : (
-                          <line x1="997" y1="0" x2="997" y2={streetDepth} stroke="#a8a29e" strokeWidth="5" strokeDasharray="20 10" />
-                        )}
-                        {/* Corner Planters / Posts */}
                         <circle cx="16" cy="16" r="10" fill="#758249" />
                         <circle cx="984" cy="16" r="10" fill="#758249" />
-                      </>
-                    )}
-
-                    {streetSide === 'bottom' && (
-                      <>
-                        {fenceEnclosure !== 'front_open' && (
-                          fenceStyle === 'railing' ? (
-                            <line x1="0" y1="996" x2="1000" y2="996" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                          ) : fenceStyle === 'walled' ? (
-                            <line x1="0" y1="995" x2="1000" y2="995" stroke="#786c5e" strokeWidth="10" />
-                          ) : fenceStyle === 'glass' ? (
-                            <line x1="0" y1="996" x2="1000" y2="996" stroke="#38bdf8" strokeWidth="5" strokeDasharray="90 8" />
-                          ) : (
-                            <line x1="0" y1="997" x2="1000" y2="997" stroke="#a8a29e" strokeWidth="5" strokeDasharray="20 10" />
-                          )
-                        )}
-                        <line x1="4" y1={1000 - streetDepth} x2="4" y2="1000" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        <line x1="996" y1={1000 - streetDepth} x2="996" y2="1000" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        <circle cx="16" cy="984" r="10" fill="#758249" />
-                        <circle cx="984" cy="984" r="10" fill="#758249" />
-                      </>
-                    )}
-
-                    {streetSide === 'right' && (
-                      <>
-                        {fenceEnclosure !== 'front_open' && (
-                          <line x1="996" y1="0" x2="996" y2="1000" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        )}
-                        <line x1={1000 - streetDepth} y1="4" x2="1000" y2="4" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        <line x1={1000 - streetDepth} y1="996" x2="1000" y2="996" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        <circle cx="984" cy="16" r="10" fill="#758249" />
-                        <circle cx="984" cy="984" r="10" fill="#758249" />
-                      </>
-                    )}
-
-                    {streetSide === 'left' && (
-                      <>
-                        {fenceEnclosure !== 'front_open' && (
-                          <line x1="4" y1="0" x2="4" y2="1000" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        )}
-                        <line x1="0" y1="4" x2={streetDepth} y2="4" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        <line x1="0" y1="996" x2={streetDepth} y2="996" stroke="#845e3c" strokeWidth="7" strokeDasharray="16 8" />
-                        <circle cx="16" cy="16" r="10" fill="#758249" />
-                        <circle cx="16" cy="984" r="10" fill="#758249" />
                       </>
                     )}
                   </g>
                 )}
               </svg>
 
-              {/* Area Labels */}
-              <div className="pointer-events-none absolute z-[2] left-4 top-4 max-w-[50%] inline-flex items-center gap-1.5 rounded-xl border border-brand-sand/70 bg-white/90 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
-                <Building2 className="h-4 w-4 shrink-0" />
-                <span className="truncate">{shop.name} · Do‘kon zali</span>
+              <div className="pointer-events-none absolute z-[2] left-4 top-4 max-w-[54%] inline-flex items-center gap-1.5 rounded-xl border border-brand-sand/70 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
+                <Building2 className="h-4 w-4 shrink-0" /> <span className="truncate">{shop.name}</span>
               </div>
-
-              {hasOutdoorStreet && (
-                <div
-                  className={`pointer-events-none absolute z-[2] inline-flex items-center gap-1.5 rounded-xl border border-brand-olive/40 bg-white/90 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-ink shadow-sm ${
-                    streetSide === 'top'
-                      ? 'left-4 top-14'
-                      : streetSide === 'bottom'
-                        ? 'left-4 bottom-4'
-                        : streetSide === 'right'
-                          ? 'right-4 top-4'
-                          : 'left-4 top-14'
-                  }`}
-                >
-                  <Sun className="h-4 w-4 text-[#969a55] shrink-0" />
-                  <span>Ko‘cha / Terassa ({outdoorCount} ta stol)</span>
-                </div>
-              )}
-
               <div className="pointer-events-none absolute z-[2] right-4 top-4 rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground">
-                {editing ? 'STOL VA DEVORLARNI SURING' : 'STOLNI BOSING'}
+                {zoneMode ? (outdoorBox ? 'BURCHAKLARDAN USHLAB CHO‘ZING' : 'XARITADA TORTIB CHIZING') : editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
               </div>
 
-              {/* Free Draw overlay if active */}
-              {customZoneMode && (
+              {/* Canvas drag-to-draw overlay in zoneMode */}
+              {zoneMode && (
                 <div
                   onPointerDown={(event) => startDrag(event, 'zone-draw')}
                   onPointerMove={(event) => onMove(event, 'zone-draw')}
@@ -931,12 +889,12 @@ export default function TableFloorplan({
                 />
               )}
 
-              {/* Interactive Entrance Door along Dividing Wall */}
+              {/* Entrance Door */}
               <button
                 type="button"
-                aria-label={`Kirish-chiqish eshigi${editing ? ', devor bo‘ylab surish' : ''}`}
-                title={editing ? 'Eshikni ushlab devor bo‘ylab suring' : 'Kirish-chiqish eshigi'}
-                disabled={!editing || saving}
+                aria-label={`Kirish eshigi: ${WALLS.find((wall) => wall.side === entrance.side)?.label} devor${editing ? ', joyini o‘zgartirish' : ''}`}
+                title={editing ? 'Eshikni ushlab devor bo‘ylab suring' : 'Kirish eshigi'}
+                disabled={!editing || saving || zoneMode}
                 onPointerDown={(event) => startDrag(event, 'entrance')}
                 onPointerMove={(event) => onMove(event, 'entrance')}
                 onPointerUp={stopDrag}
@@ -944,26 +902,23 @@ export default function TableFloorplan({
                 onKeyDown={(event) => {
                   if (!editing || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
                   event.preventDefault();
-                  setEntrance((prev) => nudgeEntrance(prev, event.key, event.shiftKey ? 50 : 20));
+                  setEntrance((previous) => nudgeEntrance(previous, event.key, event.shiftKey ? 50 : 20));
                 }}
-                style={{
-                  ...doorPositionStyle,
-                  touchAction: editing ? 'none' : 'manipulation',
-                }}
-                className={`absolute z-30 flex items-center justify-center gap-1.5 border-2 border-brand-olive bg-card text-brand-ink font-bold shadow-lg select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive ${
-                  verticalWall ? 'h-16 w-14 flex-col rounded-2xl text-[10px]' : 'h-11 min-w-[110px] rounded-xl text-xs'
-                } ${editing ? 'cursor-grab active:cursor-grabbing ring-4 ring-primary/40' : 'cursor-default'}`}
+                style={{ ...doorPositionStyle, touchAction: editing ? 'none' : 'manipulation' }}
+                className={`absolute z-25 flex items-center justify-center gap-1.5 border-2 border-brand-olive bg-card text-brand-ink font-bold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive ${
+                  verticalWall ? 'h-16 w-16 flex-col rounded-2xl text-[10px]' : 'h-12 min-w-[118px] rounded-xl text-xs'
+                } ${editing ? 'cursor-grab active:cursor-grabbing ring-4 ring-primary/30' : 'cursor-default'}`}
               >
-                <DoorOpen aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-ink" />
+                <DoorOpen aria-hidden="true" className="h-5 w-5 shrink-0" />
                 <span>Eshik</span>
-                {editing && <Grip aria-hidden="true" className="h-3 w-3 shrink-0 opacity-60" />}
+                {editing && <Grip aria-hidden="true" className="h-3 w-3 shrink-0 opacity-65" />}
               </button>
 
-              {/* Interactive Draggable Dividing Wall Handle (Editing Mode) */}
-              {editing && hasOutdoorStreet && wallHandleStyle && !customZoneMode && (
+              {/* Interactive Wall Move Handle (In Edit Mode) */}
+              {editing && finishedZone && wallHandleStyle && !zoneMode && (
                 <button
                   type="button"
-                  title="Devorni ushlab suring (zal va ko‘cha nisbatini o‘zgartirish)"
+                  title="Devorni ushlab suring (zal va ko‘cha chuqurligini o‘zgartirish)"
                   aria-label="Bino devorini surish"
                   onPointerDown={(e) => startDrag(e, 'wall-move')}
                   onPointerMove={(e) => onMove(e, 'wall-move')}
@@ -982,11 +937,12 @@ export default function TableFloorplan({
                 </button>
               )}
 
-              {/* Custom Zone Resize Handles (if customZoneMode is enabled) */}
-              {customZoneMode && outdoorBox && (
+              {/* Outdoor Box Interactive Handles */}
+              {zoneMode && outdoorBox && (
                 <>
                   <button
                     type="button"
+                    title="Burchakdan ushlab cho‘zing"
                     aria-label="Yuqori chap burchakni cho‘zish"
                     onPointerDown={(e) => startDrag(e, 'zone-corner', 'nw')}
                     onPointerMove={(e) => onMove(e, 'zone-corner')}
@@ -997,8 +953,10 @@ export default function TableFloorplan({
                   >
                     <Maximize2 className="h-4 w-4" />
                   </button>
+
                   <button
                     type="button"
+                    title="Burchakdan ushlab cho‘zing"
                     aria-label="Yuqori o‘ng burchakni cho‘zish"
                     onPointerDown={(e) => startDrag(e, 'zone-corner', 'ne')}
                     onPointerMove={(e) => onMove(e, 'zone-corner')}
@@ -1009,8 +967,10 @@ export default function TableFloorplan({
                   >
                     <Maximize2 className="h-4 w-4" />
                   </button>
+
                   <button
                     type="button"
+                    title="Burchakdan ushlab cho‘zing"
                     aria-label="Pastki o‘ng burchakni cho‘zish"
                     onPointerDown={(e) => startDrag(e, 'zone-corner', 'se')}
                     onPointerMove={(e) => onMove(e, 'zone-corner')}
@@ -1021,8 +981,10 @@ export default function TableFloorplan({
                   >
                     <Maximize2 className="h-4 w-4" />
                   </button>
+
                   <button
                     type="button"
+                    title="Burchakdan ushlab cho‘zing"
                     aria-label="Pastki chap burchakni cho‘zish"
                     onPointerDown={(e) => startDrag(e, 'zone-corner', 'sw')}
                     onPointerMove={(e) => onMove(e, 'zone-corner')}
@@ -1033,6 +995,26 @@ export default function TableFloorplan({
                   >
                     <Maximize2 className="h-4 w-4" />
                   </button>
+
+                  <button
+                    type="button"
+                    title="Ko‘cha hududini ushlab suring"
+                    aria-label="Ko‘cha hududini siljitish"
+                    onPointerDown={(e) => startDrag(e, 'zone-move')}
+                    onPointerMove={(e) => onMove(e, 'zone-move')}
+                    onPointerUp={stopDrag}
+                    onPointerCancel={stopDrag}
+                    style={{
+                      left: `${(outdoorBox.x + outdoorBox.width / 2) / 10}%`,
+                      top: `${(outdoorBox.y + outdoorBox.height / 2) / 10}%`,
+                      transform: 'translate(-50%, -50%)',
+                      touchAction: 'none',
+                    }}
+                    className="absolute z-40 inline-flex items-center gap-1.5 rounded-full border-2 border-brand-olive bg-white/95 px-3 py-1.5 text-xs font-bold text-brand-ink shadow-md cursor-grab active:cursor-grabbing hover:bg-primary/20 select-none"
+                  >
+                    <Move className="h-3.5 w-3.5 text-brand-ink" />
+                    <span>Ko‘cha hududi · siljitish</span>
+                  </button>
                 </>
               )}
 
@@ -1042,27 +1024,22 @@ export default function TableFloorplan({
                 const isOccupied = Boolean(order);
                 const isPaying = order?.state === 'paying';
                 const isSelected = selectedViewNumber === point.number;
-                const isTableOutdoor = hasOutdoorStreet && pointInOutdoorPolygon(point, outdoorPolygon);
+                const isTableOutdoor = finishedZone && pointInOutdoorPolygon(point, outdoorPolygon);
 
                 return (
                   <button
                     key={point.number}
                     type="button"
-                    aria-label={`${point.number}-stol (${isTableOutdoor ? 'Ko‘cha' : 'Zal'}), ${
-                      isOccupied ? (isPaying ? 'To‘lov kutilmoqda' : `Band, ${Number(order.total || 0).toLocaleString('en-US')} UZS`) : 'Bo‘sh'
-                    }${editing ? ', joyini suring' : ', ko‘rish va kassa'}`}
-                    title={
-                      editing
-                        ? `${point.number}-stol (${isTableOutdoor ? 'Ko‘cha hududida' : 'Zal ichida'}) · Ushlab suring`
-                        : `${point.number}-stol${isOccupied ? ` — Band (${Number(order.total || 0).toLocaleString('en-US')} UZS)` : ''}`
-                    }
-                    disabled={saving}
+                    aria-label={`${point.number}-stol, ${isOccupied ? (isPaying ? 'To‘lov tekshirilmoqda' : `Band, ${Number(order.total || 0).toLocaleString('en-US')} UZS`) : 'Bo‘sh'}${editing ? ', joylashuvni o‘zgartirish' : ', Ko‘rish va kassaga o‘tish'}`}
+                    title={editing ? 'Ushlab suring yoki tanlab yo‘nalish tugmalari bilan siljiting' : `${point.number}-stol${isOccupied ? ` — Band (${Number(order.total || 0).toLocaleString('en-US')} UZS)` : ' — Bo‘sh'}`}
+                    disabled={saving || zoneMode}
                     onPointerDown={(event) => startDrag(event, 'table', point.number)}
                     onPointerMove={(event) => onMove(event, 'table')}
                     onPointerUp={stopDrag}
                     onPointerCancel={stopDrag}
                     onKeyDown={(event) => keyboardMove(event, point)}
                     onClick={() => {
+                      if (zoneMode) return;
                       if (editing) setSelectedNumber(point.number);
                       else onOpen(shop.id, point.number);
                     }}
@@ -1074,15 +1051,15 @@ export default function TableFloorplan({
                       transform: 'translate(-50%, -50%)',
                       touchAction: editing ? 'none' : 'manipulation',
                     }}
-                    className={`absolute z-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-all ${
+                    className={`absolute z-10 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-semibold shadow-md select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-olive transition-all ${
                       editing
                         ? selectedNumber === point.number
-                          ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/30 shadow-xl'
+                          ? 'cursor-grab active:cursor-grabbing bg-primary border-brand-olive text-foreground ring-4 ring-brand-olive/20'
                           : isTableOutdoor
                             ? 'cursor-grab active:cursor-grabbing bg-[#f4f7ee] border-[#969a55] text-foreground hover:bg-primary/40'
                             : 'cursor-grab active:cursor-grabbing bg-card border-brand-olive/65 text-foreground hover:bg-primary/40'
                         : isSelected
-                          ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/50 shadow-xl scale-105 z-25'
+                          ? 'cursor-pointer bg-[#FECD7C] border-brand-olive text-brand-ink ring-4 ring-brand-olive/50 shadow-xl scale-105 z-20'
                           : isOccupied
                             ? isPaying
                               ? 'cursor-pointer bg-[#FECD7C] border-amber-600 text-brand-ink ring-2 ring-amber-500/60 shadow-md hover:scale-105'
@@ -1092,7 +1069,6 @@ export default function TableFloorplan({
                               : 'cursor-pointer bg-card border-brand-olive/65 text-foreground hover:bg-primary/30 hover:shadow-lg'
                     }`}
                   >
-                    {/* Table Icon */}
                     {editing ? (
                       <Grip aria-hidden="true" className="h-4 w-4 text-brand-ink" />
                     ) : isTableOutdoor ? (
@@ -1100,56 +1076,43 @@ export default function TableFloorplan({
                     ) : (
                       <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />
                     )}
-
-                    {/* Table Number */}
-                    <span className="text-xs font-bold leading-tight">{point.number}</span>
-
-                    {/* Outdoor Indicator Tag */}
-                    {isTableOutdoor && (
+                    <span className="text-xs">{point.number}-stol</span>
+                    {isTableOutdoor && !editing && (
                       <span className="text-[9px] font-bold text-[#656b2a] leading-none">Ko‘cha</span>
                     )}
-
-                    {/* Occupied Amount Badge Underneath */}
                     {!editing && isOccupied && (
                       <span className="pointer-events-none absolute top-full mt-1.5 rounded-lg border border-amber-300/80 bg-[#fff9ea] px-2 py-0.5 text-[10px] font-bold text-brand-ink whitespace-nowrap shadow-sm">
-                        {isPaying
-                          ? `${Number(order.total || 0).toLocaleString('en-US')} UZS · To‘lov`
-                          : `${Number(order.total || 0).toLocaleString('en-US')} UZS`}
+                        {isPaying ? `${Number(order.total || 0).toLocaleString('en-US')} UZS · To‘lov` : `${Number(order.total || 0).toLocaleString('en-US')} UZS`}
                       </span>
                     )}
                   </button>
                 );
               })}
-
               <div className="pointer-events-none absolute z-[2] bottom-3 left-4 right-4 text-center text-[10px] font-semibold text-brand-ink/70">
-                {shop.table_count} ta stol · {editing ? 'Stollarni xohlagan joyingizga erkin surib qo‘ying' : 'Stolni tanlang'}
+                {shop.table_count} ta stol · {zoneMode ? 'Ko‘cha hududini cho‘zing yoki suring' : editing ? 'Stollarni kerakli joyga suring' : 'Stolni tanlang'}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Selected Table Controls (Fine placement and size) */}
-      {editing && (
+      {/* Selected Table Fine Adjustment */}
+      {editing && !zoneMode && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary/30 p-3 sm:p-4">
           <div className="min-w-0">
             <p className="font-semibold text-sm">
               {chosen
-                ? `${chosen.number}-stol tanlandi (${
-                    hasOutdoorStreet && pointInOutdoorPolygon(chosen, outdoorPolygon) ? '🌿 Ko‘chada' : '🏛️ Zal ichida'
+                ? `${chosen.number}-stolni aniq joylashtirish (${
+                    finishedZone && pointInOutdoorPolygon(chosen, outdoorPolygon) ? '🌿 Ko‘chada' : '🏛️ Zal ichida'
                   })`
                 : 'Stolni tanlang'}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {chosen
-                ? 'Stolni suring, o‘lchamini o‘zgartiring yoki yo‘nalish tugmalari bilan siljiting.'
-                : 'Xaritadan stolni tanlab, uning joylashuvi va o‘lchamini alohida sozlashingiz mumkin.'}
-            </p>
+            <p className="text-xs text-muted-foreground">{chosen ? 'Stolni suring yoki o‘lchamini alohida o‘zgartiring.' : 'Xaritadan stolni tanlang: joyi va o‘lchamini tahrirlaysiz.'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {chosen && (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-brand-olive/30 bg-card px-3 py-2">
-                <span className="text-xs font-semibold whitespace-nowrap">O‘lcham</span>
+                <span className="text-xs font-semibold whitespace-nowrap">Stol o‘lchami</span>
                 <button
                   type="button"
                   aria-label="Stolni kichraytirish"
@@ -1182,7 +1145,6 @@ export default function TableFloorplan({
                 <span className="w-10 text-right text-xs font-bold tabular-nums text-brand-ink">{tableSize(chosen)}%</span>
               </div>
             )}
-
             {ARROWS.map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -1202,7 +1164,6 @@ export default function TableFloorplan({
                 <Icon className="h-4 w-4" />
               </button>
             ))}
-
             <Button type="button" variant="outline" disabled={!dirty || saving} onClick={reset} className="min-h-11 rounded-xl">
               <RotateCcw className="mr-1.5 h-4 w-4" /> Avvalgi holat
             </Button>
@@ -1213,17 +1174,17 @@ export default function TableFloorplan({
       {/* Footer Legend */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— erkin suring' : '— Bo‘sh / Band / To‘lovda'}
+          <Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Bo‘sh / Band / To‘lov holati'}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— devor bo‘ylab suring' : '— zalga kirish'}
+          <DoorOpen className="h-4 w-4 text-brand-ink" /> Eshik {editing ? '— suring yoki devorni tanlang' : '— kirish joyi'}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <Layers className="h-4 w-4 text-brand-ink" /> Devor & To‘siq — {fenceStyle === 'railing' ? 'Yog‘och panjara' : fenceStyle === 'walled' ? 'Past devor' : fenceStyle === 'glass' ? 'Shisha to‘siq' : 'Ochiq trotuar'}
+          <Sun className="h-4 w-4 text-brand-ink" /> Ko‘cha — to‘rtburchak hudud
         </span>
         <span className="inline-flex items-center gap-1.5">
           {editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />}{' '}
-          {editing ? 'Saqlash bosilmaguncha serverda o‘zgarmaydi' : 'Stolni bosish orqali kassa ochiladi'}
+          {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Buyurtma to‘lovgacha stolda qoladi · bron keyingi bosqichda'}
         </span>
       </div>
     </section>
