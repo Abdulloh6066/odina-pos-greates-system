@@ -306,34 +306,31 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
         <div className="max-w-full overflow-x-auto overscroll-x-contain pb-2">
           <div className="relative min-w-[760px] w-full px-16 py-16">
-            <div ref={boardRef} aria-label="Do‘kon ichi va ko‘chadagi stollar joylashuvini ko‘rsatuvchi xarita"
-              className={`relative isolate w-full aspect-[10/7] sm:aspect-[16/10] rounded-[25px] border-[3px] shadow-inner ${editing ? 'border-brand-olive' : 'border-[#b8b087]'}`}>
-              {/* Background is decorative only: existing coordinates, touch targets and sales never change. */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[62%] overflow-hidden rounded-t-[22px] bg-[#fbf6eb]"
-                style={{ backgroundImage: 'linear-gradient(rgba(208,177,127,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.14) 1px, transparent 1px)', backgroundSize: '34px 34px' }}>
-                <div className="absolute top-0 left-[17%] right-[17%] h-7 rounded-b-xl border-x-2 border-b-2 border-[#c1ab80] bg-[#e7dac1]/75 shadow-sm" />
-                <div className="absolute top-3 left-[26%] h-6 w-12 rounded border border-[#c1ab80] bg-white/65" />
-                <div className="absolute top-3 right-[26%] h-6 w-12 rounded border border-[#c1ab80] bg-white/65" />
-                <div className="absolute left-4 top-4 inline-flex max-w-[58%] items-center gap-1.5 rounded-xl border border-[#d0b17f]/65 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
-                  <Building2 className="h-4 w-4 shrink-0" /> <span className="truncate">{shop.name} · Ichkari</span>
-                </div>
-              </div>
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] overflow-hidden rounded-b-[22px] bg-[#eef0e4]"
-                style={{ backgroundImage: 'linear-gradient(45deg, rgba(172,169,93,.10) 25%, transparent 25%, transparent 75%, rgba(172,169,93,.10) 75%), linear-gradient(45deg, rgba(172,169,93,.10) 25%, transparent 25%, transparent 75%, rgba(172,169,93,.10) 75%)', backgroundSize: '30px 30px', backgroundPosition: '0 0, 15px 15px' }}>
-                <div className="absolute bottom-11 left-4 inline-flex items-center gap-1.5 rounded-xl border border-brand-olive/30 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
-                  <Sun className="h-4 w-4" /> KO‘CHA · TASHQI STOLLAR
-                </div>
-                <Leaf className="absolute bottom-3 left-5 h-5 w-5 text-brand-olive/70" />
-                <Leaf className="absolute bottom-3 right-5 h-5 w-5 text-brand-olive/70" />
-              </div>
-              <div aria-hidden="true" className="pointer-events-none absolute z-[1] inset-x-0 flex items-center justify-center" style={{ top: `${OUTDOOR_START / 10}%`, transform: 'translateY(-50%)' }}>
-                <div className="h-[3px] min-w-0 flex-1 bg-[#d0b17f]/85" />
-                <span className="whitespace-nowrap rounded-full border border-[#d0b17f] bg-card px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">Ochiq o‘tish</span>
-                <div className="h-[3px] min-w-0 flex-1 bg-[#d0b17f]/85" />
+            <div ref={boardRef} aria-label="Do‘kon va qo‘lda belgilangan ko‘cha hududi xaritasi"
+              className={`relative isolate w-full aspect-[10/7] sm:aspect-[16/10] overflow-visible rounded-[25px] border-[3px] shadow-inner ${editing ? 'border-brand-olive' : 'border-[#b8b087]'}`}
+              style={{ backgroundColor: '#fbf6eb', backgroundImage: 'linear-gradient(rgba(208,177,127,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(208,177,127,.14) 1px, transparent 1px)', backgroundSize: '34px 34px' }}>
+              {/* The street is a user-drawn polygon, not a hard-coded horizontal stripe. */}
+              <svg aria-hidden="true" viewBox="0 0 1000 1000" preserveAspectRatio="none"
+                className="pointer-events-none absolute inset-0 z-[1] h-full w-full rounded-[22px] overflow-hidden">
+                <defs><pattern id="odina-outdoor-tiles" width="36" height="36" patternUnits="userSpaceOnUse">
+                  <rect width="36" height="36" fill="#e8edda" />
+                  <path d="M0 0H36M0 0V36" fill="none" stroke="#aca95d" strokeOpacity=".20" strokeWidth="2" />
+                </pattern></defs>
+                {outdoorPolygon.length >= 3 && <polygon points={zonePoints}
+                  fill="url(#odina-outdoor-tiles)" stroke={validOutdoorPolygon(outdoorPolygon) ? '#969a55' : '#b45309'}
+                  strokeWidth="5" strokeLinejoin="round" />}
+                {zoneDrawing && !zoneClosed && outdoorPolygon.length > 1 && <polyline points={zonePoints}
+                  fill="none" stroke="#777b3d" strokeWidth="6" strokeDasharray="12 8" strokeLinejoin="round" />}
+              </svg>
+              <div className="pointer-events-none absolute z-[2] left-4 top-4 max-w-[54%] inline-flex items-center gap-1.5 rounded-xl border border-brand-sand/70 bg-white/90 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-brand-ink shadow-sm">
+                <Building2 className="h-4 w-4 shrink-0" /> <span className="truncate">{shop.name}</span>
               </div>
               <div className="pointer-events-none absolute z-[2] right-4 top-4 rounded-full border border-border bg-card/90 px-3 py-1 text-[10px] font-semibold text-muted-foreground">
-                {editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
+                {zoneDrawing ? 'KO‘CHA CHEGARASINI BELGILANG' : editing ? 'STOLNI SURING' : 'STOLNI BOSING'}
               </div>
+              {zoneDrawing && <button type="button" aria-label={zoneClosed ? 'Ko‘cha chegarasi nuqtalarini surib tahrirlang' : 'Ko‘cha chegarasiga yangi nuqta qo‘shish'}
+                onClick={addZonePoint} disabled={saving} style={{ touchAction: 'manipulation' }}
+                className={`absolute inset-0 z-30 h-full w-full rounded-[22px] touch-manipulation ${zoneClosed ? 'cursor-default' : 'cursor-crosshair'}`} />}
 
               <button type="button" aria-label={`Kirish eshigi: ${WALLS.find((wall) => wall.side === entrance.side)?.label} devor${editing ? ', joyini o‘zgartirish' : ''}`}
                 title={editing ? 'Eshikni ushlab devor bo‘ylab suring' : 'Kirish eshigi'}
