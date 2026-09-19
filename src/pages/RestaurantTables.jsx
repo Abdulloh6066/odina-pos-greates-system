@@ -108,7 +108,7 @@ export default function RestaurantTables() {
   const startNewOrder = async () => {
     if (layoutEditing && !(await odinaConfirm('Saqlanmagan xarita joylashuvi yo‘qolishi mumkin. Kassaga o‘tasizmi?'))) return;
     navigate('/pos');
-  }; 
+  };
 
   const tableCount = selectedShop?.table_count || 0;
 
