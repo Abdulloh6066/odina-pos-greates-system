@@ -142,7 +142,7 @@ export default function Receipt({ open, sale, settings, onClose, onStaffTicket }
                 className="min-h-11 flex-1">Yo‘q</Button>
               <Button type="button" onClick={() => { setAskStaffTicket(false); onStaffTicket(sale); }}
                 className="min-h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary-strong">
-                Ha, ochish
+                Chop etish
               </Button>
             </div>
           </div>
