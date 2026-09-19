@@ -94,6 +94,92 @@ export const PRESET_ZONES = [
   { id: 'left', label: 'Chap terassa', box: { x: 50, y: 50, width: 270, height: 900 } },
 ];
 
+export const STREET_SIDES = [
+  { id: 'top', label: 'Tepa ko‘cha', icon: 'top', description: 'Bino pasti, ko‘cha tepada' },
+  { id: 'bottom', label: 'Pastki ko‘cha', icon: 'bottom', description: 'Bino tepada, ko‘cha pastda' },
+  { id: 'right', label: 'O‘ng terassa', icon: 'right', description: 'Bino chapda, ko‘cha o‘ngda' },
+  { id: 'left', label: 'Chap terassa', icon: 'left', description: 'Bino o‘ngda, ko‘cha chapda' },
+  { id: 'none', label: 'Faqat do‘kon', icon: 'none', description: 'Ochiq ko‘cha hududi yo‘q' },
+];
+
+export const FENCE_STYLES = [
+  { id: 'railing', label: '🪵 Yog‘och panjara', description: 'Yog‘och to‘siqli va ustunli terassa' },
+  { id: 'walled', label: '🧱 Past devor', description: 'G‘ishtli yoki tosh qoplamali mustahkam to‘siq' },
+  { id: 'glass', label: '🪟 Shisha to‘siq', description: 'Shaffof zamonaviy shisha to‘siq' },
+  { id: 'open', label: '🌿 Ochiq trotuar', description: 'Devorsiz ochiq ko‘cha, chegara toshlari va gulzor' },
+];
+
+export const FENCE_ENCLOSURES = [
+  { id: 'full', label: '3 tomonlama to‘siq', description: 'Barcha tashqi tomonlar to‘silgan' },
+  { id: 'front_open', label: 'Oldi ochiq (piyodalar yo‘li)', description: 'Faqat yon devorlar to‘silgan, oldi ochiq' },
+  { id: 'minimal', label: 'Burchak guldonlari', description: 'Minimal to‘siq va burchak gullari' },
+];
+
+export function generateStreetPolygon(side, depth = 340) {
+  if (!side || side === 'none') return [];
+  const d = clamp(Math.round(depth / 5) * 5, 200, 650);
+  switch (side) {
+    case 'top':
+      return [
+        { x: 0, y: 0 },
+        { x: 1000, y: 0 },
+        { x: 1000, y: d },
+        { x: 0, y: d },
+      ];
+    case 'bottom':
+      return [
+        { x: 0, y: 1000 - d },
+        { x: 1000, y: 1000 - d },
+        { x: 1000, y: 1000 },
+        { x: 0, y: 1000 },
+      ];
+    case 'right':
+      return [
+        { x: 1000 - d, y: 0 },
+        { x: 1000, y: 0 },
+        { x: 1000, y: 1000 },
+        { x: 1000 - d, y: 1000 },
+      ];
+    case 'left':
+      return [
+        { x: 0, y: 0 },
+        { x: d, y: 0 },
+        { x: d, y: 1000 },
+        { x: 0, y: 1000 },
+      ];
+    default:
+      return [];
+  }
+}
+
+export function detectStreetConfig(polygon, entrance) {
+  if (!Array.isArray(polygon) || polygon.length < 3) {
+    return { side: 'none', depth: 340, fence: 'railing' };
+  }
+  const ys = polygon.map((p) => p.y);
+  const xs = polygon.map((p) => p.x);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+
+  if (minY <= 50 && maxY <= 700 && minX <= 100 && maxX >= 900) {
+    return { side: 'top', depth: clamp(maxY, 200, 650), fence: 'railing' };
+  }
+  if (maxY >= 950 && minY >= 300 && minX <= 100 && maxX >= 900) {
+    return { side: 'bottom', depth: clamp(1000 - minY, 200, 650), fence: 'railing' };
+  }
+  if (maxX >= 950 && minX >= 300 && minY <= 100 && maxY >= 900) {
+    return { side: 'right', depth: clamp(1000 - minX, 200, 650), fence: 'railing' };
+  }
+  if (minX <= 50 && maxX <= 700 && minY <= 100 && maxY >= 900) {
+    return { side: 'left', depth: clamp(maxX, 200, 650), fence: 'railing' };
+  }
+  const side = entrance?.side && ['top', 'bottom', 'left', 'right'].includes(entrance.side)
+    ? entrance.side : 'top';
+  return { side, depth: 340, fence: 'railing' };
+}
+
 export const normalizeOutdoorPolygon = (value) => validOutdoorPolygon(value)
   ? value.map(({ x, y }) => ({ x, y })) : [];
 

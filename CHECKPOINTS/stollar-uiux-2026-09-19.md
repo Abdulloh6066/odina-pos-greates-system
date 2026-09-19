@@ -37,6 +37,19 @@
    - Tezkor andozalar: «Yuqori ko‘cha», «Pastki ko‘cha», «O‘ng terassa», «Chap terassa» va «Hududni tozalash».
    - «✓ Tayyor · Stollarni joylashtirish» orqali stollarni ko‘cha zonasiga erkin surib qo‘yish.
 
+6. Bino devori, ko‘cha to‘siqlari va stollarning erkin harakati («kochani devorlarini ham ozim qiladigan bolsin»):
+   - **Bino asosiy devori:** Zal va ko‘cha o‘rtasida real me’moriy g‘ishtli/tosh devor, eshik o‘rni va eshik ochilish radiusi.
+   - **Devorni to‘g‘ridan-to‘g‘ri surish:** Xaritadagi «Devorni surish» tutqichi yoki slayder orqali zal va ko‘cha nisbatini (20% – 65%) o‘zgartirish.
+   - **Ko‘cha atrofi devorlari va to‘siqlari (Foydalanuvchi o‘zi tanlaydi):**
+     - 🪵 Yog‘och panjara (Klassik terassa)
+     - 🧱 G‘ishtli past devor (Tosh/g‘ishtli mustahkam to‘siq)
+     - 🪟 Shisha to‘siq (Zamonaviy shaffof shisha devor)
+     - 🌿 Ochiq trotuar (Devorsiz, chegara toshlari va guldonlar)
+   - **To‘siq o‘rnatilish shakli:** 3 tomonlama to‘liq to‘silgan, Oldi ochiq (piyodalar yo‘li) yoki Minimal burchak to‘sig‘i.
+   - **Stollarning erkin joylashuvi:** Stollar hech qanday qutiga qamalmagan! Eshikdan o‘tkazib zalga yoki ko‘chaga erkin qo‘yish mumkin. Ko‘chadagi stollar «Ko‘cha» nishoni va terassa bezagiga ega bo‘ladi.
+   - **Eshik harakati:** Slayder yoki xaritadagi eshikni ushlab devor bo‘ylab erkin surish.
+   - **Jonli statistika:** Jami stollar, Do‘kon ichi, Ko‘cha / terassa, Band stollar va kutilayotgan tushum.
+
 ---
 
 ## Nimalar O‘ZGARISHSIZ QOLDIRILDI

@@ -19,7 +19,8 @@
     "output_unit": {
       "type": "string",
       "enum": [
-        "piece"
+        "piece",
+        "sheet"
       ],
       "default": "piece"
     },
@@ -71,6 +72,11 @@
         {
           "user_condition": {
             "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
           }
         },
         {
