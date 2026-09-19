@@ -111,16 +111,16 @@ export default function Cart({
           <p className="text-xs font-medium text-brand-ink">{tableDirty ? '● Buyurtmada saqlanmagan o‘zgarishlar bor' : tableSaved ? '✓ Buyurtma serverda saqlangan · hali to‘lanmagan' : 'Mahsulotlarni qo‘shing, keyin buyurtmani saqlang'}</p>
           <p className="text-xs text-muted-foreground">Saqlagach Kassa avtomatik tozalanadi. Stolning hisobi ochiq qoladi.</p>
           {(discountCode || roundingTarget !== null) && <p className="text-xs text-muted-foreground">Chegirma stolga saqlanmaydi; mehmon ketganda to‘lovda qayta qo‘llang.</p>}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 min-w-0">
             <Button type="button" variant="outline" onClick={onSaveTable}
               disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
-              className="flex-1 min-h-12 rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
+              className="w-full min-w-0 min-h-12 h-auto py-2.5 whitespace-normal text-center rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
               {savingTable ? 'Saqlanmoqda…' : tableDirty ? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'}
             </Button>
             {onCancelTable && (
               <Button type="button" variant="outline" onClick={onCancelTable}
                 disabled={locked || savingTable}
-                className="min-h-12 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold px-3 touch-manipulation"
+                className="w-full min-w-0 min-h-12 h-auto py-2.5 whitespace-normal rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold px-3 touch-manipulation"
                 aria-label="Stolni bekor qilish">
                 <X className="w-4 h-4 mr-1" />
                 <span>Bekor qilish</span>
