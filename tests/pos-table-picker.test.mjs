@@ -47,7 +47,7 @@ test('saving an unpaid table returns to clean POS only after server confirmation
   assert.match(action, /setMobileCartOpen\(false\)/);
   assert.match(action, /navigate\('\/pos', \{ replace: true, state: \{ savedTableNumber: savedNumber \} \}\)/);
   assert.ok(action.indexOf('await saveTableOrder()') < action.indexOf('resetCart()'));
-  assert.match(cart, /tableDirty \? 'Stolga saqlash → Yangi buyurtma' : 'Yangi buyurtmaga o‘tish'/);
+  assert.match(cart, /tableDirty \? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'/);
   assert.match(cart, /disabled=\{locked \|\| \(!tableDirty && !tableSaved\)/);
   assert.match(pos, /role="status"[^>]*className="mx-3[^>]*>/);
   assert.match(pos, /To‘lov olinmadi\. Kassa yangi buyurtmaga tayyor/);
