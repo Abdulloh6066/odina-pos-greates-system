@@ -98,6 +98,8 @@ export default function StaffOrderTicketModal({
   const shopName = shop?.name || ticket?.shop_name || 'Odina';
   const revision = ticket?.revision || 1;
   const reprint = revision > 1 || prints > 0;
+  const units = new Set(items.map((item) => item.unit_label || 'ta'));
+  const totalUnit = units.size === 1 ? [...units][0] : 'birlik';
 
   const printTicket = () => {
     if (loading || error || !items.length) return;
@@ -143,7 +145,7 @@ export default function StaffOrderTicketModal({
       </div>
       <div className="border-t-2 border-dashed border-zinc-900 pt-2 text-right font-bold">
         Mahsulot turlari: {items.length} ta<br />
-        Jami miqdor: {items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} ta
+        Jami miqdor: {items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} {totalUnit}
       </div>
       <div className="mt-3 border-t border-dashed border-zinc-400 pt-2 text-center text-[10px]">
         *** XIZMAT UCHUN (TO‘LOV EMAS) ***
