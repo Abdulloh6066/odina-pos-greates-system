@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
 const read = (path) => readFileSync(path, 'utf8');
 const pos = read('src/pages/POS.jsx');
@@ -52,6 +53,51 @@ test('saving an unpaid table returns to clean POS only after server confirmation
   assert.match(pos, /role="status"[^>]*className="mx-3[^>]*>/);
   assert.match(pos, /To‘lov olinmadi\. Kassa yangi buyurtmaga tayyor/);
   assert.match(backend, /if \(!updated\?\.success \|\| Number\(updated.updated \|\| 0\) !== 1\)/);
+});
+
+// Exercise the actual UI action with injected in-memory callbacks. This does
+// not mount the app or invoke any live backend endpoint.
+const fastSaveAction = pos.slice(pos.indexOf('const saveAndStartNextOrder = async () => {'), pos.indexOf('const tableShop = selectedTable')).trim();
+const exerciseFastSave = async ({ dirty = true, order = { id: 'mock-order', state: 'occupied' },
+  succeeds = true, error = '', busy = false } = {}) => {
+  const events = [];
+  const context = {
+    selectedTable: { number: 3 }, tableOrderLoading: busy,
+    savingTableRef: { current: false }, paying: false, payOpen: false,
+    stockChecking: false, tableOrderError: error, tableOrder: order,
+    tableCartDirty: dirty,
+    saveTableOrder: async () => { events.push('server-save'); return succeeds; },
+    resetCart: () => events.push('reset-cart'),
+    setTableOrder: (next) => events.push(next === null ? 'clear-table-selection' : 'wrong-selection'),
+    setTableSaveError: () => events.push('clear-error'),
+    setActiveCat: () => events.push('reset-category'),
+    setShowFav: () => events.push('reset-favorites'),
+    setSearch: () => events.push('reset-search'),
+    setMobileCartOpen: () => events.push('close-mobile-sheet'),
+    navigate: (path, options) => events.push(`navigate:${path}:${options?.state?.savedTableNumber}`),
+  };
+  assert.ok(fastSaveAction.startsWith('const saveAndStartNextOrder = async () => {'));
+  vm.runInNewContext(`${fastSaveAction}\nglobalThis.runFastSave = saveAndStartNextOrder;`, context);
+  await context.runFastSave();
+  return events;
+};
+
+test('confirmed server save resets Kassa and navigates only after success', async () => {
+  const events = await exerciseFastSave();
+  assert.equal(events[0], 'server-save');
+  assert.equal(events[1], 'reset-cart');
+  assert.equal(events.at(-1), 'navigate:/pos:3');
+  assert.ok(events.includes('close-mobile-sheet'));
+});
+
+test('failed server save, existing saved order and pending load never silently lose the basket', async () => {
+  assert.deepEqual(await exerciseFastSave({ succeeds: false }), ['server-save']);
+  assert.deepEqual(await exerciseFastSave({ error: 'Network error' }), []);
+  assert.deepEqual(await exerciseFastSave({ busy: true }), []);
+  assert.deepEqual(await exerciseFastSave({ dirty: false, order: null }), []);
+  const existing = await exerciseFastSave({ dirty: false });
+  assert.equal(existing[0], 'reset-cart');
+  assert.equal(existing.at(-1), 'navigate:/pos:3');
 });
 
 test('Kassa selection stays a real authenticated completed sale with no premature inventory deduction', () => {
