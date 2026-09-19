@@ -263,14 +263,44 @@ export default function TableFloorplan({ shop, canManage, onSaved, onOpen, onEdi
         </div>
       )}
 
+      {editing && <div className={`rounded-2xl border p-3 sm:p-4 space-y-3 ${zoneDrawing ? 'border-brand-olive bg-[#f0f1e5]' : 'border-brand-olive/30 bg-brand-olive/5'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-brand-olive/30 text-brand-ink"><PenTool className="h-5 w-5" /></span>
+            <div><h3 className="text-sm font-bold">Ko‘cha hududini o‘zingiz belgilang</h3>
+              <p className="text-xs text-muted-foreground">{zoneDrawing ? zoneClosed ? 'Nuqtalarni ushlab surib chegarani sozlang.' : `Xaritaga bosib chegaraning burchaklarini belgilang (${outdoorPolygon.length}/${MAX_OUTDOOR_VERTICES}).` : 'Xaritadagi istalgan joyni ko‘cha sifatida chizishingiz mumkin.'}</p></div>
+          </div>
+          {!zoneDrawing ? <Button type="button" variant="outline" disabled={saving}
+            onClick={() => { setZoneDrawing(true); setZoneClosed(outdoorPolygon.length >= 3); setSelectedNumber(null); }}
+            className="min-h-11 rounded-xl border-brand-olive bg-card text-brand-ink font-semibold"><PenTool className="h-4 w-4 mr-2" /> {outdoorPolygon.length ? 'Ko‘cha chegarasini tahrirlash' : 'Ko‘cha hududini chizish'}</Button>
+            : <Button type="button" variant="outline" disabled={saving || !zoneClosed || !validOutdoorPolygon(outdoorPolygon)}
+              onClick={() => setZoneDrawing(false)} className="min-h-11 rounded-xl bg-card font-semibold"><Check className="h-4 w-4 mr-2" /> Stollarni joylashtirish</Button>}
+        </div>
+        {zoneDrawing && <div className="flex flex-wrap items-center gap-2 border-t border-brand-olive/25 pt-3">
+          <Button type="button" variant="outline" disabled={saving} onClick={() => { setOutdoorPolygon([]); setZoneClosed(false); }}
+            className="min-h-11 rounded-xl bg-card">Yangidan chizish</Button>
+          {!zoneClosed && <>
+            <Button type="button" variant="outline" disabled={saving || !outdoorPolygon.length}
+              onClick={() => setOutdoorPolygon((current) => current.slice(0, -1))} className="min-h-11 rounded-xl bg-card"><Undo2 className="h-4 w-4 mr-1.5" /> Oxirgi nuqtani qaytarish</Button>
+            <Button type="button" disabled={saving || outdoorPolygon.length < 3 || !validOutdoorPolygon(outdoorPolygon)}
+              onClick={() => setZoneClosed(true)} className="min-h-11 rounded-xl bg-primary text-primary-foreground"><Check className="h-4 w-4 mr-1.5" /> Hududni tugatish</Button>
+          </>}
+          {zoneClosed && outdoorPolygon.length > 0 && <Button type="button" variant="outline" disabled={saving}
+            onClick={() => { setOutdoorPolygon([]); setZoneClosed(true); setZoneDrawing(false); }}
+            className="min-h-11 rounded-xl bg-card">Ko‘cha belgisini bekor qilish</Button>}
+          <span className="text-xs text-muted-foreground">{zoneClosed ? 'Chegara tayyor. Nuqtalarni suring, keyin joylashuvni saqlang.' : '3–12 ta nuqta tanlang, «Hududni tugatish»ni bosing.'}</span>
+        </div>}
+      </div>}
+
       {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
-      {editing && !valid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar kattaligi yoki joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring. Xaritadan tashqariga chiqmasin.</p>}
+      {editing && !zoneValid && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Ko‘cha chegarasi tugallanmagan yoki chiziqlar kesishgan. Kamida 3 ta nuqtadan iborat kesishmaydigan hudud chizing.</p>}
+      {editing && !validateTableLayout(shop.table_count, layout) && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring.</p>}
 
       <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Xarita hududlari">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-sand/60 bg-[#fbf6eb] px-3 py-2 font-semibold text-brand-ink"><Building2 className="h-4 w-4" aria-hidden="true" /> Do‘kon ichi · {indoorCount} stol</span>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-olive/40 bg-[#eef0e4] px-3 py-2 font-semibold text-brand-ink"><Sun className="h-4 w-4" aria-hidden="true" /> Ko‘cha / terassa · {outdoorCount} stol</span>
-        {editing && <span className="text-muted-foreground">Chegara ochiq: stolni kerakli tomonga surib, joylashuvni saqlang.</span>}
-        <span className="w-full text-[11px] text-muted-foreground">Hududlar stolning xaritadagi joyiga qarab ko‘rsatiladi. Eski joylashuv avtomatik o‘zgarmaydi.</span>
+        {editing && <span className="text-muted-foreground">{zoneDrawing ? 'Xaritadagi nuqtalar ko‘cha chegarasini belgilaydi.' : 'Stollarni joylashtiring yoki ko‘cha hududini chizing.'}</span>}
+        <span className="w-full text-[11px] text-muted-foreground">{outdoorPolygon.length ? 'Ko‘cha chegarasi siz chizgan shaklga asoslanadi. Stollar koordinatalari o‘z-o‘zidan o‘zgarmaydi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}</span>
       </div>
 
       <div className="rounded-2xl border border-border/70 bg-[#f7f5ed] p-2 sm:p-3">
