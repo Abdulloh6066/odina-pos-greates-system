@@ -5,6 +5,11 @@ import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { transformSync } from 'esbuild';
+import * as lucideIcons from 'lucide-react';
+import * as floorGeometry from '../src/lib/table-floorplan.js';
 import { buildTableLayout, entranceFromPoint, normalizeEntrance, normalizeOutdoorPolygon, nudgeEntrance, pointInOutdoorPolygon, tablesOverlap, validOutdoorPolygon, validateTableLayout } from '../src/lib/table-floorplan.js';
 
 const read = (path) => readFileSync(path, 'utf8');
@@ -477,6 +482,40 @@ test('street geometry accepts custom shapes and excludes invalid intersections, 
     assert.equal(validOutdoorPolygon(polygon), false);
     assert.deepEqual(normalizeOutdoorPolygon(polygon), []);
   }
+});
+
+test('actual floor plan renders safely with a custom street on first load and with no saved street', () => {
+  // Render the real JSX offline; catches missing icon and symbol errors that
+  // Vite production build alone may not detect (the prior blank Kassa issue).
+  const source = read('src/components/tables/TableFloorplan.jsx');
+  const start = source.indexOf('const WALLS = ');
+  assert.ok(start > 0);
+  const body = source.slice(start).replace('export default function TableFloorplan', 'function TableFloorplan');
+  const transpiled = transformSync(`${body}\nglobalThis.TestFloorplan = TableFloorplan;`,
+    { loader: 'jsx', jsx: 'transform' }).code;
+  const context = {
+    React, useEffect: React.useEffect, useMemo: React.useMemo, useRef: React.useRef,
+    useState: React.useState, ...lucideIcons, ...floorGeometry,
+    base44: {}, Button: ({ children }) => React.createElement('button', { type: 'button' }, children),
+  };
+  vm.runInNewContext(transpiled, context);
+  const sharedShop = {
+    id: 'mock', name: 'Odina Test', table_count: 2, layout_version: 0,
+    layout: [{ number: 1, x: 200, y: 300, size: 100 }, { number: 2, x: 800, y: 700, size: 100 }],
+    orders: [], entrance: { side: 'top', offset: 500 },
+  };
+  const make = (shop) => renderToStaticMarkup(React.createElement(context.TestFloorplan,
+    { shop, canManage: true, onSaved: () => {}, onOpen: () => {} }));
+  const plain = make(sharedShop);
+  assert.match(plain, /Odina Test/);
+  assert.match(plain, /2-stol/);
+  assert.doesNotMatch(plain, /<polygon points=/);
+  const custom = make({ ...sharedShop, outdoor_polygon: [
+    { x: 600, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 1000 }, { x: 600, y: 1000 },
+  ] });
+  assert.match(custom, /<polygon points="600,0 1000,0 1000,1000 600,1000"/);
+  assert.match(custom, /Ko‘cha \/ terassa/);
+  assert.doesNotMatch(custom, /Ochiq o‘tish/);
 });
 
 test('server saves each shop street polygon with CAS and owner permission, preserving old clients and open orders', async () => {
