@@ -289,7 +289,7 @@ export default function POS() {
       confirmLabel: 'Stollarni ochish', tone: 'warning',
     }))) return;
     setMobileCartOpen(false);
-    navigate('/tables');
+    navigate('/tables', { state: { shopId: selectedTable?.shopId || shift?.shop_id || '' } });
   };
 
   // This button finishes only the unpaid order's SAVE, never its payment.
@@ -1074,7 +1074,7 @@ export default function POS() {
       <Receipt open={receiptOpen} sale={lastSale} settings={settings} onClose={() => {
         setReceiptOpen(false);
         if (selectedTable && !lastSale?.offline_pending) {
-          navigate('/tables');
+          navigate('/tables', { state: { shopId: lastSale?.shop_id || selectedTable.shopId } });
         }
       }} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
