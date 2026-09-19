@@ -202,7 +202,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
       const data = res?.data || res;
       if (data?.order) {
         toast({ title: 'Buyurtma yaratildi', description: data.order.order_number });
-        onCreated(data.order);
+        onCreated(data.order, data.items || []);
         reset();
       } else {
         throw new Error(data?.error || 'Buyurtma yaratilmadi');
