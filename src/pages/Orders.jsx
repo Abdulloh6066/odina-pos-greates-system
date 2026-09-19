@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import OrderForm from '@/components/orders/OrderForm';
 import OrderDetail from '@/components/orders/OrderDetail';
+import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderLedgerHero from '@/components/orders/OrderLedgerHero';
 import OrderLedgerKpis from '@/components/orders/OrderLedgerKpis';
@@ -50,6 +51,7 @@ export default function Orders() {
   const [dateFilter, setDateFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState(null);
+  const [staffTicket, setStaffTicket] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
   const { alerts, counts } = useOrderAlerts(orders);
 
@@ -103,10 +105,10 @@ export default function Orders() {
     }
   };
 
-  const handleCreated = (order) => {
+  const handleCreated = (order, items) => {
     setFormOpen(false);
     setRepeatPrefill(null);
-    setDetailOrder(order);
+    setStaffTicket({ order, items });
     loadOrders();
   };
 
@@ -133,7 +135,13 @@ export default function Orders() {
         </section>
       </main>
       <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
-      <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} onPaid={() => { loadOrders(); }} onRepeat={handleRepeat} />
+      <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} onPaid={() => { loadOrders(); }} onRepeat={handleRepeat}
+        onStaffTicket={(order, items) => { setDetailOrder(null); setStaffTicket({ order, items }); }} />
+      <StaffOrderTicketModal open={!!staffTicket} mode="customer" order={staffTicket?.order}
+        orderItems={staffTicket?.items} onClose={() => {
+          setDetailOrder(staffTicket?.order || null);
+          setStaffTicket(null);
+        }} />
     </div>
   );
 }
