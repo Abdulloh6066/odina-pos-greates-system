@@ -249,6 +249,7 @@ test('restaurant customer stays unpaid until one final checkout; retry cannot ch
   assert.equal(paid.data.sale.total, 100000);
   assert.equal(paid.data.sale.table_order_id_snapshot, 'open-order-1');
   assert.equal(paid.data.sale.table_number_snapshot, 2);
+  assert.equal(paid.data.sale.service_ticket_number, 1);
   assert.equal(paid.data.table_released, true);
   assert.equal(f.db.SaleItem[0].unit_price, 100000);
   assert.equal(f.db.Shop[0].restaurant_table_orders.length, 0);
@@ -261,6 +262,30 @@ test('restaurant customer stays unpaid until one final checkout; retry cannot ch
   assert.equal(f.db.Payment.length, 1);
   assert.equal(f.db.ProductStock[0].quantity, 9);
   assert.equal((await call(tablePayment('different-checkout-key-000002'))).status, 409);
+});
+
+test('paying a numbered table preserves its ticket; next takeout uses the same shop sequence without replacing sale ID', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  f.db.Shop[0].service_ticket_cycle_active = true;
+  f.db.Shop[0].service_ticket_counter = 109;
+  f.db.Shop[0].service_ticket_version = 1;
+  f.db.Shop[0].restaurant_table_orders[0].ticket_number = 109;
+  const call = loadHandler(f.client);
+  const paid = await call(tablePayment());
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.equal(paid.data.sale.service_ticket_number, 109);
+  assert.equal(f.db.Shop[0].service_ticket_counter, 109, 'Paying a saved table must not allocate a new number');
+  const takeout = await call({ action: 'complete_sale', shift_id: 'shift',
+    items: [{ product_id: 'cake', quantity: 1 }],
+    payments: [{ method: 'cash', amount: 100000 }],
+    idempotency_key: 'takeout-next-ticket-00001' });
+  assert.equal(takeout.status, 200, JSON.stringify(takeout));
+  assert.equal(takeout.data.sale.service_ticket_number, 110);
+  assert.match(takeout.data.sale.sale_number, /^OD-/);
+  assert.notEqual(takeout.data.sale.sale_number, '110', 'Keep original immutable sale_number');
+  assert.equal(f.db.Shop[0].service_ticket_counter, 110);
+  assert.equal(f.db.Sale.length, 2);
 });
 
 test('restaurant backend rejects forged quantities, stale versions, and concurrent distinct payments', async () => {
