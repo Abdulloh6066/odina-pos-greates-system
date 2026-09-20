@@ -22,8 +22,11 @@
     --customer-olive: #c9cd8c;
   }
   .customer-page-header {
-    border-bottom: 1px solid var(--customer-line);
-    padding-bottom: 18px;
+    background: linear-gradient(110deg, #e9ead2 0%, #fff0d5 63%, #fffaf0 100%);
+    border: 1px solid #ddd9b9;
+    border-left: 5px solid #aca95d;
+    border-radius: 18px;
+    padding: 22px 24px;
     margin-bottom: 20px;
   }
   .odina-customers .customer-page-header h1 {
@@ -38,9 +41,9 @@
     min-height: 44px;
   }
   .customer-birthday-panel {
-    background: var(--customer-surface);
-    border-color: var(--customer-line);
-    box-shadow: 0 4px 18px -14px #47452735;
+    background: linear-gradient(180deg, #fff9e9 0%, var(--customer-surface) 68%);
+    border-color: #ded5b5;
+    box-shadow: 0 6px 22px -14px #7765354d;
   }
   .customer-birthday-panel h2 {
     color: var(--customer-text);
@@ -48,11 +51,20 @@
   }
   .customer-birthday-panel h2 + * { color: var(--customer-muted); }
   .customer-birthday-counter {
-    background: var(--customer-soft);
+    background: #fff0d6;
     color: var(--customer-text);
-    border-color: var(--customer-line);
+    border-color: #e8cd9f;
+  }
+  .customer-birthday-counter[data-tone="blue"] {
+    background: #e9ead7;
+    border-color: #c9cba4;
+  }
+  .customer-birthday-counter[data-tone="green"] {
+    background: #e8f0e2;
+    border-color: #c6d7bc;
   }
   .customer-birthday-counter svg { color: var(--customer-olive); }
+  .customer-birthday-counter[data-tone="green"] svg { color: #426b3e; }
   .customer-birthday-counter [class*="text-2xl"] {
     color: var(--customer-text);
     font-family: var(--font-body);
@@ -64,8 +76,8 @@
     border-color: var(--customer-line);
   }
   .customer-followup-row[data-completed="true"] {
-    background: var(--customer-soft);
-    border-color: var(--customer-line);
+    background: #f0f5ea;
+    border-color: #d2dfc7;
   }
   .customer-followup-row button { min-height: 36px; border-radius: 9px; }
   .customer-search input {
@@ -84,15 +96,16 @@
     min-height: 38px;
   }
   .customer-sort button[data-variant="outline"] { background: var(--customer-surface); }
+  .customer-sort button:hover { border-color: #aca95d; }
   .odina-customers .customer-card {
-    background: var(--customer-surface);
+    background: linear-gradient(125deg, var(--customer-surface) 62%, #fff8e8 100%);
     color: var(--customer-text);
-    border-color: var(--customer-line);
+    border-color: #e5dec9;
     min-height: 118px;
     box-shadow: 0 2px 8px #3033260a;
   }
   .odina-customers .customer-card:hover {
-    background: var(--customer-surface);
+    background: linear-gradient(125deg, #fffefa 52%, #fff0d1 100%);
     border-color: #aca95d;
     box-shadow: 0 7px 22px #3033261b;
   }
@@ -101,11 +114,11 @@
     outline-offset: 2px;
   }
   .customer-avatar {
-    background: var(--customer-soft);
-    color: var(--customer-olive);
-    border: 1px solid var(--customer-line);
+    background: #fce2ad;
+    color: #5b4a28;
+    border: 1px solid #e9c886;
   }
-  .customer-spend { color: var(--customer-text); }
+  .customer-spend { color: #585f30; }
 
   .customer-profile-dialog,
   .customer-form-dialog {
@@ -124,15 +137,18 @@
     background: var(--customer-soft);
     color: var(--customer-olive);
   }
-  .customer-profile-total,
+  .customer-profile-total {
+    background: linear-gradient(110deg, #eeefd9, #fff0d4);
+    border-color: #d8d3af;
+  }
   .customer-profile-info {
     background: var(--customer-surface);
     border-color: var(--customer-line);
   }
   .customer-profile-info.is-highlighted,
   .customer-birthday-notice {
-    background: var(--customer-soft);
-    border-color: #aca95d;
+    background: #fff0d4;
+    border-color: #d9bc80;
     color: var(--customer-text);
   }
   .customer-profile-total .text-brand-ink { color: var(--customer-text); }
