@@ -6,17 +6,17 @@ import OrderDetail from '@/components/orders/OrderDetail';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderLedgerHero from '@/components/orders/OrderLedgerHero';
-import OrderLedgerKpis from '@/components/orders/OrderLedgerKpis';
 import OrderFilterRail from '@/components/orders/OrderFilterRail';
 import OrderLedgerCard from '@/components/orders/OrderLedgerCard';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import { buildDemoOrders } from '@/lib/demo-orders';
+import { shiftDateKey, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import { useToast } from '@/components/ui/use-toast';
 import '@/styles/orders-premium-ledger.css';
 
 const TYPE_OPTIONS = [
   { value: '', label: 'Barcha turlar' },
-  { value: 'toy_va_bazmlar', label: 'Toy va bazmlar' },
+  { value: 'toy_va_bazmlar', label: 'To‘y va bazmlar' },
   { value: 'tugilgan_kun_va_boshqa', label: 'Tug‘ilgan kun va boshqa' },
 ];
 const STATUS_OPTIONS = [
@@ -34,16 +34,17 @@ const PAY_OPTIONS = [
   { value: 'partial', label: 'Qisman' },
   { value: 'paid', label: 'To‘langan' },
 ];
+const FINISHED = ['yakunlandi', 'bekor_qilindi'];
 
 export default function Orders() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const role = user?.role || 'cashier';
-  const isAdmin = role === 'admin';
+  const isAdmin = user?.role === 'admin';
 
   const [orders, setOrders] = useState([]);
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('today');
   const [query, setQuery] = useState('');
   const [shopFilter, setShopFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -55,9 +56,7 @@ export default function Orders() {
   const [staffTicket, setStaffTicket] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
   const { alerts, counts } = useOrderAlerts(orders);
-  // Display samples are separate from the real orders array and all financial flows.
   const demoOrders = useMemo(buildDemoOrders, []);
-  const showDemo = isAdmin && !query && !shopFilter && !typeFilter && !statusFilter && !payFilter && !dateFilter;
 
   const loadOrders = async () => {
     setLoading(true);
@@ -81,21 +80,55 @@ export default function Orders() {
 
   useEffect(() => { loadOrders(); loadShops(); }, []);
 
+  const today = uzbekistanDateKey();
+  const tomorrow = shiftDateKey(today, 1);
+  const isActive = (order) => !FINISHED.includes(order.order_status);
+  const tabs = [
+    { key: 'today', label: 'Bugun', count: orders.filter((o) => isActive(o) && o.required_date === today).length },
+    { key: 'tomorrow', label: 'Ertaga', count: orders.filter((o) => isActive(o) && o.required_date === tomorrow).length },
+    { key: 'other', label: 'Boshqa kunlar', count: orders.filter((o) => isActive(o) && o.required_date !== today && o.required_date !== tomorrow).length },
+    { key: 'history', label: 'Tarix', count: orders.filter((o) => !isActive(o)).length },
+    { key: 'all', label: 'Barchasi', count: orders.length },
+  ];
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return orders.filter((o) => {
+      if (view === 'today' && (!isActive(o) || o.required_date !== today)) return false;
+      if (view === 'tomorrow' && (!isActive(o) || o.required_date !== tomorrow)) return false;
+      if (view === 'other' && (!isActive(o) || o.required_date === today || o.required_date === tomorrow)) return false;
+      if (view === 'history' && isActive(o)) return false;
+      if (view === 'date' && o.required_date !== dateFilter) return false;
       if (q) {
-        const hay = `${o.order_number} ${o.customer_name} ${o.customer_phone}`.toLowerCase();
+        const hay = `${o.order_number || ''} ${o.customer_name || ''} ${o.customer_phone || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (shopFilter && o.shop_id !== shopFilter) return false;
       if (typeFilter && o.order_type !== typeFilter) return false;
       if (statusFilter && o.order_status !== statusFilter) return false;
       if (payFilter && o.payment_status !== payFilter) return false;
-      if (dateFilter && o.required_date !== dateFilter) return false;
       return true;
+    }).sort((a, b) => {
+      const left = `${a.required_date || ''} ${a.required_time || ''}`;
+      const right = `${b.required_date || ''} ${b.required_time || ''}`;
+      return view === 'history' ? right.localeCompare(left) : left.localeCompare(right);
     });
-  }, [orders, query, shopFilter, typeFilter, statusFilter, payFilter, dateFilter]);
+  }, [orders, view, today, tomorrow, query, shopFilter, typeFilter, statusFilter, payFilter, dateFilter]);
+
+  const selectView = (next) => {
+    setView(next);
+    setDateFilter('');
+  };
+  const clearFilters = () => {
+    setQuery('');
+    setShopFilter('');
+    setTypeFilter('');
+    setStatusFilter('');
+    setPayFilter('');
+    setDateFilter('');
+    setView('today');
+  };
+  const hasFilters = !!(query || shopFilter || typeFilter || statusFilter || payFilter || dateFilter);
 
   const handleRepeat = async (order, items) => {
     try {
@@ -119,28 +152,55 @@ export default function Orders() {
   return (
     <div className="opl-page">
       <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />
-      <OrderLedgerKpis orders={orders} />
       <main className="opl-workspace">
+        <nav className="opl-tabs" aria-label="Buyurtma sanalari">
+          {tabs.map((tab) => (
+            <button key={tab.key} type="button" className={`opl-tab ${view === tab.key ? 'is-active' : ''}`}
+              aria-current={view === tab.key ? 'page' : undefined} onClick={() => selectView(tab.key)}>
+              {tab.label}<span className="opl-tab-count">{tab.count}</span>
+            </button>
+          ))}
+        </nav>
         <OrderFilterRail
           isAdmin={isAdmin}
           shops={shops}
           filters={{ query, shop: shopFilter, type: typeFilter, status: statusFilter, pay: payFilter, date: dateFilter }}
-          setters={{ query: setQuery, shop: setShopFilter, type: setTypeFilter, status: setStatusFilter, pay: setPayFilter, date: setDateFilter }}
+          setters={{
+            query: (value) => { setQuery(value); if (value.trim()) setView('all'); },
+            shop: setShopFilter, type: setTypeFilter, status: setStatusFilter, pay: setPayFilter,
+            date: (value) => { setDateFilter(value); setView(value ? 'date' : 'today'); },
+          }}
           typeOptions={TYPE_OPTIONS}
           statusOptions={STATUS_OPTIONS}
           payOptions={PAY_OPTIONS}
+          onClear={clearFilters}
+          hasFilters={hasFilters}
         />
-        <section className="opl-ledger">
-          <div className="opl-ledger-head"><h2 className="opl-ledger-title">Buyurtmalar</h2><span className="opl-ledger-count">{filtered.length} buyurtma</span></div>
-          {showDemo && <section className="mb-5 rounded-xl border border-amber-300 bg-amber-50/60 p-3 sm:p-4" aria-label="Namunaviy buyurtmalar">
-            <h3 className="mb-1 text-base font-semibold text-amber-900">Ko‘rinish uchun 4 ta namuna</h3>
-            <p className="mb-3 text-xs text-amber-900">Narxlar va mijozlar namunaviy. Bu kartalar haqiqiy buyurtma, to‘lov, qoldiq va hisobotlarga kirmaydi. Bosib o‘zgartirib bo‘lmaydi.</p>
-            <div className="opl-order-list">{demoOrders.map((order) => <OrderLedgerCard key={order.id} order={order} isAdmin demo />)}</div>
-          </section>}
-          <OrderAlertSummary alerts={alerts} counts={counts} onOpen={(order) => setDetailOrder(order)} loading={loading} />
-          {loading ? <div className="opl-loading"><div className="opl-spinner" /></div> : filtered.length === 0 ? <div className="opl-empty">Buyurtmalar topilmadi.</div> : (
-            <div className="opl-order-list">{filtered.map((order) => <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} />)}</div>
+        {view === 'today' && !query && <OrderAlertSummary alerts={alerts} counts={counts} onOpen={setDetailOrder} loading={loading} />}
+        <section className="opl-ledger" aria-live="polite">
+          <div className="opl-ledger-head">
+            <div>
+              <h2 className="opl-ledger-title">{view === 'date' ? `${dateFilter} dagi buyurtmalar` : tabs.find((tab) => tab.key === view)?.label}</h2>
+              <p className="opl-ledger-subtitle">{view === 'history' ? 'Yakunlangan va bekor qilingan buyurtmalar' : 'Olish yoki yetkazish vaqti bo‘yicha tartiblangan'}</p>
+            </div>
+            <span className="opl-ledger-count">{filtered.length} ta</span>
+          </div>
+          {loading ? <div className="opl-loading"><div className="opl-spinner" /><p>Buyurtmalar yuklanmoqda…</p></div> : filtered.length === 0 ? (
+            <div className="opl-empty">
+              <strong>{hasFilters ? 'Mos buyurtma topilmadi' : 'Bu bo‘limda buyurtma yo‘q'}</strong>
+              <p>{hasFilters ? 'Boshqa sana yoki qidiruvni sinab ko‘ring.' : 'Boshqa sanalarni ko‘ring yoki yangi buyurtma qo‘shing.'}</p>
+              {hasFilters && <button type="button" onClick={clearFilters}>Filtrlarni tozalash</button>}
+            </div>
+          ) : (
+            <div className="opl-order-list">{filtered.map((order) => (
+              <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} />
+            ))}</div>
           )}
+          {isAdmin && !loading && orders.length === 0 && <details className="opl-demo">
+            <summary>Ko‘rinish uchun 4 ta namuna</summary>
+            <p>Namunalar haqiqiy buyurtma, to‘lov yoki qoldiqqa kirmaydi.</p>
+            <div className="opl-order-list">{demoOrders.map((order) => <OrderLedgerCard key={order.id} order={order} isAdmin demo />)}</div>
+          </details>}
         </section>
       </main>
       <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
