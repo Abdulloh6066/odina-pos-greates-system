@@ -10,6 +10,7 @@ import CustomerForm from '@/components/customers/CustomerForm';
 import CustomerProfile from '@/components/customers/CustomerProfile';
 import BirthdayFollowupPanel from '@/components/customers/BirthdayFollowupPanel';
 import { useToast } from '@/components/ui/use-toast';
+import '@/styles/customers.css';
 
 export default function Customers() {
   const { user } = useOutletContext();
@@ -123,8 +124,8 @@ export default function Customers() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <div className="odina-customers p-4 sm:p-6 max-w-5xl mx-auto">
+      <div className="customer-page-header flex items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="font-display text-2xl font-bold">Mijozlar</h1>
           <p className="text-sm text-muted-foreground">{customers.length} ta mijoz ro‘yxatdan o‘tgan</p>
@@ -138,12 +139,12 @@ export default function Customers() {
 
       <BirthdayFollowupPanel user={user} />
 
-      <div className="relative mb-4">
+      <div className="customer-search relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ism yoki telefon bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="customer-sort flex flex-wrap gap-2 mb-4">
         <Button
           variant={sortMode === 'mostBuys' ? 'default' : 'outline'}
           size="sm"
@@ -174,10 +175,10 @@ export default function Customers() {
             <button
               key={c.id}
               onClick={() => openProfile(c)}
-              className="text-left rounded-2xl border border-border bg-card p-4 hover:border-brand-sand hover:shadow-sm transition-colors touch-manipulation"
+              className="customer-card text-left rounded-2xl border border-border bg-card p-4 transition-colors touch-manipulation"
             >
               <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-full bg-primary/20 text-brand-ink flex items-center justify-center font-semibold shrink-0">
+                <div className="customer-avatar w-11 h-11 rounded-full flex items-center justify-center font-semibold shrink-0">
                   {(c.first_name || c.phone || '?').charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -193,7 +194,7 @@ export default function Customers() {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground justify-end"><Wallet className="w-3.5 h-3.5" /> Sarflagan</div>
-                  <div className="font-semibold text-sm text-brand-ink">{formatUZS(spendMap[c.id] || 0)}</div>
+                  <div className="customer-spend font-semibold text-sm">{formatUZS(spendMap[c.id] || 0)}</div>
                 </div>
               </div>
             </button>
