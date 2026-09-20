@@ -58,13 +58,13 @@
 .odina-product-stock { color:#66502e; background:#f7ecd9; border-radius:6px; padding:3px 5px; font-size:11px; font-weight:600; }
 .odina-cart-wrap { padding:16px 16px 16px 4px; border:0; }
 .odina-cart { background:#fffefa; border:1px solid #e5dfd0; border-radius:22px; box-shadow:0 5px 24px -14px #67512638; }
-.odina-cart-header { background:#fbf2e2; border-bottom:1px solid #e8d8be; padding-top:20px; padding-bottom:18px; }
+.odina-cart-header { background:#fbf2e2; border-bottom:1px solid #e8d8be; padding-top:12px; padding-bottom:12px; }
 .odina-cart-header h2 { font-family:var(--font-body); font-size:18px; font-weight:600; letter-spacing:-0.035em; }
 .odina-cart-header p { margin-top:4px; font-size:11px; color:#73705d; }
 .odina-cart-header-icon { width:35px; height:35px; border-radius:11px; display:flex; align-items:center; justify-content:center; color:#74723c; background:#f5dfb6; flex-shrink:0; }
 .odina-cart-empty-icon { background:#f4efdf; border:1px dashed #ddd0ac; border-radius:24px; width:80px; height:80px; transform:rotate(-7deg); }
 .odina-cart-empty-icon svg { color:#ada465; transform:rotate(7deg); }
-.odina-cart-line { background:#fcfbf6; border-color:#ece7dc; border-radius:15px; }
+.odina-cart-line { background:transparent; border-color:#e5dfd0; border-radius:0; }
 .odina-cart-summary { background:#fffefa; border-top:1px dashed #d6ceb9; }
 .odina-cart-summary input { border-color:#ddd5c2; border-radius:11px; background:#fffefa; font-size:12px; }
 .odina-cart-summary button { border-radius:11px; }
@@ -95,7 +95,8 @@
 .dark .odina-sidebar-content .odina-nav-group, .dark .odina-sidebar-content .odina-nav-child,
 .dark .odina-category-tab { color:#dbd8c8; }
 .dark .odina-sidebar-content .odina-sidebar-account, .dark .odina-cart-header,
-.dark .odina-cart-line, .dark .odina-pos-search input, .dark .odina-cart-summary input { background:hsl(var(--card)); border-color:hsl(var(--border)); }
+.dark .odina-pos-search input, .dark .odina-cart-summary input { background:hsl(var(--card)); border-color:hsl(var(--border)); }
+.dark .odina-cart-line { background:transparent; border-color:hsl(var(--border)); }
 .dark .odina-sidebar-content .odina-nav-link[aria-current="page"],
 .dark .odina-sidebar-content .odina-nav-group[data-active="true"] { color:#292b1b; background:#fecd7c; border-color:#d0b17f; }
 .dark .odina-category-tab[aria-pressed="true"], .dark .odina-sidebar-content .odina-nav-child[aria-current="page"] { color:#fecd7c; background:#54482d; }
