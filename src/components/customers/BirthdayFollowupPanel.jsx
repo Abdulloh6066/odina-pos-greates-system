@@ -105,7 +105,7 @@ export default function BirthdayFollowupPanel({ user }) {
 
       <div className="customer-birthday-counters grid grid-cols-3 gap-2 mb-4">
         <Counter icon={<BellRing className="w-4 h-4" />} label="Bog‘lanish kerak" value={counters.need_contact} tone="amber" />
-        <Counter icon={<PhoneMissed className="w-4 h-4" />} label="Javob bo‘lmadi" value={counters.no_answer} tone="blue" />
+        <Counter icon={<PhoneMissed className="w-4 h-4" />} label="Javob bo‘lmadi" value={counters.no_answer} tone="olive" />
         <Counter icon={<CheckCircle className="w-4 h-4" />} label="Aloqaga chiqildi" value={counters.reached} tone="green" />
       </div>
 
