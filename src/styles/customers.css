@@ -55,7 +55,7 @@
     color: var(--customer-text);
     border-color: #e8cd9f;
   }
-  .customer-birthday-counter[data-tone="blue"] {
+  .customer-birthday-counter[data-tone="olive"] {
     background: #e9ead7;
     border-color: #c9cba4;
   }
@@ -152,9 +152,28 @@
     color: var(--customer-text);
   }
   .customer-profile-total .text-brand-ink { color: var(--customer-text); }
+  .dark .customer-page-header {
+    background: linear-gradient(110deg, #373e2c, #473927);
+    border-color: #646145;
+    border-left-color: #aca95d;
+  }
+  .dark .customer-birthday-panel { background: linear-gradient(180deg, #373124, var(--customer-surface)); border-color: #665a3d; }
+  .dark .customer-birthday-counter { background: #473a27; border-color: #706044; }
+  .dark .customer-birthday-counter[data-tone="olive"] { background: #39402d; border-color: #596544; }
+  .dark .customer-birthday-counter[data-tone="green"] { background: #304333; border-color: #4b6b4e; }
+  .dark .customer-birthday-counter[data-tone="green"] svg { color: #b2d5a4; }
+  .dark .customer-followup-row[data-completed="true"] { background: #304333; border-color: #4b6b4e; }
+  .dark .odina-customers .customer-card,
+  .dark .odina-customers .customer-card:hover { background: linear-gradient(125deg, var(--customer-surface) 62%, #383329); border-color: var(--customer-line); }
+  .dark .customer-avatar { background: #594d31; color: #ffe1a4; border-color: #77623d; }
+  .dark .customer-spend { color: #d7dba7; }
+  .dark .customer-profile-total { background: linear-gradient(110deg, #353c2c, #4a3b2a); border-color: #626044; }
+  .dark .customer-profile-info.is-highlighted,
+  .dark .customer-birthday-notice { background: #473a27; border-color: #8d774c; }
 }
 @media screen and (max-width: 639px) {
-  .customer-page-header { align-items: flex-start; }
+  .customer-page-header { align-items: flex-start; flex-direction: column; padding: 20px; }
+  .customer-page-header > button { width: 100%; justify-content: center; }
   .customer-page-header > button { flex-shrink: 0; }
   .customer-birthday-counters { grid-template-columns: 1fr; }
   .customer-birthday-counter { display: flex; justify-content: space-between; align-items: center; }
