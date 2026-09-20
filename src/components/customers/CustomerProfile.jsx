@@ -75,7 +75,7 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto scrollbar-thin">
+      <DialogContent className="customer-profile-dialog max-w-2xl max-h-[92vh] overflow-y-auto scrollbar-thin">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{customer ? fullName(customer) : 'Mijoz'}</DialogTitle>
           <DialogDescription>Mijoz profili va xarid tarixi</DialogDescription>
@@ -90,12 +90,12 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
               <InfoTile icon={<Cake className="w-4 h-4" />} label="Tug‘ilgan kun" value={birthdayDisplay(customer.birth_date) || '—'} highlight={bdInfo?.isToday || bdInfo?.isTomorrow} />
             </div>
             {customer.label && (
-              <span className="inline-flex items-center rounded-full bg-primary/20 px-3 py-1 text-xs font-semibold text-brand-ink">{customer.label}</span>
+              <span className="customer-profile-label inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold">{customer.label}</span>
             )}
             {customer.notes && <p className="text-sm text-muted-foreground bg-secondary/40 rounded-xl px-3 py-2">{customer.notes}</p>}
 
-            <div className="rounded-2xl brand-surface border border-brand-sand/40 p-4 flex items-center gap-3">
-              <span className="w-11 h-11 rounded-xl bg-primary/25 text-brand-ink flex items-center justify-center shrink-0">
+            <div className="customer-profile-total rounded-2xl border p-4 flex items-center gap-3">
+              <span className="customer-total-icon w-11 h-11 rounded-xl flex items-center justify-center shrink-0">
                 <Wallet className="w-5 h-5" />
               </span>
               <div className="min-w-0">
@@ -105,7 +105,7 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
             </div>
 
             {bdInfo && (bdInfo.isToday || bdInfo.isTomorrow) && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <div className="customer-birthday-notice rounded-xl border px-3 py-2 text-sm">
                 {bdInfo.isToday ? '🎂 Bugun tug‘ilgan kun!' : '📅 Ertaga tug‘ilgan kun — eslatma yuboriladi.'}
               </div>
             )}
@@ -162,7 +162,7 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
 
 function InfoTile({ icon, label, value, highlight }) {
   return (
-    <div className={`rounded-xl border px-3 py-2.5 flex items-center gap-2.5 ${highlight ? 'border-amber-300 bg-amber-50' : 'border-border bg-card'}`}>
+    <div className={`customer-profile-info rounded-xl border px-3 py-2.5 flex items-center gap-2.5 ${highlight ? 'is-highlighted' : ''}`}>
       <span className="w-9 h-9 rounded-lg bg-secondary text-foreground/70 flex items-center justify-center shrink-0">{icon}</span>
       <div className="min-w-0">
         <div className="text-xs text-muted-foreground">{label}</div>
