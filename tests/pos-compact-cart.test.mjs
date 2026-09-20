@@ -23,7 +23,8 @@ const context = {
   React, useState: React.useState, formatUZS: (value) => `${value.toLocaleString('en-US')} UZS`,
   Minus: Icon, Plus: Icon, Trash2: Icon, Ticket: Icon, X: Icon,
   ShoppingBag: Icon, ReceiptText: Icon, ArrowUpRight: Icon,
-  Button, Input: () => React.createElement('input'),
+  Button, Input: ({ 'aria-label': ariaLabel, placeholder }) =>
+    React.createElement('input', { 'aria-label': ariaLabel, placeholder }),
 };
 vm.runInNewContext(transformed, context);
 
