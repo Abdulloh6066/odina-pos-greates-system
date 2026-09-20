@@ -75,7 +75,7 @@ export default function CustomerForm({ open, onClose, onSaved, customer }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="customer-form-dialog max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Mijozni tahrirlash' : 'Yangi mijoz'}</DialogTitle>
           <DialogDescription>Mijoz ma’lumotlarini to‘ldiring.</DialogDescription>
