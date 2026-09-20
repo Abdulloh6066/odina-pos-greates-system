@@ -50,7 +50,7 @@ export default function Cart({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold leading-snug break-words">{item.product_name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{formatUZS(item.price)} / dona</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{formatUZS(item.price)}</div>
                 </div>
                 <button type="button" onClick={() => onRemove(item)} disabled={locked} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="h-11 w-11 -mr-1 -mt-1 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
                   <Trash2 className="w-4 h-4" />
