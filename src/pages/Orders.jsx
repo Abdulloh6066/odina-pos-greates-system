@@ -166,8 +166,10 @@ export default function Orders() {
           shops={shops}
           filters={{ query, shop: shopFilter, type: typeFilter, status: statusFilter, pay: payFilter, date: dateFilter }}
           setters={{
-            query: (value) => { setQuery(value); if (value.trim()) setView('all'); },
-            shop: setShopFilter, type: setTypeFilter, status: setStatusFilter, pay: setPayFilter,
+            query: (value) => { setQuery(value); if (value.trim()) { setDateFilter(''); setView('all'); } },
+            shop: setShopFilter, type: setTypeFilter,
+            status: (value) => { setStatusFilter(value); if (value) { setDateFilter(''); setView('all'); } },
+            pay: setPayFilter,
             date: (value) => { setDateFilter(value); setView(value ? 'date' : 'today'); },
           }}
           typeOptions={TYPE_OPTIONS}
