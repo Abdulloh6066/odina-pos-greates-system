@@ -89,7 +89,7 @@ export default function BirthdayFollowupPanel({ user }) {
   const reached = items.filter((i) => i.contact_status === 'aloqa_chiqildi');
 
   return (
-    <div className="rounded-2xl border border-border bg-card premium-shadow p-4 mb-5">
+    <div className="customer-birthday-panel rounded-2xl border p-4 mb-5">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <Cake className="w-5 h-5 text-brand-ink" />
@@ -103,7 +103,7 @@ export default function BirthdayFollowupPanel({ user }) {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="customer-birthday-counters grid grid-cols-3 gap-2 mb-4">
         <Counter icon={<BellRing className="w-4 h-4" />} label="Bog‘lanish kerak" value={counters.need_contact} tone="amber" />
         <Counter icon={<PhoneMissed className="w-4 h-4" />} label="Javob bo‘lmadi" value={counters.no_answer} tone="blue" />
         <Counter icon={<CheckCircle className="w-4 h-4" />} label="Aloqaga chiqildi" value={counters.reached} tone="green" />
@@ -125,7 +125,7 @@ export default function BirthdayFollowupPanel({ user }) {
           {reached.length > 0 && (
             <div>
               <div className="text-xs font-semibold text-muted-foreground mb-2">Aloqaga chiqildi ({reached.length})</div>
-              <div className="space-y-2 opacity-70">
+              <div className="space-y-2">
                 {reached.map((i) => (
                   <FollowupRow key={i.customer_id} item={i} onStatus={setStatus} busyId={busyId} completed />
                 ))}
@@ -139,13 +139,8 @@ export default function BirthdayFollowupPanel({ user }) {
 }
 
 function Counter({ icon, label, value, tone }) {
-  const tones = {
-    amber: 'bg-amber-50 border-amber-200 text-amber-900',
-    blue: 'bg-blue-50 border-blue-200 text-blue-900',
-    green: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-  };
   return (
-    <div className={`rounded-xl border px-3 py-2.5 ${tones[tone] || ''}`}>
+    <div className="customer-birthday-counter rounded-xl border px-3 py-2.5" data-tone={tone}>
       <div className="flex items-center gap-1.5 text-xs font-medium opacity-80">{icon}{label}</div>
       <div className="font-display text-2xl font-bold leading-tight">{value}</div>
     </div>
@@ -155,7 +150,7 @@ function Counter({ icon, label, value, tone }) {
 function FollowupRow({ item, onStatus, busyId, completed }) {
   const isBusy = busyId === item.customer_id + ':' + 'qongiroq_javob_bolmadi' || busyId === item.customer_id + ':' + 'aloqa_chiqildi';
   return (
-    <div className={`rounded-xl border border-border bg-card p-3 ${completed ? 'border-emerald-200 bg-emerald-50/40' : ''}`}>
+    <div className="customer-followup-row rounded-xl border p-3" data-completed={completed ? 'true' : undefined}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="font-semibold truncate">{item.customer_name}</div>
