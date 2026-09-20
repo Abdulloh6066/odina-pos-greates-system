@@ -13,7 +13,7 @@ export default function Cart({
 }) {
   return (
     <div className="odina-cart flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
-      <div className="odina-cart-header px-4 py-4 pr-16 xl:pr-4 shrink-0 border-b border-brand-sand/40 brand-surface flex items-center justify-between gap-2">
+      <div className="odina-cart-header px-4 py-3 pr-16 xl:pr-4 shrink-0 border-b border-brand-sand/40 brand-surface flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="odina-cart-header-icon" aria-hidden="true"><ReceiptText className="w-4 h-4" /></span>
           <div className="min-w-0">
@@ -28,7 +28,7 @@ export default function Cart({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-3 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-16">
             <div className="odina-cart-empty-icon w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -39,41 +39,41 @@ export default function Cart({
           </div>
         ) : (
           cart.map((item) => (
-            <div key={item.product_id} className="odina-cart-line min-w-0 rounded-2xl border border-border bg-background/70 p-3 animate-pop-in">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-xl bg-card overflow-hidden shrink-0 border border-border/60">
+            <div key={item.product_id} className="odina-cart-line min-w-0 border-b border-dashed border-brand-sand/60 px-1 py-2 animate-pop-in last:border-b-0">
+              <div className="flex items-start gap-2">
+                <div className="w-9 h-9 rounded-lg bg-card overflow-hidden shrink-0 border border-border/60">
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.product_name || 'Mahsulot rasmi'} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center font-display text-lg text-brand-ink">{item.product_name.charAt(0)}</div>
+                    <div className="w-full h-full flex items-center justify-center font-display text-sm text-brand-ink">{item.product_name.charAt(0)}</div>
                   )}
                 </div>
-                <div className="flex-1 min-w-0 pt-0.5">
+                <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold leading-snug break-words">{item.product_name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{formatUZS(item.price)}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{formatUZS(item.price)} / dona</div>
                 </div>
                 <button type="button" onClick={() => onRemove(item)} disabled={locked} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="h-11 w-11 -mr-1 -mt-1 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 mt-3">
-                <div className="inline-flex items-center rounded-xl border border-border bg-card">
-                  <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-11 h-11 rounded-l-xl flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
+              <div className="flex items-center justify-between gap-2 mt-1.5">
+                <div className="inline-flex items-center rounded-lg border border-border bg-card shrink-0">
+                  <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-11 h-11 rounded-l-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="min-w-8 px-1 text-center text-sm font-semibold">{item.quantity}</span>
-                  <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-11 h-11 rounded-r-xl flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
+                  <span className="min-w-7 px-0.5 text-center text-sm font-semibold tabular-nums">{item.quantity}</span>
+                  <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-11 h-11 rounded-r-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="text-right text-sm font-bold leading-snug text-brand-ink break-words">{formatUZS(item.subtotal)}</div>
+                <div className="min-w-0 text-right text-sm font-bold leading-snug text-brand-ink break-words tabular-nums">{formatUZS(item.subtotal)}</div>
               </div>
             </div>
           ))
         )}
       </div>
 
-      <div className="odina-cart-summary border-t border-brand-sand/50 p-4 safe-bottom shrink-0 space-y-3 bg-card">
+      <div className="odina-cart-summary border-t border-brand-sand/50 p-3 safe-bottom shrink-0 space-y-2.5 bg-card">
         <DiscountRow
           discountCode={discountCode}
           discount={couponDiscount}
