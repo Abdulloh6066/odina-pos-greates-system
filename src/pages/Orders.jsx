@@ -10,7 +10,7 @@ import OrderLedgerKpis from '@/components/orders/OrderLedgerKpis';
 import OrderFilterRail from '@/components/orders/OrderFilterRail';
 import OrderLedgerCard from '@/components/orders/OrderLedgerCard';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
-import { tashkentNowParts } from '@/lib/orders';
+import { buildDemoOrders } from '@/lib/demo-orders';
 import { useToast } from '@/components/ui/use-toast';
 import '@/styles/orders-premium-ledger.css';
 
@@ -55,21 +55,8 @@ export default function Orders() {
   const [staffTicket, setStaffTicket] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
   const { alerts, counts } = useOrderAlerts(orders);
-  // Owner-only visual samples: never fetched, saved, counted, alerted or paid.
-  const demoOrders = useMemo(() => {
-    const { year, month, day } = tashkentNowParts();
-    const date = (offset) => new Date(Date.UTC(year, month - 1, day + offset)).toISOString().slice(0, 10);
-    const sample = (number, details) => ({
-      id: `demo-${number}`, order_number: `NAMUNA-${number}`, customer_phone: '—',
-      shop_name_snapshot: 'Namuna', delivery_address: '', ...details,
-    });
-    return [
-      sample('01', { customer_name: 'To‘y uchun list buyurtmasi', order_type: 'toy_va_bazmlar', fulfilment_type: 'pickup', required_date: date(1), required_time: '11:00', order_status: 'qabul_qilindi', payment_status: 'partial', total: 1200000, remaining_balance: 800000, demo_items: 'МАЛАКОЛИ ПИРОГ — 2 list; МАЛИНА ПИРОК — 1 list' }),
-      sample('02', { customer_name: 'Tug‘ilgan kun torti', order_type: 'tugilgan_kun_va_boshqa', fulfilment_type: 'pickup', required_date: date(1), required_time: '15:30', order_status: 'tayyorlanmoqda', payment_status: 'unpaid', total: 260000, remaining_balance: 260000, demo_items: 'МАТИЛДА — 1 dona' }),
-      sample('03', { customer_name: 'Bazm uchun aralash listlar', order_type: 'toy_va_bazmlar', fulfilment_type: 'delivery', delivery_address: 'Yetkazish manzili namunasi', required_date: date(2), required_time: '13:00', order_status: 'qabul_qilindi', payment_status: 'partial', total: 950000, remaining_balance: 450000, demo_items: 'СУТЛИ ПИРОГ — 2 list; ОЛМАЛИ ПИРОГ — 1 list' }),
-      sample('04', { customer_name: 'Olib ketiladigan buyurtma', order_type: 'tugilgan_kun_va_boshqa', fulfilment_type: 'pickup', required_date: date(1), required_time: '18:00', order_status: 'tayyor', payment_status: 'paid', total: 180000, remaining_balance: 0, demo_items: 'САН СЕБЯСТАН — 1 list' }),
-    ];
-  }, []);
+  // Display samples are separate from the real orders array and all financial flows.
+  const demoOrders = useMemo(buildDemoOrders, []);
   const showDemo = isAdmin && !query && !shopFilter && !typeFilter && !statusFilter && !payFilter && !dateFilter;
 
   const loadOrders = async () => {
