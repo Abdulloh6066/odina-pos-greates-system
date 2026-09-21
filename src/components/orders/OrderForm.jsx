@@ -15,6 +15,11 @@ import { useToast } from '@/components/ui/use-toast';
 
 const WEDDING_PCS = 40;
 
+const isOrderCatalogProduct = (product) => {
+  const name = String(product?.name || '').toLocaleUpperCase('uz-UZ');
+  return ['LIST', 'ЛИСТ', 'MINI', 'МИНИ'].some((marker) => name.includes(marker));
+};
+
 function mapPrefillItems(sourceItems, products) {
   return (sourceItems || []).map((si) => {
     const p = (products || []).find((x) => x.id === si.product_id);
@@ -65,7 +70,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     if (!open) return;
     setLoadingProducts(true);
     base44.entities.Product.list('name', 500)
-      .then((list) => setProducts((list || []).filter((p) => p.active !== false && p.archived !== true)))
+      .then((list) => setProducts((list || []).filter((p) => p.active !== false && p.archived !== true && isOrderCatalogProduct(p))))
       .catch(() => setProducts([]))
       .finally(() => setLoadingProducts(false));
   }, [open]);
