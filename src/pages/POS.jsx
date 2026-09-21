@@ -1088,13 +1088,13 @@ export default function POS() {
           <div className="flex-1 flex flex-col min-w-0">
             {/* Search + mobile categories */}
             <div className="odina-pos-search px-4 sm:px-5 pt-4 pb-2 space-y-3">
-              <div className="odina-catalog-heading">
+              <div className="odina-catalog-toolbar">
                 <h1>Mahsulotlar</h1>
-                {!loadingData && <span>{filtered.length} ta mahsulot</span>}
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input aria-label="Mahsulotlarni qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
+                <div className="odina-catalog-search relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input aria-label="Mahsulotlarni qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
+                </div>
+                {!loadingData && <span className="odina-catalog-count">{filtered.length} ta mahsulot</span>}
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
                 <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
