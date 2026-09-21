@@ -43,7 +43,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
           className="w-full h-12 rounded-xl border border-input bg-card px-3 flex items-center gap-2 text-sm text-muted-foreground shadow-sm hover:bg-brand-olive/10 transition-colors"
         >
           <Search className="w-4 h-4" />
-          <span className="truncate">Mahsulot qidirish va tanlash...</span>
+          <span className="truncate">LIST yoki MINI mahsulotni tanlash...</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[340px] sm:w-[460px] p-0 premium-shadow-lg">
@@ -120,7 +120,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
         <div className="max-h-72 overflow-y-auto scrollbar-thin">
           {loading && <div className="p-4 text-sm text-muted-foreground">Yuklanmoqda...</div>}
           {!loading && filtered.length === 0 && (
-            <div className="p-4 text-sm text-muted-foreground">Mahsulot topilmadi.</div>
+            <div className="p-4 text-sm text-muted-foreground">LIST yoki MINI nomli mahsulot topilmadi.</div>
           )}
           {filtered.map((p) => {
             const isSheet = p.production_unit === 'sheet';
