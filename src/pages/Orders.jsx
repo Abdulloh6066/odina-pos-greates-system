@@ -9,7 +9,6 @@ import OrderLedgerHero from '@/components/orders/OrderLedgerHero';
 import OrderFilterRail from '@/components/orders/OrderFilterRail';
 import OrderLedgerCard from '@/components/orders/OrderLedgerCard';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
-import { buildDemoOrders } from '@/lib/demo-orders';
 import { shiftDateKey, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import { useToast } from '@/components/ui/use-toast';
 import '@/styles/orders-premium-ledger.css';
@@ -56,7 +55,6 @@ export default function Orders() {
   const [staffTicket, setStaffTicket] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
   const { alerts, counts } = useOrderAlerts(orders);
-  const demoOrders = useMemo(buildDemoOrders, []);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -198,11 +196,6 @@ export default function Orders() {
               <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} />
             ))}</div>
           )}
-          {isAdmin && !loading && orders.length === 0 && <details className="opl-demo">
-            <summary>Ko‘rinish uchun 4 ta namuna</summary>
-            <p>Namunalar haqiqiy buyurtma, to‘lov yoki qoldiqqa kirmaydi.</p>
-            <div className="opl-order-list">{demoOrders.map((order) => <OrderLedgerCard key={order.id} order={order} isAdmin demo />)}</div>
-          </details>}
         </section>
       </main>
       <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
