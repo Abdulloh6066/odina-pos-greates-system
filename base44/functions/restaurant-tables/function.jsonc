@@ -1,6 +1,6 @@
 {
   "name": "restaurant-tables",
   "entry": "entry.ts",
-  "description": "Do‘kon zali, stol soni va to‘lovgacha ochiq buyurtmalarni saqlash. Savdo, to‘lov va ombor faqat complete-sale orqali yakunlanadi.",
+  "description": "Do‘kon zali, stol soni, vaqtinchalik birlashtirilgan stollar va to‘lovgacha ochiq buyurtmalarni saqlash. Savdo, to‘lov va ombor faqat complete-sale orqali yakunlanadi.",
   "is_public": false
 }
