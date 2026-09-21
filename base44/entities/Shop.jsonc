@@ -88,6 +88,44 @@
       "default": 0,
       "description": "Stollar bo\u2018yicha to\u2018lanmagan buyurtmalarni bir vaqtda tahrirlash nazorati"
     },
+    "restaurant_table_groups": {
+      "type": "array",
+      "description": "Birga o\u2018tirgan mehmonlar uchun vaqtincha birlashtirilgan stollar; hisob yopilganda guruh avtomatik yechiladi",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "numbers": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            }
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_by_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "numbers",
+          "created_at",
+          "created_by"
+        ]
+      },
+      "default": []
+    },
     "restaurant_table_orders": {
       "type": "array",
       "description": "Do\u2018konning ochiq stol buyurtmalari; to\u2018lovgacha savdo yoki ombor harakati emas",
