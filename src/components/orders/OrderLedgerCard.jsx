@@ -8,12 +8,11 @@ function displayDate(value) {
   return match ? `${match[3]}.${match[2]}.${match[1]}` : value || 'Sana belgilanmagan';
 }
 
-export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat, demo = false }) {
+export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat }) {
   const remaining = Number(order.remaining_balance || 0);
   return <article className="opl-order">
-    {demo && <div className="opl-demo-label">NAMUNA · Haqiqiy buyurtma emas</div>}
-    <button type="button" className="opl-order-open" onClick={demo ? undefined : () => onOpen(order)}
-      disabled={demo} aria-label={demo ? undefined : `${order.order_number}, ${order.customer_name}, batafsil ko‘rish`}>
+    <button type="button" className="opl-order-open" onClick={() => onOpen(order)}
+      aria-label={`${order.order_number}, ${order.customer_name}, batafsil ko‘rish`}>
       <div className="opl-order-top">
         <span className="opl-order-time">{displayDate(order.required_date)} <strong>{order.required_time || '—'}</strong></span>
         <span className="opl-status" data-status={order.order_status}>{statusLabel(order.order_status)}</span>
@@ -39,9 +38,8 @@ export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat, demo
         <ArrowUpRight className="opl-open-arrow" size={20} aria-hidden="true" />
       </div>
     </button>
-    {!demo && onRepeat && <div className="opl-order-actions">
+    {onRepeat && <div className="opl-order-actions">
       <button type="button" onClick={() => onRepeat(order)}><Repeat2 size={16} aria-hidden="true" /> Qayta buyurtma</button>
     </div>}
-    {demo && <div className="opl-demo-items">Mahsulotlar: {order.demo_items}</div>}
   </article>;
 }
