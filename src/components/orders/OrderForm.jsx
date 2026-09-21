@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 const WEDDING_PCS = 40;
 
 const isOrderCatalogProduct = (product) => {
+  if (product?.production_unit === 'sheet') return true;
   const name = String(product?.name || '').toUpperCase();
   return ['LIST', 'ЛИСТ', 'MINI', 'МИНИ'].some((marker) => name.includes(marker));
 };
