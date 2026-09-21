@@ -1105,7 +1105,7 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-28 xl:pb-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 xl:pb-6">
               {loadingData ? (
                 <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
@@ -1150,8 +1150,8 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className={`xl:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
-        <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-14 h-auto py-4 whitespace-normal text-base font-semibold rounded-2xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
+      <div className={`xl:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
+        <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-12 h-12 px-4 py-2 whitespace-nowrap text-sm sm:text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>
       </div>
