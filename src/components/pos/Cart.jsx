@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight, ChevronDown } from 'lucide-react';
+import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +9,8 @@ export default function Cart({
   subtotal, discount, couponDiscount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
   roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding,
   total, onCheckout, disabled, tableMode = false, tableDirty = false,
-  tableSaved = false, onSaveTable, onStaffTicket, savingTable = false, locked = false,
+  tableSaved = false, onSaveTable, savingTable = false, locked = false, onCancelTable,
 }) {
-  const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
-
   return (
     <div className="odina-cart flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
       <div className="odina-cart-header px-4 py-3 pr-16 xl:pr-4 shrink-0 border-b border-brand-sand/40 brand-surface flex items-center justify-between gap-2">
@@ -23,29 +21,14 @@ export default function Cart({
             <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + i.quantity, 0)} ta mahsulot</p>
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {tableMode && cart.length > 0 && onStaffTicket && (
-            <button
-              type="button"
-              onClick={onStaffTicket}
-              disabled={locked || savingTable}
-              className="min-h-11 px-2 rounded-xl text-xs font-semibold text-brand-ink hover:bg-brand-olive/15 transition-colors flex items-center gap-1 touch-manipulation"
-              aria-label="Xizmat chekini ochish"
-            >
-              <ReceiptText className="w-3.5 h-3.5" />
-              <span className="sm:hidden">Chek</span>
-              <span className="hidden sm:inline">Xizmat cheki</span>
-            </button>
-          )}
-          {cart.length > 0 && !tableSaved && (
-            <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
-              <Trash2 className="w-3.5 h-3.5" /> Tozalash
-            </button>
-          )}
-        </div>
+        {cart.length > 0 && !tableSaved && (
+          <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
+            <Trash2 className="w-3.5 h-3.5" /> Tozalash
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 min-h-[9rem] overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-16">
             <div className="odina-cart-empty-icon w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -90,44 +73,25 @@ export default function Cart({
         )}
       </div>
 
-      <div className="odina-cart-summary max-h-[48%] overflow-y-auto overscroll-contain border-t border-brand-sand/50 p-3 shrink-0 space-y-2.5 bg-card">
-        <button
-          type="button"
-          onClick={() => setAdjustmentsOpen((open) => !open)}
-          aria-expanded={adjustmentsOpen}
-          className="w-full min-h-11 rounded-xl border border-border bg-card px-3 flex items-center justify-between gap-2 text-sm font-semibold hover:bg-secondary/60 touch-manipulation"
-        >
-          <span className="flex items-center gap-2 min-w-0">
-            <Ticket className="w-4 h-4 shrink-0 text-brand-ink" />
-            <span className="truncate">Chegirma va tuzatish</span>
-          </span>
-          <span className="flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground">
-            {discount > 0 ? `−${formatUZS(discount)}` : 'Ochish'}
-            <ChevronDown className={`w-4 h-4 transition-transform ${adjustmentsOpen ? 'rotate-180' : ''}`} />
-          </span>
-        </button>
-        {adjustmentsOpen && (
-          <div className="space-y-2.5 rounded-xl border border-border/70 bg-secondary/20 p-2.5">
-            <DiscountRow
-              discountCode={discountCode}
-              discount={couponDiscount}
-              onApplyDiscount={onApplyDiscount}
-              onRemoveDiscount={onRemoveDiscount}
-              discountError={discountError}
-            />
-            {cart.length > 0 && (
-              <RoundingRow
-                subtotal={subtotal}
-                discountCode={discountCode}
-                roundingTarget={roundingTarget}
-                adjustmentMode={adjustmentMode}
-                roundingError={roundingError}
-                onApplyRounding={onApplyRounding}
-                onApplyManualDiscount={onApplyManualDiscount}
-                onRemoveRounding={onRemoveRounding}
-              />
-            )}
-          </div>
+      <div className="odina-cart-summary border-t border-brand-sand/50 p-3 safe-bottom shrink-0 space-y-2.5 bg-card">
+        <DiscountRow
+          discountCode={discountCode}
+          discount={couponDiscount}
+          onApplyDiscount={onApplyDiscount}
+          onRemoveDiscount={onRemoveDiscount}
+          discountError={discountError}
+        />
+        {cart.length > 0 && (
+          <RoundingRow
+            subtotal={subtotal}
+            discountCode={discountCode}
+            roundingTarget={roundingTarget}
+            adjustmentMode={adjustmentMode}
+            roundingError={roundingError}
+            onApplyRounding={onApplyRounding}
+            onApplyManualDiscount={onApplyManualDiscount}
+            onRemoveRounding={onRemoveRounding}
+          />
         )}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>Oraliq summa</span>
@@ -143,17 +107,27 @@ export default function Cart({
           <span className="font-display text-lg font-bold">Jami</span>
           <span className="text-2xl font-bold tracking-tight text-brand-ink text-right break-words">{formatUZS(total)}</span>
         </div>
-        {tableMode && <div className="rounded-xl border border-brand-olive/30 bg-brand-olive/5 p-2.5 space-y-2">
-          <p className="text-xs font-semibold text-brand-ink">{tableDirty ? '● Saqlanmagan o‘zgarishlar bor' : tableSaved ? '✓ Stolga saqlangan · hali to‘lanmagan' : 'Mahsulot qo‘shib, stolga saqlang'}</p>
-          {(discountCode || roundingTarget !== null) && <p className="text-xs text-muted-foreground">Chegirma to‘lov paytida qayta qo‘llanadi.</p>}
-          <Button type="button" variant="outline" onClick={onSaveTable}
-            disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
-            className="w-full min-w-0 min-h-11 h-auto py-2 whitespace-normal text-center rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
-            {savingTable ? 'Saqlanmoqda…' : tableDirty ? 'Stolga saqlash →' : 'Yangi buyurtmaga o‘tish'}
-          </Button>
+        {tableMode && <div className="rounded-xl border border-brand-olive/30 bg-brand-olive/5 p-3 space-y-2">
+          <p className="text-xs font-medium text-brand-ink">{tableDirty ? '● Buyurtmada saqlanmagan o‘zgarishlar bor' : tableSaved ? '✓ Buyurtma serverda saqlangan · hali to‘lanmagan' : 'Mahsulotlarni qo‘shing, keyin buyurtmani saqlang'}</p>
+          <p className="text-xs text-muted-foreground">Saqlagach Kassa avtomatik tozalanadi. Stolning hisobi ochiq qoladi.</p>
+          {(discountCode || roundingTarget !== null) && <p className="text-xs text-muted-foreground">Chegirma stolga saqlanmaydi; mehmon ketganda to‘lovda qayta qo‘llang.</p>}
+          <div className="flex flex-col gap-2 min-w-0">
+            <Button type="button" variant="outline" onClick={onSaveTable}
+              disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
+              className="w-full min-w-0 min-h-12 h-auto py-2.5 whitespace-normal text-center rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
+              {savingTable ? 'Saqlanmoqda…' : tableDirty ? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'}
+            </Button>
+            {onCancelTable && (
+              <Button type="button" variant="outline" onClick={onCancelTable}
+                disabled={locked || savingTable}
+                className="w-full min-w-0 min-h-12 h-auto py-2.5 whitespace-normal rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold px-3 touch-manipulation"
+                aria-label="Stolni bekor qilish">
+                <X className="w-4 h-4 mr-1" />
+                <span>Bekor qilish</span>
+              </Button>
+            )}
+          </div>
         </div>}
-      </div>
-      <div className="odina-cart-checkout shrink-0 border-t border-brand-sand/50 bg-card p-3 safe-bottom">
         <Button
           onClick={onCheckout}
           disabled={disabled || locked || cart.length === 0}

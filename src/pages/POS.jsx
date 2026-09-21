@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -365,14 +365,6 @@ export default function POS() {
   };
 
   const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
-
-  const openTableServiceTicket = async () => {
-    if (!selectedTable || tableOrderLoading || savingTableRef.current || paying || payOpen || stockChecking
-      || tableOrderError || tableOrder?.state === 'paying') return;
-    if (tableCartDirty && !(await saveTableOrder())) return;
-    setStaffTicket({ mode: 'table', shop: tableShop, shopId: selectedTable.shopId, tableNumber: selectedTable.number });
-  };
-
   const tableSelectionError = tableQuery.invalid && !screenMode
     ? 'Stol havolasi noto‘g‘ri. Xaritadan qayta tanlang.'
     : selectedTable && !loadingData && (!tableShop
@@ -1031,11 +1023,32 @@ export default function POS() {
               setTableSaveError('');
               setDiscountCode(''); setDiscountPct(0); setRoundingTarget(null); setAdjustmentMode(null);
             }}>Saqlangan holatga qaytish</Button>}
+            {tableOrder?.items?.length > 0 && !tableCartDirty && <Button type="button" variant="outline"
+              onClick={() => setStaffTicket({ mode: 'table', shop: tableShop, shopId: selectedTable.shopId, tableNumber: selectedTable.number })}
+              className="min-h-11 rounded-xl font-semibold text-brand-ink">
+              <ReceiptText className="h-4 w-4 mr-1.5" /> Xizmat cheki
+            </Button>}
             {tableOrder?.state === 'paying' && <Button type="button" variant="outline" className="min-h-11 border-amber-500" onClick={() => void reconcileTablePayment()}>To‘lovni tekshirish</Button>}
             {(tableOrderError || tableSaveError) && <Button type="button" variant="outline" className="min-h-11" onClick={async () => {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
               setTableReload((current) => current + 1);
             }}>Buyurtmani yangilash</Button>}
+            {Boolean(selectedTable && (tableOrder?.items?.length || cart.length)) && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 rounded-xl border-brand-olive/50 bg-card text-brand-ink font-semibold touch-manipulation"
+                onClick={() => setStaffTicketModal({
+                  open: true,
+                  shop: tableShop,
+                  shopId: selectedTable.shopId,
+                  tableNumber: selectedTable.number,
+                  order: tableOrder,
+                })}
+              >
+                <UtensilsCrossed className="w-4 h-4 mr-1.5" /> Xizmat cheki
+              </Button>
+            )}
             <Button type="button" variant="outline" className="min-h-11" onClick={() => void goToTables()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
           </div>
         </div>
@@ -1131,7 +1144,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveAndStartNextOrder()} onStaffTicket={() => void openTableServiceTicket()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
+            onSaveTable={() => void saveAndStartNextOrder()} onCancelTable={() => void cancelTableSelection()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </div>
       </div>
@@ -1156,7 +1169,7 @@ export default function POS() {
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
-            onSaveTable={() => void saveAndStartNextOrder()} onStaffTicket={() => void openTableServiceTicket()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
+            onSaveTable={() => void saveAndStartNextOrder()} onCancelTable={() => void cancelTableSelection()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </SheetContent>
       </Sheet>
