@@ -97,11 +97,6 @@
 .opl-empty button { margin-top: 6px; min-height: 42px; border: 1px solid #c8c5a5; border-radius: 9px; background: #f1f0e4; padding: 8px 14px; font-weight: 650; }
 .opl-spinner { width: 26px; height: 26px; border: 3px solid #e4e3d3; border-top-color: #aca95d; border-radius: 50%; animation: opl-spin .7s linear infinite; }
 @keyframes opl-spin { to { transform: rotate(360deg); } }
-.opl-demo { margin-top: 22px; padding: 14px; border: 1px dashed #d9cfa8; border-radius: 12px; }
-.opl-demo summary { cursor: pointer; font-size: 13px; font-weight: 650; }
-.opl-demo p, .opl-demo-items { color: #756e58; font-size: 12px; }
-.opl-demo-label, .opl-demo-items { margin: 10px 18px; }
-.opl-demo-label { color: #896d34; font-size: 11px; font-weight: 800; }
 .opl-alert-box { border: 1px solid #ddd7ac; border-radius: 12px; background: #f9f8ec; padding: 13px 15px; margin-bottom: 22px; }
 .opl-alert-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .opl-alert-heading { font-size: 13px; font-weight: 750; }
