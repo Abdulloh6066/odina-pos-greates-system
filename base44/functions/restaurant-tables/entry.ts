@@ -223,6 +223,93 @@ Deno.serve(async (req) => {
     }
 
     const shopId = String(body?.shop_id || "");
+    if (action === "group_tables" || action === "ungroup_tables") {
+      const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
+      if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
+      if (role !== "admin" && userShopId(actor) !== shop.id) {
+        return Response.json({ error: "Boshqa do‘kon stollariga ruxsat yo‘q." }, { status: 403 });
+      }
+      const count = safeShop(shop).table_count;
+      const primaryNumber = body?.primary_table_number;
+      if (!Number.isInteger(primaryNumber) || primaryNumber < 1 || primaryNumber > count) {
+        return Response.json({ error: "Asosiy stol topilmadi." }, { status: 400 });
+      }
+      const groups = cleanGroups(shop, count);
+      const stored = ordersOf(shop);
+      const version = ordersVersion(shop);
+
+      if (action === "ungroup_tables") {
+        const group = groups.find((row: any) => row.numbers.includes(primaryNumber));
+        if (!group) return Response.json({ ok: true, unchanged: true, shop: safeShop(shop) });
+        if (stored.some((order: any) => group.numbers.includes(order.number))) {
+          return Response.json({ error: "Buyurtmasi ochiq birlashtirilgan stollar hisob yopilganda avtomatik ajraladi." }, { status: 409 });
+        }
+        const updated = await service.entities.Shop.updateMany(
+          { id: shop.id, ...ordersVersionCondition(version) },
+          { $set: { restaurant_table_groups: groups.filter((row: any) => row.id !== group.id) },
+            $inc: { restaurant_table_orders_version: 1 } },
+        );
+        if (!updated?.success || Number(updated.updated || 0) !== 1) {
+          return Response.json({ error: "Stollar boshqa qurilmada o‘zgardi. Yangilang." }, { status: 409 });
+        }
+        const saved = await service.entities.Shop.get(shop.id);
+        await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
+          action: "restaurant_tables_ungrouped",
+          details: `${shop.name} · ${group.numbers.join(" + ")}-stollar ajratildi` }).catch(() => {});
+        return Response.json({ ok: true, shop: safeShop(saved) });
+      }
+
+      const secondaryNumber = body?.secondary_table_number;
+      if (!Number.isInteger(secondaryNumber) || secondaryNumber < 1 || secondaryNumber > count
+        || secondaryNumber === primaryNumber) {
+        return Response.json({ error: "Qo‘shiladigan stol noto‘g‘ri." }, { status: 400 });
+      }
+      const primaryGroup = groups.find((row: any) => row.numbers.includes(primaryNumber)) || null;
+      const secondaryGroup = groups.find((row: any) => row.numbers.includes(secondaryNumber)) || null;
+      if (secondaryGroup && secondaryGroup.id !== primaryGroup?.id) {
+        return Response.json({ error: "Tanlangan stol boshqa guruhga ulangan." }, { status: 409 });
+      }
+      const numbers = primaryGroup ? [...primaryGroup.numbers] : [primaryNumber];
+      if (numbers.includes(secondaryNumber)) {
+        return Response.json({ ok: true, unchanged: true, group: primaryGroup, shop: safeShop(shop) });
+      }
+      if (numbers.length >= 8) {
+        return Response.json({ error: "Bitta guruhga ko‘pi bilan 8 ta stol ulanadi." }, { status: 400 });
+      }
+      numbers.push(secondaryNumber);
+      const relatedOrders = stored.filter((order: any) => numbers.includes(order.number));
+      if (relatedOrders.length > 1) {
+        return Response.json({ error: "Ikkala stolda ham buyurtma bor. Birlashtirishdan oldin bittasining hisobini yakunlang." }, { status: 409 });
+      }
+      const now = new Date().toISOString();
+      const group = primaryGroup
+        ? { ...primaryGroup, numbers }
+        : { id: crypto.randomUUID(), numbers, created_at: now,
+            created_by: actor.id, created_by_name: userLabel(actor) };
+      const canonical = numbers[0];
+      const nextOrders = relatedOrders.length === 1 && relatedOrders[0].number !== canonical
+        ? stored.map((order: any) => order.id === relatedOrders[0].id
+          ? { ...order, number: canonical, revision: Number(order.revision || 0) + 1,
+              updated_by: actor.id, updated_at: now } : order)
+        : stored;
+      const nextGroups = primaryGroup
+        ? groups.map((row: any) => row.id === primaryGroup.id ? group : row)
+        : [...groups, group];
+      const updated = await service.entities.Shop.updateMany(
+        { id: shop.id, ...ordersVersionCondition(version) },
+        { $set: { restaurant_table_groups: nextGroups, restaurant_table_orders: nextOrders },
+          $inc: { restaurant_table_orders_version: 1 } },
+      );
+      if (!updated?.success || Number(updated.updated || 0) !== 1) {
+        return Response.json({ error: "Stollar boshqa qurilmada o‘zgardi. Yangilang." }, { status: 409 });
+      }
+      const saved = await service.entities.Shop.get(shop.id);
+      await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
+        action: "restaurant_tables_grouped",
+        details: `${shop.name} · ${numbers.join(" + ")}-stollar birlashtirildi` }).catch(() => {});
+      return Response.json({ ok: true, group, shop: safeShop(saved) });
+    }
+
     if (action === "get_table_order" || action === "save_table_order" || action === "reconcile_table_payment") {
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
       if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
@@ -234,8 +321,13 @@ Deno.serve(async (req) => {
         return Response.json({ error: "Bu do‘konda stol topilmadi." }, { status: 400 });
       }
       const stored = ordersOf(shop);
-      const existing = stored.find((order: any) => order.number === number) || null;
-      if (action === "get_table_order") return Response.json({ ok: true, order: existing });
+      const group = groupForNumber(shop, number);
+      const primaryNumber = canonicalNumber(shop, number);
+      const existing = orderForNumber(shop, number);
+      if (action === "get_table_order") {
+        return Response.json({ ok: true, order: existing, group,
+          primary_table_number: primaryNumber });
+      }
       if (action === "reconcile_table_payment") {
         if (!existing || existing.state !== "paying" || !existing.checkout_key) {
           return Response.json({ error: "To‘lov tekshiriladigan stol topilmadi." }, { status: 409 });
@@ -244,13 +336,19 @@ Deno.serve(async (req) => {
           table_order_id_snapshot: existing.id, idempotency_key: existing.checkout_key,
         }, "-created_date", 2);
         if ((matches || []).length !== 1 || matches[0].status !== "completed"
-          || matches[0].shop_id !== shop.id || matches[0].table_number_snapshot !== number) {
+          || matches[0].shop_id !== shop.id
+          || !((group?.numbers || [number]).includes(matches[0].table_number_snapshot))) {
           return Response.json({ error: "To‘lov tasdiqlanmadi. Qayta to‘lov olmang — egasi Savdolar tarixini tekshirsin." }, { status: 409 });
         }
         const version = ordersVersion(shop);
         const cleared = await service.entities.Shop.updateMany(
           { id: shop.id, ...ordersVersionCondition(version) },
-          { $set: { restaurant_table_orders: stored.filter((row: any) => row.id !== existing.id) },
+          { $set: {
+              restaurant_table_orders: stored.filter((row: any) => row.id !== existing.id),
+              restaurant_table_groups: group
+                ? cleanGroups(shop, safeShop(shop).table_count).filter((row: any) => row.id !== group.id)
+                : cleanGroups(shop, safeShop(shop).table_count),
+            },
             $inc: { restaurant_table_orders_version: 1 } },
         );
         if (!cleared?.success || Number(cleared.updated || 0) !== 1) {
@@ -311,7 +409,7 @@ Deno.serve(async (req) => {
       const ticketNumber = Number.isSafeInteger(existing?.ticket_number) && existing.ticket_number > 0
         ? existing.ticket_number : await allocateServiceTicketNumber(service, shop.id);
       const now = new Date().toISOString();
-      const order = { id: existing?.id || crypto.randomUUID(), number, ticket_number: ticketNumber,
+      const order = { id: existing?.id || crypto.randomUUID(), number: primaryNumber, ticket_number: ticketNumber,
         revision: revision + 1,
         state: "occupied", items, total, started_at: existing?.started_at || now,
         opened_by: existing?.opened_by || actor.id,
@@ -322,7 +420,7 @@ Deno.serve(async (req) => {
       const version = ordersVersion(shop);
       const updated = await service.entities.Shop.updateMany(
         { id: shop.id, restaurant_table_count: safeShop(shop).table_count, ...ordersVersionCondition(version) },
-        { $set: { restaurant_table_orders: [...stored.filter((row: any) => row.number !== number), order] },
+        { $set: { restaurant_table_orders: [...stored.filter((row: any) => row.number !== primaryNumber), order] },
           $inc: { restaurant_table_orders_version: 1 } },
       );
       if (!updated?.success || Number(updated.updated || 0) !== 1) {
@@ -330,7 +428,7 @@ Deno.serve(async (req) => {
       }
       await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
         action: "restaurant_table_order_saved",
-        details: `${shop.name} · ${number}-stol · ${revision + 1}-tahrir · ${total} UZS (to‘lanmagan)` }).catch(() => {});
+        details: `${shop.name} · ${(group?.numbers || [number]).join(" + ")}-stol · ${revision + 1}-tahrir · ${total} UZS (to‘lanmagan)` }).catch(() => {});
       return Response.json({ ok: true, order, summary: orderSummary(order) });
     }
     if (action !== "set_table_count" && action !== "set_table_layout") {
