@@ -33,8 +33,8 @@ export default function Cart({
               aria-label="Xizmat chekini ochish"
             >
               <ReceiptText className="w-3.5 h-3.5" />
-              <span className="2xl:hidden">Chek</span>
-              <span className="hidden 2xl:inline">Xizmat cheki</span>
+              <span className="sm:hidden">Chek</span>
+              <span className="hidden sm:inline">Xizmat cheki</span>
             </button>
           )}
           {cart.length > 0 && !tableSaved && (
