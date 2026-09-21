@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Armchair, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Building2, Check,
   Coffee, DoorOpen, Edit3, Grip, Layers, Maximize2, Minus, MousePointer2,
-  Move, Plus, RotateCcw, Save, Sliders, Sun, Trash2, X, ZoomIn, ZoomOut,
+  Link2, Move, Plus, RotateCcw, Save, Sliders, Sun, Trash2, X, ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -1101,6 +1101,7 @@ export default function TableFloorplan({
               {/* Tables: Freely Draggable Everywhere between Coffee Shop and Street */}
               {layout.map((point) => {
                 const order = (shop.orders || []).find((row) => row.number === point.number);
+                const group = (shop.groups || []).find((row) => row.numbers?.includes(point.number));
                 const isOccupied = Boolean(order);
                 const isPaying = order?.state === 'paying';
                 const isSelected = selectedViewNumber === point.number;
@@ -1157,6 +1158,12 @@ export default function TableFloorplan({
                       <Armchair aria-hidden="true" className="h-5 w-5 text-brand-ink" />
                     )}
                     <span className="text-xs font-bold leading-tight">{point.number}-stol</span>
+                    {!editing && group && (
+                      <span className="flex items-center gap-0.5 text-[8px] font-bold leading-none text-brand-ink">
+                        <Link2 className="h-2.5 w-2.5" />
+                        {group.numbers.join('+')}
+                      </span>
+                    )}
                     {isTableOutdoor && (
                       <span className="text-[9px] font-bold text-[#656b2a] leading-none">Ko‘cha</span>
                     )}
