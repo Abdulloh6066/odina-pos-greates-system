@@ -259,7 +259,7 @@ export default function TableDetailSheet({
         {/* Footer Actions */}
         <div className="p-4 border-t border-border bg-card/50 flex flex-col gap-2">
           {!isPaying && (
-            <div className={group && !isOccupied ? 'grid grid-cols-2 gap-2' : ''}>
+            <div className={group && !isOccupied ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : ''}>
               <Button
                 type="button"
                 variant="outline"
