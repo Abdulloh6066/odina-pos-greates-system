@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Armchair, ArrowLeft, Building2, Check, Minus, Plus, RefreshCw, ShieldCheck, Sparkles, LayoutGrid, Map as MapIcon } from 'lucide-react';
+import { Armchair, ArrowLeft, Building2, Check, Link2, Minus, Plus, RefreshCw, ShieldCheck, Sparkles, LayoutGrid, Map as MapIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { odinaConfirm } from '@/lib/odina-dialog';
@@ -243,6 +243,7 @@ export default function RestaurantTables() {
                   {Array.from({ length: tableCount }, (_, i) => {
                     const number = i + 1;
                     const order = (selectedShop.orders || []).find((row) => row.number === number);
+                    const group = (selectedShop.groups || []).find((row) => row.numbers?.includes(number));
                     const isOccupied = Boolean(order && order.state !== 'empty');
                     const isPaying = order?.state === 'paying';
                     const isSelected = inspectTableNumber === number;
@@ -276,6 +277,12 @@ export default function RestaurantTables() {
                             {isOccupied ? (isPaying ? 'To‘lovda' : 'Band') : 'Bo‘sh'}
                           </span>
                         </div>
+                        {group && (
+                          <div className="mt-2 inline-flex items-center gap-1 rounded-lg bg-brand-olive/15 px-2 py-1 text-[10px] font-semibold text-brand-ink">
+                            <Link2 className="h-3 w-3" />
+                            {group.numbers.join(' + ')} birga
+                          </div>
+                        )}
                         <div className="mt-3">
                           {isOccupied ? (
                             <div>
