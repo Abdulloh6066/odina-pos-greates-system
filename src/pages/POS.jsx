@@ -1107,7 +1107,7 @@ export default function POS() {
 
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 xl:pb-6">
               {loadingData ? (
-                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
                 </div>
               ) : filtered.length === 0 ? (
@@ -1116,7 +1116,7 @@ export default function POS() {
                   <p className="text-sm font-medium text-muted-foreground">Mahsulot topilmadi</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
                   {filtered.map((p) => (
                     <ProductCard
                       key={p.id}
