@@ -9,7 +9,7 @@ export default function Cart({
   subtotal, discount, couponDiscount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
   roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding,
   total, onCheckout, disabled, tableMode = false, tableDirty = false,
-  tableSaved = false, onSaveTable, savingTable = false, locked = false,
+  tableSaved = false, onSaveTable, onStaffTicket, savingTable = false, locked = false,
 }) {
   const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
 
@@ -23,11 +23,26 @@ export default function Cart({
             <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + i.quantity, 0)} ta mahsulot</p>
           </div>
         </div>
-        {cart.length > 0 && !tableSaved && (
-          <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
-            <Trash2 className="w-3.5 h-3.5" /> Tozalash
-          </button>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {tableMode && cart.length > 0 && onStaffTicket && (
+            <button
+              type="button"
+              onClick={onStaffTicket}
+              disabled={locked || savingTable}
+              className="min-h-11 px-2 rounded-xl text-xs font-semibold text-brand-ink hover:bg-brand-olive/15 transition-colors flex items-center gap-1 touch-manipulation"
+              aria-label="Xizmat chekini ochish"
+            >
+              <ReceiptText className="w-3.5 h-3.5" />
+              <span className="2xl:hidden">Chek</span>
+              <span className="hidden 2xl:inline">Xizmat cheki</span>
+            </button>
+          )}
+          {cart.length > 0 && !tableSaved && (
+            <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
+              <Trash2 className="w-3.5 h-3.5" /> Tozalash
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 min-h-[9rem] overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
