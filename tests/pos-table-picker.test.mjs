@@ -81,8 +81,12 @@ test('saving an unpaid table returns to clean POS only after server confirmation
   assert.match(action, /navigate\('\/pos', \{ replace: true, state: \{ savedTableNumber: savedNumber, savedShopId \} \}\)/);
   assert.match(action, /setStaffTicket\(\{ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber \}\)/);
   assert.ok(action.indexOf('await saveTableOrder()') < action.indexOf('resetCart()'));
-  assert.match(cart, /tableDirty \? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'/);
+  assert.match(cart, /tableDirty \? 'Stolga saqlash →' : 'Yangi buyurtmaga o‘tish'/);
   assert.match(cart, /disabled=\{locked \|\| \(!tableDirty && !tableSaved\)/);
+  assert.match(cart, /min-h-\[9rem\]/);
+  assert.match(cart, /max-h-\[48%\].*overflow-y-auto/);
+  assert.match(cart, /Chegirma va tuzatish/);
+  assert.match(cart, /odina-cart-checkout shrink-0/);
   assert.match(pos, /role="status"[^>]*className="mx-3[^>]*>/);
   assert.match(pos, /To‘lov olinmadi\. Kassa yangi buyurtmaga tayyor/);
   assert.match(backend, /if \(!updated\?\.success \|\| Number\(updated.updated \|\| 0\) !== 1\)/);
@@ -123,6 +127,35 @@ test('confirmed server save resets Kassa and navigates only after success', asyn
   assert.equal(events.at(-2), 'navigate:/pos:3');
   assert.equal(events.at(-1), 'ticket:table:shop-1:3');
   assert.ok(events.includes('close-mobile-sheet'));
+});
+
+const serviceTicketAction = pos.slice(pos.indexOf('const openTableServiceTicket = async () => {'), pos.indexOf('const tableSelectionError')).trim();
+const exerciseServiceTicket = async ({ dirty = true, succeeds = true } = {}) => {
+  const events = [];
+  const context = {
+    selectedTable: { number: 3, shopId: 'shop-1' },
+    tableShop: { id: 'shop-1', name: 'Mock shop' },
+    tableOrderLoading: false,
+    savingTableRef: { current: false },
+    paying: false,
+    payOpen: false,
+    stockChecking: false,
+    tableOrderError: '',
+    tableOrder: { id: 'mock-order', state: 'occupied' },
+    tableCartDirty: dirty,
+    saveTableOrder: async () => { events.push('server-save'); return succeeds; },
+    setStaffTicket: (ticket) => events.push(`ticket:${ticket.mode}:${ticket.shopId}:${ticket.tableNumber}`),
+  };
+  assert.ok(serviceTicketAction.startsWith('const openTableServiceTicket = async () => {'));
+  vm.runInNewContext(`${serviceTicketAction}\nglobalThis.openTicket = openTableServiceTicket;`, context);
+  await context.openTicket();
+  return events;
+};
+
+test('Xizmat cheki saves dirty table first and never prints an unsaved basket', async () => {
+  assert.deepEqual(await exerciseServiceTicket(), ['server-save', 'ticket:table:shop-1:3']);
+  assert.deepEqual(await exerciseServiceTicket({ succeeds: false }), ['server-save']);
+  assert.deepEqual(await exerciseServiceTicket({ dirty: false }), ['ticket:table:shop-1:3']);
 });
 
 test('failed server save, existing saved order and pending load never silently lose the basket', async () => {
@@ -180,8 +213,8 @@ test('cashier can cancel selected table in Kassa via touch-friendly "Stolni beko
   assert.match(pos, /Stolni bekor qilish/);
   assert.match(pos, /const cancelTableSelection = async \(\) =>/);
   assert.match(pos, /navigate\('\/pos', \{ replace: true \}\)/);
-  assert.match(read('src/components/pos/Cart.jsx'), /onCancelTable/);
-  assert.match(read('src/components/pos/Cart.jsx'), /aria-label="Stolni bekor qilish"/);
+  assert.match(pos, /aria-label="Stolni bekor qilish"/);
+  assert.doesNotMatch(read('src/components/pos/Cart.jsx'), /onCancelTable/);
 
   // When clean, immediately resets cart and table state without server mutations or prompt
   const cleanEvents = await exerciseCancelTable({ dirty: false });
@@ -231,6 +264,8 @@ test('staff order ticket matches reference layout with table number, time, taker
   assert.doesNotMatch(ticketModal, /formatUZS/);
   assert.match(pos, /<StaffOrderTicketModal/);
   assert.match(tableSheet, /<StaffOrderTicketModal/);
-  assert.match(pos, /setStaffTicketModal/);
+  assert.match(pos, /const openTableServiceTicket = async \(\) =>/);
+  assert.match(pos, /onStaffTicket=\{\(\) => void openTableServiceTicket\(\)\}/);
+  assert.doesNotMatch(pos, /setStaffTicketModal/);
 });
 
