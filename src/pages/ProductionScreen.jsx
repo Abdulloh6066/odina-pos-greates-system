@@ -11,7 +11,6 @@ import { typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
 import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
-import { buildDemoOrders } from '@/lib/demo-orders';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderDetail from '@/components/orders/OrderDetail';
 import DemandSection from '@/components/production/DemandSection';
@@ -146,7 +145,6 @@ function ProductionScreenInner() {
   const [forecastError, setForecastError] = useState('');
   const loadedOnce = useRef(false);
   const { alerts, counts } = useOrderAlerts(active);
-  const demoOrders = useMemo(buildDemoOrders, [clock]);
 
   const loadOrders = async () => {
     try {
@@ -338,15 +336,6 @@ function ProductionScreenInner() {
           </div>
         ) : (
           <div className="space-y-8">
-            <section className="rounded-2xl border border-amber-300 bg-amber-50/50 p-4 sm:p-5" aria-label="Namunaviy ishlab chiqarish buyurtmalari">
-              <h2 className="font-display text-lg sm:text-xl font-semibold text-amber-950">Ko‘rinish uchun 4 ta namuna</h2>
-              <p className="mt-1 mb-4 text-sm text-amber-900">Ular haqiqiy buyurtma emas. Tugmalar ishlamaydi; ombor, to‘lov, ogohlantirish va haqiqiy buyurtmalar soniga ta’sir qilmaydi.</p>
-              <div className="space-y-4">
-                {demoOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} items={order.demo_lines} demo />
-                ))}
-              </div>
-            </section>
             <OrderAlertSummary alerts={alerts} counts={counts} onOpen={(o) => setDetailOrder(o)} />
             {visibleDays.map((day) => (
               <OrderDaySection
@@ -569,8 +558,8 @@ function OrderDaySection({
   );
 }
 
-function OrderCard({ order, items, busy, onReady, onShip, onPreview, demo = false }) {
-  const u = demo ? '' : urgency(order);
+function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
+  const u = urgency(order);
   const isReady = order.order_status === 'tayyor';
   const hasImage = !!order.reference_image;
 
@@ -582,7 +571,6 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview, demo = fals
       <div className="p-4 sm:p-5 pb-3 sm:pb-3 flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            {demo && <span className="text-[11px] font-bold text-amber-900 bg-amber-100 border border-amber-300 rounded-full px-2 py-0.5">NAMUNA · Haqiqiy emas</span>}
             <span className="font-display text-base sm:text-lg font-semibold">{order.order_number}</span>
             <span className="text-[11px] font-medium bg-secondary text-muted-foreground rounded-full px-2 py-0.5">
               {typeLabel(order.order_type)}
@@ -671,7 +659,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview, demo = fals
           </div>
 
           {/* Actions */}
-          {demo ? <div className="p-4 sm:px-5 border-t border-amber-200 bg-amber-50 text-xs text-amber-900 font-medium">Faqat ko‘rinish uchun · Tayyor/Yuborildi amallari mavjud emas</div> : <div className="p-4 sm:px-5 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
+          <div className="p-4 sm:px-5 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
             <Button
               variant={isReady ? 'secondary' : 'outline'}
               size="lg"
@@ -691,7 +679,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview, demo = fals
               {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
               Yuborildi
             </Button>
-          </div>}
+          </div>
         </div>
       </div>
     </div>
