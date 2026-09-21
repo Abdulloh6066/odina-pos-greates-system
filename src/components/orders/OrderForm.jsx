@@ -15,10 +15,26 @@ import { useToast } from '@/components/ui/use-toast';
 
 const WEDDING_PCS = 40;
 
+const ORDER_LIST_PRODUCT_NAMES = new Set([
+  'МАЛАКОЛИ ПИРОГ', 'ГАШИРЛИ ПИРОГ', 'СУТЛИ ПИРОГ', 'БУРИНИ ПИРОГ',
+  'ОЛМАЛИ ПИРОГ', 'ТВОРОГЛИ ПИРОК', 'МАЛИНА ПИРОК', 'ДАМАШНИ ПАХЛОВА',
+  'ТУРЕЦКИЙ ПАХЛАВА', 'БИЗЕ', 'КОРА ТВОРОЖНИ', 'ПИТИЧИ МАЛАКО ПИРОК',
+  'САН СЕБЯСТАН', 'ЧИЗ КЕЙК', 'ОЙ', 'КАЙМОКЛИ МЕДАВИК',
+  'БОТКАЛИ МЕДАВИК', 'ТВОРОЖНИ', 'TWIKS', 'БАНАН', 'ОПЕРА',
+  'СНИКЕРС ОК', 'СНИКЕРС КОРА', 'ГОЗЛИ ПЕРОЖНИ', 'МАЛИНА', 'УЛИТКА',
+  'МАРОЖНИ', 'СПАРТАК', 'МИШКА', 'ДАМИШНИ МИШКА', 'УЧ МУРШ МЕДАВИК',
+  'БУМЕР', 'БАНАЛИ БУМЕР', 'МАХРОВИЙ ОК', 'МАХРОВИЙ КОРА',
+  'МЕВАЛИ КОРА', 'ОК КОРА', 'НЕГИР', 'ПЕЛЕЧУДА', 'ОДИЙ ПЕРОЖНИ',
+  'ОҚ ТАРТ', 'ҚОРА ТАРТ',
+]);
+
+const normalizeProductName = (name) => String(name || '').trim().replace(/\s+/g, ' ').toUpperCase();
+
 const isOrderCatalogProduct = (product) => {
-  if (product?.production_unit === 'sheet') return true;
-  const name = String(product?.name || '').toUpperCase();
-  return ['LIST', 'ЛИСТ', 'MINI', 'МИНИ'].some((marker) => name.includes(marker));
+  const name = normalizeProductName(product?.name);
+  return product?.production_unit === 'sheet'
+    || ORDER_LIST_PRODUCT_NAMES.has(name)
+    || ['LIST', 'ЛИСТ', 'MINI', 'МИНИ'].some((marker) => name.includes(marker));
 };
 
 function mapPrefillItems(sourceItems, products) {
