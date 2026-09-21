@@ -117,7 +117,10 @@ export default function ProductCombobox({ products, onAdd, loading }) {
           </div>
         </div>
 
-        <div className="max-h-72 overflow-y-auto scrollbar-thin">
+        <div
+          className="max-h-72 overflow-y-auto overscroll-contain touch-pan-y scrollbar-thin"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {loading && <div className="p-4 text-sm text-muted-foreground">Yuklanmoqda...</div>}
           {!loading && filtered.length === 0 && (
             <div className="p-4 text-sm text-muted-foreground">LIST yoki MINI nomli mahsulot topilmadi.</div>
