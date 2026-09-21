@@ -502,6 +502,9 @@ Deno.serve(async (req) => {
     if (ordersOf(shop).some((order: any) => order.number > count)) {
       return Response.json({ error: "Buyurtmasi ochiq stolni olib tashlab bo‘lmaydi. Avval hisobni yakunlang." }, { status: 409 });
     }
+    if (cleanGroups(shop, previous).some((group: any) => group.numbers.some((number: number) => number > count))) {
+      return Response.json({ error: "Birlashtirilgan stolni olib tashlab bo‘lmaydi. Avval stollarni ajrating." }, { status: 409 });
+    }
     // Keep the table orders intact when the count grows or unused tables are removed.
     const existingLayout = Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [];
     const countUpdate = await service.entities.Shop.updateMany(
