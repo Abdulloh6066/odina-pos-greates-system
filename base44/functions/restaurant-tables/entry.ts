@@ -8,6 +8,25 @@ const ALLOWED_ROLES = new Set(["admin", "cashier", "manager"]);
 const MAX_TABLES = 30;
 const MAX_ORDER_ITEMS = 100;
 const ordersOf = (shop: any) => Array.isArray(shop?.restaurant_table_orders) ? shop.restaurant_table_orders : [];
+const groupsOf = (shop: any) => Array.isArray(shop?.restaurant_table_groups) ? shop.restaurant_table_groups : [];
+const groupForNumber = (shop: any, number: number) =>
+  groupsOf(shop).find((group: any) => Array.isArray(group?.numbers) && group.numbers.includes(number)) || null;
+const canonicalNumber = (shop: any, number: number) => groupForNumber(shop, number)?.numbers?.[0] || number;
+const orderForNumber = (shop: any, number: number) => {
+  const primary = canonicalNumber(shop, number);
+  return ordersOf(shop).find((order: any) => order.number === primary) || null;
+};
+const cleanGroups = (shop: any, count: number) => {
+  const used = new Set<number>();
+  return groupsOf(shop).filter((group: any) => {
+    if (!group?.id || !Array.isArray(group.numbers) || group.numbers.length < 2 || group.numbers.length > 8) return false;
+    const numbers = group.numbers;
+    if (new Set(numbers).size !== numbers.length
+      || numbers.some((number: any) => !Number.isInteger(number) || number < 1 || number > count || used.has(number))) return false;
+    numbers.forEach((number: number) => used.add(number));
+    return true;
+  }).map((group: any) => ({ ...group, numbers: [...group.numbers] }));
+};
 const ordersVersion = (shop: any) => Number.isInteger(shop?.restaurant_table_orders_version)
   && shop.restaurant_table_orders_version >= 0 ? shop.restaurant_table_orders_version : 0;
 const ordersVersionCondition = (version: number) => version === 0
@@ -101,23 +120,39 @@ const cleanOutdoorPolygon = (polygon: any) => validOutdoorPolygon(polygon)
   ? polygon.map(({ x, y }: any) => ({ x, y })) : [];
 const isShop = (shop: any) => Boolean(shop && shop.active !== false
   && shop.location_type === "shop" && shop.allows_pos !== false);
-const safeShop = (shop: any) => ({
-  id: String(shop.id),
-  name: String(shop.name || "Do‘kon"),
-  is_main: Boolean(shop.is_main),
-  table_count: Number.isInteger(shop.restaurant_table_count)
+const safeShop = (shop: any) => {
+  const tableCount = Number.isInteger(shop.restaurant_table_count)
     && shop.restaurant_table_count >= 0 && shop.restaurant_table_count <= MAX_TABLES
-    ? shop.restaurant_table_count : 0,
-  entrance: cleanEntrance(shop.restaurant_entrance),
-  outdoor_polygon: cleanOutdoorPolygon(shop.restaurant_outdoor_polygon),
-  orders: ordersOf(shop).filter((order: any) => Number.isInteger(order.number))
-    .map(orderSummary).sort((a: any, b: any) => a.number - b.number),
-  layout_version: Number.isInteger(shop.restaurant_table_layout_version)
-    && shop.restaurant_table_layout_version >= 0 ? shop.restaurant_table_layout_version : 0,
-  layout: (Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [])
-    .filter((row: any) => hasValidPosition(row, Number(shop.restaurant_table_count || 0)))
-    .map((row: any) => ({ number: row.number, x: row.x, y: row.y, size: sizeOf(row) })),
-});
+    ? shop.restaurant_table_count : 0;
+  const groups = cleanGroups(shop, tableCount);
+  const orders = ordersOf(shop).filter((order: any) => Number.isInteger(order.number));
+  const expandedOrders = orders.flatMap((order: any) => {
+    const group = groups.find((row: any) => row.numbers.includes(order.number));
+    const numbers = group?.numbers || [order.number];
+    return numbers.map((number: number) => ({
+      ...orderSummary(order),
+      number,
+      primary_number: order.number,
+      group_id: group?.id || "",
+      group_numbers: numbers,
+    }));
+  }).sort((a: any, b: any) => a.number - b.number);
+  return {
+    id: String(shop.id),
+    name: String(shop.name || "Do‘kon"),
+    is_main: Boolean(shop.is_main),
+    table_count: tableCount,
+    entrance: cleanEntrance(shop.restaurant_entrance),
+    outdoor_polygon: cleanOutdoorPolygon(shop.restaurant_outdoor_polygon),
+    groups,
+    orders: expandedOrders,
+    layout_version: Number.isInteger(shop.restaurant_table_layout_version)
+      && shop.restaurant_table_layout_version >= 0 ? shop.restaurant_table_layout_version : 0,
+    layout: (Array.isArray(shop.restaurant_table_layout) ? shop.restaurant_table_layout : [])
+      .filter((row: any) => hasValidPosition(row, tableCount))
+      .map((row: any) => ({ number: row.number, x: row.x, y: row.y, size: sizeOf(row) })),
+  };
+};
 
 Deno.serve(async (req) => {
   try {
