@@ -333,6 +333,53 @@ test('all cashiers at one shop share service order numbering while another shop 
   assert.equal(f.db.Sale.length, 0, 'Kitchen tickets do not create sales before payment');
 });
 
+test('temporary table groups share one order, reject two occupied tables and clear after payment', async () => {
+  const f = fixture();
+  f.as('cashier-2');
+
+  const saved = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+    shift_id: 'shift-second', expected_revision: 0, items: [{ product_id: 'cake', quantity: 1 }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+
+  const grouped = await f.run({ action: 'group_tables', shop_id: 'second-shop',
+    primary_table_number: 1, secondary_table_number: 2 });
+  assert.equal(grouped.status, 200, JSON.stringify(grouped));
+  assert.deepEqual(grouped.data.group.numbers, [1, 2]);
+  assert.equal(f.db.Shop[1].restaurant_table_orders[0].number, 1);
+  assert.equal(f.db.Shop[1].restaurant_table_orders[0].revision, 2);
+
+  const openedFromSecond = await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 });
+  assert.equal(openedFromSecond.status, 200);
+  assert.equal(openedFromSecond.data.order.number, 1);
+  assert.equal(openedFromSecond.data.primary_table_number, 1);
+  assert.deepEqual(openedFromSecond.data.group.numbers, [1, 2]);
+
+  const status = await f.run({ action: 'status' });
+  assert.deepEqual(status.data.shops[0].orders.map((order) => order.number), [1, 2]);
+  assert.equal((await f.run({ action: 'ungroup_tables', shop_id: 'second-shop',
+    primary_table_number: 2 })).status, 409);
+
+  const other = await f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 3,
+    shift_id: 'shift-second', expected_revision: 0, items: [{ product_id: 'coffee', quantity: 1 }] });
+  assert.equal(other.status, 200);
+  assert.equal((await f.run({ action: 'group_tables', shop_id: 'second-shop',
+    primary_table_number: 1, secondary_table_number: 3 })).status, 409);
+
+  f.db.Shop[1].restaurant_table_orders = f.db.Shop[1].restaurant_table_orders.filter((order) => order.number !== 3);
+  const order = f.db.Shop[1].restaurant_table_orders[0];
+  order.state = 'paying';
+  order.checkout_key = 'group-checkout-123456789';
+  f.db.Sale.push({ id: 'group-sale', table_order_id_snapshot: order.id,
+    idempotency_key: order.checkout_key, status: 'completed',
+    shop_id: 'second-shop', table_number_snapshot: 1 });
+
+  const reconciled = await f.run({ action: 'reconcile_table_payment',
+    shop_id: 'second-shop', table_number: 2 });
+  assert.equal(reconciled.status, 200, JSON.stringify(reconciled));
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 0);
+  assert.equal(f.db.Shop[1].restaurant_table_groups.length, 0);
+});
+
 test('simultaneous saves on the same table cannot silently overwrite one another', async () => {
   const f = fixture();
   f.as('cashier-2');
