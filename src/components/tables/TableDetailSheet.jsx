@@ -333,6 +333,7 @@ export default function TableDetailSheet({
       shopId={shop?.id}
       tableNumber={primaryTableNumber}
       order={tableOrder}
+      orderItems={items}
     />
     <TableGroupDialog
       open={groupOpen}
