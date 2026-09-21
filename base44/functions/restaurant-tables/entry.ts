@@ -177,8 +177,7 @@ Deno.serve(async (req) => {
         const assignedId = userShopId(actor);
         if (!assignedId) return Response.json({ error: "Kassirga do‘kon biriktirilmagan." }, { status: 403 });
         const assignedShop = await service.entities.Shop.get(assignedId).catch(() => null);
-        if (!isShop(assignedShop)) {
-          return Response.json({ error: "Biriktirilgan do‘kon faol emas yoki topilmadi." }, { status: 403 });
+        if (!isShop(assignedShop)) {          return Response.json({ error: "Biriktirilgan do‘kon faol emas yoki topilmadi." }, { status: 403 });
         }
         return Response.json({ can_manage: false, shops: [safeShop(assignedShop)], invalid_records: [] });
       }
@@ -357,8 +356,7 @@ Deno.serve(async (req) => {
         }
         return Response.json({ ok: true, sale_id: matches[0].id, released: true });
       }
-      const shiftId = String(body?.shift_id || "");
-      const shift = shiftId ? await service.entities.Shift.get(shiftId).catch(() => null) : null;
+      const shiftId = String(body?.shift_id || "");      const shift = shiftId ? await service.entities.Shift.get(shiftId).catch(() => null) : null;
       if (!shift || shift.status !== "open" || shift.user_id !== actor.id || shift.shop_id !== shop.id) {
         return Response.json({ error: "Stol buyurtmasini faqat shu do‘kondagi ochiq smenangizda saqlang." }, { status: 403 });
       }
