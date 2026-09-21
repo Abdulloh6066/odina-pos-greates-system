@@ -942,8 +942,8 @@ export default function POS() {
         <div className="flex-1" />
         {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
           aria-label="Stollar sahifasini ochish"
-          className="hidden xl:inline-flex h-11 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
-          <Armchair className="h-4 w-4 sm:mr-1.5" /> <span>Stollar</span>
+          className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 sm:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
+          <Armchair className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Stollar</span>
         </Button>}
         {shift ? (
           <>
@@ -964,13 +964,6 @@ export default function POS() {
         )}
       </div>
 
-      {!screenMode && <div className="xl:hidden shrink-0 border-b border-brand-olive/20 bg-brand-olive/5 px-3 py-2 sm:px-5">
-        <Button type="button" variant="outline" onClick={() => void goToTables()}
-          aria-label="Stollar sahifasini ochish"
-          className="w-full min-h-11 rounded-xl border-brand-olive/50 bg-card font-semibold text-brand-ink touch-manipulation">
-          <Armchair className="h-4 w-4 mr-2" /> Stollar sahifasini ochish
-        </Button>
-      </div>}
 
       {!screenMode && !selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
