@@ -4,6 +4,7 @@ import { allocateServiceTicketNumber } from "../../shared/shift-close-helpers.ts
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
 // Completed sales, payments and stock movements occur only in complete-sale.
+// Table grouping backend v2 — keep this marker so the deployed function version is traceable.
 const ALLOWED_ROLES = new Set(["admin", "cashier", "manager"]);
 const MAX_TABLES = 30;
 const MAX_ORDER_ITEMS = 100;
