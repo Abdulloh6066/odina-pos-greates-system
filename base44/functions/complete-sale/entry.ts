@@ -258,6 +258,13 @@ function resolveSoldAt(rawValue: unknown, shift: any, receivedAt: string) {
 // CAS on the Shop document serializes edits and payment claims for all tables
 // in that shop. No inventory or revenue is touched while an order is occupied.
 const tableOrders = (shop: any) => Array.isArray(shop?.restaurant_table_orders) ? shop.restaurant_table_orders : [];
+const tableGroups = (shop: any) => Array.isArray(shop?.restaurant_table_groups) ? shop.restaurant_table_groups : [];
+const tableGroupForNumber = (shop: any, number: number) =>
+  tableGroups(shop).find((group: any) => Array.isArray(group?.numbers) && group.numbers.includes(number)) || null;
+const tableOrderForNumber = (shop: any, number: number) => {
+  const primary = tableGroupForNumber(shop, number)?.numbers?.[0] || number;
+  return tableOrders(shop).find((order: any) => order.number === primary) || null;
+};
 const tableOrdersVersion = (shop: any) => Number.isInteger(shop?.restaurant_table_orders_version)
   && shop.restaurant_table_orders_version >= 0 ? shop.restaurant_table_orders_version : 0;
 const tableVersionQuery = (version: number) => version === 0
@@ -274,9 +281,17 @@ async function changeLockedTable(service: any, shopId: string, orderId: string, 
     const next = clear ? orders.filter((row: any) => row.id !== orderId)
       : orders.map((row: any) => row.id === orderId
         ? { ...row, state: "occupied", checkout_key: "" } : row);
+    const group = tableGroups(shop).find((row: any) =>
+      Array.isArray(row?.numbers) && row.numbers.includes(current.number));
     const update = await service.entities.Shop.updateMany(
       { id: shopId, ...tableVersionQuery(tableOrdersVersion(shop)) },
-      { $set: { restaurant_table_orders: next }, $inc: { restaurant_table_orders_version: 1 } },
+      { $set: {
+          restaurant_table_orders: next,
+          ...(clear && group
+            ? { restaurant_table_groups: tableGroups(shop).filter((row: any) => row.id !== group.id) }
+            : {}),
+        },
+        $inc: { restaurant_table_orders_version: 1 } },
     );
     if (update?.success && Number(update.updated || 0) === 1) return true;
   }
@@ -704,7 +719,7 @@ export default async function(req) {
           return Response.json({ error: "Stol do‘koni yoki raqami noto‘g‘ri." }, { status: 403 });
         }
         const shop = await service.entities.Shop.get(shift.shop_id).catch(() => null);
-        const order = tableOrders(shop).find((row: any) => row.number === number);
+        const order = tableOrderForNumber(shop, number);
         if (!shop || shop.active === false || shop.location_type !== "shop"
           || shop.allows_pos === false || number < 1 || number > shop.restaurant_table_count
           || !order || order.id !== body.table_order_id || order.revision !== body.table_order_revision
@@ -1097,7 +1112,7 @@ export default async function(req) {
 
     // A paid table must match the server-stored order, not browser totals.
     const tableOrder: any = hasTable
-      ? tableOrders(receiptShop).find((row: any) => row.number === requestedTableNumber) : null;
+      ? tableOrderForNumber(receiptShop, requestedTableNumber) : null;
     if (hasTable) {
       if (!tableOrder || !body?.table_order_id || body.table_order_id !== tableOrder.id
         || !Number.isInteger(body?.table_order_revision)
