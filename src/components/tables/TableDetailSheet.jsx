@@ -315,7 +315,7 @@ export default function TableDetailSheet({
                 type="button"
                 onClick={() => {
                   onClose();
-                  onOpenPos(tableNumber);
+                  onOpenPos(primaryTableNumber);
                 }}
                 className="min-h-12 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary-strong flex-1 shadow-sm"
               >
