@@ -42,9 +42,10 @@
 .odina-category-tab[aria-pressed="true"] { background:linear-gradient(135deg, #fecd7c 0%, #f8dba5 100%); border-color:#d0b17f; color:#4f3b20; box-shadow:0 5px 14px -11px #79582f99; }
 .odina-category-tab[aria-pressed="false"]:hover { background:#fff2da; }
 .odina-pos-search { padding-top:22px; padding-bottom:16px; }
-.odina-catalog-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
-.odina-catalog-heading h1 { font-family:var(--font-body); font-size:22px; font-weight:600; letter-spacing:-0.045em; line-height:1.3; }
-.odina-catalog-heading span { color:#70644f; font-size:11px; white-space:nowrap; background:#f7ecd9; padding:5px 9px; border-radius:8px; }
+.odina-catalog-toolbar { display:grid; grid-template-columns:auto minmax(12rem, 1fr) auto; grid-template-areas:"title search count"; align-items:center; gap:12px; }
+.odina-catalog-toolbar h1 { grid-area:title; font-family:var(--font-body); font-size:22px; font-weight:600; letter-spacing:-0.045em; line-height:1.3; white-space:nowrap; }
+.odina-catalog-search { grid-area:search; min-width:0; }
+.odina-catalog-count { grid-area:count; color:#70644f; font-size:11px; white-space:nowrap; background:#f7ecd9; padding:5px 9px; border-radius:8px; }
 .odina-pos-search input { min-height:46px; border:1px solid #e2d2b8; background:#fffefa; border-radius:13px; box-shadow:0 2px 3px #60513403; }
 .odina-product-card { border:1px solid #e8e3d8; border-radius:19px; background:white; padding:7px; box-shadow:0 3px 10px -7px #58452930; }
 .odina-product-card:hover { border-color:#c6bf95; box-shadow:0 8px 20px -12px #65552e50; }
@@ -79,8 +80,8 @@
   .odina-pos-header { min-height:68px; padding-left:14px; padding-right:14px; }
   .odina-pos-header .odina-store-icon { display:none; }
   .odina-pos-search { padding-top:16px; padding-bottom:12px; }
-  .odina-catalog-heading { margin-bottom:12px; }
-  .odina-catalog-heading h1 { font-size:20px; }
+  .odina-catalog-toolbar { grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"title count" "search search"; gap:8px 12px; }
+  .odina-catalog-toolbar h1 { font-size:20px; }
   .odina-product-card { padding:5px; border-radius:16px; }
   .odina-product-photo { border-radius:11px; }
   .odina-product-info { padding:10px 5px 6px; }
