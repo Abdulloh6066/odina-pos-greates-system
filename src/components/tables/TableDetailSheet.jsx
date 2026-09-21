@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Armchair, Clock, ShoppingBag, ArrowRight, CreditCard,
-  Printer, AlertCircle, CheckCircle2, UtensilsCrossed, Link2
+  Printer, AlertCircle, CheckCircle2, UtensilsCrossed, Link2, Unlink2, Loader2
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
@@ -26,6 +26,7 @@ export default function TableDetailSheet({
   const [error, setError] = useState('');
   const [group, setGroup] = useState(null);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [ungrouping, setUngrouping] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [showStaffTicket, setShowStaffTicket] = useState(false);
   const printRef = useRef(null);
@@ -81,6 +82,28 @@ export default function TableDetailSheet({
 
   const handlePrintPrecheck = () => {
     window.print();
+  };
+
+  const handleUngroup = async () => {
+    if (!group || isOccupied || ungrouping) return;
+    setUngrouping(true);
+    setError('');
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'ungroup_tables',
+        shop_id: shop.id,
+        primary_table_number: primaryTableNumber,
+      });
+      const result = response?.data || response;
+      if (!result?.ok) throw new Error(result?.error || 'Stollar ajratilmadi.');
+      setGroup(null);
+      onShopChanged?.(result.shop);
+      setReloadKey((value) => value + 1);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Stollarni ajratib bo‘lmadi.');
+    } finally {
+      setUngrouping(false);
+    }
   };
 
   return (
@@ -236,15 +259,31 @@ export default function TableDetailSheet({
         {/* Footer Actions */}
         <div className="p-4 border-t border-border bg-card/50 flex flex-col gap-2">
           {!isPaying && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setGroupOpen(true)}
-              className="min-h-11 rounded-xl border-brand-olive/40 bg-brand-olive/5 font-semibold text-brand-ink hover:bg-brand-olive/15"
-            >
-              <Link2 className="h-4 w-4" />
-              {group ? 'Yana stol qo‘shish' : 'Stol qo‘shish'}
-            </Button>
+            <div className={group && !isOccupied ? 'grid grid-cols-2 gap-2' : ''}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setGroupOpen(true)}
+                className="min-h-11 w-full rounded-xl border-brand-olive/40 bg-brand-olive/5 font-semibold text-brand-ink hover:bg-brand-olive/15"
+              >
+                <Link2 className="h-4 w-4" />
+                {group ? 'Yana stol qo‘shish' : 'Stol qo‘shish'}
+              </Button>
+              {group && !isOccupied && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleUngroup}
+                  disabled={ungrouping}
+                  className="min-h-11 w-full rounded-xl border-red-200 bg-red-50 font-semibold text-red-700 hover:bg-red-100 hover:text-red-800"
+                >
+                  {ungrouping
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Unlink2 className="h-4 w-4" />}
+                  {ungrouping ? 'Ajratilmoqda...' : 'Stollarni ajratish'}
+                </Button>
+              )}
+            </div>
           )}
           {isOccupied ? (
             <>
