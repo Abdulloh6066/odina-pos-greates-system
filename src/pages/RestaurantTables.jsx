@@ -355,6 +355,10 @@ export default function RestaurantTables() {
           onPayDirect={(number) => {
             navigate(`/pos?${new URLSearchParams({ table_shop: selectedShop.id, table_number: String(number), action: 'pay' })}`);
           }}
+          onShopChanged={(updatedShop) => {
+            setShops((current) => current.map((shop) => shop.id === updatedShop.id ? updatedShop : shop));
+            setNotice('Stollar guruhi yangilandi.');
+          }}
         />
       )}
     </div>
