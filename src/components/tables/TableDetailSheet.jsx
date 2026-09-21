@@ -257,14 +257,14 @@ export default function TableDetailSheet({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-border bg-card/50 flex flex-col gap-2">
+        <div className="flex flex-col gap-3 border-t border-border bg-card/50 p-4">
           {!isPaying && (
             <div className={group && !isOccupied ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : ''}>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setGroupOpen(true)}
-                className="min-h-11 w-full rounded-xl border-brand-olive/40 bg-brand-olive/5 font-semibold text-brand-ink hover:bg-brand-olive/15"
+                className="min-h-12 w-full rounded-xl border-border bg-background text-sm font-semibold text-foreground shadow-none hover:border-brand-olive/50 hover:bg-brand-olive/5"
               >
                 <Link2 className="h-4 w-4" />
                 {group ? 'Yana stol qo‘shish' : 'Stol qo‘shish'}
@@ -275,7 +275,7 @@ export default function TableDetailSheet({
                   variant="outline"
                   onClick={handleUngroup}
                   disabled={ungrouping}
-                  className="min-h-11 w-full rounded-xl border-red-200 bg-red-50 font-semibold text-red-700 hover:bg-red-100 hover:text-red-800"
+                  className="min-h-12 w-full rounded-xl border-red-200 bg-red-50 text-sm font-semibold text-red-700 shadow-none hover:bg-red-100 hover:text-red-800"
                 >
                   {ungrouping
                     ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -287,16 +287,16 @@ export default function TableDetailSheet({
           )}
           {isOccupied ? (
             <>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
                   type="button"
                   onClick={() => {
                     onClose();
                     onOpenPos(primaryTableNumber);
                   }}
-                  className="min-h-12 rounded-xl bg-card border-2 border-brand-olive text-brand-ink font-semibold hover:bg-brand-olive/15"
+                  className="min-h-12 rounded-xl border border-brand-olive/50 bg-brand-olive/10 text-sm font-semibold text-brand-ink shadow-none hover:bg-brand-olive/15"
                 >
-                  <ShoppingBag className="w-4 h-4 mr-1.5" />
+                  <ShoppingBag className="h-4 w-4" />
                   Buyurtmani tahrirlash
                 </Button>
                 <Button
@@ -305,29 +305,29 @@ export default function TableDetailSheet({
                     onClose();
                     onPayDirect(primaryTableNumber);
                   }}
-                  className="min-h-12 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary-strong shadow-sm"
+                  className="min-h-12 rounded-xl border border-primary bg-primary text-sm font-bold text-primary-foreground shadow-none hover:bg-primary-strong"
                 >
-                  <CreditCard className="w-4 h-4 mr-1.5" />
+                  <CreditCard className="h-4 w-4" />
                   To‘lov qilish
                 </Button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowStaffTicket(true)}
-                  className="min-h-11 rounded-xl text-xs font-semibold border-brand-olive/40 hover:bg-brand-olive/10"
+                  className="min-h-12 rounded-xl border-border bg-background text-sm font-semibold text-foreground shadow-none hover:border-brand-olive/50 hover:bg-brand-olive/5"
                 >
-                  <UtensilsCrossed className="w-4 h-4 mr-1.5 text-brand-ink" />
+                  <UtensilsCrossed className="h-4 w-4" />
                   Xizmat cheki
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handlePrintPrecheck}
-                  className="min-h-11 rounded-xl text-xs font-semibold"
+                  className="min-h-12 rounded-xl border-border bg-background text-sm font-semibold text-foreground shadow-none hover:border-brand-olive/50 hover:bg-brand-olive/5"
                 >
-                  <Printer className="w-4 h-4 mr-1.5" />
+                  <Printer className="h-4 w-4" />
                   Hisob cheki (Pre-check)
                 </Button>
               </div>
