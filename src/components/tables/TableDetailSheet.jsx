@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Armchair, Clock, ShoppingBag, ArrowRight, CreditCard,
-  Printer, AlertCircle, CheckCircle2, UtensilsCrossed
+  Printer, AlertCircle, CheckCircle2, UtensilsCrossed, Link2
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
@@ -10,6 +10,7 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import StaffOrderTicketModal from './StaffOrderTicketModal';
+import TableGroupDialog from './TableGroupDialog';
 
 export default function TableDetailSheet({
   open,
@@ -18,16 +19,21 @@ export default function TableDetailSheet({
   shop,
   onOpenPos,
   onPayDirect,
+  onShopChanged,
 }) {
   const [loading, setLoading] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
   const [error, setError] = useState('');
+  const [group, setGroup] = useState(null);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [showStaffTicket, setShowStaffTicket] = useState(false);
   const printRef = useRef(null);
 
   useEffect(() => {
     if (!open || !shop?.id || !tableNumber) {
       setTableOrder(null);
+      setGroup(null);
       setError('');
       return;
     }
@@ -46,6 +52,7 @@ export default function TableDetailSheet({
         const result = response?.data || response;
         if (result?.ok) {
           setTableOrder(result.order || null);
+          setGroup(result.group || null);
         } else {
           setError(result?.error || 'Stol buyurtmasini yuklab bo‘lmadi.');
         }
@@ -61,7 +68,7 @@ export default function TableDetailSheet({
     return () => {
       active = false;
     };
-  }, [open, shop?.id, tableNumber]);
+  }, [open, shop?.id, tableNumber, reloadKey]);
 
   if (!open || !tableNumber) return null;
 
@@ -69,6 +76,8 @@ export default function TableDetailSheet({
   const isPaying = tableOrder?.state === 'paying';
   const items = tableOrder?.items || [];
   const totalAmount = Number(tableOrder?.total || 0);
+  const displayNumbers = group?.numbers || [tableNumber];
+  const primaryTableNumber = displayNumbers[0];
 
   const handlePrintPrecheck = () => {
     window.print();
@@ -95,7 +104,7 @@ export default function TableDetailSheet({
                 {shop?.name || 'Do‘kon'} · Stol ma’lumoti
               </div>
               <DialogTitle className="font-display text-2xl font-bold flex items-center gap-2">
-                {tableNumber}-stol
+                {displayNumbers.join(' + ')}-stol
                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${
                   isOccupied
                     ? isPaying
@@ -106,6 +115,12 @@ export default function TableDetailSheet({
                   {isOccupied ? (isPaying ? 'To‘lovda' : 'Band') : 'Bo‘sh'}
                 </span>
               </DialogTitle>
+              {group && (
+                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-brand-ink">
+                  <Link2 className="h-3.5 w-3.5" />
+                  {group.numbers.length} ta stol bitta umumiy hisobga ulangan
+                </p>
+              )}
               {tableOrder?.started_at && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                   <Clock className="w-3.5 h-3.5" />
@@ -180,7 +195,7 @@ export default function TableDetailSheet({
                 <div className="text-center space-y-1">
                   <div className="font-display text-lg font-bold">{shop?.name || 'Odina'}</div>
                   <div className="text-[11px] font-bold uppercase tracking-wider">HISOB VARAQASI (PRE-CHECK)</div>
-                  <div className="text-sm font-bold">{tableNumber}-stol</div>
+                  <div className="text-sm font-bold">{displayNumbers.join(' + ')}-stol</div>
                   <div className="text-[10px] text-muted-foreground">{formatUzbekistanDateTime(Date.now())}</div>
                 </div>
                 <div className="border-t border-dashed border-border my-2" />
@@ -220,6 +235,17 @@ export default function TableDetailSheet({
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-border bg-card/50 flex flex-col gap-2">
+          {!isPaying && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setGroupOpen(true)}
+              className="min-h-11 rounded-xl border-brand-olive/40 bg-brand-olive/5 font-semibold text-brand-ink hover:bg-brand-olive/15"
+            >
+              <Link2 className="h-4 w-4" />
+              {group ? 'Yana stol qo‘shish' : 'Stol qo‘shish'}
+            </Button>
+          )}
           {isOccupied ? (
             <>
               <div className="grid grid-cols-2 gap-2">
@@ -227,18 +253,18 @@ export default function TableDetailSheet({
                   type="button"
                   onClick={() => {
                     onClose();
-                    onOpenPos(tableNumber);
+                    onOpenPos(primaryTableNumber);
                   }}
                   className="min-h-12 rounded-xl bg-card border-2 border-brand-olive text-brand-ink font-semibold hover:bg-brand-olive/15"
                 >
                   <ShoppingBag className="w-4 h-4 mr-1.5" />
-                  Kassada ochish
+                  Buyurtmani tahrirlash
                 </Button>
                 <Button
                   type="button"
                   onClick={() => {
                     onClose();
-                    onPayDirect(tableNumber);
+                    onPayDirect(primaryTableNumber);
                   }}
                   className="min-h-12 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary-strong shadow-sm"
                 >
@@ -305,8 +331,21 @@ export default function TableDetailSheet({
       onClose={() => setShowStaffTicket(false)}
       shop={shop}
       shopId={shop?.id}
-      tableNumber={tableNumber}
+      tableNumber={primaryTableNumber}
       order={tableOrder}
+    />
+    <TableGroupDialog
+      open={groupOpen}
+      onClose={() => setGroupOpen(false)}
+      shop={shop}
+      tableNumber={primaryTableNumber}
+      group={group}
+      hasOpenOrder={isOccupied}
+      onChanged={(updatedShop, nextGroup) => {
+        setGroup(nextGroup || null);
+        onShopChanged?.(updatedShop);
+        setReloadKey((value) => value + 1);
+      }}
     />
   </>
   );
