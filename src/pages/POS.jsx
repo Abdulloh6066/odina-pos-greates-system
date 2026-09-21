@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -1033,6 +1033,22 @@ export default function POS() {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
               setTableReload((current) => current + 1);
             }}>Buyurtmani yangilash</Button>}
+            {Boolean(selectedTable && (tableOrder?.items?.length || cart.length)) && (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 rounded-xl border-brand-olive/50 bg-card text-brand-ink font-semibold touch-manipulation"
+                onClick={() => setStaffTicketModal({
+                  open: true,
+                  shop: tableShop,
+                  shopId: selectedTable.shopId,
+                  tableNumber: selectedTable.number,
+                  order: tableOrder,
+                })}
+              >
+                <UtensilsCrossed className="w-4 h-4 mr-1.5" /> Xizmat cheki
+              </Button>
+            )}
             <Button type="button" variant="outline" className="min-h-11" onClick={() => void goToTables()}><ArrowLeft className="w-4 h-4 mr-1" /> Stollar xaritasi</Button>
           </div>
         </div>
@@ -1117,7 +1133,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="odina-cart-wrap hidden xl:flex w-[360px] 2xl:w-[400px] min-w-0 shrink-0 border-l border-border overflow-hidden">
+        <div className="odina-cart-wrap hidden xl:flex w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
