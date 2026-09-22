@@ -488,6 +488,200 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
   );
 }
 
+function TransferProductPicker({ products, stockByProduct, selectedQuantities, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState('all');
+  const [draftQuantities, setDraftQuantities] = useState({});
+
+  const categories = useMemo(() => Array.from(new Map(
+    products
+      .filter((product) => product.category_id || product.category_name)
+      .map((product) => [
+        product.category_id || product.category_name,
+        product.category_name || 'Kategoriyasiz',
+      ]),
+  ).entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'uz')), [products]);
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = search.toLowerCase().trim();
+    return products.filter((product) => {
+      const productCategoryId = product.category_id || product.category_name;
+      const categoryMatches = categoryId === 'all' || productCategoryId === categoryId;
+      const searchMatches = !normalizedSearch
+        || [product.name, product.category_name].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch);
+      return categoryMatches && searchMatches;
+    });
+  }, [products, search, categoryId]);
+
+  const productById = useMemo(
+    () => Object.fromEntries(products.map((product) => [product.id, product])),
+    [products],
+  );
+
+  const draftEntries = useMemo(() => Object.entries(draftQuantities)
+    .map(([productId, quantity]) => ({ product: productById[productId], quantity: Number(quantity) }))
+    .filter((item) => item.product && item.quantity > 0), [draftQuantities, productById]);
+
+  const openPicker = () => {
+    setSearch('');
+    setCategoryId('all');
+    setDraftQuantities({});
+    setOpen(true);
+  };
+
+  const closePicker = () => {
+    setDraftQuantities({});
+    setOpen(false);
+  };
+
+  const changeDraft = (product, nextValue) => {
+    const stock = Math.floor(Number(stockByProduct[product.id] || 0));
+    const alreadySelected = Math.floor(Number(selectedQuantities[product.id] || 0));
+    const maxAddable = Math.max(0, stock - alreadySelected);
+
+    setDraftQuantities((current) => {
+      const next = { ...current };
+      const parsed = Math.floor(Number(nextValue));
+      if (!Number.isFinite(parsed) || parsed <= 0 || maxAddable <= 0) {
+        delete next[product.id];
+        return next;
+      }
+
+      const selectedIds = new Set([
+        ...Object.entries(selectedQuantities).filter(([, quantity]) => Number(quantity) > 0).map(([id]) => id),
+        ...Object.entries(current).filter(([, quantity]) => Number(quantity) > 0).map(([id]) => id),
+      ]);
+      if (!selectedIds.has(product.id) && selectedIds.size >= 50) return current;
+
+      next[product.id] = Math.min(parsed, maxAddable);
+      return next;
+    });
+  };
+
+  const applySelection = () => {
+    draftEntries.forEach(({ product, quantity }) => onAdd(product, quantity));
+    closePicker();
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openPicker}
+        className="w-full min-h-[76px] rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary/60 hover:bg-primary/5 touch-manipulation"
+      >
+        <span className="flex items-center gap-3">
+          <span className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
+            <Plus className="w-5 h-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Mahsulot qo‘shish</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">Alohida oynada qidiring, miqdorni belgilang va tanlang</span>
+          </span>
+          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs whitespace-nowrap">
+            {formatNum(products.length)} ta mavjud
+          </span>
+        </span>
+      </button>
+
+      <Dialog open={open} onOpenChange={(value) => !value && closePicker()}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl h-[92dvh] max-h-[92dvh] overflow-hidden p-0 flex flex-col">
+          <DialogHeader className="p-5 pb-3 border-b border-border">
+            <DialogTitle className="font-display text-xl">Transfer mahsulotlarini tanlash</DialogTitle>
+            <p className="text-sm text-muted-foreground">Ombordagi qoldiqdan oshirmasdan bir nechta mahsulot tanlashingiz mumkin.</p>
+          </DialogHeader>
+
+          <div className="p-4 sm:p-5 flex-1 min-h-0 overflow-hidden flex flex-col gap-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1.5 block">Kategoriya</Label>
+                <OdinaSelect value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+                  <option value="all">Barcha kategoriyalar</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </OdinaSelect>
+              </div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Mahsulot nomi..." className="h-11 pl-9 rounded-xl" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+              {filteredProducts.length === 0 ? (
+                <div className="h-full min-h-40 rounded-2xl border border-dashed border-border flex items-center justify-center text-sm text-muted-foreground text-center px-4">
+                  Bu kategoriya yoki qidiruv bo‘yicha qoldiqli mahsulot topilmadi.
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {filteredProducts.map((product) => {
+                    const stock = Math.floor(Number(stockByProduct[product.id] || 0));
+                    const alreadySelected = Math.floor(Number(selectedQuantities[product.id] || 0));
+                    const draftQuantity = Math.floor(Number(draftQuantities[product.id] || 0));
+                    const maxAddable = Math.max(0, stock - alreadySelected);
+                    const reachedMaximum = draftQuantity >= maxAddable;
+
+                    return (
+                      <div key={product.id} className={`rounded-xl border p-3 ${draftQuantity > 0 ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{product.category_name || 'Kategoriyasiz'}</p>
+                          </div>
+                          {draftQuantity > 0 && (
+                            <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                              +{formatNum(draftQuantity)} {sourceUnitLabel(product)}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Omborda: <b className="text-foreground">{formatNum(stock)} {sourceUnitLabel(product)}</b>
+                          {alreadySelected > 0 && <> · Savatda: <b className="text-foreground">{formatNum(alreadySelected)}</b></>}
+                        </p>
+
+                        {draftQuantity > 0 ? (
+                          <div className="mt-3 flex items-center gap-2">
+                            <Button type="button" size="icon" variant="outline" onClick={() => changeDraft(product, draftQuantity - 1)} className="w-9 h-9 rounded-lg shrink-0">
+                              <Minus className="w-3.5 h-3.5" />
+                            </Button>
+                            <Input type="number" inputMode="numeric" min="1" max={maxAddable} value={draftQuantity} onChange={(event) => changeDraft(product, event.target.value)} className="h-9 rounded-lg text-center px-1" />
+                            <Button type="button" size="icon" variant="outline" onClick={() => changeDraft(product, draftQuantity + 1)} disabled={reachedMaximum} className="w-9 h-9 rounded-lg shrink-0">
+                              <Plus className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button type="button" variant="secondary" onClick={() => changeDraft(product, 1)} disabled={maxAddable <= 0} className="w-full h-9 mt-3 rounded-lg">
+                            <Plus className="w-3.5 h-3.5 mr-1.5" />
+                            {maxAddable <= 0 ? 'Maksimal miqdor savatda' : 'Tanlash'}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 sm:p-5 border-t border-border gap-2 sm:gap-2">
+            <Button type="button" variant="outline" onClick={closePicker}>Bekor qilish</Button>
+            <Button type="button" onClick={applySelection} disabled={draftEntries.length === 0} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong">
+              <Plus className="w-4 h-4 mr-1.5" />
+              {draftEntries.length > 0 ? `${formatNum(draftEntries.length)} tur mahsulotni qo‘shish` : 'Mahsulot tanlang'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function Empty({ text }) {
   return (
     <div className="odina-panel rounded-2xl border border-dashed border-border bg-card py-10 text-center">
