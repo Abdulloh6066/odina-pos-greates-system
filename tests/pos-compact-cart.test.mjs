@@ -58,13 +58,13 @@ test('six products render as compact receipt-like rows with prices, totals, imag
   assert.match(css, /\.odina-cart-line \{ background:transparent;[^}]*border-radius:0;/);
 });
 
-test('touch-friendly quantity and removal controls retain names and callback wiring', () => {
+test('compact quantity and touch-friendly removal controls retain names and callback wiring', () => {
   const html = render();
   assert.match(html, /Mahsulot 1 miqdorini kamaytirish/);
   assert.match(html, /Mahsulot 1 miqdorini oshirish/);
   assert.match(html, /Mahsulot 1ni buyurtmadan olib tashlash/);
-  assert.match(html, /w-11 h-11 rounded-l-lg/);
-  assert.match(html, /w-11 h-11 rounded-r-lg/);
+  assert.match(html, /w-9 h-9 rounded-l-lg/);
+  assert.match(html, /w-9 h-9 rounded-r-lg/);
   assert.match(html, /h-11 w-11/);
   assert.match(source, /onClick=\{\(\) => onDec\(item\)\}/);
   assert.match(source, /onClick=\{\(\) => onInc\(item\)\}/);
