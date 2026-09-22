@@ -54,12 +54,12 @@ export default function Cart({
                 </div>
               </div>
               <div className="inline-flex shrink-0 items-center rounded-lg border border-border bg-card">
-                <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-11 h-11 rounded-l-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
-                  <Minus className="w-4 h-4" />
+                <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-9 h-9 rounded-l-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
+                  <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="min-w-7 px-0.5 text-center text-xs font-semibold tabular-nums">{item.quantity}</span>
-                <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-11 h-11 rounded-r-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
-                  <Plus className="w-4 h-4" />
+                <span className="min-w-5 px-0.5 text-center text-xs font-semibold tabular-nums">{item.quantity}</span>
+                <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-9 h-9 rounded-r-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
+                  <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="min-w-0 text-right text-sm font-bold leading-snug text-brand-ink break-words tabular-nums">{formatUZS(item.subtotal)}</div>
