@@ -57,7 +57,7 @@ export default function Cart({
                 <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-11 h-11 rounded-l-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="min-w-7 px-0.5 text-center text-sm font-semibold tabular-nums">{item.quantity}</span>
+                <span className="min-w-7 px-0.5 text-center text-xs font-semibold tabular-nums">{item.quantity}</span>
                 <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-11 h-11 rounded-r-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                   <Plus className="w-4 h-4" />
                 </button>
