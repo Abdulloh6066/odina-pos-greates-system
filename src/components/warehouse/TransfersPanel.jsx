@@ -409,116 +409,62 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
             </OdinaSelect>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-4 items-start">
-            <div className="odina-panel lg:col-span-2 rounded-2xl border border-border bg-card p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div>
-                  <p className="font-semibold">Mahsulotlarni tanlang</p>
-                  <p className="text-xs text-muted-foreground">Har xil tort va mahsulotlarni bitta transferga qo‘shing.</p>
-                </div>
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs whitespace-nowrap">
-                  {formatNum(availableProducts.length)} ta mavjud
-                </span>
-              </div>
+          <TransferProductPicker
+            products={availableProducts}
+            stockByProduct={stockByProduct}
+            selectedQuantities={selectedQuantities}
+            onAdd={addProduct}
+          />
 
-              <div className="grid sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <Label className="text-xs mb-1.5 block">Kategoriya</Label>
-                  <OdinaSelect value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
-                    <option value="all">Barcha kategoriyalar</option>
-                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                  </OdinaSelect>
-                </div>
-                <div>
-                  <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    <Input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Masalan: Almond" className="h-11 pl-9" />
-                  </div>
-                </div>
+          <aside className="rounded-2xl border border-primary/25 bg-primary/5 p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ShoppingBasket className="w-4 h-4 text-brand-ink" />
+                <p className="font-semibold">Tanlangan mahsulotlar</p>
               </div>
-
-              {filteredProducts.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                  Bu kategoriya yoki qidiruv bo‘yicha qoldiqli mahsulot topilmadi.
-                </div>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
-                  {filteredProducts.map((product) => {
-                    const available = Math.floor(Number(stockByProduct[product.id] || 0));
-                    const selected = Number(selectedQuantities[product.id] || 0);
-                    return (
-                      <div key={product.id} className={`rounded-xl border p-3 transition-colors ${selected > 0 ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-medium text-sm truncate">{product.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{product.category_name || 'Kategoriyasiz'}</p>
-                          </div>
-                          {selected > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">{formatNum(selected)} {sourceUnitLabel(product)}</span>}
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-2">
-                          <span className="text-xs text-muted-foreground">Mavjud: <b className="text-foreground">{formatNum(available)} {sourceUnitLabel(product)}</b></span>
-                          <Button type="button" size="sm" variant={selected > 0 ? 'outline' : 'secondary'} onClick={() => addProduct(product)} disabled={selected >= available} className="h-8 rounded-lg">
-                            <Plus className="w-3.5 h-3.5 mr-1" /> {selected > 0 ? 'Yana' : 'Qo‘shish'}
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <span className="rounded-full bg-card px-2.5 py-1 text-xs font-semibold">{formatNum(selectedEntries.length)} tur</span>
             </div>
 
-            <aside className="rounded-2xl border border-primary/25 bg-primary/5 p-3 sm:p-4 lg:sticky lg:top-0">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <ShoppingBasket className="w-4 h-4 text-brand-ink" />
-                  <p className="font-semibold">Transfer savati</p>
-                </div>
-                <span className="rounded-full bg-card px-2.5 py-1 text-xs font-semibold">{formatNum(selectedEntries.length)} tur</span>
+            {selectedEntries.length === 0 ? (
+              <div className="py-7 text-center">
+                <ShoppingBasket className="w-8 h-8 mx-auto text-muted-foreground/35 mb-2" />
+                <p className="text-sm text-muted-foreground">“Mahsulot qo‘shish” tugmasini bosib transfer mahsulotlarini tanlang.</p>
               </div>
-
-              {selectedEntries.length === 0 ? (
-                <div className="py-8 text-center">
-                  <ShoppingBasket className="w-8 h-8 mx-auto text-muted-foreground/35 mb-2" />
-                  <p className="text-sm text-muted-foreground">Chap tomondan mahsulotlarni qo‘shing.</p>
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2 max-h-[330px] overflow-y-auto pr-1">
-                  {selectedEntries.map(({ product, quantity, available }) => (
-                    <div key={product.id} className="rounded-xl border border-border bg-card p-3">
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-[11px] text-muted-foreground">Jo‘natilgach {formatNum(available - quantity)} {sourceUnitLabel(product)} qoladi</p>
-                        </div>
-                        <button type="button" onClick={() => removeProduct(product.id)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center touch-manipulation" aria-label={`${product.name}ni olib tashlash`}>
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+            ) : (
+              <div className="mt-3 grid sm:grid-cols-2 gap-2 max-h-[330px] overflow-y-auto pr-1">
+                {selectedEntries.map(({ product, quantity, available }) => (
+                  <div key={product.id} className="rounded-xl border border-border bg-card p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{product.name}</p>
+                        <p className="text-[11px] text-muted-foreground">Jo‘natilgach {formatNum(available - quantity)} {sourceUnitLabel(product)} qoladi</p>
                       </div>
-                      <p className="mt-2 text-xs font-semibold text-brand-ink">{product.production_unit === 'sheet'
-                        ? `${quantity} list → ${quantity * Number(product.pieces_per_sheet || 20)} bo‘lak qabul qilinadi`
-                        : `${quantity} dona qabul qilinadi`}</p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity - 1)} className="w-9 h-9 rounded-lg shrink-0">
-                          <Minus className="w-3.5 h-3.5" />
-                        </Button>
-                        <Input type="number" inputMode="numeric" min="1" max={available} step="1" value={quantity} onChange={(event) => changeQuantity(product.id, event.target.value)} className="h-9 rounded-lg text-center px-1" />
-                        <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity + 1)} disabled={quantity >= available} className="w-9 h-9 rounded-lg shrink-0">
-                          <Plus className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                      <button type="button" onClick={() => removeProduct(product.id)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center touch-manipulation" aria-label={`${product.name}ni olib tashlash`}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-3 pt-3 border-t border-primary/20 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Do‘konda jami</span>
-                <span className="font-display text-lg font-bold text-brand-ink">{formatNum(totalQuantity)} dona/bo‘lak</span>
+                    <p className="mt-2 text-xs font-semibold text-brand-ink">{product.production_unit === 'sheet'
+                      ? `${quantity} list → ${quantity * Number(product.pieces_per_sheet || 20)} bo‘lak qabul qilinadi`
+                      : `${quantity} dona qabul qilinadi`}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity - 1)} className="w-9 h-9 rounded-lg shrink-0">
+                        <Minus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Input type="number" inputMode="numeric" min="1" max={available} step="1" value={quantity} onChange={(event) => changeQuantity(product.id, event.target.value)} className="h-9 rounded-lg text-center px-1" />
+                      <Button type="button" size="icon" variant="outline" onClick={() => changeQuantity(product.id, quantity + 1)} disabled={quantity >= available} className="w-9 h-9 rounded-lg shrink-0">
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </aside>
-          </div>
+            )}
+
+            <div className="mt-3 pt-3 border-t border-primary/20 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Do‘konda jami</span>
+              <span className="font-display text-lg font-bold text-brand-ink">{formatNum(totalQuantity)} dona/bo‘lak</span>
+            </div>
+          </aside>
 
           <div>
             <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
