@@ -1,16 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { Minus, Plus, Search, Send, Trash2 } from 'lucide-react';
+import { Minus, Plus, Send, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ProductCombobox from '@/components/orders/ProductCombobox';
 import { unitLabel } from '@/lib/shop-demand';
 
 export default function ShopDemandForm({ open, onClose, user, shopName, products, editing, onSubmit }) {
   const [requiredDate, setRequiredDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState({}); // productId -> quantity
   const [saving, setSaving] = useState(false);
 
@@ -27,23 +27,25 @@ export default function ShopDemandForm({ open, onClose, user, shopName, products
       setNotes('');
       setSelected({});
     }
-    setSearch('');
   }, [open, editing?.id]);
 
-  const normalizedSearch = search.toLowerCase().trim();
-  const available = useMemo(() => (products || [])
+  const availableProducts = useMemo(() => (products || [])
     .filter((p) => p.active !== false && p.archived !== true && p.track_stock !== false)
-    .filter((p) => !normalizedSearch || String(p.name || '').toLowerCase().includes(normalizedSearch)
-      || String(p.category_name || '').toLowerCase().includes(normalizedSearch))
-    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uz')), [products, normalizedSearch]);
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uz')), [products]);
 
   const selectedList = useMemo(() => Object.entries(selected)
     .map(([productId, q]) => ({ product: (products || []).find((p) => p.id === productId), quantity: Number(q) }))
     .filter((x) => x.product && Number.isInteger(x.quantity) && x.quantity > 0), [selected, products]);
 
-  const add = (product) => setSelected((s) => (s[product.id] ? s : { ...s, [product.id]: 1 }));
+  const add = (product, quantity = 1) => {
+    const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+    setSelected((current) => ({
+      ...current,
+      [product.id]: (Number(current[product.id]) || 0) + amount,
+    }));
+  };
   const remove = (productId) => setSelected((s) => { const n = { ...s }; delete n[productId]; return n; });
-  const change = (productId, value, max) => {
+  const change = (productId, value) => {
     const v = Math.max(0, Math.floor(Number(value) || 0));
     setSelected((s) => ({ ...s, [productId]: v }));
   };
@@ -88,69 +90,42 @@ export default function ShopDemandForm({ open, onClose, user, shopName, products
           </div>
 
           <div>
-            <Label className="text-xs mb-1.5 block">Mahsulot qidirish</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulot nomi bo'yicha qidirish…" className="h-11 pl-9 rounded-xl" />
-            </div>
+            <Label className="text-xs mb-1.5 block">Mahsulotlar</Label>
+            <ProductCombobox products={availableProducts} onAdd={add} loading={false} />
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4 items-start">
-            <div className="odina-panel rounded-2xl border border-border bg-card p-3 max-h-[280px] overflow-y-auto">
-              {available.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Mahsulot topilmadi.</p>
-              ) : (
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {available.map((p) => {
-                    const isSel = Boolean(selected[p.id]);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => add(p)}
-                        disabled={editing && (editing.items || []).some((it) => it.product_id === p.id && Number(it.sent_quantity) > 0)}
-                        className={`rounded-xl border p-2.5 text-left transition-colors touch-manipulation ${isSel ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-secondary/50'}`}
-                      >
-                        <p className="text-sm font-medium truncate">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{p.category_name || 'Kategoriyasiz'} · {unitLabel(p.production_unit)}</p>
+          <aside className="rounded-2xl border border-primary/25 bg-primary/5 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-semibold text-sm">Tanlangan mahsulotlar</p>
+              <span className="rounded-full bg-card px-2.5 py-0.5 text-xs font-semibold">{selectedList.length} tur</span>
+            </div>
+            {selectedList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                “Mahsulot qo‘shish” tugmasini bosib kerakli mahsulotlarni tanlang.
+              </p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-2 max-h-[280px] overflow-y-auto pr-1">
+                {selectedList.map(({ product, quantity }) => (
+                  <div key={product.id} className="rounded-xl border border-border bg-card p-2.5">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{product.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{unitLabel(product.production_unit)}</p>
+                      </div>
+                      <button type="button" onClick={() => remove(product.id)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center touch-manipulation" aria-label="Olib tashlash">
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <aside className="rounded-2xl border border-primary/25 bg-primary/5 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-sm">Tanlanganlar</p>
-                <span className="rounded-full bg-card px-2.5 py-0.5 text-xs font-semibold">{selectedList.length} tur</span>
-              </div>
-              {selectedList.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Chap tomondan mahsulot tanlang.</p>
-              ) : (
-                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
-                  {selectedList.map(({ product, quantity }) => (
-                    <div key={product.id} className="rounded-xl border border-border bg-card p-2.5">
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{product.name}</p>
-                          <p className="text-[11px] text-muted-foreground">{unitLabel(product.production_unit)}</p>
-                        </div>
-                        <button type="button" onClick={() => remove(product.id)} className="w-8 h-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex items-center justify-center touch-manipulation" aria-label="Olib tashlash">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <Button type="button" size="icon" variant="outline" onClick={() => change(product.id, quantity - 1)} className="w-9 h-9 rounded-lg shrink-0"><Minus className="w-3.5 h-3.5" /></Button>
-                        <Input type="number" inputMode="numeric" min={1} value={quantity} onChange={(e) => change(product.id, e.target.value)} className="h-9 rounded-lg text-center px-1 w-24" />
-                        <Button type="button" size="icon" variant="outline" onClick={() => change(product.id, quantity + 1)} className="w-9 h-9 rounded-lg shrink-0"><Plus className="w-3.5 h-3.5" /></Button>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </aside>
-          </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button type="button" size="icon" variant="outline" onClick={() => change(product.id, quantity - 1)} className="w-9 h-9 rounded-lg shrink-0"><Minus className="w-3.5 h-3.5" /></Button>
+                      <Input type="number" inputMode="numeric" min={1} value={quantity} onChange={(e) => change(product.id, e.target.value)} className="h-9 rounded-lg text-center px-1 w-24" />
+                      <Button type="button" size="icon" variant="outline" onClick={() => change(product.id, quantity + 1)} className="w-9 h-9 rounded-lg shrink-0"><Plus className="w-3.5 h-3.5" /></Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
 
           <div>
             <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
