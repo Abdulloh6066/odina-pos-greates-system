@@ -281,8 +281,6 @@ function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
 
 function SendTransferDialog({ open, onClose, source, locations, products, productStock, onSaved }) {
   const [destinationId, setDestinationId] = useState('');
-  const [categoryId, setCategoryId] = useState('all');
-  const [productSearch, setProductSearch] = useState('');
   const [selectedQuantities, setSelectedQuantities] = useState({});
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -297,24 +295,6 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
     .filter((product) => Number(stockByProduct[product.id] || 0) > 0)
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uz'));
   const productById = Object.fromEntries(availableProducts.map((product) => [product.id, product]));
-  const categories = Array.from(new Map(
-    availableProducts
-      .filter((product) => product.category_id || product.category_name)
-      .map((product) => [
-        product.category_id || product.category_name,
-        product.category_name || 'Kategoriyasiz',
-      ]),
-  ).entries())
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'uz'));
-  const normalizedProductSearch = productSearch.toLowerCase().trim();
-  const filteredProducts = availableProducts.filter((product) => {
-    const productCategoryId = product.category_id || product.category_name;
-    const categoryMatches = categoryId === 'all' || productCategoryId === categoryId;
-    const searchMatches = !normalizedProductSearch
-      || [product.name, product.category_name].filter(Boolean).join(' ').toLowerCase().includes(normalizedProductSearch);
-    return categoryMatches && searchMatches;
-  });
   const selectedEntries = Object.entries(selectedQuantities)
     .map(([productId, rawQuantity]) => ({
       product: productById[productId],
@@ -345,15 +325,16 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
     });
   };
 
-  const addProduct = (product) => {
+  const addProduct = (product, quantity = 1) => {
     const available = Math.floor(Number(stockByProduct[product.id] || 0));
+    const amount = Math.max(1, Math.floor(Number(quantity) || 1));
     setSelectedQuantities((current) => {
       const currentQuantity = Number(current[product.id] || 0);
       const selectedTypeCount = Object.values(current).filter((value) => Number(value) > 0).length;
       if (currentQuantity >= available || (!current[product.id] && selectedTypeCount >= 50)) {
         return current;
       }
-      return { ...current, [product.id]: currentQuantity + 1 };
+      return { ...current, [product.id]: Math.min(currentQuantity + amount, available) };
     });
   };
 
@@ -367,8 +348,6 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
 
   const clearForm = () => {
     setDestinationId('');
-    setCategoryId('all');
-    setProductSearch('');
     setSelectedQuantities({});
     setNotes('');
   };
