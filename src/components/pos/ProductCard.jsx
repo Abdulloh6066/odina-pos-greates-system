@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 
 export default function ProductCard({ product, stockQuantity = null, onAdd, disabled = false }) {
@@ -25,21 +25,19 @@ export default function ProductCard({ product, stockQuantity = null, onAdd, disa
             {product.name.charAt(0)}
           </div>
         )}
-        <div className="odina-product-add absolute top-2 right-2 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100 transition-opacity shadow-lg">
-          <Plus className="w-5 h-5" strokeWidth={2.5} />
-        </div>
-        {stockQuantity !== null && stockQuantity <= 0 && (
-          <div className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-full bg-red-600/95 text-white px-2 py-1 text-xs font-semibold shadow">
-            <AlertTriangle className="w-3 h-3" /> Qoldiq {stockQuantity}
-          </div>
-        )}
       </div>
       <div className="odina-product-info p-3 sm:p-3.5">
         <div className="odina-product-name text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</div>
         <div className="odina-product-meta">
           <span className="odina-product-price">{formatUZS(product.price)}</span>
-          {stockQuantity !== null && stockQuantity > 0 && (
-            <span className="odina-product-stock">{stockQuantity} dona</span>
+          {stockQuantity !== null && (
+            stockQuantity <= 0 ? (
+              <span className="odina-product-stock odina-product-stock-zero">
+                <AlertTriangle className="w-3 h-3" /> Qoldiq {stockQuantity}
+              </span>
+            ) : (
+              <span className="odina-product-stock">{stockQuantity} dona</span>
+            )
           )}
         </div>
       </div>
