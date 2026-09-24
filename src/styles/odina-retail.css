@@ -52,9 +52,9 @@
 .odina-product-photo { aspect-ratio:1.3; border-radius:11px; background:#f1eee5; }
 .odina-product-info { padding:8px 6px 6px; }
 .odina-product-name { font-size:12px; font-weight:600; min-height:2.1rem; line-height:1.35; }
-.odina-product-meta { display:flex; align-items:center; justify-content:space-between; gap:5px; margin-top:4px; flex-wrap:wrap; }
-.odina-product-price { font-size:14px; font-weight:700; letter-spacing:-0.035em; color:#454831; }
-.odina-product-stock { color:#66502e; background:#f7ecd9; border-radius:6px; padding:3px 5px; font-size:11px; font-weight:600; }
+.odina-product-meta { display:flex; align-items:center; justify-content:space-between; gap:5px; margin-top:4px; flex-wrap:nowrap; }
+.odina-product-price { font-size:14px; font-weight:700; letter-spacing:-0.035em; color:#454831; white-space:nowrap; }
+.odina-product-stock { color:#66502e; background:#f7ecd9; border-radius:6px; padding:3px 5px; font-size:11px; font-weight:600; white-space:nowrap; flex-shrink:0; }
 .odina-product-stock-zero { display:inline-flex; align-items:center; gap:4px; color:#fff; background:#dc2626; border-radius:999px; padding:4px 7px; box-shadow:0 2px 6px #991b1b26; }
 .odina-cart-wrap { padding:16px 16px 16px 4px; border:0; }
 .odina-cart { background:#fffefa; border:1px solid #e5dfd0; border-radius:22px; box-shadow:0 5px 24px -14px #67512638; }
