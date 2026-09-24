@@ -32,8 +32,12 @@ export default function ProductCard({ product, stockQuantity = null, onAdd, disa
           <span className="odina-product-price">{formatUZS(product.price)}</span>
           {stockQuantity !== null && (
             stockQuantity <= 0 ? (
-              <span className="odina-product-stock odina-product-stock-zero">
-                <AlertTriangle className="w-3 h-3" /> Qoldiq {stockQuantity}
+              <span
+                className="odina-product-stock odina-product-stock-zero"
+                aria-label={`Qoldiq ${stockQuantity}`}
+                title={`Qoldiq ${stockQuantity}`}
+              >
+                <AlertTriangle className="w-3 h-3" /> Q {stockQuantity}
               </span>
             ) : (
               <span className="odina-product-stock">{stockQuantity} dona</span>
