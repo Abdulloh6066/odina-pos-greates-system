@@ -32,6 +32,27 @@ export default function DataCleanupPanel() {
     }
   };
 
+  const clearPrelaunchSales = async () => {
+    const phrase = window.prompt('38 ta sotuv, 3 ta ochiq smena va ularga bog‘liq tarix o‘chiriladi. Mahsulot va qoldiqlar saqlanadi. SOTUVNI_TOZALASH deb yozing.');
+    if (phrase !== 'SOTUVNI_TOZALASH') return;
+    if (!window.confirm('Sotuv va smenalarni doimiy o‘chirishni tasdiqlaysizmi?')) return;
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      const response = await base44.functions.invoke('clear-prelaunch-sales', {
+        scope: 'prelaunch_sales_shifts',
+        confirm: 'SOTUVNI_TOZALASH',
+      });
+      const data = response?.data || response;
+      setResult({ ...data, total_deleted: Object.values(data.deleted || {}).reduce((sum, count) => sum + count, 0) });
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Tozalash yakunlanmadi. Qoldiq yozuvlarni tekshiring.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 space-y-3">
       <div className="flex items-start gap-3">
@@ -51,6 +72,9 @@ export default function DataCleanupPanel() {
       <Button variant="destructive" onClick={cleanup} disabled={busy} className="min-h-11 rounded-xl">
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
         {busy ? 'Tozalanmoqda…' : 'Test ma’lumotlarini tozalash'}
+      </Button>
+      <Button variant="outline" onClick={clearPrelaunchSales} disabled={busy} className="min-h-11 rounded-xl">
+        Sotuv va smenalarni tozalash (mahsulotlar saqlanadi)
       </Button>
       {result?.ok && (
         <p role="status" className="text-sm font-medium text-emerald-700">
