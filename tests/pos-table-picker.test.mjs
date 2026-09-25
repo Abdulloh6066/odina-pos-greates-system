@@ -1,4 +1,4 @@
-// Offline-only regression tests for the dedicated Stollar page and fast Kassa reset.
+// Offline-only regression tests for the Kassa table popup and fast Kassa reset.
 // Never contact Base44 or create live orders, sales, shifts or stock movements.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -42,32 +42,33 @@ test('Kassa renders offline and sync-status banners without missing icon runtime
   }
 });
 
-test('Kassa opens the dedicated Stollar page instead of a large modal on desktop and touch devices', () => {
+test('Kassa opens a focused table map popup while the management page remains available', () => {
+  const picker = read('src/components/tables/PosTablePicker.jsx');
   const page = read('src/pages/RestaurantTables.jsx');
   const app = read('src/App.jsx');
   assert.match(app, /path="\/tables" element=\{<RoleRoute pageKey="tables">/);
   assert.match(pos, /Stollar sahifasini ochish/);
-  assert.match(pos, /const goToTables = async \(\) =>/);
-  assert.match(pos, /navigate\('\/tables', \{ state: \{ shopId:/);
-  assert.doesNotMatch(pos, /tablePickerOpen|<TableFloorplan|Kassa · Stollar xaritasi/);
+  assert.match(pos, /setTablePickerOpen\(true\)/);
+  assert.match(pos, /<PosTablePicker/);
+  assert.match(picker, /<TableFloorplan[^>]*pickerOnly/);
+  assert.match(picker, /canManage=\{false\}/);
+  assert.match(picker, /<TableDetailSheet/);
   assert.match(page, /<TableFloorplan/);
-  assert.match(page, /Yangi buyurtma · Kassa/);
-  assert.match(page, /onOpen=\{openTable\}/);
   assert.match(floorplan, /if \(editing\)\s*setSelectedNumber\(point\.number\);\s*else\s*onOpen\(shop\.id, point\.number\)/);
   assert.doesNotMatch(pos, /entities\.Shop\.(update|create|delete)/);
 });
 
-test('dedicated map retains backend shop scoping, and navigation protects unsaved table edits', () => {
-  const page = read('src/pages/RestaurantTables.jsx');
-  assert.match(page, /functions\.invoke\('restaurant-tables', \{ action: 'status' \}\)/);
+test('table popup stays in the active shop and saves table edits before switching', () => {
+  const picker = read('src/components/tables/PosTablePicker.jsx');
+  assert.match(picker, /functions\.invoke\('restaurant-tables', \{ action: 'status' \}\)/);
+  assert.match(picker, /find\(\(item\) => item\.id === activeShopId\)/);
+  assert.match(pos, /activeShopId=\{shift\?\.shop_id \|\| user\?\.shop_id\}/);
   assert.match(backend, /const assignedId = userShopId\(actor\)/);
   assert.match(backend, /shops: \[safeShop\(assignedShop\)\]/);
   assert.match(pos, /selectedTable && tableCartDirty && !\(await saveTableOrder\(\)\)/);
-  assert.match(pos, /navigate\('\/tables', \{ state: \{ shopId:/);
-  assert.match(page, /navigate\(`\/pos\?\$\{new URLSearchParams\(\{ table_shop: selectedShop\.id, table_number: String\(number\) \}\)\}`\)/);
   assert.match(pos, /const priorTableKey = useRef\(tableKey\)/);
-  assert.match(pos, /if \(selectedTable && !lastSale\?\.offline_pending\) \{\s*navigate\('\/tables', \{ state: \{ shopId:/);
-  assert.match(page, /available\.some\(\(shop\) => shop\.id === location\.state\?\.shopId\)/);
+  assert.match(pos, /screenMode \? \{ screen: '1' \} : \{\}/);
+  assert.match(pos, /navigate\(posHomePath, \{ replace: true \}\);\s*setTablePickerOpen\(true\)/);
 });
 
 test('saving an unpaid table returns to clean POS only after server confirmation; failure preserves the cart', () => {
