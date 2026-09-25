@@ -23,6 +23,10 @@ import {
   syncErrorMessage,
 } from '@/lib/offline-sales';
 
+// Temporary business choice: sell through without the negative-stock confirmation.
+// Set to true when the owner wants the warning restored.
+const SHOW_NEGATIVE_STOCK_CONFIRMATION = false;
+
 export default function POS() {
   const { user, sidebarCollapsed, screenMode } = useOutletContext();
   const navigate = useNavigate();
@@ -570,6 +574,7 @@ export default function POS() {
       });
       return false;
     }
+    if (!SHOW_NEGATIVE_STOCK_CONFIRMATION) return true;
     return odinaConfirm(
       'Savdodan keyin ayrim mahsulotlar qoldig‘i minus bo‘ladi.',
       {
