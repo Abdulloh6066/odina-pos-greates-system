@@ -35,6 +35,8 @@ import {
 
 const PAYMENT_LABELS = {
   cash: "Naqd pul",
+  bank_card: "Bank card",
+  online: "Online",
   uzcard: "Uzcard",
   humo: "Humo",
   click: "Click",
@@ -349,9 +351,8 @@ function ShiftCard({ shift, onOpen }) {
         <Cell label="Jami" value={formatUZS(shift.total_sales)} bold />
         <Cell label="Buyurtmalar" value={formatNum(shift.order_count)} />
         <Cell label="Naqd pul" value={formatUZS(shift.cash_sales)} />
-        <Cell label="Plastik" value={formatUZS(plastic)} />
-        <Cell label="Uzcard" value={formatUZS(shift.uzcard_sales)} />
-        <Cell label="Humo" value={formatUZS(shift.humo_sales)} />
+        <Cell label="Bank card" value={formatUZS(plastic)} />
+        <Cell label="Online" value={formatUZS(shift.online_sales)} />
       </div>
 
       {shift.status === "closed" && (
@@ -464,7 +465,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 <SummaryCard label="Jami savdo" value={formatUZS(shift.total_sales)} />
                 <SummaryCard label="Naqd savdo" value={formatUZS(shift.cash_sales)} />
-                <SummaryCard label="Plastik" value={formatUZS(plastic)} />
+                <SummaryCard label="Bank card" value={formatUZS(plastic)} />
                 <SummaryCard label="Onlayn / bank" value={formatUZS(online)} />
                 <SummaryCard label="Kassadan berildi" value={formatUZS(shift.cash_removed || movementsTotal)} warn />
                 <SummaryCard label="Qaytarishlar" value={formatUZS(shift.refunds_total || refundsTotal)} danger />
@@ -493,10 +494,9 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs">
-                <Cell label="Uzcard" value={formatUZS(shift.uzcard_sales)} />
-                <Cell label="Humo" value={formatUZS(shift.humo_sales)} />
-                <Cell label="Onlayn" value={formatUZS(shift.online_sales)} />
-                <Cell label="Bank" value={formatUZS(shift.bank_transfer_sales)} />
+                <Cell label="Bank card" value={formatUZS(plastic)} />
+                <Cell label="Online" value={formatUZS(shift.online_sales)} />
+                {Number(shift.bank_transfer_sales || 0) !== 0 && <Cell label="Eski bank o‘tkazmalari" value={formatUZS(shift.bank_transfer_sales)} />}
               </div>
             </section>
 

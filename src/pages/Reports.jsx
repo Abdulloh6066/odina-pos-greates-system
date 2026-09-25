@@ -8,8 +8,8 @@ import { formatUzbekistan } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import RealProfitDashboard from '@/components/reports/RealProfitDashboard';
 
-const PAY_COLORS = { cash: 'hsl(var(--primary))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
-const PAY_LABELS = { cash: 'Naqd pul', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
+const PAY_COLORS = { cash: 'hsl(var(--primary))', bank_card: 'hsl(var(--brand-olive))', online: 'hsl(var(--brand-sand))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
+const PAY_LABELS = { cash: 'Naqd pul', bank_card: 'Bank card', online: 'Online', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
 
 export default function Reports() {
   const { user } = useOutletContext();

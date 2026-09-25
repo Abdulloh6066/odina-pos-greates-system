@@ -124,10 +124,9 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
             <h3 className="font-semibold">Pul hisoboti</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
               <SummaryRow label="Naqd savdo" value={formatUZS(shift?.cash_sales)} />
-              <SummaryRow label="Uzcard savdosi" value={formatUZS(shift?.uzcard_sales)} />
-              <SummaryRow label="Humo savdosi" value={formatUZS(shift?.humo_sales)} />
-              <SummaryRow label="Onlayn savdo" value={formatUZS(shift?.online_sales)} />
-              <SummaryRow label="Bank o‘tkazmalari" value={formatUZS(shift?.bank_transfer_sales)} />
+              <SummaryRow label="Bank card savdosi" value={formatUZS(Number(shift?.uzcard_sales || 0) + Number(shift?.humo_sales || 0))} />
+              <SummaryRow label="Online savdo" value={formatUZS(shift?.online_sales)} />
+              {Number(shift?.bank_transfer_sales || 0) !== 0 && <SummaryRow label="Eski bank o‘tkazmalari" value={formatUZS(shift?.bank_transfer_sales)} />}
               <SummaryRow label="Jami savdo" value={formatUZS(shift?.total_sales)} bold />
               <SummaryRow label="Boshlang‘ich naqd pul" value={formatUZS(shift?.starting_cash)} />
               <SummaryRow label="Kutilayotgan naqd pul" value={formatUZS(expected)} bold />
@@ -157,7 +156,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
           </section>
 
           <div className="rounded-xl bg-secondary/60 px-3 py-2.5 text-xs text-muted-foreground">
-            Uzcard, Humo, onlayn va bank tushumlari Budgetga qo‘shiladi. Mahsulotlarning tizimdagi qoldig‘i smena yopilgan paytda avtomatik tarixga saqlanadi.
+            Bank card va Online tushumlari Budgetga qo‘shiladi. Mahsulotlarning tizimdagi qoldig‘i smena yopilgan paytda avtomatik tarixga saqlanadi.
           </div>
         </div>
         <DialogFooter className="gap-2">

@@ -33,7 +33,7 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
 
   if (!order) return null;
 
-  const methodLabel = (m) => PAYMENT_METHODS.find((p) => p.id === m)?.label || m;
+  const methodLabel = (m) => PAYMENT_METHODS.find((p) => p.id === m)?.label || ({ uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa onlayn' }[m] || m);
   const refresh = async () => {
     const updated = await base44.entities.CustomerOrder.get(order.id);
     const pm = await base44.entities.OrderPayment.filter({ order_id: order.id });
