@@ -1152,7 +1152,7 @@ export default function POS() {
             <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
             <div className="h-px bg-border my-2 mx-3" />
             {categories.map((c) => (
-              <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<CategoryIcon icon={c.icon} className="text-base" imgClassName="w-5 h-5" />} label={c.name} />
+              <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<CategoryIcon icon={c.icon} className="text-base" imgClassName="w-5 h-5" />} label={c.name.replaceAll('&', ' & ')} />
             ))}
           </div>
 
@@ -1171,7 +1171,7 @@ export default function POS() {
                 <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
                 <Chip active={showFav} onClick={() => setShowFav(true)}>★ Sevimlilar</Chip>
                 {categories.map((c) => (
-                  <Chip key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }}>{c.name}</Chip>
+                  <Chip key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }}>{c.name.replaceAll('&', ' & ')}</Chip>
                 ))}
               </div>
             </div>
