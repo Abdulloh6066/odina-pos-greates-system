@@ -250,7 +250,24 @@ export default function POS() {
       base44.entities.ProductStock.list('-updated_at', 500),
       base44.functions.invoke('waste-ledger', { action: 'get_alerts' }).catch(() => ({ data: { expired_items: [] } })),
     ]);
-    setCategories((cats || []).filter((c) => c.active));
+    const categoryPriority = {
+      '15 somlik': 1,
+      '18 somlik': 2,
+      'aralash': 3,
+      'pishiriqlar': 4,
+      'tortlar': 5,
+    };
+    setCategories(
+      (cats || [])
+        .filter((c) => c.active)
+        .sort((a, b) => {
+          const aName = String(a.name || '').trim().toLowerCase();
+          const bName = String(b.name || '').trim().toLowerCase();
+          const aPriority = categoryPriority[aName] ?? 100;
+          const bPriority = categoryPriority[bName] ?? 100;
+          return aPriority - bPriority;
+        }),
+    );
     setProducts((prods || []).filter((p) => p.active && p.archived !== true));
     setProductStock(stockList || []);
     setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
