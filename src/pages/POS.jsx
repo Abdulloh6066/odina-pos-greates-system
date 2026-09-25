@@ -260,8 +260,9 @@ export default function POS() {
       '15 somlik': 1,
       '18 somlik': 2,
       'aralash': 3,
-      'pishiriqlar': 4,
-      'tortlar': 5,
+      'mini/tart': 4,
+      'pishiriqlar': 5,
+      'tortlar': 6,
     };
     const activeCategories = (cats || []).filter((c) => c.active);
     const normalizeCategoryName = (name) => String(name || '').trim().toLowerCase();
