@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,21 +9,14 @@ import { receiptWishForSale } from '@/lib/receipt-wishes';
 
 export default function Receipt({ open, sale, settings, onClose, onStaffTicket }) {
   const afterPrintRef = useRef(null);
-  const questionRef = useRef(null);
-  const [askStaffTicket, setAskStaffTicket] = useState(false);
   const canOfferStaffTicket = Boolean(onStaffTicket && sale?.items?.length && !sale?.table_number_snapshot);
 
   useEffect(() => {
     if (open) return;
-    setAskStaffTicket(false);
     if (afterPrintRef.current) window.removeEventListener('afterprint', afterPrintRef.current);
     afterPrintRef.current = null;
     document.body.classList.remove('odina-sale-printing');
   }, [open, sale?.id]);
-
-  useEffect(() => {
-    if (askStaffTicket) questionRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [askStaffTicket]);
 
   useEffect(() => () => {
     if (afterPrintRef.current) window.removeEventListener('afterprint', afterPrintRef.current);
@@ -34,12 +27,11 @@ export default function Receipt({ open, sale, settings, onClose, onStaffTicket }
 
   const handlePrint = () => {
     if (afterPrintRef.current) return;
-    setAskStaffTicket(false);
     const onAfterPrint = () => {
       if (afterPrintRef.current !== onAfterPrint) return;
       afterPrintRef.current = null;
       document.body.classList.remove('odina-sale-printing');
-      if (canOfferStaffTicket) setAskStaffTicket(true);
+      if (canOfferStaffTicket) onStaffTicket(sale);
     };
     afterPrintRef.current = onAfterPrint;
     window.addEventListener('afterprint', onAfterPrint, { once: true });
@@ -133,21 +125,6 @@ export default function Receipt({ open, sale, settings, onClose, onStaffTicket }
           </div>,
           document.body
         )}
-        {askStaffTicket && canOfferStaffTicket && (
-          <div ref={questionRef} role="group" aria-label="Xizmat cheki kerakmi?"
-            className="no-print rounded-xl border border-brand-olive/40 bg-brand-olive/10 p-3 space-y-2">
-            <p className="text-sm font-semibold">Olib ketish buyurtmasi uchun xizmat cheki kerakmi?</p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => setAskStaffTicket(false)}
-                className="min-h-11 flex-1">Yo‘q</Button>
-              <Button type="button" onClick={() => { setAskStaffTicket(false); onStaffTicket(sale); }}
-                className="min-h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary-strong">
-                Chop etish
-              </Button>
-            </div>
-          </div>
-        )}
-
         <DialogFooter className="flex flex-wrap gap-2 no-print">
           <Button variant="outline" onClick={onClose} className="flex-1 min-w-[120px]">Yangi buyurtma</Button>
           <Button onClick={handlePrint} className="flex-1 min-w-[120px] bg-primary text-primary-foreground hover:bg-primary-strong">
