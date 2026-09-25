@@ -10,9 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import CategoryIcon from '@/components/CategoryIcon';
-import { TEA_ICON_URL } from '@/lib/category-icon';
+import { TEA_ICON_URL, APELSIN_ICON_URL } from '@/lib/category-icon';
 
-const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '🥤', '🍰', '🍪', '🍩', '🥧', '🍫', '🍓', '🍋', '🫐', '➕', TEA_ICON_URL];
+const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '🥤', '🍰', '🍪', '🍩', '🥧', '🍫', '🍓', '🍋', '🫐', '➕', TEA_ICON_URL, APELSIN_ICON_URL];
 
 export default function Categories() {
   const { user } = useOutletContext();
