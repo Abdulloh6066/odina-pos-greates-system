@@ -346,8 +346,8 @@ export default function POS() {
     return () => unsubscribe?.();
   }, [user?.id]);
 
-  // The operational floor plan has its own /tables page. Never discard a
-  // table's unsaved edits when navigating away; keep an ordinary unsaved cart.
+  // Show the current shop's floor plan over Kassa. Save pending table edits
+  // before switching so an unpaid order cannot silently lose its cart.
   const goToTables = async () => {
     if (savingTableRef.current || paying || payOpen || stockChecking || tableOrderLoading) return;
     if (selectedTable && tableOrderError) {
@@ -356,7 +356,29 @@ export default function POS() {
     }
     if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
     setMobileCartOpen(false);
-    navigate('/tables', { state: { shopId: selectedTable?.shopId || shift?.shop_id || user?.shop_id || '' } });
+    setTablePickerOpen(true);
+  };
+
+  const selectTableFromPicker = async (shopId, number, payDirect) => {
+    if (!selectedTable && cart.length && !(await odinaConfirm({
+      title: 'Savatni almashtirish',
+      description: 'Joriy savatda saqlanmagan mahsulotlar bor. Stolga o‘tsangiz bu savat tozalanadi. Davom etasizmi?',
+      confirmLabel: 'Stolga o‘tish',
+      tone: 'warning',
+    }))) {
+      setTablePickerOpen(true);
+      return;
+    }
+    setTablePickerOpen(false);
+    setMobileCartOpen(false);
+    autoPayProcessedRef.current = false;
+    const query = new URLSearchParams({
+      ...(screenMode ? { screen: '1' } : {}),
+      table_shop: shopId,
+      table_number: String(number),
+      ...(payDirect ? { action: 'pay' } : {}),
+    });
+    navigate(`/pos?${query}`);
   };
 
   // Deselect the table immediately without full page reload.
@@ -757,7 +779,8 @@ export default function POS() {
     if (sale?.items?.length && !sale?.table_number_snapshot) {
       setStaffTicketPrompt(sale);
     } else if (selectedTable && !sale?.offline_pending) {
-      navigate('/tables', { state: { shopId: sale?.shop_id || selectedTable.shopId } });
+      navigate(posHomePath, { replace: true });
+      setTablePickerOpen(true);
     }
   };
 
@@ -1047,7 +1070,7 @@ export default function POS() {
       </div>
 
 
-      {!screenMode && !selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
+      {!selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-ink" aria-hidden="true" />
           <p className="flex-1"><strong>{location.state.savedTableNumber}-stol buyurtmasi saqlandi.</strong> To‘lov olinmadi. Kassa yangi buyurtmaga tayyor.</p>
@@ -1059,7 +1082,7 @@ export default function POS() {
             <ReceiptText className="h-4 w-4 mr-1.5" /> Xizmat cheki
           </Button>
           <Button type="button" variant="ghost" size="icon" aria-label="Saqlash xabarini yopish"
-            onClick={() => navigate('/pos', { replace: true, state: null })} className="h-11 w-11 shrink-0 rounded-xl"><X className="h-4 w-4" /></Button>
+            onClick={() => navigate(posHomePath, { replace: true, state: null })} className="h-11 w-11 shrink-0 rounded-xl"><X className="h-4 w-4" /></Button>
         </div>
       )}
 
@@ -1072,7 +1095,7 @@ export default function POS() {
         onRetry={syncOfflineSales}
       />
 
-      {!screenMode && (selectedTable || tableQuery.invalid) && (
+      {(selectedTable || tableQuery.invalid) && (
         <div className="mx-3 sm:mx-5 mt-3 shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 p-3 text-sm">
           <div className="flex items-center gap-2 min-w-0">
             <Armchair className="w-5 h-5 text-brand-ink shrink-0" />
