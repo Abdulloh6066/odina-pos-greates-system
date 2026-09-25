@@ -4,6 +4,8 @@ const COMPLETE_SALE_RUNTIME_VERSION = "offline-sales-v1-2026-09-12";
 
 const PAYMENT_METHODS = new Set([
   "cash",
+  "bank_card",
+  "online",
   "uzcard",
   "humo",
   "click",
@@ -786,9 +788,9 @@ export default async function(req) {
         .filter((payment: any) => payment.method === method)
         .reduce((sum: number, payment: any) => sum + money(payment.amount), 0);
       const cash = byMethod("cash");
-      const uzcard = byMethod("uzcard");
+      const uzcard = byMethod("uzcard") + byMethod("bank_card");
       const humo = byMethod("humo");
-      const online = byMethod("click") + byMethod("payme") + byMethod("other");
+      const online = byMethod("online") + byMethod("click") + byMethod("payme") + byMethod("other");
       const bank = byMethod("bank_transfer");
       if (cash > Number(refundShift.expected_cash || 0)) {
         return Response.json({ error: "Qaytarish uchun kassada kutilayotgan naqd pul yetarli emas." }, { status: 409 });
@@ -1490,13 +1492,13 @@ export default async function(req) {
       .filter((payment) => payment.method === "cash")
       .reduce((sum, payment) => sum + payment.amount, 0);
     const uzcardIncrement = normalizedPayments
-      .filter((payment) => payment.method === "uzcard")
+      .filter((payment) => ["bank_card", "uzcard"].includes(payment.method))
       .reduce((sum, payment) => sum + payment.amount, 0);
     const humoIncrement = normalizedPayments
       .filter((payment) => payment.method === "humo")
       .reduce((sum, payment) => sum + payment.amount, 0);
     const onlineIncrement = normalizedPayments
-      .filter((payment) => ["click", "payme", "other"].includes(payment.method))
+      .filter((payment) => ["online", "click", "payme", "other"].includes(payment.method))
       .reduce((sum, payment) => sum + payment.amount, 0);
     const bankTransferIncrement = normalizedPayments
       .filter((payment) => payment.method === "bank_transfer")
