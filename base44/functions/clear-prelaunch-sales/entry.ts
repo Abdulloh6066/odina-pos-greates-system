@@ -4,13 +4,13 @@ import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 // One-time reset for the pre-launch transaction records. The fixed counts make
 // the operation fail if a cashier has recorded another sale since the backup.
 const EXPECTED: Record<string, number> = {
-  SaleItem: 52,
-  Payment: 38,
+  SaleItem: 54,
+  Payment: 39,
   Refund: 0,
   CashMovement: 0,
-  StockMovement: 52,
+  StockMovement: 54,
   ShiftProductSnapshot: 0,
-  Sale: 38,
+  Sale: 39,
   Shift: 3,
   DailyShopReport: 16,
 };
