@@ -1272,6 +1272,12 @@ export default function POS() {
         </SheetContent>
       </Sheet>
 
+      <PosTablePicker
+        open={tablePickerOpen}
+        onOpenChange={setTablePickerOpen}
+        activeShopId={shift?.shop_id || user?.shop_id}
+        onSelect={(shopId, number, payDirect) => { void selectTableFromPicker(shopId, number, payDirect); }}
+      />
       <PaymentModal
         open={payOpen}
         total={total}
