@@ -1,49 +1,48 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Printer } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
 
-export default function Receipt({ open, sale, settings, onClose, onStaffTicket }) {
+export default function Receipt({ sale, settings, print, onAfterPrint }) {
   const afterPrintRef = useRef(null);
-  const canOfferStaffTicket = Boolean(onStaffTicket && sale?.items?.length && !sale?.table_number_snapshot);
+  const onAfterPrintRef = useRef(onAfterPrint);
 
   useEffect(() => {
-    if (open) return;
-    if (afterPrintRef.current) window.removeEventListener('afterprint', afterPrintRef.current);
-    afterPrintRef.current = null;
-    document.body.classList.remove('odina-sale-printing');
-  }, [open, sale?.id]);
+    onAfterPrintRef.current = onAfterPrint;
+  }, [onAfterPrint]);
 
-  useEffect(() => () => {
-    if (afterPrintRef.current) window.removeEventListener('afterprint', afterPrintRef.current);
-    document.body.classList.remove('odina-sale-printing');
-  }, []);
+  useEffect(() => {
+    if (!print || !sale || afterPrintRef.current) return undefined;
 
-  if (!sale) return null;
-
-  const handlePrint = () => {
-    if (afterPrintRef.current) return;
-    const onAfterPrint = () => {
-      if (afterPrintRef.current !== onAfterPrint) return;
+    const finishPrint = () => {
+      if (afterPrintRef.current !== finishPrint) return;
       afterPrintRef.current = null;
+      window.removeEventListener('afterprint', finishPrint);
       document.body.classList.remove('odina-sale-printing');
-      if (canOfferStaffTicket) onStaffTicket(sale);
+      onAfterPrintRef.current?.(sale);
     };
-    afterPrintRef.current = onAfterPrint;
-    window.addEventListener('afterprint', onAfterPrint, { once: true });
+
+    afterPrintRef.current = finishPrint;
+    window.addEventListener('afterprint', finishPrint, { once: true });
     document.body.classList.add('odina-sale-printing');
-    try {
-      window.print();
-    } catch {
-      window.removeEventListener('afterprint', onAfterPrint);
-      afterPrintRef.current = null;
+    const printTimer = window.setTimeout(() => {
+      try {
+        window.print();
+      } catch {
+        finishPrint();
+      }
+    }, 50);
+
+    return () => {
+      window.clearTimeout(printTimer);
+      window.removeEventListener('afterprint', finishPrint);
+      if (afterPrintRef.current === finishPrint) afterPrintRef.current = null;
       document.body.classList.remove('odina-sale-printing');
-    }
-  };
+    };
+  }, [print, sale]);
+
+  if (!sale || !print) return null;
 
   const timeStr = formatUzbekistanDateTime(sale.sold_at || sale.created_date || sale.created_at || Date.now());
   // Legacy shared footers may contain a different shop's Instagram or location.
@@ -103,35 +102,10 @@ export default function Receipt({ open, sale, settings, onClose, onStaffTicket }
 
   );
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xs max-h-[92dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl text-center">
-            {sale.offline_pending ? 'Savdo qurilmaga saqlandi' : 'Savdo yakunlandi'}
-          </DialogTitle>
-        </DialogHeader>
-
-        {sale.offline_pending && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 mb-3 text-center text-xs text-amber-900">
-            Internet kelganda bu savdo avtomatik ravishda serverga yuboriladi.
-          </div>
-        )}
-
-        <div className="receipt-preview">{receiptContent}</div>
-        {open && createPortal(
-          <div className="receipt-print sale-receipt hidden font-mono text-[12px] leading-relaxed text-foreground">
-            {receiptContent}
-          </div>,
-          document.body
-        )}
-        <DialogFooter className="flex flex-wrap gap-2 no-print">
-          <Button variant="outline" onClick={onClose} className="flex-1 min-w-[120px]">Yangi buyurtma</Button>
-          <Button onClick={handlePrint} className="flex-1 min-w-[120px] bg-primary text-primary-foreground hover:bg-primary-strong">
-            <Printer className="w-4 h-4 mr-1.5" /> Chop etish
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+  return createPortal(
+    <div className="receipt-print sale-receipt hidden font-mono text-[12px] leading-relaxed text-foreground">
+      {receiptContent}
+    </div>,
+    document.body
   );
 }
