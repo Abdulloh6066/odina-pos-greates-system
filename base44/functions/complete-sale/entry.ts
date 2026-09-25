@@ -36,10 +36,16 @@ async function normalizeSaleItems(service: any, requestedItems: any[], trustedTa
     quantities.set(productId, (quantities.get(productId) || 0) + quantity);
   }
 
+  const entries = [...quantities.entries()];
+  const savedItems = entries.map(([productId]) =>
+    trustedTableItems?.find((item: any) => item.product_id === productId));
+  const products = await Promise.all(entries.map(([productId], index) =>
+    savedItems[index] || service.entities.Product.get(productId)));
+
   const normalizedItems = [];
-  for (const [productId, quantity] of quantities.entries()) {
-    const savedItem = trustedTableItems?.find((item: any) => item.product_id === productId);
-    const product = savedItem || await service.entities.Product.get(productId);
+  for (const [index, [productId, quantity]] of entries.entries()) {
+    const savedItem = savedItems[index];
+    const product = products[index];
     if (!product || (!savedItem && (product.active === false || product.archived === true))) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
     }
@@ -71,11 +77,14 @@ async function stockPolicy(service: any) {
 async function planSaleStock(service: any, shopId: string, items: any[]) {
   const plans = [];
   const shortages = [];
-  for (const item of items.filter((row) => row.stock_tracked)) {
-    const rows = await service.entities.ProductStock.filter({
+  const trackedItems = items.filter((row) => row.stock_tracked);
+  const stockRows = await Promise.all(trackedItems.map((item) =>
+    service.entities.ProductStock.filter({
       location_id: shopId,
       product_id: item.product_id,
-    });
+    })));
+  for (const [index, item] of trackedItems.entries()) {
+    const rows = stockRows[index];
     if ((rows || []).length > 1) {
       throw httpError(`${item.product_name} uchun takroriy ombor qoldig‘i topildi.`, 409);
     }
@@ -742,8 +751,10 @@ export default async function(req) {
         }
         tableItems = order.items;
       }
-      const normalizedItems = await normalizeSaleItems(service, requestedItems, tableItems);
-      const allowNegativeStock = await stockPolicy(service);
+      const [normalizedItems, allowNegativeStock] = await Promise.all([
+        normalizeSaleItems(service, requestedItems, tableItems),
+        stockPolicy(service),
+      ]);
       const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
       if (shortages.length && !allowNegativeStock) {
         return Response.json({
