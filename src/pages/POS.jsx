@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
@@ -991,6 +991,12 @@ export default function POS() {
           </div>
         </div>
         <div className="flex-1" />
+        {!screenMode && <Button asChild variant="outline" size="sm"
+          className="inline-flex h-10 w-10 lg:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 lg:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
+          <a href="/pos?screen=1" target="_blank" rel="noopener noreferrer" aria-label="Ekranlar — kassani yangi oynada ochish" title="Ekranlar">
+            <Monitor className="h-4 w-4 lg:mr-1.5" /> <span className="hidden lg:inline">Ekranlar</span>
+          </a>
+        </Button>}
         {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
           aria-label="Stollar sahifasini ochish"
           className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 sm:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
