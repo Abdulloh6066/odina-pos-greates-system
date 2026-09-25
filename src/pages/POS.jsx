@@ -14,6 +14,7 @@ import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
 import CategoryIcon from '@/components/CategoryIcon';
 import {
@@ -77,6 +78,7 @@ export default function POS() {
   const checkoutRecordedAtRef = useRef('');
   const [lastSale, setLastSale] = useState(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [staffTicketPrompt, setStaffTicketPrompt] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
 
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
@@ -1203,13 +1205,35 @@ export default function POS() {
         offline={checkoutOffline || (!isOnline && !selectedTable)}
       />
       <Receipt open={receiptOpen} sale={lastSale} settings={settings}
-        onStaffTicket={(sale) => { setReceiptOpen(false); setStaffTicket({ mode: 'sale', order: sale, autoPrint: true }); }}
+        onStaffTicket={(sale) => { setReceiptOpen(false); setStaffTicketPrompt(sale); }}
         onClose={() => {
         setReceiptOpen(false);
         if (selectedTable && !lastSale?.offline_pending) {
           navigate('/tables', { state: { shopId: lastSale?.shop_id || selectedTable.shopId } });
         }
       }} />
+      <Dialog open={!!staffTicketPrompt} onOpenChange={(open) => !open && setStaffTicketPrompt(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">
+              Olib ketish buyurtmasi uchun xizmat cheki kerakmi?
+            </DialogTitle>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => setStaffTicketPrompt(null)}
+              className="min-h-11 flex-1">
+              Yo‘q
+            </Button>
+            <Button type="button" onClick={() => {
+              const sale = staffTicketPrompt;
+              setStaffTicketPrompt(null);
+              setStaffTicket({ mode: 'sale', order: sale, autoPrint: true });
+            }} className="min-h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary-strong">
+              Chop etish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <StaffOrderTicketModal open={!!staffTicket} onClose={() => setStaffTicket(null)}
         mode={staffTicket?.mode} order={staffTicket?.order} shop={staffTicket?.shop}
         shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} autoPrint={staffTicket?.autoPrint} />
