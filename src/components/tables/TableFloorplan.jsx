@@ -35,6 +35,7 @@ export default function TableFloorplan({
   onOpen,
   onEditingChange,
   selectedViewNumber = null,
+  pickerOnly = false,
 }) {
   const defaultLayout = useMemo(
     () => buildTableLayout(shop.table_count, shop.layout),
@@ -409,9 +410,9 @@ export default function TableFloorplan({
   const verticalWall = streetSide === 'left' || streetSide === 'right';
 
   return (
-    <section aria-label={`${shop.name} stollar xaritasi`} className="rounded-[28px] border border-border bg-card premium-shadow p-4 sm:p-6 space-y-4">
+    <section aria-label={`${shop.name} stollar xaritasi`} className={pickerOnly ? 'space-y-2' : 'rounded-[28px] border border-border bg-card premium-shadow p-4 sm:p-6 space-y-4'}>
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      {!pickerOnly && <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-olive/15 text-brand-ink">
             <Armchair className="h-5 w-5" />
@@ -460,10 +461,10 @@ export default function TableFloorplan({
             </Button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Real-time Floorplan Status in View Mode */}
-      {!editing && (
+      {!pickerOnly && !editing && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Zal holati">
           <div className="rounded-xl border border-border bg-[#fbf8f0] p-3">
             <p className="text-[11px] text-muted-foreground">Bo‘sh</p>
@@ -727,7 +728,7 @@ export default function TableFloorplan({
       {editing && !validateTableLayout(shop.table_count, layout) && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Stollar joylashuvi mos emas: ustma-ust tushgan stollarni ajrating yoki kichraytiring.</p>}
 
       {/* Areas Indicator */}
-      <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Xarita hududlari">
+      {!pickerOnly && <div className="flex flex-wrap items-center gap-2 text-xs" aria-label="Xarita hududlari">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-sand/60 bg-[#fbf6eb] px-3 py-2 font-semibold text-brand-ink">
           <Building2 className="h-4 w-4" aria-hidden="true" /> Do‘kon ichi · {indoorCount} stol
         </span>
@@ -742,7 +743,7 @@ export default function TableFloorplan({
         <span className="w-full text-[11px] text-muted-foreground">
           {outdoorPolygon.length ? 'Ko‘cha va do‘kon zali belgilangan. Stollar erkin harakatlanadi.' : 'Ko‘cha hali belgilanmagan. «Xaritani tahrirlash» → «Ko‘cha hududini chizish» orqali tanlang.'}
         </span>
-      </div>
+      </div>}
 
       {/* Big Map Board (Free Open Space without trapping green border) */}
       <div className="rounded-2xl border border-border/80 bg-[#f4f1e8] p-1.5 sm:p-2 shadow-inner">
@@ -1259,7 +1260,7 @@ export default function TableFloorplan({
       )}
 
       {/* Footer Legend */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
+      {!pickerOnly && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <Armchair className="h-4 w-4 text-brand-ink" /> Stol {editing ? '— surib joylashtiring' : '— Bo‘sh / Band / To‘lov holati'}
         </span>
@@ -1273,7 +1274,7 @@ export default function TableFloorplan({
           {editing ? <Save className="h-4 w-4" /> : <MousePointer2 className="h-4 w-4" />}{' '}
           {editing ? 'Saqlash bosilmaguncha o‘zgarmaydi' : 'Buyurtma to‘lovgacha stolda qoladi · bron keyingi bosqichda'}
         </span>
-      </div>
+      </div>}
     </section>
   );
 }
