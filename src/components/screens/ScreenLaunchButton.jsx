@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
  * Kassa, Ombor and Ishlab chiqarish can stay open in separate tabs at once.
  */
 export default function ScreenLaunchButton({ to, label, icon: Icon, active, onAfterOpen, blocked, onBlocked, onClear }) {
-  const url = `${window.location.origin}${to}`;
+  const url = new URL(to, 'https://odinatort.uz').href;
 
   const handleOpen = (e) => {
     e.preventDefault();
