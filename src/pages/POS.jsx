@@ -76,8 +76,7 @@ export default function POS() {
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
   const checkoutRecordedAtRef = useRef('');
-  const [lastSale, setLastSale] = useState(null);
-  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptPrintSale, setReceiptPrintSale] = useState(null);
   const [staffTicketPrompt, setStaffTicketPrompt] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
 
@@ -721,18 +720,30 @@ export default function POS() {
     }
   }, [selectedTable, tableOrderLoading, tableOrder?.id, tableOrder?.state, cart.length, location.search]);
 
-  const finishQueuedSale = (record) => {
-    setLastSale(record.local_sale);
+  const finishSalePresentation = (sale) => {
+    setReceiptPrintSale(null);
+    if (sale?.items?.length && !sale?.table_number_snapshot) {
+      setStaffTicketPrompt(sale);
+    } else if (selectedTable && !sale?.offline_pending) {
+      navigate('/tables', { state: { shopId: sale?.shop_id || selectedTable.shopId } });
+    }
+  };
+
+  const presentCompletedSale = (sale, printReceipt) => {
+    if (printReceipt) setReceiptPrintSale(sale);
+    else finishSalePresentation(sale);
+  };
+
+  const finishQueuedSale = (record, printReceipt) => {
     setPayOpen(false);
-    setReceiptOpen(true);
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
     resetCart();
+    presentCompletedSale(record.local_sale, printReceipt);
   };
 
-  const applyCompletedSale = (payload) => {
-    setLastSale(payload.sale);
+  const applyCompletedSale = (payload, printReceipt) => {
     if (payload.shift) setShift(payload.shift);
     if (payload.stock_updates?.length) {
       const updatedByProduct = Object.fromEntries(payload.stock_updates.map((item) => [item.product_id, item.quantity]));
@@ -754,12 +765,12 @@ export default function POS() {
       });
     }
     setPayOpen(false);
-    setReceiptOpen(true);
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
     resetCart();
     setTableOrder(null);
+    presentCompletedSale(payload.sale, printReceipt);
     if (payload.table_released === false) {
       void odinaAlert('Savdo yozildi, lekin stolni bo‘shatish tasdiqlanmadi. Qayta pul olmang! Stollar xaritasida «To‘lovni tekshirish» orqali yakunlang.');
     }
@@ -768,7 +779,7 @@ export default function POS() {
       .catch(() => {});
   };
 
-  const completeSale = async (payments) => {
+  const completeSale = async (payments, printReceipt = true) => {
     setPaying(true);
     const idempotencyKey = checkoutRequestKeyRef.current || createSaleIdempotencyKey();
     checkoutRequestKeyRef.current = idempotencyKey;
@@ -798,7 +809,7 @@ export default function POS() {
           throw new Error('Chegirmali savdoni offline saqlab bo‘lmaydi. Internetni kuting.');
         }
         await enqueueOfflineSale(pendingRecord);
-        finishQueuedSale(pendingRecord);
+        finishQueuedSale(pendingRecord, printReceipt);
         return;
       }
 
@@ -824,11 +835,11 @@ export default function POS() {
         const result = await base44.functions.invoke('complete-sale', request);
         const payload = result?.data || result;
         if (!payload?.sale) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
-        applyCompletedSale(payload);
+        applyCompletedSale(payload, printReceipt);
       } catch (error) {
         if (!pendingRecord || !isRetryableSyncError(error)) throw error;
         await enqueueOfflineSale(pendingRecord);
-        finishQueuedSale(pendingRecord);
+        finishQueuedSale(pendingRecord, printReceipt);
       }
     } catch (error) {
       const message = syncErrorMessage(error);
@@ -1204,14 +1215,12 @@ export default function POS() {
         loading={paying}
         offline={checkoutOffline || (!isOnline && !selectedTable)}
       />
-      <Receipt open={receiptOpen} sale={lastSale} settings={settings}
-        onStaffTicket={(sale) => { setReceiptOpen(false); setStaffTicketPrompt(sale); }}
-        onClose={() => {
-        setReceiptOpen(false);
-        if (selectedTable && !lastSale?.offline_pending) {
-          navigate('/tables', { state: { shopId: lastSale?.shop_id || selectedTable.shopId } });
-        }
-      }} />
+      <Receipt
+        sale={receiptPrintSale}
+        settings={settings}
+        print={!!receiptPrintSale}
+        onAfterPrint={finishSalePresentation}
+      />
       <Dialog open={!!staffTicketPrompt} onOpenChange={(open) => !open && setStaffTicketPrompt(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
