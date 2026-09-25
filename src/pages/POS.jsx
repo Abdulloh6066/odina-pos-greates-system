@@ -11,6 +11,7 @@ import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
+import PosTablePicker from '@/components/tables/PosTablePicker';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -42,7 +43,8 @@ export default function POS() {
     if (!Number.isInteger(number) || number > 30) return { selected: null, invalid: true };
     return { selected: { shopId, number }, invalid: false };
   }, [location.search]);
-  const selectedTable = screenMode ? null : tableQuery.selected;
+  const selectedTable = tableQuery.selected;
+  const posHomePath = screenMode ? '/pos?screen=1' : '/pos';
   const tableKey = selectedTable ? `${selectedTable.shopId}:${selectedTable.number}` : '';
   const priorTableKey = useRef(tableKey);
   const lastSavedOrderRef = useRef(null);
@@ -89,6 +91,7 @@ export default function POS() {
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
   const [tableOrderLoading, setTableOrderLoading] = useState(false);
   const [tableOrderError, setTableOrderError] = useState('');
@@ -128,7 +131,7 @@ export default function POS() {
       setDiscountPct(0);
       setRoundingTarget(null);
       setAdjustmentMode(null);
-      navigate('/pos', { replace: true });
+      navigate(posHomePath, { replace: true });
     }
   }, [shift?.shop_id, user?.shop_id, selectedTable?.shopId]);
 
@@ -380,7 +383,7 @@ export default function POS() {
     setRoundingTarget(null);
     setAdjustmentMode(null);
     setMobileCartOpen(false);
-    navigate('/pos', { replace: true });
+    navigate(posHomePath, { replace: true });
   };
 
   // This button finishes only the unpaid order's SAVE, never its payment.
@@ -401,12 +404,12 @@ export default function POS() {
     setShowFav(false);
     setSearch('');
     setMobileCartOpen(false);
-    navigate('/pos', { replace: true, state: { savedTableNumber: savedNumber, savedShopId } });
+    navigate(posHomePath, { replace: true, state: { savedTableNumber: savedNumber, savedShopId } });
     setStaffTicket({ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber });
   };
 
   const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
-  const tableSelectionError = tableQuery.invalid && !screenMode
+  const tableSelectionError = tableQuery.invalid
     ? 'Stol havolasi noto‘g‘ri. Xaritadan qayta tanlang.'
     : selectedTable && !loadingData && (!tableShop
       || !Number.isInteger(tableShop.restaurant_table_count)
