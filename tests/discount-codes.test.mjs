@@ -236,6 +236,27 @@ const tablePayment = (key = 'restaurant-checkout-key-00001') => ({
   idempotency_key: key, recorded_at: '2026-09-11T20:30:00.000Z',
 });
 
+test('Bank card and Online split payment records both methods and the correct shift totals', async () => {
+  const f = fixture(5);
+  setupUnpaidTable(f);
+  const call = loadHandler(f.client);
+  const paid = await call({
+    ...tablePayment('bank-card-online-split-00001'),
+    payments: [
+      { method: 'bank_card', amount: 60000 },
+      { method: 'online', amount: 40000 },
+    ],
+  });
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.deepEqual(f.db.Payment.map(({ method, amount }) => ({ method, amount })), [
+    { method: 'bank_card', amount: 60000 },
+    { method: 'online', amount: 40000 },
+  ]);
+  assert.equal(f.db.Shift[0].uzcard_sales, 60000);
+  assert.equal(f.db.Shift[0].online_sales, 40000);
+  assert.equal(f.db.Shift[0].cash_sales, 0);
+});
+
 test('restaurant customer stays unpaid until one final checkout; retry cannot charge twice', async () => {
   const f = fixture(5);
   setupUnpaidTable(f);

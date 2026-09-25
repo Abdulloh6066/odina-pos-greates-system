@@ -157,6 +157,31 @@ const baseOrder = (overrides = {}) => ({
   ...overrides,
 });
 
+test('new Bank card advance and Online balance keep order and shift accounting accurate', async () => {
+  const f = fixture();
+  const call = loadHandler(harness(f.db));
+  const created = await call(baseOrder({
+    advance_payment: { method: 'bank_card', amount: 300000 },
+  }));
+  assert.equal(created.status, 200, JSON.stringify(created));
+  assert.equal(f.db.OrderPayment[0].payment_method, 'bank_card');
+  assert.equal(f.db.Shift[0].uzcard_sales, 300000);
+  const remaining = created.data.order.remaining_balance;
+  const paid = await call({
+    action: 'record_payment',
+    order_id: created.data.order.id,
+    method: 'online',
+    amount: remaining,
+    payment_kind: 'balance',
+    idempotency_key: 'online-balance-00001',
+  });
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.equal(f.db.OrderPayment[1].payment_method, 'online');
+  assert.equal(f.db.Shift[0].online_sales, remaining);
+  assert.equal(f.db.Shift[0].cash_sales, 0);
+  assert.equal(f.db.CustomerOrder[0].payment_status, 'paid');
+});
+
 test('multiple products in one order', async () => {
   const f = fixture();
   const call = loadHandler(harness(f.db));
