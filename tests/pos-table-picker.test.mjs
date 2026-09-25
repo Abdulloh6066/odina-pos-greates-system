@@ -79,7 +79,7 @@ test('saving an unpaid table returns to clean POS only after server confirmation
   assert.match(action, /resetCart\(\)/);
   assert.match(action, /setTableOrder\(null\)/);
   assert.match(action, /setMobileCartOpen\(false\)/);
-  assert.match(action, /navigate\('\/pos', \{ replace: true, state: \{ savedTableNumber: savedNumber, savedShopId \} \}\)/);
+  assert.match(action, /navigate\(posHomePath, \{ replace: true, state: \{ savedTableNumber: savedNumber, savedShopId \} \}\)/);
   assert.match(action, /setStaffTicket\(\{ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber \}\)/);
   assert.ok(action.indexOf('await saveTableOrder()') < action.indexOf('resetCart()'));
   assert.match(cart, /tableDirty \? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'/);
@@ -108,6 +108,7 @@ const exerciseFastSave = async ({ dirty = true, order = { id: 'mock-order', stat
     setShowFav: () => events.push('reset-favorites'),
     setSearch: () => events.push('reset-search'),
     setMobileCartOpen: () => events.push('close-mobile-sheet'),
+    posHomePath: '/pos',
     navigate: (path, options) => events.push(`navigate:${path}:${options?.state?.savedTableNumber}`),
     setStaffTicket: (ticket) => events.push(`ticket:${ticket.mode}:${ticket.shopId}:${ticket.tableNumber}`),
   };
@@ -169,6 +170,7 @@ const exerciseCancelTable = async ({ dirty = false, confirmed = true } = {}) => 
     setRoundingTarget: () => events.push('clear-rounding'),
     setAdjustmentMode: () => events.push('clear-adjustment'),
     setMobileCartOpen: () => events.push('close-mobile-sheet'),
+    posHomePath: '/pos',
     navigate: (path, options) => events.push(`navigate:${path}:${options?.replace ? 'replace' : 'push'}`),
   };
   assert.ok(cancelAction.startsWith('const cancelTableSelection = async () => {'));
@@ -180,7 +182,7 @@ const exerciseCancelTable = async ({ dirty = false, confirmed = true } = {}) => 
 test('cashier can cancel selected table in Kassa via touch-friendly "Stolni bekor qilish" action without page reload', async () => {
   assert.match(pos, /Stolni bekor qilish/);
   assert.match(pos, /const cancelTableSelection = async \(\) =>/);
-  assert.match(pos, /navigate\('\/pos', \{ replace: true \}\)/);
+  assert.match(pos, /navigate\(posHomePath, \{ replace: true \}\)/);
   assert.match(read('src/components/pos/Cart.jsx'), /onCancelTable/);
   assert.match(read('src/components/pos/Cart.jsx'), /aria-label="Stolni bekor qilish"/);
 
@@ -204,7 +206,7 @@ test('cashier can cancel selected table in Kassa via touch-friendly "Stolni beko
 
 test('invalid table selection is automatically cleared if active shop changes', () => {
   assert.match(pos, /activeShopId && selectedTable\.shopId !== activeShopId/);
-  assert.match(pos, /navigate\('\/pos', \{ replace: true \}\)/);
+  assert.match(pos, /navigate\(posHomePath, \{ replace: true \}\)/);
 });
 
 test('central location and branch tables remain strictly isolated in backend and Stollar page', () => {
@@ -232,6 +234,6 @@ test('staff order ticket matches reference layout with table number, time, taker
   assert.doesNotMatch(ticketModal, /formatUZS/);
   assert.match(pos, /<StaffOrderTicketModal/);
   assert.match(tableSheet, /<StaffOrderTicketModal/);
-  assert.match(pos, /setStaffTicketModal/);
+  assert.match(pos, /setStaffTicket\(/);
 });
 
