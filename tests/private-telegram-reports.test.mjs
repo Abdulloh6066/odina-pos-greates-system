@@ -82,6 +82,19 @@ test('report isolates shop and date, aggregates payment methods and refunds via 
   assert.doesNotMatch(text, /800,000|999,999|Production|Odina Branch/);
   assert.match(text, /Bu sof foyda emas/);
 });
+test('Bank card and Online appear in the owner report without losing split payment totals', () => {
+  const plan = { kind:'report', chatId:owner, shopId:'center1', from:'2026-09-17', to:'2026-09-17', period:'today' };
+  const sales = [{
+    id:'new-payment', shop_id:'center1', business_date:'2026-09-17',
+    status:'completed', total:100000,
+    payments:[{method:'bank_card',amount:60000},{method:'online',amount:40000}],
+  }];
+  const text = report.renderPrivateReport(plan, shops, sales, []);
+  assert.match(text, /Bank card\/Uzcard: 60,000 so‘m/);
+  assert.match(text, /Online: 40,000 so‘m/);
+  assert.match(text, /Tushum: 100,000 so‘m/);
+});
+
 test('all-shop report totals only POS shops; no live network or writes exist in module', () => {
   const plan = { kind:'report', chatId:owner, shopId:'all', from:'2026-09-17', to:'2026-09-17', period:'today' };
   const sales = [
