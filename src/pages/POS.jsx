@@ -15,6 +15,7 @@ import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog'
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
+import CategoryIcon from '@/components/CategoryIcon';
 import {
   buildPendingSale,
   createSaleIdempotencyKey,
@@ -1052,8 +1053,8 @@ export default function POS() {
                 type="button"
                 variant="outline"
                 className="min-h-11 rounded-xl border-brand-olive/50 bg-card text-brand-ink font-semibold touch-manipulation"
-                onClick={() => setStaffTicketModal({
-                  open: true,
+                onClick={() => setStaffTicket({
+                  mode: 'table',
                   shop: tableShop,
                   shopId: selectedTable.shopId,
                   tableNumber: selectedTable.number,
@@ -1095,7 +1096,7 @@ export default function POS() {
             <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
             <div className="h-px bg-border my-2 mx-3" />
             {categories.map((c) => (
-              <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<span className="text-base">{c.icon || '🍰'}</span>} label={c.name} />
+              <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<CategoryIcon icon={c.icon} className="text-base" imgClassName="w-5 h-5" />} label={c.name} />
             ))}
           </div>
 

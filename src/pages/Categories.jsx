@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import CategoryIcon from '@/components/CategoryIcon';
+import { TEA_ICON_URL } from '@/lib/category-icon';
 
-const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '🥤', '🍰', '🍪', '🍩', '🥧', '🍫', '🍓', '🍋', '🫐'];
+const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '🥤', '🍰', '🍪', '🍩', '🥧', '🍫', '🍓', '🍋', '🫐', '➕', TEA_ICON_URL];
 
 export default function Categories() {
   const { user } = useOutletContext();
@@ -61,7 +63,9 @@ export default function Categories() {
         <div className="grid sm:grid-cols-2 gap-3">
           {categories.map((c) => (
             <div key={c.id} className="odina-panel flex items-center gap-3 rounded-2xl bg-card border border-border premium-shadow p-4">
-              <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center text-xl">{c.icon || '🍰'}</div>
+              <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center text-xl overflow-hidden">
+                <CategoryIcon icon={c.icon} imgClassName="w-8 h-8" />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold truncate">{c.name}</div>
                 <div className="text-xs text-muted-foreground">{c.active ? 'Faol' : 'Nofaol'}</div>
@@ -119,7 +123,9 @@ function CategoryDialog({ open, category, onClose, onSaved, user }) {
             <Label className="text-xs mb-1.5 block">Belgi</Label>
             <div className="flex flex-wrap gap-2">
               {ICONS.map((ic) => (
-                <button key={ic} onClick={() => setIcon(ic)} className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${icon === ic ? 'bg-primary premium-shadow scale-105' : 'bg-secondary hover:bg-secondary/70'}`}>{ic}</button>
+                <button key={ic} onClick={() => setIcon(ic)} className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all overflow-hidden ${icon === ic ? 'bg-primary premium-shadow scale-105' : 'bg-secondary hover:bg-secondary/70'}`}>
+                  <CategoryIcon icon={ic} imgClassName="w-7 h-7" />
+                </button>
               ))}
             </div>
           </div>
