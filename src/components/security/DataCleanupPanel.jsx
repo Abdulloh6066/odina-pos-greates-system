@@ -33,7 +33,7 @@ export default function DataCleanupPanel() {
   };
 
   const clearPrelaunchSales = async () => {
-    const phrase = window.prompt('38 ta sotuv, 3 ta ochiq smena va ularga bog‘liq tarix o‘chiriladi. Mahsulot va qoldiqlar saqlanadi. SOTUVNI_TOZALASH deb yozing.');
+    const phrase = window.prompt('39 ta sotuv, 3 ta ochiq smena va ularga bog‘liq tarix o‘chiriladi. Mahsulot va qoldiqlar saqlanadi. SOTUVNI_TOZALASH deb yozing.');
     if (phrase !== 'SOTUVNI_TOZALASH') return;
     if (!window.confirm('Sotuv va smenalarni doimiy o‘chirishni tasdiqlaysizmi?')) return;
     setBusy(true);
