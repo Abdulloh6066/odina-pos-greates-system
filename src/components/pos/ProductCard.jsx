@@ -1,6 +1,5 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
-import { AlertTriangle } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 
 export default function ProductCard({ product, stockQuantity = null, onAdd, disabled = false }) {
@@ -30,19 +29,6 @@ export default function ProductCard({ product, stockQuantity = null, onAdd, disa
         <div className="odina-product-name text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</div>
         <div className="odina-product-meta">
           <span className="odina-product-price">{formatUZS(product.price)}</span>
-          {stockQuantity !== null && (
-            stockQuantity <= 0 ? (
-              <span
-                className="odina-product-stock odina-product-stock-zero"
-                aria-label={`Qoldiq ${stockQuantity}`}
-                title={`Qoldiq ${stockQuantity}`}
-              >
-                <AlertTriangle className="w-3 h-3" /> Q {stockQuantity}
-              </span>
-            ) : (
-              <span className="odina-product-stock">{stockQuantity} dona</span>
-            )
-          )}
         </div>
       </div>
     </button>
