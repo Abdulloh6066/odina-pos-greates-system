@@ -222,7 +222,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           >
             {loading
               ? 'Amalga oshirilmoqda…'
-              : `${offline ? 'Qurilmaga saqlash' : 'Yakunlash'} · ${formatUZS(total)}`}
+              : (offline ? 'Qurilmaga saqlash' : 'Yakunlash')}
           </Button>
         </div>
       </DialogContent>
