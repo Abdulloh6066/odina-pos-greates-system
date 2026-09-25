@@ -3,12 +3,8 @@ import { uzbekistanDateKey } from './uzbekistan-time.js';
 
 export const PAYMENT_METHODS = [
   { id: 'cash', label: 'Naqd pul', short: 'Naqd pul', group: 'cash' },
-  { id: 'uzcard', label: 'Uzcard', short: 'Uzcard', group: 'card' },
-  { id: 'humo', label: 'Humo', short: 'Humo', group: 'card' },
-  { id: 'click', label: 'Click', short: 'Click', group: 'online' },
-  { id: 'payme', label: 'Payme', short: 'Payme', group: 'online' },
-  { id: 'bank_transfer', label: 'Bank o‘tkazmasi', short: 'Bank', group: 'bank' },
-  { id: 'other', label: 'Boshqa onlayn', short: 'Other', group: 'online' },
+  { id: 'bank_card', label: 'Bank card', short: 'Bank card', group: 'card' },
+  { id: 'online', label: 'Online', short: 'Online', group: 'online' },
 ];
 
 export const ROLE_MENU = {
