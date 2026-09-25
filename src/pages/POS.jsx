@@ -993,7 +993,7 @@ export default function POS() {
         <div className="flex-1" />
         {!screenMode && <Button asChild variant="outline" size="sm"
           className="inline-flex h-10 w-10 lg:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 lg:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
-          <a href="https://odinatort.uz/pos?screen=1" target="_blank" rel="noopener noreferrer" aria-label="Ekranlar — kassani yangi oynada ochish" title="Ekranlar">
+          <a href={`${window.location.origin}/pos?screen=1`} target="_blank" rel="noopener noreferrer" aria-label="Ekranlar — kassani yangi oynada ochish" title="Ekranlar">
             <Monitor className="h-4 w-4 lg:mr-1.5" /> <span className="hidden lg:inline">Ekranlar</span>
           </a>
         </Button>}
