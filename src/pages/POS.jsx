@@ -787,6 +787,9 @@ export default function POS() {
   };
 
   const completeSale = async (payments, printReceipt = true) => {
+    // Close the payment dialog before the async request so a cleared cart can
+    // never leave a stale 0 UZS payment window on screen after a successful sale.
+    setPayOpen(false);
     setPaying(true);
     const idempotencyKey = checkoutRequestKeyRef.current || createSaleIdempotencyKey();
     checkoutRequestKeyRef.current = idempotencyKey;
@@ -849,9 +852,10 @@ export default function POS() {
         finishQueuedSale(pendingRecord, printReceipt);
       }
     } catch (error) {
+      setPayOpen(true);
       const message = syncErrorMessage(error);
       const discountHint = (discountCode || roundingTarget !== null || selectedTable) && isRetryableSyncError(error)
-        ? ' Natija noaniq bo‘lishi mumkin. To‘lov oynasini yopmang; aloqa qaytgach shu tugmani yana bosing. Avval Savdolar tarixini ham tekshiring.'
+        ? ' Natija noaniq bo‘lishi mumkin. To‘lov oynasi qayta ochildi; avval Savdolar tarixini tekshiring, keyin kerak bo‘lsa shu tugmani yana bosing.'
         : '';
       void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
     } finally {
