@@ -46,10 +46,10 @@ export function computeShopReport(
       const amt = Number(p.amount || 0) * sign;
       const method = String(p.method || "");
       if (method === "cash") payments.cash += amt;
-      else if (method === "uzcard") payments.uzcard += amt;
+      else if (method === "uzcard" || method === "bank_card") payments.uzcard += amt;
       else if (method === "humo") payments.humo += amt;
       else if (method === "bank_transfer") payments.bank_transfer += amt;
-      else if (method === "click" || method === "payme" || method === "other")
+      else if (method === "online" || method === "click" || method === "payme" || method === "other")
         payments.online += amt;
     }
   }
@@ -82,8 +82,8 @@ export const REPORT_HEADERS = [
   "Sotuv soni",
   "Qaytar soni",
   "Naqd",
-  "Uzcard",
-  "Humo",
+  "Bank card / Uzcard",
+  "Humo (old)",
   "Online",
   "Bank",
   "Yuborildi",

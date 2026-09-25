@@ -413,7 +413,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
   if (!shift) return null;
 
   const plastic = Number(shift.uzcard_sales || 0) + Number(shift.humo_sales || 0);
-  const online = Number(shift.online_sales || 0) + Number(shift.bank_transfer_sales || 0);
+  const online = Number(shift.online_sales || 0);
   const movementsTotal = (detail.movements || []).reduce(
     (sum, movement) => sum + Number(movement.amount || 0),
     0,
@@ -466,7 +466,8 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
                 <SummaryCard label="Jami savdo" value={formatUZS(shift.total_sales)} />
                 <SummaryCard label="Naqd savdo" value={formatUZS(shift.cash_sales)} />
                 <SummaryCard label="Bank card" value={formatUZS(plastic)} />
-                <SummaryCard label="Onlayn / bank" value={formatUZS(online)} />
+                <SummaryCard label="Online" value={formatUZS(online)} />
+                {Number(shift.bank_transfer_sales || 0) !== 0 && <SummaryCard label="Eski bank o‘tkazmalari" value={formatUZS(shift.bank_transfer_sales)} />}
                 <SummaryCard label="Kassadan berildi" value={formatUZS(shift.cash_removed || movementsTotal)} warn />
                 <SummaryCard label="Qaytarishlar" value={formatUZS(shift.refunds_total || refundsTotal)} danger />
               </div>

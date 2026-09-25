@@ -104,7 +104,7 @@ export function renderPrivateReport(plan: ReportPlan, allShops: Shop[], sales: a
   for (const shop of shops) {
     const metrics = computeShopReport(eligible.filter(s => s.shop_id === shop.id), bySale);
     lines.push("", `🏪 ${clean(shop.name)}`, `Tushum: ${uzs(metrics.revenue)}`, `Savdolar: ${metrics.saleCount} · Qaytarishlar: ${metrics.refundCount}`,
-      `Naqd: ${uzs(metrics.cash)} · Uzcard: ${uzs(metrics.uzcard)}`, `Humo: ${uzs(metrics.humo)} · Online: ${uzs(metrics.online)} · Bank: ${uzs(metrics.bank_transfer)}`,
+      `Naqd: ${uzs(metrics.cash)} · Bank card/Uzcard: ${uzs(metrics.uzcard)}`, `Humo (old): ${uzs(metrics.humo)} · Online: ${uzs(metrics.online)} · Bank: ${uzs(metrics.bank_transfer)}`,
       `Tushum − mahsulot tannarxi: ${uzs(metrics.realProfit)}`);
     for (const key of Object.keys(totals) as (keyof typeof totals)[]) totals[key] += metrics[key];
   }

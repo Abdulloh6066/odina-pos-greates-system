@@ -15,7 +15,7 @@ import { formatNum, tashkentDateKey } from '@/lib/pos';
 
 const CSV_HEADERS = [
   "Sana", "Do'kon", "Tushum (UZS)", "Tannarx (UZS)", "Real foyda (UZS)",
-  "Sotuv soni", "Qaytar soni", "Naqd", "Uzcard", "Humo", "Online", "Bank",
+  "Sotuv soni", "Qaytar soni", "Naqd", "Bank card / Uzcard", "Humo (old)", "Online", "Bank",
   "Yuborildi", "Yuborilgan vaqt",
 ];
 
@@ -57,8 +57,8 @@ const COLS = [
   { key: 'sale_count', label: 'Sotuv', num: true },
   { key: 'refund_count', label: 'Qaytar', num: true },
   { key: 'cash_total', label: 'Naqd', num: true },
-  { key: 'uzcard_total', label: 'Uzcard', num: true },
-  { key: 'humo_total', label: 'Humo', num: true },
+  { key: 'uzcard_total', label: 'Bank card / Uzcard', num: true },
+  { key: 'humo_total', label: 'Humo (old)', num: true },
   { key: 'online_total', label: 'Online', num: true },
   { key: 'bank_transfer_total', label: 'Bank', num: true },
 ];
