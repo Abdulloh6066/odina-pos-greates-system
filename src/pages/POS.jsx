@@ -641,6 +641,13 @@ export default function POS() {
       return;
     }
     if (!cart.length || stockChecking || offlineSyncing || tableLocked) return;
+    if (total <= 0 && !(discountPct === 100 && subtotal > 0)) {
+      await odinaAlert('To‘lov summasi 0 UZS. Mahsulot narxini yoki savatni tekshiring.', {
+        title: 'Savdoni yakunlab bo‘lmaydi',
+        tone: 'danger',
+      });
+      return;
+    }
     if (selectedTable && (tableCartDirty || !tableOrder?.id) && !(await saveTableOrder())) return;
 
     setStockChecking(true);
@@ -692,11 +699,11 @@ export default function POS() {
   };
 
   const closePayment = () => {
+    setPayOpen(false);
     if (paying) return;
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
     setCheckoutOffline(false);
-    setPayOpen(false);
   };
 
   const autoPayProcessedRef = useRef(false);
@@ -1214,6 +1221,7 @@ export default function POS() {
         onConfirm={completeSale}
         loading={paying}
         offline={checkoutOffline || (!isOnline && !selectedTable)}
+        fullDiscount={discountPct === 100 && subtotal > 0 && total === 0}
       />
       <Receipt
         sale={receiptPrintSale}
