@@ -495,8 +495,12 @@ export default function POS() {
       const q = search.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q));
     }
+    const activeCategory = categories.find((c) => c.id === activeCat);
+    if (activeCategory?.name?.trim().toLowerCase() === 'tortlar') {
+      list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
     return list;
-  }, [products, activeCat, showFav, search]);
+  }, [products, categories, activeCat, showFav, search]);
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id),
