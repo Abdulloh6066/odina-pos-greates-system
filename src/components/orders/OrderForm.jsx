@@ -426,7 +426,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
             {form.useAdvance && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <OdinaSelect value={form.advance_method} onChange={(e) => update({ advance_method: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
-                  {PAYMENT_METHODS.filter((m) => m.id !== 'other').map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </OdinaSelect>
                 <Input type="number" min="0" value={form.advance_amount} onChange={(e) => update({ advance_amount: Number(e.target.value) })} placeholder="Summa" />
               </div>

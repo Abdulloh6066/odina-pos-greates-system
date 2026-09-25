@@ -20,6 +20,8 @@
       "type": "string",
       "enum": [
         "cash",
+        "bank_card",
+        "online",
         "uzcard",
         "humo",
         "click",

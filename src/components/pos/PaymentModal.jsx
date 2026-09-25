@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Plus, X, Check, CreditCard, Smartphone, Landmark, Banknote, ReceiptText } from 'lucide-react';
+import { Plus, X, Check, CreditCard, Smartphone, Banknote, ReceiptText } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
 export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false }) {
@@ -48,7 +48,6 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     if (method.id === 'cash') return Banknote;
     if (method.group === 'card') return CreditCard;
     if (method.group === 'online') return Smartphone;
-    if (method.group === 'bank') return Landmark;
     return CreditCard;
   };
 

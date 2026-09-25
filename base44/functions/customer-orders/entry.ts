@@ -9,7 +9,7 @@ import { ensureCustomer } from "../../shared/customer-helpers.ts";
 const ORDER_RUNTIME_VERSION = "customer-orders-v3-2026-09-13";
 
 const PAYMENT_METHODS = new Set([
-  "cash", "uzcard", "humo", "click", "payme", "bank_transfer", "other",
+  "cash", "bank_card", "online", "uzcard", "humo", "click", "payme", "bank_transfer", "other",
 ]);
 const ORDER_TYPES = new Set(["toy_va_bazmlar", "tugilgan_kun_va_boshqa"]);
 const PAYMENT_KINDS = new Set(["advance", "balance", "additional"]);
@@ -38,10 +38,10 @@ function tashkentStamp(): string {
 
 function methodToShiftField(method: string): string | null {
   if (method === "cash") return "cash_sales";
-  if (method === "uzcard") return "uzcard_sales";
+  if (method === "uzcard" || method === "bank_card") return "uzcard_sales";
   if (method === "humo") return "humo_sales";
   if (method === "bank_transfer") return "bank_transfer_sales";
-  if (["click", "payme", "other"].includes(method)) return "online_sales";
+  if (["online", "click", "payme", "other"].includes(method)) return "online_sales";
   return null;
 }
 
