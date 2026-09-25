@@ -3,19 +3,22 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, X, Check, CreditCard, Smartphone, Landmark, Banknote } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, X, Check, CreditCard, Smartphone, Landmark, Banknote, ReceiptText } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
 export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
+  const [printReceipt, setPrintReceipt] = useState(true);
 
   useEffect(() => {
     if (open) {
       setPayments(total > 0 ? [{ method: 'cash', amount: total }] : []);
       setError('');
       setShowMethodPicker(false);
+      setPrintReceipt(true);
     }
   }, [open, total]);
 
@@ -53,7 +56,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
   const handleConfirm = () => {
     if (total <= 0) {
-      onConfirm([]);
+      onConfirm([], printReceipt);
       return;
     }
     const valid = payments.filter((p) => Number(p.amount) > 0);
@@ -64,7 +67,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
       setError(`Jami ${formatUZS(total)}, to‘lovlar esa ${formatUZS(sum)}. Farq: ${formatUZS(Math.abs(sum - total))}.`);
       return;
     }
-    onConfirm(valid.map((p) => ({ method: p.method, amount: Number(p.amount) })));
+    onConfirm(valid.map((p) => ({ method: p.method, amount: Number(p.amount) })), printReceipt);
   };
 
   return (
@@ -187,7 +190,19 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
         {error && <p className="text-sm text-destructive mt-2">{error}</p>}
 
-        <DialogFooter className="mt-4 gap-2">
+        <DialogFooter className="mt-4 flex-row flex-wrap items-center gap-2">
+          <div className="mr-auto flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-2.5">
+            <ReceiptText className="h-4 w-4 text-brand-ink" aria-hidden="true" />
+            <label htmlFor="print-receipt" className="cursor-pointer text-sm font-semibold">Chek</label>
+            <Switch
+              id="print-receipt"
+              checked={printReceipt}
+              onCheckedChange={setPrintReceipt}
+              disabled={loading}
+              aria-label="Savdo chekini chop etish"
+            />
+            <span className="w-7 text-xs font-bold text-muted-foreground">{printReceipt ? 'ON' : 'OFF'}</span>
+          </div>
           <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
           <Button onClick={handleConfirm} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             {loading
