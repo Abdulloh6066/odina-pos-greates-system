@@ -26,9 +26,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 
 const ACCOUNTS = [
   { id: "cash", label: "Naqd pul", icon: Banknote, tone: "bg-emerald-50 text-emerald-700" },
-  { id: "uzcard", label: "Uzcard", icon: CreditCard, tone: "bg-blue-50 text-blue-700" },
+  { id: "uzcard", label: "Bank card", icon: CreditCard, tone: "bg-blue-50 text-blue-700" },
   { id: "humo", label: "Humo", icon: WalletCards, tone: "bg-violet-50 text-violet-700" },
-  { id: "online", label: "Onlayn", icon: Smartphone, tone: "bg-amber-50 text-amber-700" },
+  { id: "online", label: "Online", icon: Smartphone, tone: "bg-amber-50 text-amber-700" },
   { id: "bank", label: "Bank", icon: Landmark, tone: "bg-slate-100 text-slate-700" },
 ];
 

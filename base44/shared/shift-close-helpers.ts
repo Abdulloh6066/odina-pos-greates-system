@@ -288,9 +288,9 @@ export async function cleanupShiftStockSnapshots(service: any, shiftId: string) 
 
 export const BUDGET_ACCOUNT_LABELS: Record<string, string> = {
   cash: "Naqd pul",
-  uzcard: "Uzcard",
+  uzcard: "Bank card",
   humo: "Humo",
-  online: "Onlayn",
+  online: "Online",
   bank: "Bank",
 };
 

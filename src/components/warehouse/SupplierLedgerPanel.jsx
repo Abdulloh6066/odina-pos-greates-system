@@ -787,9 +787,9 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
             className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
           >
             <option value="cash">Naqd pul · {formatUZS(balances.cash || 0)}</option>
-            <option value="uzcard">Uzcard · {formatUZS(balances.uzcard || 0)}</option>
+            <option value="uzcard">Bank card · {formatUZS(balances.uzcard || 0)}</option>
             <option value="humo">Humo · {formatUZS(balances.humo || 0)}</option>
-            <option value="online">Onlayn · {formatUZS(balances.online || 0)}</option>
+            <option value="online">Online · {formatUZS(balances.online || 0)}</option>
             <option value="bank">Bank · {formatUZS(balances.bank || 0)}</option>
           </OdinaSelect>
         </div>
