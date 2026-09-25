@@ -345,7 +345,7 @@ export default function POS() {
   // The operational floor plan has its own /tables page. Never discard a
   // table's unsaved edits when navigating away; keep an ordinary unsaved cart.
   const goToTables = async () => {
-    if (screenMode || savingTableRef.current || paying || payOpen || stockChecking || tableOrderLoading) return;
+    if (savingTableRef.current || paying || payOpen || stockChecking || tableOrderLoading) return;
     if (selectedTable && tableOrderError) {
       void odinaAlert('Stol buyurtmasi yuklanmagan. Avval buyurtmani yangilang; saqlanmagan mahsulotlar yo‘qolmasligi kerak.');
       return;
@@ -1018,11 +1018,11 @@ export default function POS() {
             <Monitor className="h-4 w-4 lg:mr-1.5" /> <span className="hidden lg:inline">Ekranlar</span>
           </a>
         </Button>}
-        {!screenMode && <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
+        <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
           aria-label="Stollar sahifasini ochish"
           className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 sm:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <Armchair className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Stollar</span>
-        </Button>}
+        </Button>
         {shift ? (
           <>
             <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
