@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Plus, X, Check, CreditCard, Smartphone, Landmark, Banknote, ReceiptText } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
-export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false }) {
+export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
@@ -56,6 +56,10 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
   const handleConfirm = () => {
     if (total <= 0) {
+      if (!fullDiscount) {
+        setError('To‘lov summasi 0 UZS. Mahsulot narxini yoki savatni tekshiring.');
+        return;
+      }
       onConfirm([], printReceipt);
       return;
     }
@@ -72,7 +76,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">To‘lov</DialogTitle>
         </DialogHeader>
@@ -82,10 +86,15 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
 
-        {total <= 0 && (
+        {total <= 0 && fullDiscount && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-700 flex items-center gap-2">
             <Check className="w-5 h-5 shrink-0" />
-            100% chegirma qo‘llandi — to‘lov talab qilinmaydi.
+            Tasdiqlangan 100% chegirma — to‘lov talab qilinmaydi.
+          </div>
+        )}
+        {total <= 0 && !fullDiscount && (
+          <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm font-medium text-red-800">
+            To‘lov summasi 0 UZS. Savdoni yakunlashdan oldin mahsulot narxini yoki savatni tekshiring.
           </div>
         )}
 
@@ -190,10 +199,10 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
         {error && <p className="text-sm text-destructive mt-2">{error}</p>}
 
-        <DialogFooter className="mt-4 flex-row flex-wrap items-center gap-2">
-          <div className="mr-auto flex min-h-10 items-center gap-2 rounded-xl border border-border bg-card px-2.5">
+        <div className="mt-4 grid grid-cols-2 items-center gap-2 border-t border-border pt-4 sm:grid-cols-[max-content_max-content_minmax(0,1fr)]">
+          <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
             <ReceiptText className="h-4 w-4 text-brand-ink" aria-hidden="true" />
-            <label htmlFor="print-receipt" className="cursor-pointer text-sm font-semibold">Chek</label>
+            <label htmlFor="print-receipt" className="cursor-pointer whitespace-nowrap text-sm font-semibold">Chek chiqarish</label>
             <Switch
               id="print-receipt"
               checked={printReceipt}
@@ -201,15 +210,21 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
               disabled={loading}
               aria-label="Savdo chekini chop etish"
             />
-            <span className="w-7 text-xs font-bold text-muted-foreground">{printReceipt ? 'ON' : 'OFF'}</span>
+            <span className="w-7 text-xs font-bold text-muted-foreground">{printReceipt ? 'Ha' : 'Yo‘q'}</span>
           </div>
-          <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
-          <Button onClick={handleConfirm} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+          <Button variant="outline" onClick={onClose} disabled={loading} className="min-h-11 whitespace-nowrap">
+            Bekor qilish
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={loading || (total <= 0 && !fullDiscount)}
+            className="col-span-2 min-h-11 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary-strong sm:col-span-1"
+          >
             {loading
               ? 'Amalga oshirilmoqda…'
               : `${offline ? 'Qurilmaga saqlash' : 'Yakunlash'} · ${formatUZS(total)}`}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
