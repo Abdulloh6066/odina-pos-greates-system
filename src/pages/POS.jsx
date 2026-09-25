@@ -263,12 +263,29 @@ export default function POS() {
       'pishiriqlar': 4,
       'tortlar': 5,
     };
+    const activeCategories = (cats || []).filter((c) => c.active);
+    const normalizeCategoryName = (name) => String(name || '').trim().toLowerCase();
+    const categoryByName = new Map(activeCategories.map((c) => [normalizeCategoryName(c.name), c]));
+    const pairedCategories = {
+      'kofe/issiq&kofe/ice': 'kofe/ice',
+      'limonadlar&matcha/anchan': 'matcha anchan',
+      'milkshake&smuzi': 'smuzi',
+    };
+    const hiddenCategoryIds = new Set();
+    const displayCategories = activeCategories.map((category) => {
+      const paired = categoryByName.get(pairedCategories[normalizeCategoryName(category.name)]);
+      if (paired) hiddenCategoryIds.add(paired.id);
+      return {
+        ...category,
+        sourceCategoryIds: paired ? [category.id, paired.id] : [category.id],
+      };
+    });
     setCategories(
-      (cats || [])
-        .filter((c) => c.active)
+      displayCategories
+        .filter((c) => !hiddenCategoryIds.has(c.id))
         .sort((a, b) => {
-          const aName = String(a.name || '').trim().toLowerCase();
-          const bName = String(b.name || '').trim().toLowerCase();
+          const aName = normalizeCategoryName(a.name);
+          const bName = normalizeCategoryName(b.name);
           const aPriority = categoryPriority[aName] ?? 100;
           const bPriority = categoryPriority[bName] ?? 100;
           return aPriority - bPriority;
@@ -512,7 +529,11 @@ export default function POS() {
 
   const filtered = useMemo(() => {
     let list = products;
-    if (activeCat !== 'all') list = list.filter((p) => p.category_id === activeCat);
+    if (activeCat !== 'all') {
+      const selectedCategory = categories.find((c) => c.id === activeCat);
+      const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
+      list = list.filter((p) => sourceIds.includes(p.category_id));
+    }
     if (showFav) list = list.filter((p) => p.is_favorite);
     if (search.trim()) {
       const q = search.toLowerCase();
