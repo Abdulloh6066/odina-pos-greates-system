@@ -4,6 +4,7 @@ import { startReceiptPrint } from '@/lib/receipt-print-lifecycle';
 import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
+import odinaMark from '@/components/brand/odina-mark';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
 
 export default function Receipt({ sale, settings, print, onAfterPrint }) {
@@ -33,6 +34,7 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
   const receiptContent = (
     <div className="font-mono text-[12px] leading-relaxed text-foreground">
           <div className="text-center">
+            <img src={odinaMark} alt="Odina" width="72" height="72" style={{ display: 'block', margin: '0 auto 6px', objectFit: 'contain', filter: 'grayscale(1) contrast(2)' }} />
             <div className="font-display text-lg font-bold">{settings?.shop_name || 'Odina Shop'}</div>
             <div className="text-[11px] text-muted-foreground">{sale.shop_name || ''}</div>
             {Number.isInteger(sale.table_number_snapshot) && sale.table_number_snapshot > 0 && (
@@ -64,7 +66,7 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
           ))}
           <div className="border-t border-dashed border-border my-2" />
           <div className="text-center text-[12px] py-1">
-            {settings?.thank_you_message || 'Rahmat! Sizning tabassumingiz biz uchun juda muhim ❤️'}
+            {settings?.thank_you_message || 'Sizning tabassumingiz biz uchun muhim! ❤️'}
           </div>
           <div className="text-center text-[12px] leading-relaxed px-1 py-1 font-semibold">
             {receiptWishForSale(sale)}
