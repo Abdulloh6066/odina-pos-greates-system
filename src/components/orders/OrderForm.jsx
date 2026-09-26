@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Image } from '@/components/ui/image';
 import { Plus, Minus, Trash2, X, Loader2, Lock } from 'lucide-react';
 import ProductCombobox from '@/components/orders/ProductCombobox';
+import { priceForShop } from '@/lib/shop-pricing';
 import ReferenceImageField from '@/components/orders/ReferenceImageField';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -177,10 +178,14 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     return '';
   }, [composedDate, dateParts.day, form.required_time]);
   useEffect(() => { setForm((f) => ({ ...f, required_date: composedDate })); }, [composedDate]);
-  const subtotal = useMemo(() => items.reduce((sum, i) => {
-    const unit = i.production_unit === 'sheet' ? Number(i.sheet_price || 0) : Number(i.price || 0);
-    return sum + unit * i.quantity;
-  }, 0), [items]);
+  const currentShopId = isAdmin ? form.shop_id : user?.shop_id;
+  const pricedProducts = useMemo(() => products.map((p) => ({ ...p, price: priceForShop(p, currentShopId) })), [products, currentShopId]);
+  const currentItemPrice = (item) => {
+    if (item.production_unit === 'sheet') return Number(item.sheet_price || 0);
+    const product = products.find((p) => p.id === item.product_id);
+    return product ? priceForShop(product, currentShopId) : Number(item.price || 0);
+  };
+  const subtotal = items.reduce((sum, item) => sum + currentItemPrice(item) * item.quantity, 0);
 
   const deliveryFee = form.fulfilment_type === 'delivery' ? (isWedding ? 0 : Math.max(0, Number(form.delivery_fee || 0))) : 0;
   const adjustment = Number(form.adjustment_amount) || 0;
@@ -357,14 +362,14 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
               <span className="text-xs font-normal text-muted-foreground">{items.length} ta</span>
             </Label>
             <div className="mt-2">
-              <ProductCombobox products={products} onAdd={addFromCombobox} loading={loadingProducts} />
+              <ProductCombobox products={pricedProducts} onAdd={addFromCombobox} loading={loadingProducts} />
             </div>
 
             <div className="mt-3 space-y-2">
               {items.map((i) => {
                 const isSheet = i.production_unit === 'sheet';
                 const unit = isSheet ? 'varaq' : 'dona';
-                const unitPrice = isSheet ? i.sheet_price : i.price;
+                const unitPrice = currentItemPrice(i);
                 const pcs = isSheet ? (isWedding ? WEDDING_PCS : i.pieces_per_sheet) : 0;
                 return (
                   <div key={i.product_id} className="border border-border rounded-xl p-3 bg-secondary/30">
