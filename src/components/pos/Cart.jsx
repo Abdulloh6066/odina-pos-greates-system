@@ -72,10 +72,6 @@ export default function Cart({
       </div>
 
       <div className="odina-cart-summary border-t border-brand-sand/50 p-3 safe-bottom shrink-0 space-y-2.5 bg-card">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Oraliq summa</span>
-          <span className="font-medium text-foreground">{formatUZS(subtotal)}</span>
-        </div>
         {discount > 0 && (
           <div className="flex items-center justify-between text-sm text-brand-ink">
             <span>{discountCode ? `Chegirma (${discountCode})` : adjustmentMode === 'manual' ? 'Qaytib berish' : 'Yaxlitlash'}</span>
