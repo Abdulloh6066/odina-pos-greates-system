@@ -119,6 +119,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
               </OdinaSelect>
               <Input
                 type="number"
+                step={1000}
+                min={0}
                 value={p.amount}
                 onChange={(e) => updatePayment(idx, 'amount', e.target.value)}
                 className="w-32 h-10 text-right font-medium"
