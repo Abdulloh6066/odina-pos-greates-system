@@ -1,20 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
 
 const order = ['SaleItem', 'Payment', 'Refund', 'CashMovement', 'StockMovement',
   'ShiftProductSnapshot', 'Sale', 'Shift', 'DailyShopReport', 'BudgetTransaction'];
 
-async function hash(rows) {
-  const ids = rows.map((row) => row.id).sort().join('\n');
-  const bytes = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(ids));
-  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function fixture({ extraSale = false } = {}) {
+function fixture({ extraSale = false, partiallyDeleted = false } = {}) {
   const db = {
     SaleItem: [{ id: 'item', sale_id: 'sale' }],
     Payment: [{ id: 'pay', sale_id: 'sale' }],
@@ -41,8 +34,11 @@ async function fixture({ extraSale = false } = {}) {
     Category: [{ id: 'category' }],
     ActionHistory: [],
   };
-  const expected = {};
-  for (const name of order) expected[name] = [db[name].length, await hash(db[name])];
+  const allowed = Object.fromEntries(order.map((name) => [name, db[name].map((row) => row.id)]));
+  if (partiallyDeleted) {
+    db.SaleItem = [];
+    db.Payment = [];
+  }
   if (extraSale) db.Sale.push({ id: 'new-sale', shift_id: 'shift' });
   const deleted = [];
   const entities = Object.fromEntries(Object.keys(db).map((name) => [name, {
@@ -67,12 +63,12 @@ async function fixture({ extraSale = false } = {}) {
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{ resolveStoredAppUser, userRole \} from "\.\.\/\.\.\/shared\/user-helpers\.ts";/,
       'const resolveStoredAppUser = async () => ({ id: "admin", role: "admin", active: true }); const userRole = () => "admin";')
-    .replace(/const EXPECTED: Record<string, \[number, string\]> = \{[\s\S]*?\};/,
-      'const EXPECTED = ' + JSON.stringify(expected) + ';');
+    .replace(/const ALLOWED_IDS: Record<string, string\[]> = \{[\s\S]*?\};/,
+      'const ALLOWED_IDS = ' + JSON.stringify(allowed) + ';');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
   vm.runInNewContext(code, {
-    client, Deno: { serve: (fn) => { handler = fn; } }, Response, crypto: webcrypto,
-    TextEncoder, Date, Set, Number, String, Object, Array,
+    client, Deno: { serve: (fn) => { handler = fn; } }, Response,
+    Date, Set, Number, String, Object, Array,
   });
   const invoke = async () => {
     const response = await handler({ method: 'POST', json: async () => ({
@@ -83,10 +79,15 @@ async function fixture({ extraSale = false } = {}) {
   return { db, deleted, invoke };
 }
 
-test('prelaunch reset deletes only archived sales and shifts; restores pre-deposit balances', async () => {
-  const { db, deleted, invoke } = await fixture();
-  const { data } = await invoke();
-  assert.equal(data.ok, true);
+test('partial prelaunch reset resumes only archived rows and retains catalog and stock', async () => {
+  const { db, deleted, invoke } = fixture({ partiallyDeleted: true });
+  let result;
+  for (let i = 0; i < 20; i += 1) {
+    result = await invoke();
+    assert.equal(result.data.ok, true, JSON.stringify(result));
+    if (result.data.done) break;
+  }
+  assert.equal(result.data.done, true);
   for (const name of order) assert.equal(db[name].length, 0, name);
   assert.deepEqual(db.Product, [{ id: 'product' }]);
   assert.deepEqual(db.ProductStock, [{ id: 'stock', quantity: 7 }]);
@@ -97,8 +98,8 @@ test('prelaunch reset deletes only archived sales and shifts; restores pre-depos
   assert.equal(db.ActionHistory.length, 1);
 });
 
-test('a new sale stops reset before any deletion or budget update', async () => {
-  const { db, deleted, invoke } = await fixture({ extraSale: true });
+test('a new sale stops resumed reset before any further deletion', async () => {
+  const { db, deleted, invoke } = fixture({ extraSale: true, partiallyDeleted: true });
   const { status, data } = await invoke();
   assert.equal(status, 409);
   assert.match(data.error, /Sale/);
