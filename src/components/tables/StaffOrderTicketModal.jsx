@@ -223,7 +223,7 @@ export default function StaffOrderTicketModal({
                 {item.product_name}
               </span>
               <span className={`font-black text-black tabular-nums shrink-0 ${isPrint ? 'text-[15px]' : 'text-xl'}`}>
-                {item.quantity}
+                {item.quantity}{item.sale_unit === 'gram' ? ' g' : ''}
               </span>
             </div>
             {Boolean(item.variant_name) && (
