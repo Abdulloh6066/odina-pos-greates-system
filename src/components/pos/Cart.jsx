@@ -105,26 +105,21 @@ export default function Cart({
           <span className="font-display text-lg font-bold">Jami</span>
           <span className="text-2xl font-bold tracking-tight text-brand-ink text-right break-words">{formatUZS(total)}</span>
         </div>
-        {tableMode && <div className="rounded-xl border border-brand-olive/30 bg-brand-olive/5 p-3 space-y-2">
-          <p className="text-xs font-medium text-brand-ink">{tableDirty ? '● Buyurtmada saqlanmagan o‘zgarishlar bor' : tableSaved ? '✓ Buyurtma serverda saqlangan · hali to‘lanmagan' : 'Mahsulotlarni qo‘shing, keyin buyurtmani saqlang'}</p>
-          <p className="text-xs text-muted-foreground">Saqlagach Kassa avtomatik tozalanadi. Stolning hisobi ochiq qoladi.</p>
-          {(discountCode || roundingTarget !== null) && <p className="text-xs text-muted-foreground">Chegirma stolga saqlanmaydi; mehmon ketganda to‘lovda qayta qo‘llang.</p>}
-          <div className="flex flex-col gap-2 min-w-0">
-            <Button type="button" variant="outline" onClick={onSaveTable}
-              disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
-              className="w-full min-w-0 min-h-12 h-auto py-2.5 whitespace-normal text-center rounded-xl border-brand-olive bg-card text-brand-ink font-bold hover:bg-brand-olive/15">
-              {savingTable ? 'Saqlanmoqda…' : tableDirty ? 'Buyurtmani stolga saqlash →' : 'Yangi buyurtmaga o‘tish'}
+        {tableMode && <div className="flex items-center gap-2 min-w-0">
+          <Button type="button" variant="outline" onClick={onSaveTable}
+            disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
+            className="flex-1 min-w-0 min-h-11 h-auto py-2 whitespace-normal text-center rounded-xl border-brand-olive bg-card text-brand-ink font-semibold hover:bg-brand-olive/15">
+            {savingTable ? 'Saqlanmoqda…' : tableDirty ? 'Stolga saqlash' : 'Yangi buyurtma'}
+          </Button>
+          {onCancelTable && (
+            <Button type="button" variant="outline" onClick={onCancelTable}
+              disabled={locked || savingTable}
+              className="shrink-0 min-h-11 h-auto px-3 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold touch-manipulation"
+              aria-label="Stolni bekor qilish">
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">Bekor qilish</span>
             </Button>
-            {onCancelTable && (
-              <Button type="button" variant="outline" onClick={onCancelTable}
-                disabled={locked || savingTable}
-                className="w-full min-w-0 min-h-12 h-auto py-2.5 whitespace-normal rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 font-semibold px-3 touch-manipulation"
-                aria-label="Stolni bekor qilish">
-                <X className="w-4 h-4 mr-1" />
-                <span>Bekor qilish</span>
-              </Button>
-            )}
-          </div>
+          )}
         </div>}
         <Button
           onClick={onCheckout}
