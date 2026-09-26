@@ -123,6 +123,14 @@
           },
           "subtotal": {
             "type": "number"
+          },
+          "sale_unit": {
+            "type": "string",
+            "enum": [
+              "piece",
+              "gram"
+            ],
+            "default": "piece"
           }
         }
       }
