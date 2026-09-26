@@ -5,6 +5,7 @@
 // Base44 Secrets after independently verifying their numeric Telegram ID.
 // NEVER claim the first /start sender as owner, trust usernames, or send to groups.
 import { approvedOwnerId, routePrivateReport, reportShops, renderPrivateReport } from "./private-telegram-report-logic.ts";
+import { loadReportActivity } from "./report-activity.ts";
 
 type Dependencies = {
   ownerId: unknown;
@@ -78,11 +79,7 @@ export async function preparePrivateTelegramReply(update: any, deps: Dependencie
   // Query only the bounded business dates and selected POS shops.
   const selected = shops.filter((shop: any) => plan.shopId === "all" || shop.id === plan.shopId);
   if (!selected.length) return { kind: "ignore" };
-  const sales = await readAll(deps.service.entities.Sale, {
-    business_date: { $gte: plan.from, $lte: plan.to },
-    shop_id: { $in: selected.map((shop: any) => shop.id) },
-  });
-  const ids = sales.map((sale: any) => sale.id).filter(Boolean);
-  const saleItems = ids.length ? await readAll(deps.service.entities.SaleItem, { sale_id: { $in: ids } }) : [];
-  return { kind: "message", chatId: plan.chatId, text: renderPrivateReport(plan, shops, sales, saleItems), callbackId };
+  const activity = await loadReportActivity(deps.service, plan.from, plan.to, selected.map((shop: any) => shop.id));
+  return { kind: "message", chatId: plan.chatId,
+    text: renderPrivateReport(plan, shops, activity.sales, activity.items, activity), callbackId };
 }
