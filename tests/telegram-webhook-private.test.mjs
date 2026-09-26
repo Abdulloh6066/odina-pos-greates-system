@@ -17,7 +17,8 @@ function load(path, imports = {}, globals = {}) {
 }
 const daily=load('base44/shared/daily-report-logic.ts');
 const reports=load('base44/shared/private-telegram-report-logic.ts', {'./daily-report-logic.ts':daily});
-const stage=load('base44/shared/private-telegram-webhook-stage.ts', {'./private-telegram-report-logic.ts':reports});
+const activity=load('base44/shared/report-activity.ts');
+const stage=load('base44/shared/private-telegram-webhook-stage.ts', {'./private-telegram-report-logic.ts':reports, './report-activity.ts':activity});
 const telegramLogic=load('base44/shared/telegram-alert-logic.ts');
 const token='OFFLINE_SECRET_TOKEN_NOT_TO_EXPOSE';
 const secret=Array.from(new Uint8Array(await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,32);
