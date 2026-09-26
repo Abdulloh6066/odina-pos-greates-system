@@ -552,4 +552,27 @@ test('simultaneous Ready requests cannot double-deduct stock', async () => {
   assert.equal(f.db.StockMovement.length, 4);
 });
 
+test('correctly assigned production worker can mark ready and shipped but cannot accept payments', async () => {
+  const f = fixture('production', 'prod-main');
+  const call = loadHandler(harness(f.db));
+  const ready = await call(readyRequest);
+  assert.equal(ready.status, 200, JSON.stringify(ready));
+  assert.equal(ready.data.order.order_status, 'tayyor');
+  assert.equal(ready.data.production_applied, true);
+  const shipped = await call({ ...readyRequest, step: 'shipped' });
+  assert.equal(shipped.status, 200, JSON.stringify(shipped));
+  assert.equal(shipped.data.order.order_status, 'yuborildi_olib_ketildi');
+  for (const action of ['create_order', 'record_payment', 'complete_order']) {
+    assert.equal((await call({ action, order_id: 'order-1', amount: 1, method: 'cash' })).status, 403);
+  }
+  assert.equal(f.db.OrderPayment.length, 0);
+});
+
+test('disabled production worker is rejected before any order status change', async () => {
+  const f = fixture('production', 'prod-main'); f.db.User[0].active = false;
+  const result = await loadHandler(harness(f.db))(readyRequest);
+  assert.equal(result.status, 403);
+  assert.equal(f.db.CustomerOrder[0].order_status, 'qabul_qilindi');
+});
+
 console.log('Customer order ready-production offline regression tests ready.');
