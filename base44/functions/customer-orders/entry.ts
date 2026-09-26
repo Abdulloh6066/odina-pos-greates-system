@@ -178,12 +178,15 @@ export default async function(req: Request): Promise<Response> {
     if (user.active === false) {
       return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
     }
-    if (!["admin", "cashier"].includes(user.role)) {
-      return Response.json({ error: "Buyurtma yaratish uchun ruxsat yo‘q." }, { status: 403 });
-    }
-
     const body = await req.json();
     const action = String(body?.action || "");
+    // Production staff may change production status only, never create orders
+    // or accept payments. Authorize the requested action before any writes.
+    const allowedRoles = action === "update_production_status"
+      ? ["admin", "production"] : ["admin", "cashier"];
+    if (!allowedRoles.includes(user.role)) {
+      return Response.json({ error: "Bu buyurtma amali uchun ruxsat yo‘q." }, { status: 403 });
+    }
 
     if (action === "runtime_status") {
       return Response.json({ ok: true, runtime_version: ORDER_RUNTIME_VERSION });
@@ -571,6 +574,13 @@ export default async function(req: Request): Promise<Response> {
       const order = await service.entities.CustomerOrder.get(orderId);
       if (!order) {
         return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
+      }
+      if (user.role === "production") {
+        const assigned = user.shop_id ? await service.entities.Shop.get(user.shop_id).catch(() => null) : null;
+        if (!assigned || assigned.active === false || assigned.location_type !== "production"
+          || (order.ready_inventory_location_id && order.ready_inventory_location_id !== assigned.id)) {
+          return Response.json({ error: "Siz faol ishlab chiqarish omboriga biriktirilmagansiz." }, { status: 403 });
+        }
       }
 
       if (step === "ready") {
