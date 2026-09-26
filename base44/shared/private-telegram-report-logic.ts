@@ -88,11 +88,17 @@ const uzs = (value: number) => `${Math.round(value).toLocaleString("en-US")} so�
 // Caller must query Sale by business_date within plan.from/to, and SaleItem for
 // returned sale IDs; this function repeats both date and shop filters defensively.
 // The report is read-only and never sends messages or queries live data itself.
-export function renderPrivateReport(plan: ReportPlan, allShops: Shop[], sales: any[], saleItems: any[]): string {
+export function renderPrivateReport(plan: ReportPlan, allShops: Shop[], sales: any[], saleItems: any[], activity: any = {}): string {
   const shops = reportShops(allShops).filter(s => plan.shopId === "all" || s.id === plan.shopId);
   if (!shops.length) return "Do‘kon topilmadi.";
   const eligible = sales.filter(s => s.business_date >= plan.from && s.business_date <= plan.to && shops.some(shop => shop.id === s.shop_id));
-  const saleIds = new Set(eligible.map(s => s.id));
+  const originalSales = (activity.allSales || sales).filter((s: any) => shops.some(shop => shop.id === s.shop_id));
+  const saleIds = new Set(originalSales.map((s: any) => s.id));
+  const withinPeriod = (value: unknown) => {
+    const ms = Date.parse(String(value || ''));
+    const date = Number.isFinite(ms) ? new Date(ms + 5 * 60 * 60 * 1000).toISOString().slice(0, 10) : '';
+    return date >= plan.from && date <= plan.to;
+  };
   const bySale = new Map<string, any[]>();
   for (const item of saleItems) {
     if (!saleIds.has(item.sale_id)) continue;
@@ -100,15 +106,23 @@ export function renderPrivateReport(plan: ReportPlan, allShops: Shop[], sales: a
     bySale.get(item.sale_id)!.push(item);
   }
   const lines = [`📊 Odina hisobot · ${plan.from} — ${plan.to}`];
-  const totals = { revenue: 0, cost: 0, saleCount: 0, refundCount: 0, cash: 0, uzcard: 0, humo: 0, online: 0, bank_transfer: 0 };
+  const totals = { revenue: 0, cost: 0, saleCount: 0, refundCount: 0, cash: 0, uzcard: 0, humo: 0, online: 0, bank_transfer: 0, collections: 0 };
   for (const shop of shops) {
-    const metrics = computeShopReport(eligible.filter(s => s.shop_id === shop.id), bySale);
-    lines.push("", `🏪 ${clean(shop.name)}`, `Tushum: ${uzs(metrics.revenue)}`, `Savdolar: ${metrics.saleCount} · Qaytarishlar: ${metrics.refundCount}`,
+    const metrics = computeShopReport(eligible.filter(s => s.shop_id === shop.id), bySale, {
+      allSales: originalSales,
+      refunds: activity.refunds?.filter((r: any) => r.shop_id === shop.id && withinPeriod(r.created_at || r.created_date)),
+      orderPayments: (activity.orderPayments || []).filter((r: any) => r.shop_id === shop.id && withinPeriod(r.paid_at)),
+      expenses: (activity.expenses || []).filter((r: any) => r.shop_id === shop.id && withinPeriod(r.created_at || r.created_date)),
+    });
+    lines.push("", `🏪 ${clean(shop.name)}`, `Tushum: ${uzs(metrics.collections)}`,
+      `Kassa sof savdo: ${uzs(metrics.revenue)} · Buyurtma to‘lovlari: ${uzs(metrics.orderPayments)}`,
+      `Savdolar: ${metrics.saleCount} · Qaytarishlar: ${metrics.refundCount}`,
       `Naqd: ${uzs(metrics.cash)} · Bank card/Uzcard: ${uzs(metrics.uzcard)}`, `Humo (old): ${uzs(metrics.humo)} · Online: ${uzs(metrics.online)} · Bank: ${uzs(metrics.bank_transfer)}`,
-      `Tushum − mahsulot tannarxi: ${uzs(metrics.realProfit)}`);
+      `Kassa yalpi foydasi${metrics.unknownCostCount ? ' (taxminiy)' : ''}: ${uzs(metrics.realProfit)}`,
+      `Do‘kon xarajatlari: ${uzs(metrics.expenses)}`);
     for (const key of Object.keys(totals) as (keyof typeof totals)[]) totals[key] += metrics[key];
   }
-  if (shops.length > 1) lines.push("", `JAMI: ${uzs(totals.revenue)} · ${totals.saleCount} ta savdo`);
-  lines.push("", "Izoh: tannarx ma’lumoti taxminiy bo‘lishi mumkin. Bu sof foyda emas; boshqa xarajatlar kiritilmagan.");
+  if (shops.length > 1) lines.push("", `JAMI: ${uzs(totals.collections)} · ${totals.saleCount} ta savdo`);
+  lines.push("", "Izoh: buyurtma avansi va qoldig‘i olingan kunida tushumga kiradi, Kassa foydasiga qo‘shilmaydi. Bu sof foyda emas; noma’lum tannarx bo‘lsa natija taxminiy.");
   return lines.join("\n");
 }
