@@ -12,29 +12,8 @@ import {
   Download, Send, FileSpreadsheet, Mail, RefreshCw, ExternalLink, ShieldAlert,
 } from 'lucide-react';
 import { formatNum, tashkentDateKey } from '@/lib/pos';
-
-const CSV_HEADERS = [
-  "Sana", "Do'kon", "Tushum (UZS)", "Tannarx (UZS)", "Real foyda (UZS)",
-  "Sotuv soni", "Qaytar soni", "Naqd", "Bank card / Uzcard", "Humo (old)", "Online", "Bank",
-  "Yuborildi", "Yuborilgan vaqt",
-];
-
-function csvCell(v) {
-  const s = String(v ?? '');
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
-
-function reportsToCsv(reports) {
-  const lines = [CSV_HEADERS, ...reports.map((r) => [
-    r.business_date, r.shop_name,
-    Math.round(r.total_revenue || 0), Math.round(r.total_cost || 0), Math.round(r.real_profit || 0),
-    r.sale_count || 0, r.refund_count || 0,
-    Math.round(r.cash_total || 0), Math.round(r.uzcard_total || 0), Math.round(r.humo_total || 0),
-    Math.round(r.online_total || 0), Math.round(r.bank_transfer_total || 0),
-    r.email_sent ? 'ha' : 'yoq', r.sent_at || '',
-  ])];
-  return lines.map((cols) => cols.map(csvCell).join(',')).join('\n');
-}
+import { odinaConfirm } from '@/lib/odina-dialog';
+import { reportsToCsv } from '../../base44/shared/daily-report-logic';
 
 function downloadCsv(filename, reports) {
   const csv = '\uFEFF' + reportsToCsv(reports);
@@ -51,9 +30,9 @@ function downloadCsv(filename, reports) {
 
 const COLS = [
   { key: 'shop_name', label: "Do'kon" },
-  { key: 'total_revenue', label: 'Tushum', num: true },
+  { key: 'total_revenue', label: 'Kassa sof savdo', num: true },
   { key: 'total_cost', label: 'Tannarx', num: true },
-  { key: 'real_profit', label: 'Real foyda', num: true, profit: true },
+  { key: 'real_profit', label: 'Kassa yalpi foyda', num: true, profit: true },
   { key: 'sale_count', label: 'Sotuv', num: true },
   { key: 'refund_count', label: 'Qaytar', num: true },
   { key: 'cash_total', label: 'Naqd', num: true },
@@ -61,6 +40,9 @@ const COLS = [
   { key: 'humo_total', label: 'Humo (old)', num: true },
   { key: 'online_total', label: 'Online', num: true },
   { key: 'bank_transfer_total', label: 'Bank', num: true },
+  { key: 'order_payment_total', label: 'Buyurtma to‘lovlari', num: true },
+  { key: 'collections_total', label: 'Jami olingan pul', num: true },
+  { key: 'expenses_total', label: 'Xarajatlar', num: true },
 ];
 
 export default function DailyExport() {
@@ -128,36 +110,36 @@ export default function DailyExport() {
     loadHistory();
   }, []);
 
-  const totals = useMemo(() => {
-    return reports.reduce(
-      (acc, r) => {
-        acc.revenue += Number(r.total_revenue || 0);
-        acc.cost += Number(r.total_cost || 0);
-        acc.profit += Number(r.real_profit || 0);
-        acc.sales += Number(r.sale_count || 0);
-        acc.refunds += Number(r.refund_count || 0);
-        return acc;
-      },
-      { revenue: 0, cost: 0, profit: 0, sales: 0, refunds: 0 },
-    );
-  }, [reports]);
+  const totals = useMemo(() => Object.fromEntries(COLS.filter(c => c.num).map(c => [
+    c.key, reports.reduce((sum, row) => sum + Number(row[c.key] || 0), 0),
+  ])), [reports]);
 
   const handleSend = async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || sending) return;
+    const uncertain = history.some(row => row.business_date === businessDate
+      && ['sending', 'uncertain'].includes(row.email_delivery_state));
+    let retryUncertain = false;
+    if (uncertain) {
+      retryUncertain = await odinaConfirm('Oldingi email yetib borganligi noaniq. Avval pochtangizni tekshiring. Qayta yuborish takroriy email keltirishi mumkin.', {
+        title: 'Emailni qayta yuborish', confirmLabel: 'Tekshirdim, qayta yuborish', tone: 'warning',
+      });
+      if (!retryUncertain) return;
+    }
     setSending(true);
     try {
       const res = await base44.functions.invoke('daily-sales-export', {
         action: 'send',
         business_date: businessDate,
+        retry_uncertain_email: retryUncertain,
       });
       const d = res.data || {};
       toast({
         title: d.sent ? `Yuborildi: ${d.sent} do‘kon` : 'Yuborilmadi',
         description: [
           d.sheet_ok ? 'Google Sheet ✅' : `Sheet: ${d.sheet_error || 'xato'}`,
-          d.email_ok ? 'Email ✅' : `Email: ${d.email_error || 'yoq'}`,
+          d.email_skipped ? 'Email sozlanmagan' : d.email_ok ? 'Email ✅' : `Email: ${d.email_error || 'yoq'}`,
         ].join(' · '),
-        variant: d.sheet_ok && d.email_ok ? 'default' : 'destructive',
+        variant: d.sheet_ok && (d.email_ok || d.email_skipped) ? 'default' : 'destructive',
       });
       loadConfig();
       loadHistory();
@@ -198,7 +180,7 @@ export default function DailyExport() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Kunlik eksport" subtitle="Har do‘kon uchun tushum, tannarx va real foyda — Google Sheet, email va CSV" />
+      <PageHeader title="Kunlik eksport" subtitle="Kassa savdosi, buyurtma to‘lovlari va olingan pul — Google Sheets, email va CSV" />
 
       {/* Config */}
       {isAdmin && (
@@ -277,6 +259,9 @@ export default function DailyExport() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground leading-relaxed">Buyurtma avansi va qoldig‘i pul olingan kuni hisoblanadi, Kassa foydasiga qo‘shilmaydi. Kassa yalpi foydasidan do‘kon xarajatlari ayrilmagan.
+            {reports.some(row => row.unknown_cost_count > 0) && ' Ayrim tannarxlar noma’lum yoki taxminiy; foyda to‘liq emas.'}
+          </p>
           {loading ? (
             <div className="py-10 text-center text-sm text-muted-foreground">Hisoblanmoqda…</div>
           ) : (
@@ -306,13 +291,7 @@ export default function DailyExport() {
                 {reports.length > 0 && (
                   <tfoot>
                     <tr className="font-semibold bg-secondary/40">
-                      <td className="py-2.5 pr-3">JAMI</td>
-                      <td className="py-2.5 pr-3 tabular-nums">{formatNum(totals.revenue)}</td>
-                      <td className="py-2.5 pr-3 tabular-nums">{formatNum(totals.cost)}</td>
-                      <td className="py-2.5 pr-3 tabular-nums text-emerald-600">{formatNum(totals.profit)}</td>
-                      <td className="py-2.5 pr-3 tabular-nums">{totals.sales}</td>
-                      <td className="py-2.5 pr-3 tabular-nums">{totals.refunds}</td>
-                      <td colSpan={5} />
+                      {COLS.map(c => <td key={c.key} className="py-2.5 pr-3 tabular-nums">{c.num ? formatNum(totals[c.key]) : 'JAMI'}</td>)}
                     </tr>
                   </tfoot>
                 )}
@@ -368,11 +347,10 @@ export default function DailyExport() {
                             <td className={`py-1.5 pr-3 tabular-nums ${Number(r.real_profit) < 0 ? 'text-destructive' : 'text-emerald-600'}`}>{formatNum(r.real_profit)}</td>
                             <td className="py-1.5 pr-3 tabular-nums">{r.sale_count}</td>
                             <td className="py-1.5 pr-3">
-                              {r.email_sent ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-600"><Mail className="w-3 h-3" /> yuborildi</span>
-                              ) : (
-                                <span className="text-muted-foreground">CSV</span>
-                              )}
+                              <span className={r.sheet_appended ? 'text-emerald-600' : 'text-muted-foreground'}>Sheets: {r.sheet_appended ? 'yuborildi' : 'yuborilmagan'}</span>
+                              <br />
+                              <span className={r.email_sent ? 'text-emerald-600' : 'text-muted-foreground'}>Email: {r.email_sent ? 'yuborildi' : ['sending', 'uncertain'].includes(r.email_delivery_state) ? 'tekshirish kerak' : 'yuborilmagan'}</span>
+                              {r.delivery_error && <p className="mt-1 max-w-xs text-destructive">{r.delivery_error}</p>}
                             </td>
                           </tr>
                         ))}
