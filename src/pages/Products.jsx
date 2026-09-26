@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
+import { priceForShop } from '@/lib/shop-pricing';
 import PageHeader from '@/components/PageHeader';
 import TestCatalogCleanup from '@/components/TestCatalogCleanup';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ export default function Products() {
   const canManageCatalog = role === 'admin' || role === 'accountant';
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
@@ -28,9 +30,10 @@ export default function Products() {
 
   const load = async () => {
     setLoading(true);
-    const [p, c] = await Promise.all([base44.entities.Product.list(), base44.entities.Category.list()]);
+    const [p, c, s] = await Promise.all([base44.entities.Product.list(), base44.entities.Category.list(), base44.entities.Shop.list()]);
     setProducts(p || []);
     setCategories(c || []);
+    setShops((s || []).filter((shop) => shop.location_type === 'shop' && shop.active !== false));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -137,6 +140,11 @@ export default function Products() {
                 <div className={`text-sm font-semibold mt-2 ${Number(p.price) === 0 ? 'text-muted-foreground' : 'text-brand-ink'}`}>
                   {Number(p.price) === 0 ? '0 so‘m' : formatUZS(p.price)}
                 </div>
+                {shops.some((shop) => priceForShop(p, shop.id) !== Number(p.price)) && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {shops.map((shop) => `${shop.name}: ${formatUZS(priceForShop(p, shop.id))}`).join(' · ')}
+                  </div>
+                )}
                 {(role === 'production' || canManageCatalog) && (
                   <Button variant="outline" size="sm" className="w-full mt-3 h-9 rounded-lg px-2 text-[11px] font-semibold whitespace-nowrap touch-manipulation" onClick={() => setAvailability(p)}>
                     {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
@@ -148,14 +156,15 @@ export default function Products() {
         </div>
       )}
 
-      <ProductDialog open={open} product={editing} categories={categories} onClose={() => setOpen(false)} onSaved={onSaved} user={user} canArchive={role === 'admin'} />
+      <ProductDialog open={open} product={editing} categories={categories} shops={shops} onClose={() => setOpen(false)} onSaved={onSaved} user={user} canArchive={role === 'admin'} />
     </div>
   );
 }
 
-function ProductDialog({ open, product, categories, onClose, onSaved, user, canArchive }) {
+function ProductDialog({ open, product, categories, shops, onClose, onSaved, user, canArchive }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [shopPrices, setShopPrices] = useState({});
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
@@ -173,6 +182,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     if (open) {
       setName(product?.name || '');
       setPrice(product?.price ?? '');
+      setShopPrices(product?.shop_prices || {});
       setCategoryId(product?.category_id || (categories[0]?.id || ''));
       setImageUrl(product?.image_url || '');
       setDescription(product?.description || '');
@@ -200,6 +210,10 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     if (!name.trim() || price === '' || !Number.isFinite(Number(price)) || Number(price) < 0) {
       void odinaAlert('Nomi va manfiy bo‘lmagan narx majburiy.'); return;
     }
+    if (shops.some((shop) => shopPrices[shop.id] !== undefined
+      && (!Number.isSafeInteger(Number(shopPrices[shop.id])) || String(shopPrices[shop.id]).trim() === '' || Number(shopPrices[shop.id]) < 0))) {
+      void odinaAlert('Har bir do‘kon narxi musbat yoki 0 bo‘lgan butun son bo‘lishi kerak.'); return;
+    }
     if (productionUnit === 'sheet' && (!Number.isSafeInteger(Number(piecesPerSheet)) || Number(piecesPerSheet) < 1
       || sheetPrice === '' || !Number.isFinite(Number(sheetPrice)) || Number(sheetPrice) < 0)) {
       void odinaAlert('1 listdan chiqadigan butun bo‘lak soni va list narxini kiriting.'); return;
@@ -209,6 +223,7 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
     const payload = {
       name: name.trim(),
       price: Number(price),
+      shop_prices: Object.fromEntries(Object.entries(shopPrices).map(([id, value]) => [id, Number(value)])),
       category_id: categoryId || undefined,
       category_name: cat?.name,
       image_url: imageUrl || undefined,
@@ -296,6 +311,20 @@ function ProductDialog({ open, product, categories, onClose, onSaved, user, canA
               </OdinaSelect>
             </div>
           </div>
+          {shops.length > 0 && (
+            <div className="rounded-xl border border-border bg-secondary/30 p-3 space-y-3">
+              <p className="text-xs text-muted-foreground">Mahsulot barcha do‘konlarda ko‘rinadi. Har bir do‘kon narxini shu yerda alohida o‘zgartiring.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {shops.map((shop) => (
+                  <div key={shop.id}>
+                    <Label className="text-xs mb-1.5 block">{shop.name} narxi (UZS)</Label>
+                    <Input type="number" min="0" step="1" value={shopPrices[shop.id] ?? price}
+                      onChange={(e) => setShopPrices((current) => ({ ...current, [shop.id]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <Label className="text-xs mb-1.5 block">Mahsulot qayerdan ta’minlanadi</Label>
             <OdinaSelect value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
