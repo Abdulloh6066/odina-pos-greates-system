@@ -343,68 +343,104 @@ async function deliverReports(
   businessDate: string,
   ctx: { userId: string; userName: string },
   trigger: string,
+  retryUncertainEmail = false,
 ) {
-  const persisted: any[] = [];
-  for (const r of reports) {
-    persisted.push(await upsertReport(service, r));
-  }
-
-  let sheetOk = false;
-  let sheetError = "";
-  const token = await getSheetsToken(service);
-  if (token) {
-    try {
-      const cfg = await ensureSheet(service, token, config);
-      const rows = reports.map(reportToSheetRow);
-      await appendRows(token, cfg.google_sheet_id, rows);
-      sheetOk = true;
-      config = cfg;
-    } catch (e) {
-      sheetError = e instanceof Error ? e.message : String(e);
-    }
-  } else {
-    sheetError = "Google Sheets ulanmagan.";
-  }
-  if (sheetOk) {
-    for (const rec of persisted) {
-      await service.entities.DailyShopReport.update(rec.id, {
-        sheet_appended: true,
-        sheet_append_at: new Date().toISOString(),
-      }).catch(() => {});
-    }
-  }
-
-  let emailOk = false;
-  let emailError = "";
-  try {
-    const r = await sendEmailReport(service, config.recipient_email, businessDate, reports);
-    emailOk = r.sent;
-    if (!emailOk) emailError = r.reason || "email yuborilmadi";
-  } catch (e) {
-    emailError = e instanceof Error ? e.message : String(e);
-  }
-
+  const lockToken = crypto.randomUUID();
   const now = new Date().toISOString();
-  for (const rec of persisted) {
-    await service.entities.DailyShopReport.update(rec.id, {
-      email_sent: emailOk,
-      email_sent_at: emailOk ? now : "",
-      sent_at: now,
-      sent_by_id: ctx.userId,
-      sent_by_name: ctx.userName,
-      trigger,
-    }).catch(() => {});
+  const locked = await service.entities.DailyExportConfig.updateMany({ id: config.id,
+    $or: [{ delivery_lock_token: { $exists: false } }, { delivery_lock_token: "" },
+      { delivery_lock_until: { $lt: now } }],
+  }, { $set: { delivery_lock_token: lockToken, delivery_lock_until: new Date(Date.now() + 300000).toISOString() } });
+  if (!locked?.success || Number(locked.updated || 0) !== 1) {
+    throw new Error("Hisobot boshqa so‘rovda yuborilmoqda. Qayta yuborilmadi.");
   }
-
-  return {
-    sent: reports.length,
-    sheet_ok: sheetOk,
-    sheet_error: sheetError,
-    email_ok: emailOk,
-    email_error: emailError,
-    targetDate: businessDate,
-    sheet_url: config.google_sheet_url || "",
+  const renewLease = async () => {
+    const renewed = await service.entities.DailyExportConfig.updateMany({ id: config.id,
+      delivery_lock_token: lockToken, delivery_lock_until: { $gt: new Date().toISOString() },
+    }, { $set: { delivery_lock_until: new Date(Date.now() + 300000).toISOString() } });
+    if (!renewed?.success || Number(renewed.updated || 0) !== 1) throw new Error("Eksport so‘rovi eskirgan. Yuborish to‘xtadi.");
   };
+  try {
+    config = await service.entities.DailyExportConfig.get(config.id);
+    const persisted: any[] = [];
+    for (const r of reports) persisted.push(await upsertReport(service, r));
+    let sheetError = "";
+    let emailError = "";
+    const neededSheet = persisted.filter(rec => !rec.sheet_appended || rec.sheet_fingerprint !== rec.delivery_fingerprint);
+    if (neededSheet.length) {
+      const token = await getSheetsToken(service);
+      if (!token) sheetError = "Google Sheets ulanmagan.";
+      else {
+        try {
+          await renewLease();
+          config = await ensureSheet(service, token, config);
+          await renewLease();
+          await upsertSheetRows(token, config.google_sheet_id, neededSheet);
+          for (const rec of neededSheet) {
+            await service.entities.DailyShopReport.update(rec.id, { sheet_appended: true,
+              sheet_fingerprint: rec.delivery_fingerprint, sheet_append_at: new Date().toISOString() });
+            rec.sheet_appended = true; rec.sheet_fingerprint = rec.delivery_fingerprint;
+          }
+        } catch (error) { sheetError = error instanceof Error ? error.message : String(error); }
+      }
+    }
+    const recipient = String(config.recipient_email || "").trim();
+    const neededEmail = recipient ? persisted.filter(rec => !rec.email_sent
+      || rec.email_fingerprint !== rec.delivery_fingerprint || rec.email_recipient_snapshot !== recipient) : [];
+    const uncertain = neededEmail.filter(rec => ["sending", "uncertain"].includes(rec.email_delivery_state));
+    const eligibleEmail = neededEmail.filter(rec => retryUncertainEmail || !uncertain.includes(rec));
+    if (uncertain.length && !retryUncertainEmail) emailError = "Email natijasi noaniq. Pochtani tekshiring; tasdiqsiz takroriy email yuborilmaydi.";
+    if (eligibleEmail.length) {
+      await renewLease();
+      for (const rec of eligibleEmail) {
+        await service.entities.DailyShopReport.update(rec.id, { email_delivery_state: "sending",
+          email_attempted_at: new Date().toISOString(), email_recipient_snapshot: recipient });
+      }
+      try {
+        await sendEmailReport(service, recipient, businessDate, eligibleEmail);
+        for (const rec of eligibleEmail) {
+          await service.entities.DailyShopReport.update(rec.id, { email_sent: true, email_delivery_state: "sent",
+            email_fingerprint: rec.delivery_fingerprint, email_sent_at: new Date().toISOString(), email_recipient_snapshot: recipient });
+          rec.email_sent = true; rec.email_fingerprint = rec.delivery_fingerprint;
+          rec.email_recipient_snapshot = recipient; rec.email_delivery_state = "sent";
+        }
+      } catch (error) {
+        const status = Number((error as any)?.response?.status || (error as any)?.status || 0);
+        const state = [400, 401, 403, 404, 422, 429].includes(status) ? "failed" : "uncertain";
+        emailError = state === "uncertain" ? "Email yetib borganligi noaniq. Takrorlamasdan avval pochtani tekshiring."
+          : "Email xizmati so‘rovni rad etdi. Keyingi urinishda qayta yuboriladi.";
+        for (const rec of eligibleEmail) {
+          if (rec.email_delivery_state === "sent" && rec.email_fingerprint === rec.delivery_fingerprint) continue;
+          rec.email_delivery_state = state;
+          await service.entities.DailyShopReport.update(rec.id, { email_sent: false, email_delivery_state: state }).catch(() => {});
+        }
+      }
+    }
+    let sent = 0;
+    for (const rec of persisted) {
+      const sheetDone = rec.sheet_appended === true && rec.sheet_fingerprint === rec.delivery_fingerprint;
+      const emailDone = !recipient || (rec.email_sent === true && rec.email_fingerprint === rec.delivery_fingerprint
+        && rec.email_recipient_snapshot === recipient);
+      const complete = sheetDone && emailDone;
+      await service.entities.DailyShopReport.update(rec.id, {
+        sent_at: complete ? new Date().toISOString() : "", delivery_attempted_at: new Date().toISOString(),
+        delivery_error: [sheetDone ? "" : sheetError, emailDone ? "" : emailError].filter(Boolean).join(" · "),
+        sent_by_id: ctx.userId, sent_by_name: ctx.userName, trigger,
+      });
+      if (complete) sent++;
+    }
+    return { sent, attempted: reports.length,
+      sheet_ok: persisted.every(rec => rec.sheet_appended && rec.sheet_fingerprint === rec.delivery_fingerprint),
+      sheet_error: sheetError,
+      email_ok: Boolean(recipient) && persisted.every(rec => rec.email_sent && rec.email_fingerprint === rec.delivery_fingerprint && rec.email_recipient_snapshot === recipient),
+      email_skipped: !recipient, email_error: emailError,
+      email_uncertain: persisted.some(rec => ["sending", "uncertain"].includes(rec.email_delivery_state)),
+      targetDate: businessDate, sheet_url: config.google_sheet_url || "",
+    };
+  } finally {
+    await service.entities.DailyExportConfig.updateMany({ id: config.id, delivery_lock_token: lockToken },
+      { $set: { delivery_lock_token: "", delivery_lock_until: new Date().toISOString() } }).catch(() => {});
+  }
 }
 
 // ---- Actions ----
@@ -423,7 +459,7 @@ async function handleSend(
   const reports = await computeReportsForDate(service, businessDate);
   const config = await getConfig(service);
   return Response.json(
-    await deliverReports(service, config, reports, businessDate, ctx, body.trigger || "manual"),
+    await deliverReports(service, config, reports, businessDate, ctx, "manual", body.retry_uncertain_email === true),
   );
 }
 
@@ -431,17 +467,23 @@ async function handleAutoSend(service: any, body: any, ctx: { userId: string; us
   const config = await getConfig(service);
   if (!config.auto_send_enabled) return Response.json({ skipped: true, reason: "disabled" });
   const clock = localClock(Date.now());
-  if (clock.hour < 23) return Response.json({ skipped: true, reason: "before-23" });
-  const targetDate = String(body.business_date || clock.today);
+  if (clock.hour !== 23 && clock.hour !== 0) return Response.json({ skipped: true, reason: "outside-export-window" });
+  const previousDay = new Date(Date.parse(clock.today + "T12:00:00Z") - 86400000).toISOString().slice(0, 10);
+  const targetDate = String(body.business_date || (clock.hour === 0 ? previousDay : clock.today));
+  reportRange(targetDate, targetDate);
 
   const shops = (await readAll(service.entities.Shop, {}, "name")).filter(
     (s: any) => s.active !== false,
   );
-  const openShifts = await readAll(service.entities.Shift, { status: "open" }, "id");
-  const openShopIds = new Set(openShifts.map((s: any) => s.shop_id).filter(Boolean));
+  const openShifts = await readAll(service.entities.Shift, { status: { $in: ["open", "closing"] } }, "id");
+  const endOfDay = reportRange(targetDate, targetDate).end;
+  const openShopIds = new Set(openShifts.filter((s: any) => !s.opened_at || s.opened_at < endOfDay).map((s: any) => s.shop_id).filter(Boolean));
   const sent = await readAll(service.entities.DailyShopReport, { business_date: targetDate }, "id");
   const sentShopIds = new Set(
-    sent.filter((r: any) => r.sent_at).map((r: any) => r.shop_id),
+    sent.filter((r: any) => r.sheet_appended === true && r.sheet_fingerprint === r.delivery_fingerprint
+      && r.delivery_fingerprint && (!config.recipient_email || (r.email_sent === true
+        && r.email_fingerprint === r.delivery_fingerprint && r.email_recipient_snapshot === config.recipient_email.trim())))
+      .map((r: any) => r.shop_id),
   );
 
   const readyShopIds = new Set(
