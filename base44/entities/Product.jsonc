@@ -42,6 +42,14 @@
       "default": false,
       "type": "boolean"
     },
+    "favorite_shop_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Do\u2018kon bo\u2018yicha sevimli mahsulotlar"
+    },
     "name": {
       "type": "string"
     },
