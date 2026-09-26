@@ -61,3 +61,24 @@ test('printer exception releases print state and finishes safely', () => {
   h.close(); h.start(); h.tick(); h.tick(); h.tick(); h.flush();
   assert.equal(h.doneCount(), 1); assert.equal(h.classes.size, 0);
 });
+
+test('shift report print completes after save or cancel and cleans only its own class', () => {
+  const h = harness(); h.close(); let done = 0;
+  h.classes.add('unrelated-modal');
+  startReceiptPrint({ win: h.win, doc: h.doc, printClass: 'odina-shift-printing', onDone: () => done++ });
+  h.tick(); h.tick(); h.tick();
+  assert.equal(h.classes.has('odina-shift-printing'), true);
+  assert.equal(h.classes.has('odina-sale-printing'), false);
+  h.events.get('afterprint')(); h.flush();
+  assert.equal(done, 1);
+  assert.deepEqual([...h.classes], ['unrelated-modal']);
+});
+test('shift report recovers on interaction if browser omits afterprint', () => {
+  const h = harness(); h.close(); let done = 0;
+  startReceiptPrint({ win: h.win, doc: h.doc, printClass: 'odina-shift-printing', onDone: () => done++ });
+  h.tick(); h.tick(); h.tick();
+  h.events.get('pointerdown')(); h.flush();
+  assert.equal(done, 1);
+  assert.equal(h.classes.size, 0);
+  assert.equal(h.events.size, 0);
+});
