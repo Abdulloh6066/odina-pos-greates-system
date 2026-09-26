@@ -175,6 +175,9 @@
   .receipt-print.table-precheck { display: block !important; }
   .receipt-print.staff-order-ticket { display: block !important; box-sizing: border-box !important; }
   .receipt-print.sale-receipt { display: block !important; }
+  body.odina-shift-printing > #root { display: none !important; }
+  body.odina-shift-printing .receipt-print.shift-report { display: block !important; }
+  body.odina-shift-printing .receipt-print:not(.shift-report) { display: none !important; }
   body.odina-sale-printing > #root { display: none !important; }
   .receipt-print {
     position: absolute !important;
