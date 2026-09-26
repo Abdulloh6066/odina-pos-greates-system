@@ -72,25 +72,6 @@ export default function Cart({
       </div>
 
       <div className="odina-cart-summary border-t border-brand-sand/50 p-3 safe-bottom shrink-0 space-y-2.5 bg-card">
-        <DiscountRow
-          discountCode={discountCode}
-          discount={couponDiscount}
-          onApplyDiscount={onApplyDiscount}
-          onRemoveDiscount={onRemoveDiscount}
-          discountError={discountError}
-        />
-        {cart.length > 0 && (
-          <RoundingRow
-            subtotal={subtotal}
-            discountCode={discountCode}
-            roundingTarget={roundingTarget}
-            adjustmentMode={adjustmentMode}
-            roundingError={roundingError}
-            onApplyRounding={onApplyRounding}
-            onApplyManualDiscount={onApplyManualDiscount}
-            onRemoveRounding={onRemoveRounding}
-          />
-        )}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>Oraliq summa</span>
           <span className="font-medium text-foreground">{formatUZS(subtotal)}</span>
@@ -134,7 +115,7 @@ export default function Cart({
   );
 }
 
-function RoundingRow({ subtotal, discountCode, roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding }) {
+export function RoundingRow({ subtotal, discountCode, roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const step = subtotal >= 10000 ? 5000 : subtotal >= 1000 ? 1000 : 100;
@@ -163,7 +144,7 @@ function RoundingRow({ subtotal, discountCode, roundingTarget, adjustmentMode, r
   );
 }
 
-function DiscountRow({ discountCode, discount, onApplyDiscount, onRemoveDiscount, discountError }) {
+export function DiscountRow({ discountCode, discount, onApplyDiscount, onRemoveDiscount, discountError }) {
   const [code, setCode] = useState('');
   if (discount > 0) {
     return (
