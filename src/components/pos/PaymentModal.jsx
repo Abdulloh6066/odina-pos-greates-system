@@ -18,7 +18,7 @@ function savedReceiptPreference() {
 }
 
 export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false, checking = false }) {
-  const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
+  const [payments, setPayments] = useState([]);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [printReceipt, setPrintReceipt] = useState(savedReceiptPreference);
@@ -32,13 +32,13 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
   useEffect(() => {
     const before = previous.current;
     if (open && !before.open) {
-      setPayments(total > 0 ? [{ method: 'cash', amount: total }] : []);
+      setPayments([]);
       setError('');
-      setShowMethodPicker(false);
+      setShowMethodPicker(total > 0);
     } else if (open && total !== before.total) {
       setPayments((rows) => {
         if (total <= 0) return [];
-        if (rows.length === 0) return [{ method: 'cash', amount: total }];
+        if (rows.length === 0) return [];
         if (rows.length === 1 && Number(rows[0].amount) === before.total) {
           return [{ ...rows[0], amount: total }];
         }
@@ -92,7 +92,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
       return;
     }
     const valid = payments.filter((p) => Number(p.amount) > 0);
-    if (valid.length === 0) { setError('Kamida bitta to‘lov kiriting.'); return; }
+    if (valid.length === 0) { setError('Avval to‘lov usulini tanlang.'); setShowMethodPicker(true); return; }
     const sum = valid.reduce((s, p) => s + Number(p.amount), 0);
     // Match the backend: no 1 UZS tolerance, or the cashier sees a false success path.
     if (sum !== total) {
@@ -177,7 +177,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
               className="min-h-11 rounded-xl px-2 -ml-2 text-brand-ink font-medium flex items-center gap-1.5 disabled:opacity-40"
               aria-expanded={showMethodPicker}
             >
-              <Plus className="w-4 h-4" /> To‘lov usuli qo‘shish
+              <Plus className="w-4 h-4" /> {payments.length === 0 ? 'To‘lov usulini tanlang' : 'To‘lov usuli qo‘shish'}
             </button>
             <div className="text-right shrink-0">
               {remaining > 0 ? (
@@ -251,7 +251,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={checking || loading || discountPending || (total <= 0 && !fullDiscount)}
+            disabled={checking || loading || discountPending || (total <= 0 && !fullDiscount) || (total > 0 && payments.length === 0)}
             className="col-span-2 min-h-11 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary-strong sm:col-span-1"
           >
             {loading
