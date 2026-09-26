@@ -1,12 +1,12 @@
 // One uplifting message per receipt. A sale's stable identifier keeps reprints consistent.
 export const RECEIPT_WISHES = Object.freeze([
   'Bugungi kuningiz shirin lahzalarga boy bo‘lsin! ❤️',
-  'Tabassumingiz hech qachon yuzingizdan arimasin!',
+  'Tabassumingiz hech qachon yuzingizdan arimasin! 😊',
   'Baxt ba’zan bir bo‘lak tortdan boshlanadi. 🍰',
-  'Hayotning eng shirin lahzalari hali oldinda!',
+  'Hayotning eng shirin lahzalari hali oldinda! ✨',
   'Bugun tabassum qilish uchun yana bir sababingiz bor. ❤️',
-  'Shirinlikni bizdan, yaxshi kayfiyatni hayotdan oling!',
-  'Orzularingiz siz o‘ylagandan ham yaqinroq bo‘lsin.',
+  'Shirinlikni bizdan, yaxshi kayfiyatni hayotdan oling! 🍰',
+  'Orzularingiz siz o‘ylagandan ham yaqinroq bo‘lsin. ⭐',
 ]);
 
 export function receiptWishForSale(sale) {
