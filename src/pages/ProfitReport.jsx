@@ -104,7 +104,7 @@ export default function ProfitReport() {
         <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
           <TrendingUp className="w-6 h-6 text-brand-olive" /> Tannarx va foyda
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Sotuv tannarxi, yalpi foyda va xarajatlardan keyingi foyda hisoboti.</p>
+        <p className="text-sm text-muted-foreground mt-1">Kassa savdosi tannarxi va foydasi. Buyurtma avanslari foydaga qayta qo‘shilmaydi.</p>
       </div>
 
       {/* Filters */}
@@ -154,14 +154,21 @@ export default function ProfitReport() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700 p-3 mb-4 text-sm">{error}</div>
       )}
 
+      <p className="mb-4 text-xs text-muted-foreground leading-relaxed">
+        Tanlangan davr va do‘konlar bo‘yicha buyurtma to‘lovlari: {formatUZS(s.order_payment_total || 0)}.
+        {' '}Kassa sof savdosi bilan jami olingan pul: {formatUZS(s.collections_total || 0)}.
+        {' '}Bu pul tushumi; buyurtmalar foydasi emas.
+        {(productId || categoryId) && ' Xarajatlar butun do‘kon bo‘yicha ko‘rsatiladi, tanlangan mahsulotga taqsimlanmagan.'}
+        {s.incomplete_sale_count > 0 && ' Ayrim savdolarning mahsulot tafsiloti to‘liq emas; foydani yakuniy deb hisoblamang.'}
+      </p>
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-        <StatCard icon={Receipt} label="Sof savdo" value={s.net_revenue} />
+        <StatCard icon={Receipt} label="Kassa sof savdo" value={s.net_revenue} />
         <StatCard icon={Coins} label="Sotilgan tannarx" value={s.cost_of_goods} tone="muted" />
-        <StatCard icon={PiggyBank} label="Yalpi foyda" value={s.gross_profit} tone="positive" />
+        <StatCard icon={PiggyBank} label={s.unknown_count > 0 || s.estimate_count > 0 ? 'Taxminiy yalpi foyda' : 'Kassa yalpi foyda'} value={s.gross_profit} tone="positive" />
         <StatCard icon={Percent} label="Foyda marjasi" suffix={`${s.margin ?? 0}%`} tone="neutral" />
         <StatCard icon={Wallet} label="Xarajatlar" value={s.expenses} tone="muted" />
-        <StatCard icon={TrendingUp} label="Xarajatlardan keyingi foyda" value={s.net_profit} tone="positive" />
+        <StatCard icon={TrendingUp} label={s.unknown_count > 0 || s.estimate_count > 0 ? 'Taxminiy natija' : 'Kassa foydasi − xarajatlar'} value={s.net_profit} tone="positive" />
       </div>
 
       {(s.unknown_count > 0 || s.estimate_count > 0) && (
