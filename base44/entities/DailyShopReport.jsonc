@@ -93,6 +93,54 @@
     "generated_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "order_payment_total": {
+      "type": "number"
+    },
+    "collections_total": {
+      "type": "number"
+    },
+    "expenses_total": {
+      "type": "number"
+    },
+    "net_profit": {
+      "type": "number"
+    },
+    "unknown_cost_count": {
+      "type": "number"
+    },
+    "delivery_fingerprint": {
+      "type": "string"
+    },
+    "sheet_fingerprint": {
+      "type": "string"
+    },
+    "email_fingerprint": {
+      "type": "string"
+    },
+    "email_delivery_state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sending",
+        "sent",
+        "failed",
+        "uncertain"
+      ]
+    },
+    "email_recipient_snapshot": {
+      "type": "string"
+    },
+    "email_attempted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "delivery_attempted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "delivery_error": {
+      "type": "string"
     }
   },
   "required": [
