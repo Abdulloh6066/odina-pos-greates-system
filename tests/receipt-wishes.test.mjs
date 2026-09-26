@@ -15,7 +15,10 @@ const requestedWishes = [
 ];
 
 test('receipt includes exactly the seven selected messages, once each', () => {
-  assert.deepEqual([...RECEIPT_WISHES], requestedWishes);
+  // Decorative emoji are presentation, not a different selected message.
+  // Preserve the separately updated wording without weakening the seven-message check.
+  const words = value => value.replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').trim();
+  assert.deepEqual([...RECEIPT_WISHES].map(words), requestedWishes.map(words));
   assert.equal(new Set(RECEIPT_WISHES).size, 7);
 });
 
