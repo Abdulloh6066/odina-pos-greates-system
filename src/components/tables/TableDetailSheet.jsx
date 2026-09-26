@@ -172,7 +172,7 @@ export default function TableDetailSheet({
           ) : isOccupied ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <span>Buyurtma qilingan mahsulotlar ({items.reduce((s, i) => s + (i.quantity || 0), 0)} ta)</span>
+                <span>Buyurtma qilingan mahsulotlar ({items.reduce((s, i) => s + (i.sale_unit === 'gram' ? 1 : (i.quantity || 0)), 0)} ta)</span>
                 <span>Summa</span>
               </div>
 
@@ -187,7 +187,7 @@ export default function TableDetailSheet({
                       <div className="min-w-0">
                         <div className="font-semibold text-foreground truncate">{item.product_name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {item.quantity} × {formatUZS(item.price)}
+                          {item.quantity}{item.sale_unit === 'gram' ? ' g · ' : ' × '}{formatUZS(item.price)}{item.sale_unit === 'gram' ? ' / kg' : ''}
                         </div>
                       </div>
                       <div className="font-bold tabular-nums text-brand-ink shrink-0">
@@ -225,7 +225,7 @@ export default function TableDetailSheet({
                 <div className="space-y-1">
                   {items.map((it, i) => (
                     <div key={i} className="flex justify-between gap-2">
-                      <span className="truncate">{it.quantity}× {it.product_name}</span>
+                      <span className="truncate">{it.quantity}{it.sale_unit === 'gram' ? ' g' : '×'} {it.product_name}</span>
                       <span className="shrink-0">{formatUZS(it.subtotal)}</span>
                     </div>
                   ))}
