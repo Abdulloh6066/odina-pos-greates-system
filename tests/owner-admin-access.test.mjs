@@ -183,7 +183,8 @@ test('RLS blocks direct admin privilege edits; UI obtains owner flag from authen
   }
   for (const path of ['base44/entities/PendingStaffInvite.jsonc', 'base44/entities/pending-staff-invite.jsonc']) {
     const schema = JSON.parse(read(path));
-    for (const action of ['create', 'update', 'delete']) assert.equal(schema.rls[action].user_condition.is_owner, true);
+    // Invites now use the stricter server-only policy, including for owners.
+    for (const action of ['create', 'update', 'delete']) assert.equal(schema.rls[action], false);
   }
   const users = read('src/pages/Users.jsx');
   assert.match(users, /can_manage_admins/);
