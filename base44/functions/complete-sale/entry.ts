@@ -22,10 +22,11 @@ import {
   allocateServiceTicketNumber, finishServiceTicketCycleIfLastShift,
 } from "../../shared/shift-close-helpers.ts";
 import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
+import { priceForShop } from "../../shared/shop-pricing.ts";
 
 // Table orders are server-stored before payment. The snapshot is trusted only
 // after the table is authenticated, version-checked and locked below.
-async function normalizeSaleItems(service: any, requestedItems: any[], trustedTableItems: any[] | null = null) {
+async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string, trustedTableItems: any[] | null = null) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
     const quantity = Math.floor(Number(requested?.quantity));
@@ -49,7 +50,7 @@ async function normalizeSaleItems(service: any, requestedItems: any[], trustedTa
     if (!product || (!savedItem && (product.active === false || product.archived === true))) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
     }
-    const unitPrice = savedItem ? savedItem.price : money(product.price);
+    const unitPrice = savedItem ? savedItem.price : money(priceForShop(product, shopId));
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
     }
@@ -752,7 +753,7 @@ export default async function(req) {
         tableItems = order.items;
       }
       const [normalizedItems, allowNegativeStock] = await Promise.all([
-        normalizeSaleItems(service, requestedItems, tableItems),
+        normalizeSaleItems(service, requestedItems, shift.shop_id, tableItems),
         stockPolicy(service),
       ]);
       const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
@@ -1148,7 +1149,7 @@ export default async function(req) {
         return Response.json({ error: "Stol savati saqlangan buyurtmadan farq qiladi. Avval saqlang." }, { status: 409 });
       }
     }
-    const normalizedItems = await normalizeSaleItems(service, requestedItems, tableOrder?.items || null);
+    const normalizedItems = await normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null);
     const allowNegativeStock = await stockPolicy(service);
     const { plans: stockPlans, shortages: stockWarnings } =
       await planSaleStock(service, shift.shop_id, normalizedItems);
