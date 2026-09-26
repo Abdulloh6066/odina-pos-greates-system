@@ -7,6 +7,7 @@ export default function DataCleanupPanel() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState('');
 
   const clearPrelaunchSales = async () => {
     const phrase = window.prompt(
@@ -17,15 +18,27 @@ export default function DataCleanupPanel() {
     setBusy(true);
     setError('');
     setResult(null);
+    setProgress('');
     try {
-      const response = await base44.functions.invoke('clear-prelaunch-sales', {
-        scope: 'prelaunch_sales_shifts',
-        confirm: 'SOTUVNI_TOZALASH',
-      });
-      const data = response?.data || response;
-      setResult({ ...data, total_deleted: Object.values(data.deleted || {}).reduce((sum, count) => sum + count, 0) });
+      let removedThisSession = 0;
+      for (let step = 0; step < 100; step += 1) {
+        const response = await base44.functions.invoke('clear-prelaunch-sales', {
+          scope: 'prelaunch_sales_shifts',
+          confirm: 'SOTUVNI_TOZALASH',
+        });
+        const data = response?.data || response;
+        if (!data?.ok) throw new Error(data?.error || 'Tozalash to‘xtadi.');
+        removedThisSession += Number(data.deleted_this_step || 0);
+        if (data.done) {
+          setResult({ ...data, total_deleted: removedThisSession });
+          setProgress('');
+          return;
+        }
+        setProgress(`${data.stage}: yana ${data.deleted_this_step} ta yozuv tozalandi…`);
+      }
+      throw new Error('Tozalash 100 bosqich chegarasida to‘xtadi. Qoldiq yozuvlarni tekshiring.');
     } catch (e) {
-      setError(e?.response?.data?.error || 'Tozalash yakunlanmadi. Qoldiq yozuvlarni tekshiring.');
+      setError(e?.response?.data?.error || e?.message || 'Tozalash yakunlanmadi. Qoldiq yozuvlarni tekshiring.');
     } finally {
       setBusy(false);
     }
@@ -52,9 +65,10 @@ export default function DataCleanupPanel() {
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
         {busy ? 'Tozalanmoqda…' : 'Sotuv va smenalarni tozalash (mahsulotlar saqlanadi)'}
       </Button>
+      {busy && progress && <p role="status" className="text-sm text-muted-foreground">{progress}</p>}
       {result?.ok && (
         <p role="status" className="text-sm font-medium text-emerald-700">
-          Tozalandi: {Number(result.total_deleted || 0)} ta yozuv. Yangi smena ochish mumkin.
+          Savdo va smena tarixi tozalandi. Ushbu davom ettirishda {Number(result.total_deleted || 0)} ta yozuv o‘chirildi. Yangi smena ochish mumkin.
         </p>
       )}
       {error && <p role="alert" className="text-sm font-medium text-destructive">{error}</p>}
