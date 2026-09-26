@@ -671,17 +671,10 @@ export default async function(req) {
       if (!/^[A-Za-z0-9_-]{8,100}$/.test(requestKey)) {
         return Response.json({ error: "Pul operatsiyasi kaliti noto‘g‘ri." }, { status: 400 });
       }
-      const fingerprint = hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(
-        JSON.stringify([shiftId, user.id, amount, reason, expenseCategory, verifiedRecipientId, recipientName]),
-      ))));
-      const claimPrefix = `cash-out:${requestKey}:`;
-      const claimKey = claimPrefix + fingerprint;
+      const claimKey = `cash-out:${requestKey}`;
       const shift = await service.entities.Shift.get(shiftId);
       if (!shift || shift.user_id !== user.id) return Response.json({ error: "Bu smena boshqa xodimga tegishli yoki topilmadi." }, { status: 403 });
-      const priorClaim = (shift.sale_request_keys || []).find((key: string) => key.startsWith(claimPrefix));
-      if (priorClaim && priorClaim !== claimKey) {
-        return Response.json({ error: "Avvalgi pul so‘rovining ma’lumotlarini o‘zgartirib qayta yuborib bo‘lmaydi.", operation_pending: true }, { status: 409 });
-      }
+      const priorClaim = (shift.sale_request_keys || []).includes(claimKey);
       const findMovement = async () => {
         const rows = await service.entities.CashMovement.filter({ reference_id: requestKey, reference_type: "cash_withdrawal", user_id: user.id, shift_id: shift.id }, "created_date", 2);
         if (rows.length > 1) throw httpError("Pul operatsiyasi tarixi tekshirilishi kerak. Qayta pul bermang.", 409);
@@ -689,7 +682,13 @@ export default async function(req) {
       };
       if (priorClaim) {
         const recorded = await findMovement();
-        if (recorded) return Response.json({ movement: recorded, shift, already_processed: true });
+        if (recorded) {
+          if (recorded.amount !== amount || recorded.reason !== reason || recorded.expense_category !== expenseCategory
+            || String(recorded.recipient_id || "") !== verifiedRecipientId || String(recorded.recipient_name_snapshot || "") !== recipientName) {
+            return Response.json({ error: "Bu pul so‘rovi kaliti boshqa ma’lumotlar uchun ishlatilgan.", operation_pending: true }, { status: 409 });
+          }
+          return Response.json({ movement: recorded, shift, already_processed: true });
+        }
         return Response.json({ error: "Pul operatsiyasi yakunlanmoqda yoki tekshiruv talab qiladi. Qayta pul bermang; shu so‘rovni qayta tekshiring.", operation_pending: true }, { status: 503 });
       }
       if (shift.status !== "open") return Response.json({ error: "Smena ochiq emas." }, { status: 409 });
@@ -700,7 +699,9 @@ export default async function(req) {
         { $inc: { expected_cash: -amount, cash_removed: amount }, $push: { sale_request_keys: claimKey } },
       );
       if (!debited?.success || Number(debited.updated || 0) !== 1) {
-        return Response.json({ error: "Kassada pul yetarli emas yoki operatsiya boshqa oynada boshlangan. Yangilab tekshiring." }, { status: 409 });
+        const latest = await service.entities.Shift.get(shift.id);
+        const pending = (latest?.sale_request_keys || []).includes(claimKey);
+        return Response.json({ error: "Kassada pul yetarli emas yoki operatsiya boshqa oynada boshlangan. Yangilab tekshiring.", operation_pending: pending }, { status: 409 });
       }
       let movement: any;
       try {
