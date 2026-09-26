@@ -106,8 +106,11 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
     });
   };
 
+  // Unmount the closing dialog before the shift report can invoke native print.
+  if (!open || !shift) return null;
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && !loading && onClose()}>
       <DialogContent className="sm:max-w-3xl max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Smenani yopish</DialogTitle>
