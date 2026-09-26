@@ -76,6 +76,14 @@
       "type": "number",
       "default": 0,
       "description": "Oxirgi ishlab chiqarishdagi 1 natija birligi tannarxi"
+    },
+    "sale_unit": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "gram"
+      ],
+      "default": "piece"
     }
   },
   "required": [
