@@ -297,10 +297,10 @@ async function withSyncLock(work) {
 export function pendingSaleRetryDelay(records, now = Date.now()) {
   const pending = (records || []).filter((row) => row.status !== 'failed');
   if (!pending.length) return null;
-  return Math.max(1000, Math.min(...pending.map((row) => {
-    const next = Date.parse(row.next_retry_at || '');
-    return Number.isFinite(next) ? next - now : 1000;
-  })));
+  // Keep temporary outages ordered: a newer sale must not defeat the oldest
+  // pending request's backoff and cause repeated server calls every second.
+  const next = Date.parse(pending[0].next_retry_at || '');
+  return Math.max(1000, Number.isFinite(next) ? next - now : 1000);
 }
 
 // Storage injection is used by memory-only regression tests; production defaults
@@ -322,7 +322,8 @@ export async function syncPendingSales({ userId, send, retryFailed = false,
 
     for (const record of records) {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
-      if (!retryFailed && (record.status === 'failed' || Date.parse(record.next_retry_at || '') > now())) continue;
+      if (!retryFailed && record.status === 'failed') continue;
+      if (!retryFailed && Date.parse(record.next_retry_at || '') > now()) break;
 
       await storage.update(record.id, {
         status: 'syncing',
