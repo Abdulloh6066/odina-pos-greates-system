@@ -18,7 +18,7 @@ export default function Cart({
           <span className="odina-cart-header-icon" aria-hidden="true"><ReceiptText className="w-4 h-4" /></span>
           <div className="min-w-0">
             <h2 className="font-display text-lg font-bold">Joriy buyurtma</h2>
-            <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + i.quantity, 0)} ta mahsulot</p>
+            <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + (i.sale_unit === 'gram' ? 1 : i.quantity), 0)} ta mahsulot</p>
           </div>
         </div>
         {cart.length > 0 && !tableSaved && (
@@ -50,10 +50,12 @@ export default function Cart({
                 </div>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold leading-snug" title={item.product_name}>{item.product_name}</div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{formatUZS(item.price)}</div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{formatUZS(item.price)}{item.sale_unit === 'gram' ? ' / kg' : ''}</div>
                 </div>
               </div>
-              <div className="inline-flex shrink-0 items-center rounded-lg border border-border bg-card">
+              {item.sale_unit === 'gram' ? (
+                <button type="button" disabled={locked} onClick={() => onInc(item)} className="h-11 px-2 rounded-lg border border-border text-xs font-semibold" aria-label={item.product_name + ' grammini o‘zgartirish'}>{item.quantity} g ✎</button>
+              ) : <div className="inline-flex shrink-0 items-center rounded-lg border border-border bg-card">
                 <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-9 h-9 rounded-l-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -61,7 +63,7 @@ export default function Cart({
                 <button type="button" onClick={() => onInc(item)} disabled={locked} aria-label={`${item.product_name} miqdorini oshirish`} className="w-9 h-9 rounded-r-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                   <Plus className="w-3.5 h-3.5" />
                 </button>
-              </div>
+              </div>}
               <div className="min-w-0 text-right text-sm font-bold leading-snug text-brand-ink break-words tabular-nums">{formatUZS(item.subtotal)}</div>
               <button type="button" onClick={() => onRemove(item)} disabled={locked} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="h-11 w-11 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
                 <Trash2 className="w-4 h-4" />
