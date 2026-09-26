@@ -1,6 +1,6 @@
 // Printing is presentation only: never retry or change the saved sale here.
 // Do not release global modal pointer locks: another real dialog may own them.
-export function startReceiptPrint({ win = window, doc = document, onDone, onWarning = () => {} }) {
+export function startReceiptPrint({ win = window, doc = document, onDone, onWarning = () => {}, printClass = 'odina-sale-printing', warningMessage }) {
   let stopped = false;
   let started = false;
   let returned = false;
@@ -11,7 +11,7 @@ export function startReceiptPrint({ win = window, doc = document, onDone, onWarn
   let recoveryTimer = null;
   let paintedFrames = 0;
   const media = win.matchMedia?.('print');
-  const warning = 'Savdo saqlangan. Chek chiqmagan bo‘lsa, Savdolar tarixidan qayta chop eting; qayta pul olmang.';
+  const warning = warningMessage || 'Savdo saqlangan. Chek chiqmagan bo‘lsa, Savdolar tarixidan qayta chop eting; qayta pul olmang.';
   const removeListeners = () => {
     win.removeEventListener('afterprint', finish);
     win.removeEventListener('focus', recoverOnReturn);
@@ -26,7 +26,7 @@ export function startReceiptPrint({ win = window, doc = document, onDone, onWarn
     if (frame !== null) win.cancelAnimationFrame(frame);
     if (recoveryTimer !== null) win.clearTimeout(recoveryTimer);
     removeListeners();
-    doc.body.classList.remove('odina-sale-printing');
+    doc.body.classList.remove(printClass);
     // Defer until native window.print() returns, including synchronous afterprint.
     doneTimer = win.setTimeout(() => { if (!stopped) onDone(); }, 0);
   };
@@ -64,7 +64,7 @@ export function startReceiptPrint({ win = window, doc = document, onDone, onWarn
     win.addEventListener('keydown', recoverOnInteraction, true);
     if (media?.addEventListener) media.addEventListener('change', onMediaChange);
     else media?.addListener?.(onMediaChange);
-    doc.body.classList.add('odina-sale-printing');
+    doc.body.classList.add(printClass);
     try { win.print(); } catch { onWarning(warning); finish(); }
     finally {
       returned = true;
@@ -83,6 +83,6 @@ export function startReceiptPrint({ win = window, doc = document, onDone, onWarn
     if (doneTimer !== null) win.clearTimeout(doneTimer);
     if (recoveryTimer !== null) win.clearTimeout(recoveryTimer);
     removeListeners();
-    doc.body.classList.remove('odina-sale-printing');
+    doc.body.classList.remove(printClass);
   };
 }
