@@ -1,67 +1,75 @@
+// Offline receipt lifecycle test. No printer or live sale is touched.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
 const receipt = fs.readFileSync(new URL('../src/components/pos/Receipt.jsx', import.meta.url), 'utf8');
+const pos = fs.readFileSync(new URL('../src/pages/POS.jsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
 
-test('printable receipt uses the full saved sale contents outside the clipped dialog', () => {
-  const content = receipt.slice(receipt.indexOf('const receiptContent = ('), receipt.indexOf('  return (\n    <Dialog'));
-  assert.match(content, /sale\.items\?\.map/);
-  assert.match(content, /sale\.payments\?\.map/);
-  assert.match(content, /formatUZS\(sale\.total\)/);
-  assert.match(content, /sale\.sale_number/);
-  assert.match(receipt, /className="receipt-preview"\>\{receiptContent\}/);
-  assert.match(receipt, /createPortal\(\s*<div className="receipt-print sale-receipt hidden[^"]*"\>\s*\{receiptContent\}/);
+test('printed 80mm receipt uses saved sale items, payments and shop contacts', () => {
+  assert.match(receipt, /sale\.items\?\.map/);
+  assert.match(receipt, /sale\.payments\?\.map/);
+  assert.match(receipt, /formatUZS\(sale\.total\)/);
+  assert.match(receipt, /sale\.sale_number/);
+  assert.match(receipt, /sale\.receipt_phone_snapshot/);
+  assert.match(receipt, /return createPortal\(/);
+  assert.match(receipt, /className="receipt-print sale-receipt hidden/);
   assert.match(css, /\.receipt-print\.sale-receipt \{ display: block !important; \}/);
   assert.match(css, /body\.odina-sale-printing > #root \{ display: none !important; \}/);
 });
 
-const printAction = receipt.slice(
-  receipt.indexOf('  const handlePrint = () => {'),
-  receipt.indexOf('  const timeStr ='),
-).trim();
+const start = receipt.indexOf('  useEffect(() => {\n    if (!print || !sale || afterPrintRef.current)');
+const end = receipt.indexOf('  }, [print, sale]);', start);
+assert.ok(start >= 0 && end > start, 'print effect exists');
+const effectBody = receipt.slice(start, end + '  }, [print, sale]);'.length)
+  .replace('  useEffect(() => {', '  const runEffect = () => {')
+  .replace('  }, [print, sale]);', '  };');
 
-function simulatePrint({ eligible, throws = false }) {
+function simulatePrint({ print = true, throws = false } = {}) {
   const calls = [];
   const classes = new Set();
   let afterprint;
+  const sale = { id: 'saved-sale' };
   const context = {
-    afterPrintRef: { current: null },
-    canOfferStaffTicket: eligible,
-    setAskStaffTicket: (value) => calls.push(['ask', value]),
+    print, sale, afterPrintRef: { current: null },
+    onAfterPrintRef: { current: (value) => calls.push(['after', value.id]) },
     document: { body: { classList: {
       add: (value) => classes.add(value),
       remove: (value) => classes.delete(value),
     } } },
     window: {
-      addEventListener: (name, handler) => { assert.equal(name, 'afterprint'); afterprint = handler; },
-      removeEventListener: (name, handler) => { if (name === 'afterprint' && afterprint === handler) afterprint = null; },
+      addEventListener: (name, fn) => { assert.equal(name, 'afterprint'); afterprint = fn; },
+      removeEventListener: (name, fn) => { if (name === 'afterprint' && afterprint === fn) afterprint = null; },
+      setTimeout: (fn) => { fn(); return 1; },
+      clearTimeout: () => {},
       print: () => { calls.push(['print']); if (throws) throw new Error('printer unavailable'); },
     },
   };
-  vm.runInNewContext(printAction + '\nglobalThis.startPrint = handlePrint;', context);
-  context.startPrint();
-  return { calls, classes, afterprint: () => afterprint?.(), current: () => context.afterPrintRef.current };
+  vm.runInNewContext(effectBody + '\nglobalThis.cleanup = runEffect();', context);
+  return { calls, classes, afterprint: () => afterprint?.(), cleanup: () => context.cleanup?.(),
+    current: () => context.afterPrintRef.current };
 }
 
-test('walk-in sale asks about service ticket only after the print window closes', () => {
-  const result = simulatePrint({ eligible: true });
-  assert.deepEqual(result.calls, [['ask', false], ['print']]);
+test('receipt finishes only after print and clears print mode once', () => {
+  const result = simulatePrint();
+  assert.deepEqual(result.calls, [['print']]);
   assert.equal(result.classes.has('odina-sale-printing'), true);
   result.afterprint();
-  assert.deepEqual(result.calls.at(-1), ['ask', true]);
+  result.afterprint();
+  assert.deepEqual(result.calls, [['print'], ['after', 'saved-sale']]);
   assert.equal(result.classes.has('odina-sale-printing'), false);
   assert.equal(result.current(), null);
+  result.cleanup();
 });
 
-test('table sale and failed print do not offer a second service ticket', () => {
-  const table = simulatePrint({ eligible: false });
-  table.afterprint();
-  assert.deepEqual(table.calls, [['ask', false], ['print']]);
-  const failure = simulatePrint({ eligible: true, throws: true });
-  assert.deepEqual(failure.calls, [['ask', false], ['print']]);
-  assert.equal(failure.current(), null);
-  assert.equal(failure.classes.has('odina-sale-printing'), false);
+test('printer failure releases print mode; POS decides whether to ask for a service ticket', () => {
+  const result = simulatePrint({ throws: true });
+  assert.deepEqual(result.calls, [['print'], ['after', 'saved-sale']]);
+  assert.equal(result.classes.has('odina-sale-printing'), false);
+  assert.equal(result.current(), null);
+  assert.match(pos, /if \(sale\?\.items\?\.length && !sale\?\.table_number_snapshot\)/);
+  assert.match(pos, /onAfterPrint=\{finishSalePresentation\}/);
+  assert.deepEqual(simulatePrint({ print: false }).calls, []);
 });
