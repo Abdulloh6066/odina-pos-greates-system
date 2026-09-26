@@ -29,9 +29,9 @@ import { priceForShop } from "../../shared/shop-pricing.ts";
 async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string, trustedTableItems: any[] | null = null) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
-    const quantity = Math.floor(Number(requested?.quantity));
+    const quantity = Number(requested?.quantity);
     const productId = String(requested?.product_id || "");
-    if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
+    if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) {
       throw httpError("Har bir mahsulotda to‘g‘ri dona soni bo‘lishi kerak.", 400);
     }
     quantities.set(productId, (quantities.get(productId) || 0) + quantity);
@@ -54,17 +54,20 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
     }
+    const saleUnit = product.sale_unit === "gram" ? "gram" : "piece";
+    const tracked = saleUnit !== "gram" && (product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false);
     normalizedItems.push({
       product_id: product.id || product.product_id,
       product_name: savedItem ? savedItem.product_name : product.name,
       image_url: product.image_url || "",
       price: unitPrice,
+      sale_unit: saleUnit,
       quantity,
-      subtotal: unitPrice * quantity,
+      subtotal: Math.round(unitPrice * quantity / (saleUnit === "gram" ? 1000 : 1)),
       source_type: product.source_type || "central_produced",
-      stock_tracked: product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false,
+      stock_tracked: tracked,
       stock_location_id: "",
-      stock_quantity_change: (product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false) ? -quantity : 0,
+      stock_quantity_change: tracked ? -quantity : 0,
     });
   }
   return normalizedItems;
@@ -1413,7 +1416,7 @@ export default async function(req) {
         : money(discountAmount * item.subtotal / subtotal);
       allocatedDiscount += itemDiscount;
       const costInfo = unitCostByProduct.get(item.product_id) || { costPerPiece: 0, hasPrice: false };
-      const snapUnitCost = costInfo.hasPrice ? money(costInfo.costPerPiece) : 0;
+      const snapUnitCost = item.sale_unit !== "gram" && costInfo.hasPrice ? money(costInfo.costPerPiece) : 0;
       const snapTotalCost = snapUnitCost * item.quantity;
       return {
         sale_id: sale.id,
@@ -1430,11 +1433,12 @@ export default async function(req) {
         image_url_snapshot: item.image_url,
         quantity: item.quantity,
         unit_price: item.price,
+        sale_unit: item.sale_unit,
         discount_amount: itemDiscount,
         line_total: item.subtotal - itemDiscount,
         unit_cost_at_sale: snapUnitCost,
         total_cost_at_sale: snapTotalCost,
-        cost_is_estimate: !costInfo.hasPrice,
+        cost_is_estimate: item.sale_unit === "gram" || !costInfo.hasPrice,
         created_at: soldAt,
       };
     });
