@@ -647,7 +647,7 @@ export default async function(req) {
       const allowedCategories = new Set(["shop_expense", "goods_payment", "owner_withdrawal", "other_expense"]);
       const employeeName = user.full_name || user.email || "Noma’lum xodim";
 
-      if (!shiftId || amount <= 0 || !reason || !allowedCategories.has(expenseCategory)) {
+      if (!shiftId || !Number.isSafeInteger(amount) || amount <= 0 || !reason || !allowedCategories.has(expenseCategory)) {
         return Response.json({ error: "Miqdor, chiqim turi va izoh majburiy." }, { status: 400 });
       }
 
@@ -667,14 +667,44 @@ export default async function(req) {
         recipientName = requestedRecipientName || "Abdulloh";
       }
 
-      const shift = await service.entities.Shift.get(shiftId);
-      if (!shift || shift.status !== "open") return Response.json({ error: "Smena ochiq emas." }, { status: 409 });
-      if (shift.user_id !== user.id) return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
-      if (amount > Number(shift.expected_cash || 0)) {
-        return Response.json({ error: "Kassada kutilayotgan naqd pul yetarli emas." }, { status: 400 });
+      const requestKey = String(body?.idempotency_key || crypto.randomUUID());
+      if (!/^[A-Za-z0-9_-]{8,100}$/.test(requestKey)) {
+        return Response.json({ error: "Pul operatsiyasi kaliti noto‘g‘ri." }, { status: 400 });
       }
-
-      const movement = await service.entities.CashMovement.create({
+      const fingerprint = hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(
+        JSON.stringify([shiftId, user.id, amount, reason, expenseCategory, verifiedRecipientId, recipientName]),
+      ))));
+      const claimPrefix = `cash-out:${requestKey}:`;
+      const claimKey = claimPrefix + fingerprint;
+      const shift = await service.entities.Shift.get(shiftId);
+      if (!shift || shift.user_id !== user.id) return Response.json({ error: "Bu smena boshqa xodimga tegishli yoki topilmadi." }, { status: 403 });
+      const priorClaim = (shift.sale_request_keys || []).find((key: string) => key.startsWith(claimPrefix));
+      if (priorClaim && priorClaim !== claimKey) {
+        return Response.json({ error: "Avvalgi pul so‘rovining ma’lumotlarini o‘zgartirib qayta yuborib bo‘lmaydi.", operation_pending: true }, { status: 409 });
+      }
+      const findMovement = async () => {
+        const rows = await service.entities.CashMovement.filter({ reference_id: requestKey, reference_type: "cash_withdrawal", user_id: user.id, shift_id: shift.id }, "created_date", 2);
+        if (rows.length > 1) throw httpError("Pul operatsiyasi tarixi tekshirilishi kerak. Qayta pul bermang.", 409);
+        return rows[0] || null;
+      };
+      if (priorClaim) {
+        const recorded = await findMovement();
+        if (recorded) return Response.json({ movement: recorded, shift, already_processed: true });
+        return Response.json({ error: "Pul operatsiyasi yakunlanmoqda yoki tekshiruv talab qiladi. Qayta pul bermang; shu so‘rovni qayta tekshiring.", operation_pending: true }, { status: 503 });
+      }
+      if (shift.status !== "open") return Response.json({ error: "Smena ochiq emas." }, { status: 409 });
+      // Atomic debit + request claim: another sale or withdrawal cannot overwrite
+      // this operation, and the same request cannot debit the drawer twice.
+      const debited = await service.entities.Shift.updateMany(
+        { id: shift.id, status: "open", user_id: user.id, expected_cash: { $gte: amount }, sale_request_keys: { $ne: claimKey } },
+        { $inc: { expected_cash: -amount, cash_removed: amount }, $push: { sale_request_keys: claimKey } },
+      );
+      if (!debited?.success || Number(debited.updated || 0) !== 1) {
+        return Response.json({ error: "Kassada pul yetarli emas yoki operatsiya boshqa oynada boshlangan. Yangilab tekshiring." }, { status: 409 });
+      }
+      let movement: any;
+      try {
+        movement = await service.entities.CashMovement.create({
         shift_id: shift.id,
         shop_id: shift.shop_id,
         user_id: user.id,
@@ -686,27 +716,39 @@ export default async function(req) {
         recipient_name_snapshot: recipientName || undefined,
         amount,
         reason,
+        reference_id: requestKey,
+        reference_type: "cash_withdrawal",
         created_at: new Date().toISOString(),
-      });
-
-      await service.entities.Shift.update(shift.id, {
-        expected_cash: Number(shift.expected_cash || 0) - amount,
-        cash_removed: Number(shift.cash_removed || 0) + amount,
-      });
+        });
+      } catch (recordError) {
+        // A timeout can mean the ledger write succeeded but its reply was lost.
+        // Re-read before deciding; never blindly reverse or debit a second time.
+        let checked = false;
+        try { movement = await findMovement(); checked = true; } catch { /* uncertain */ }
+        if (!movement) {
+          const status = Number((recordError as any)?.response?.status || (recordError as any)?.status || 0);
+          if (checked && [400, 401, 403, 404, 422].includes(status)) {
+            const reversed = await service.entities.Shift.updateMany(
+              { id: shift.id, sale_request_keys: { $in: [claimKey] } },
+              { $inc: { expected_cash: amount, cash_removed: -amount }, $pull: { sale_request_keys: claimKey } },
+            );
+            if (reversed?.success && Number(reversed.updated || 0) === 1) {
+              return Response.json({ error: "Pul olish yozilmadi; kassa balansi qaytarildi. Qayta urinib ko‘ring." }, { status: 400 });
+            }
+          }
+          await service.entities.ActionHistory.create({ user_id: user.id, user_name: employeeName,
+            action: "cash_withdrawal_needs_review", details: `${requestKey} · ${shift.id} · ${amount} UZS · ${expenseCategory} · ${reason}. Balans band qilindi; qayta pul bermang.` }).catch(() => {});
+          return Response.json({ error: "Pul operatsiyasi javobi noaniq. Qayta pul bermang; tarixni tekshiring yoki egasiga xabar bering.", operation_pending: true, reference_id: requestKey }, { status: 503 });
+        }
+      }
       await service.entities.ActionHistory.create({
         user_id: user.id,
         user_name: user.full_name || user.email,
         action: "cash_withdrawal",
         details: `${amount} UZS. ${expenseCategory}. ${recipientName || "Qabul qiluvchi yo‘q"}. ${reason}. Xodim: ${employeeName}`,
-      });
-      return Response.json({
-        movement,
-        shift: {
-          ...shift,
-          expected_cash: Number(shift.expected_cash || 0) - amount,
-          cash_removed: Number(shift.cash_removed || 0) + amount,
-        },
-      });
+      }).catch(() => {});
+      const updatedShift = await service.entities.Shift.get(shift.id);
+      return Response.json({ movement, shift: updatedShift });
     }
 
     if (action === "check_stock") {
