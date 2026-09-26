@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -23,19 +23,17 @@ export default function RealProfitDashboard() {
   const today = tashkentDateKey();
   const [mode, setMode] = useState('range'); // 'day' | 'range'
   const [day, setDay] = useState(today);
-  const [from, setFrom] = useState(today);
+  const [from, setFrom] = useState(() => tashkentDateKey(new Date(Date.now() - 6 * 86400000)));
   const [to, setTo] = useState(today);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
-  // Default range = last 7 days.
-  useEffect(() => {
-    setFrom(tashkentDateKey(new Date(Date.now() - 6 * 86400000)));
-    setTo(today);
-  }, [today]);
+  const requestVersion = useRef(0);
+  useEffect(() => () => { requestVersion.current += 1; }, []);
 
   const fetchData = async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setErr('');
     try {
@@ -46,17 +44,21 @@ export default function RealProfitDashboard() {
         date_from: dateFrom,
         date_to: dateTo,
       });
+      if (version !== requestVersion.current) return;
       setData(res.data || null);
     } catch (e) {
-      setErr(e?.message || 'Hisobni yuklab bo‘lmadi.');
+      if (version !== requestVersion.current) return;
+      setErr(e?.response?.data?.error || e?.message || 'Hisobni yuklab bo‘lmadi.');
       setData(null);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    // A short debounce prevents a request for every intermediate date edit.
+    const timer = window.setTimeout(fetchData, 250);
+    return () => { window.clearTimeout(timer); requestVersion.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, day, from, to]);
 
@@ -83,7 +85,7 @@ export default function RealProfitDashboard() {
       <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 className="font-display text-lg font-bold flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-brand-olive" /> Real foyda — tushum vs tannarx
+            <TrendingUp className="w-5 h-5 text-brand-olive" /> Pul tushumi va Kassa foydasi
           </h3>
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-xl border border-border overflow-hidden">
@@ -140,15 +142,21 @@ export default function RealProfitDashboard() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Jami tushum" value={formatUZS(grand.revenue)} sub={`${grand.sales} ta savdo`} />
-        <StatCard label="Tannarx (masalliqlar)" value={formatUZS(grand.cost)} tone="cost" sub={`${grand.refunds} ta qaytar`} />
-        <StatCard label="Real foyda" value={formatUZS(grand.profit)} tone="profit" />
-        <StatCard label="Foyda marjasi" value={`${margin}%`} tone={margin >= 0 ? 'profit' : 'cost'} />
+        <StatCard label="Jami olingan pul" value={formatUZS(grand.collections ?? grand.revenue)} sub="Kassa sof savdo + buyurtma to‘lovlari" />
+        <StatCard label="Buyurtma to‘lovlari" value={formatUZS(grand.orderPayments || 0)} sub="Avans va qoldiq — pul olingan kuni" />
+        <StatCard label="Kassa sof savdo" value={formatUZS(grand.revenue)} sub={`${grand.sales} ta savdo · ${grand.refunds} ta qaytar`} />
+        <StatCard label="Kassa yalpi foyda" value={grand.unknownCostCount > 0 ? 'Taxminiy: ' + formatUZS(grand.profit) : formatUZS(grand.profit)} tone="profit" sub={`Tannarx: ${formatUZS(grand.cost)} · marja ${margin}%`} />
       </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Buyurtma to‘lovlari foydaga qayta qo‘shilmaydi. Kassa yalpi foydasidan do‘kon xarajatlari ayrilmagan.
+        {' '}Xarajatlar: {formatUZS(grand.expenses || 0)}.
+        {' '}Kassa foydasi − do‘kon xarajatlari: {formatUZS(grand.netProfit ?? grand.profit)}.
+        {grand.unknownCostCount > 0 && ' Ayrim tannarxlar noma’lum yoki taxminiy; ko‘rsatilgan foyda to‘liq emas.'}
+      </p>
 
       {showTrend && (
         <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
-          <h3 className="font-display text-lg font-bold mb-4">Kunlik trend — tushum, tannarx, foyda</h3>
+          <h3 className="font-display text-lg font-bold mb-4">Kunlik Kassa savdosi, tannarxi va yalpi foydasi</h3>
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={byDay} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -168,7 +176,7 @@ export default function RealProfitDashboard() {
       )}
 
       <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
-        <h3 className="font-display text-lg font-bold mb-4">Do‘konlar bo‘yicha real foyda</h3>
+        <h3 className="font-display text-lg font-bold mb-4">Do‘konlar bo‘yicha Kassa foydasi</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -176,9 +184,11 @@ export default function RealProfitDashboard() {
                 <th className="py-2 pr-3 font-medium">Do‘kon</th>
                 <th className="py-2 pr-3 font-medium text-right">Tushum</th>
                 <th className="py-2 pr-3 font-medium text-right">Tannarx</th>
-                <th className="py-2 pr-3 font-medium text-right">Real foyda</th>
+                <th className="py-2 pr-3 font-medium text-right">Kassa yalpi foyda</th>
                 <th className="py-2 pr-3 font-medium text-right">Marja</th>
                 <th className="py-2 pr-3 font-medium text-right">Sotuv</th>
+                <th className="py-2 pr-3 font-medium text-right">Buyurtma to‘lovlari</th>
+                <th className="py-2 pr-3 font-medium text-right">Jami olingan pul</th>
               </tr>
             </thead>
             <tbody>
@@ -192,11 +202,13 @@ export default function RealProfitDashboard() {
                     <td className={`py-2.5 pr-3 text-right tabular-nums ${s.totals.profit < 0 ? 'text-destructive' : 'text-emerald-600'}`}>{formatNum(s.totals.profit)}</td>
                     <td className={`py-2.5 pr-3 text-right tabular-nums ${m < 0 ? 'text-destructive' : ''}`}>{m}%</td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">{s.totals.sales}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums">{formatNum(s.totals.orderPayments || 0)}</td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums">{formatNum(s.totals.collections ?? s.totals.revenue)}</td>
                   </tr>
                 );
               })}
               {!shopsSorted.length && !loading && (
-                <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Tanlangan davr uchun savdo topilmadi.</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Tanlangan davr uchun savdo topilmadi.</td></tr>
               )}
             </tbody>
           </table>
