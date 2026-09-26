@@ -241,9 +241,6 @@ export default function TableDetailSheet({
                 <div className="border-t border-dashed border-border my-2" />
                 <div className="text-center text-[12px] py-1">Sizning tabassumingiz biz uchun muhim! ❤️</div>
                 <div className="text-center text-[12px] py-1 font-semibold">{receiptWishForSale(tableOrder)}</div>
-                <div className="text-center text-[10px] pt-1 text-muted-foreground">
-                  Ushbu varaq to‘lov hujjati hisoblanmaydi.
-                </div>
               </div>, document.body)}
             </div>
           ) : (
