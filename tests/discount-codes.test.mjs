@@ -181,7 +181,9 @@ function loadHandler(client) {
       'error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",',
       'error: error instanceof Error ? (error.stack || error.message) : "Savdoni yakunlab bo‘lmadi.",',
     );
-  source = sharedCode + '\n' + costCode + '\n' + source + '\nglobalThis.testHandler = handler;';
+  const shopPricing = readFileSync('base44/shared/shop-pricing.ts', 'utf8').replace(/export /g, '');
+  source = source.replace(/import \{ priceForShop \} from "\.\.\/\.\.\/shared\/shop-pricing\.ts";/, '');
+  source = sharedCode + '\n' + costCode + '\n' + shopPricing + '\n' + source + '\nglobalThis.testHandler = handler;';
 
   const code = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
