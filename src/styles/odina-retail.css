@@ -49,7 +49,7 @@
 .odina-pos-search input { min-height:46px; border:1px solid #e2d2b8; background:#fffefa; border-radius:13px; box-shadow:0 2px 3px #60513403; }
 .odina-product-card { border:1px solid #e8e3d8; border-radius:16px; background:white; padding:5px; box-shadow:0 3px 10px -7px #58452930; }
 .odina-product-card:hover { border-color:#c6bf95; box-shadow:0 8px 20px -12px #65552e50; }
-.odina-product-photo { aspect-ratio:1.3; border-radius:11px; background:#f1eee5; }
+.odina-product-photo { aspect-ratio:1.3; border-radius:11px; background:#ffffff; }
 .odina-product-info { padding:8px 6px 6px; }
 .odina-product-name { font-size:12px; font-weight:600; min-height:2.1rem; line-height:1.35; }
 .odina-product-meta { display:flex; align-items:center; justify-content:space-between; gap:5px; margin-top:4px; flex-wrap:nowrap; }
