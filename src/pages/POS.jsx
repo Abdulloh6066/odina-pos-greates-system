@@ -10,6 +10,7 @@ import ProductCard from '@/components/pos/ProductCard';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
+import ShiftReport from '@/components/pos/ShiftReport';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import PosTablePicker from '@/components/tables/PosTablePicker';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
@@ -79,6 +80,7 @@ export default function POS() {
   const checkoutRequestKeyRef = useRef('');
   const checkoutRecordedAtRef = useRef('');
   const [receiptPrintSale, setReceiptPrintSale] = useState(null);
+  const [shiftReport, setShiftReport] = useState(null);
   const [staffTicketPrompt, setStaffTicketPrompt] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
 
@@ -973,7 +975,7 @@ export default function POS() {
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani yopib bo‘lmadi.');
-      window.print();
+      setShiftReport(payload.shift);
       setShift(null);
       setCloseShiftOpen(false);
     } catch (e) {
@@ -1287,6 +1289,7 @@ export default function POS() {
         offline={checkoutOffline || (!isOnline && !selectedTable)}
         fullDiscount={discountPct === 100 && subtotal > 0 && total === 0}
       />
+      <ShiftReport shift={shiftReport} onAfterPrint={() => setShiftReport(null)} />
       <Receipt
         sale={receiptPrintSale}
         settings={settings}
