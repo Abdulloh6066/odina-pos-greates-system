@@ -599,7 +599,7 @@ export default function POS() {
       const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
       list = list.filter((p) => sourceIds.includes(p.category_id));
     }
-    if (showFav) list = list.filter((p) => p.is_favorite);
+    if (showFav) list = list.filter((p) => p.is_favorite || (shopId && p.favorite_shop_ids?.includes(shopId)));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q));
