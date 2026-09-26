@@ -77,7 +77,8 @@ export function buildPendingSale({
       image_url: String(item.image_url || ''),
       price,
       quantity,
-      subtotal: price * quantity,
+      sale_unit: item.sale_unit === 'gram' ? 'gram' : 'piece',
+      subtotal: Math.round(price * quantity / (item.sale_unit === 'gram' ? 1000 : 1)),
     };
   });
 
