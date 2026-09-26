@@ -19,7 +19,7 @@ function StatCard({ label, value, sub, tone }) {
   );
 }
 
-export default function RealProfitDashboard() {
+export default function RealProfitDashboard({ onData } = {}) {
   const today = tashkentDateKey();
   const [mode, setMode] = useState('range'); // 'day' | 'range'
   const [day, setDay] = useState(today);
@@ -30,6 +30,8 @@ export default function RealProfitDashboard() {
   const [err, setErr] = useState('');
 
   const requestVersion = useRef(0);
+  const onDataRef = useRef(onData);
+  onDataRef.current = onData;
   useEffect(() => () => { requestVersion.current += 1; }, []);
 
   const fetchData = async () => {
@@ -46,10 +48,12 @@ export default function RealProfitDashboard() {
       });
       if (version !== requestVersion.current) return;
       setData(res.data || null);
+      onDataRef.current?.(res.data || null);
     } catch (e) {
       if (version !== requestVersion.current) return;
       setErr(e?.response?.data?.error || e?.message || 'Hisobni yuklab bo‘lmadi.');
       setData(null);
+      onDataRef.current?.(null);
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
