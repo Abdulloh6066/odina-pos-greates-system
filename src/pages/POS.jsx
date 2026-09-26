@@ -1134,7 +1134,7 @@ export default function POS() {
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">{shift?.shop_name || 'Faol smena yo‘q'}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {shift ? `${formatUZS(Number(shift.total_sales || 0) + queuedShiftTotal)} · ${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : 'Savdoni boshlash uchun smenani oching'}
+              {shift ? `${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : 'Savdoni boshlash uchun smenani oching'}
             </div>
           </div>
         </div>
