@@ -88,7 +88,8 @@ test('queue persists in IndexedDB and uses a cross-tab sync lock', () => {
   assert.match(source, /indexedDB\.open/);
   assert.match(source, /navigator\.locks\?\.request/);
   assert.match(source, /if \(!payload\?\.sale\)/);
-  assert.match(source, /await removePendingSale\(record\.id\)/);
+  assert.match(source, /storage = \{ list: listPendingSales, update: updatePendingSale, remove: removePendingSale \}/);
+  assert.match(source, /await storage\.remove\(record\.id\)/);
 });
 
 console.log('4 offline Kassa queue tests passed. No live data was used.');
