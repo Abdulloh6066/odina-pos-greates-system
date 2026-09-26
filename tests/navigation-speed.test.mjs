@@ -63,7 +63,7 @@ test('React uses one shared cached loader; sidebar warms only on intent/idle, no
 
 test('order entrance is no longer delayed by a 0.65s animation plus staged waits', () => {
   const css = read('src/styles/orders-premium-ledger.css');
-  assert.match(css, /animation:opl-rise \.18s/);
+  assert.doesNotMatch(css, /animation:opl-rise/);
   assert.doesNotMatch(css, /animation-delay:\.(?:08|16|24)s/);
   assert.doesNotMatch(css, /animation:opl-rise \.65s/);
 });
