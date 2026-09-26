@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { startReceiptPrint } from '@/lib/receipt-print-lifecycle';
+import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 export default function ShiftReport({ shift, onAfterPrint }) {
-  const printPendingRef = useRef(false);
   const onAfterPrintRef = useRef(onAfterPrint);
 
   useEffect(() => {
@@ -12,33 +13,13 @@ export default function ShiftReport({ shift, onAfterPrint }) {
   }, [onAfterPrint]);
 
   useEffect(() => {
-    if (!shift || printPendingRef.current) return undefined;
-    printPendingRef.current = true;
-
-    const finishPrint = () => {
-      if (!printPendingRef.current) return;
-      printPendingRef.current = false;
-      window.removeEventListener('afterprint', finishPrint);
-      document.body.classList.remove('odina-shift-printing');
-      onAfterPrintRef.current?.();
-    };
-
-    window.addEventListener('afterprint', finishPrint);
-    document.body.classList.add('odina-shift-printing');
-    const timer = window.setTimeout(() => {
-      try {
-        window.print();
-      } catch {
-        finishPrint();
-      }
-    }, 50);
-
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener('afterprint', finishPrint);
-      printPendingRef.current = false;
-      document.body.classList.remove('odina-shift-printing');
-    };
+    if (!shift) return undefined;
+    return startReceiptPrint({
+      printClass: 'odina-shift-printing',
+      warningMessage: 'Smena yopilgan. Hisobot chiqmagan bo‘lsa, Smenalar tarixidan qayta chop eting.',
+      onDone: () => onAfterPrintRef.current?.(),
+      onWarning: (description) => toast({ title: 'Smena hisoboti', description, variant: 'destructive' }),
+    });
   }, [shift]);
 
   if (!shift) return null;
