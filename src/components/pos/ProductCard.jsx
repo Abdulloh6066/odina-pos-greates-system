@@ -9,7 +9,7 @@ export default function ProductCard({ product, stockQuantity = null, onAdd, disa
       onClick={() => onAdd(product)}
       disabled={disabled}
       aria-label={`${product.name}, ${formatUZS(product.price)}. Buyurtmaga qo‘shish`}
-      className="odina-product-card group relative text-left bg-card rounded-2xl overflow-hidden border border-border hover:border-brand-sand premium-shadow hover:premium-shadow-lg transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 touch-manipulation select-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="odina-product-card group relative text-left bg-card rounded-2xl overflow-hidden border border-border hover:border-brand-sand premium-shadow hover:premium-shadow-lg transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation select-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <div className="odina-product-photo relative aspect-square bg-secondary overflow-hidden">
         {product.image_url ? (
