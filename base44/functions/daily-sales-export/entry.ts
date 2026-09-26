@@ -3,23 +3,32 @@ import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 import { TELEGRAM_GROUP_ID, localClock } from "../../shared/telegram-alert-logic.ts";
 import {
   computeShopReport,
-  reportToRow,
+  reportToRow, REPORT_HEADERS,
 } from "../../shared/daily-report-logic.ts";
+import { loadReportActivity, readReportRows, reportDate, reportRange } from "../../shared/report-activity.ts";
 
 const CONFIG_KEY = "daily-export";
 
 const VIEW_ROLES = ["admin", "manager", "accountant"];
 const ADMIN_ROLES = ["admin"];
 
-async function readAll(entity: any, query: any = {}, sort = "id", limit = 500): Promise<any[]> {
-  const rows: any[] = [];
-  for (let skip = 0; skip < 10000; skip += limit) {
-    const page = await entity.filter(query, sort, limit, skip);
-    rows.push(...page);
-    if (page.length < limit) return rows;
-  }
-  return rows;
+const readAll = readReportRows;
+
+function activityMetrics(activity: any, shopId = "", date = "") {
+  const match = (row: any, day: string) => (!shopId || row.shop_id === shopId) && (!date || day === date);
+  return computeShopReport(
+    activity.sales.filter((row: any) => match(row, row.business_date)), activity.itemsBySale,
+    { allSales: activity.allSales,
+      refunds: activity.refunds.filter((row: any) => match(row, reportDate(row.created_at || row.created_date))),
+      orderPayments: activity.orderPayments.filter((row: any) => match(row, reportDate(row.paid_at))),
+      expenses: activity.expenses.filter((row: any) => match(row, reportDate(row.created_at || row.created_date))),
+    },
+  );
 }
+const extraMetrics = (m: any) => ({
+  orderPayments: m.orderPayments, collections: m.collections, expenses: m.expenses,
+  netProfit: m.netProfit, unknownCostCount: m.unknownCostCount,
+});
 
 async function getConfig(service: any) {
   const rows = await service.entities.DailyExportConfig.filter({ key: CONFIG_KEY }, "created_date", 2);
@@ -36,21 +45,13 @@ async function getConfig(service: any) {
 async function computeReportsForDate(service: any, businessDate: string) {
   const allShops = await readAll(service.entities.Shop, {}, "name");
   const shops = allShops.filter((s: any) => s.active !== false);
-  const sales = await readAll(service.entities.Sale, { business_date: businessDate }, "id");
-  const saleIds = sales.map((s: any) => s.id).filter(Boolean);
-  const saleItems = saleIds.length
-    ? await readAll(service.entities.SaleItem, { sale_id: { $in: saleIds } }, "id")
-    : [];
-  const itemsBySale = new Map<string, any[]>();
-  for (const it of saleItems) {
-    if (!itemsBySale.has(it.sale_id)) itemsBySale.set(it.sale_id, []);
-    itemsBySale.get(it.sale_id)!.push(it);
-  }
+  const activity = await loadReportActivity(service, businessDate, businessDate);
+  const sales = activity.sales;
 
   const reports: any[] = [];
   for (const shop of shops) {
     const shopSales = sales.filter((s: any) => s.shop_id === shop.id);
-    const m = computeShopReport(shopSales, itemsBySale);
+    const m = activityMetrics(activity, shop.id);
     reports.push({
       business_date: businessDate,
       shop_id: shop.id,
@@ -65,7 +66,12 @@ async function computeReportsForDate(service: any, businessDate: string) {
       humo_total: m.humo,
       online_total: m.online,
       bank_transfer_total: m.bank_transfer,
-      _empty: shopSales.length === 0,
+      order_payment_total: m.orderPayments,
+      collections_total: m.collections,
+      expenses_total: m.expenses,
+      net_profit: m.netProfit,
+      unknown_cost_count: m.unknownCostCount,
+      _empty: shopSales.length === 0 && m.orderPaymentCount === 0 && m.refundCount === 0,
     });
   }
   return reports;
@@ -82,20 +88,8 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     f = t;
     t = tmp;
   }
-  const sales = await readAll(
-    service.entities.Sale,
-    { business_date: { $gte: f, $lte: t } },
-    "business_date",
-  );
-  const saleIds = sales.map((s: any) => s.id).filter(Boolean);
-  const saleItems = saleIds.length
-    ? await readAll(service.entities.SaleItem, { sale_id: { $in: saleIds } }, "id")
-    : [];
-  const itemsBySale = new Map<string, any[]>();
-  for (const it of saleItems) {
-    if (!itemsBySale.has(it.sale_id)) itemsBySale.set(it.sale_id, []);
-    itemsBySale.get(it.sale_id)!.push(it);
-  }
+  const activity = await loadReportActivity(service, f, t);
+  const sales = activity.sales;
 
   const dateSet = new Set<string>();
   const salesByDate = new Map<string, any[]>();
@@ -105,7 +99,10 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     if (!salesByDate.has(d)) salesByDate.set(d, []);
     salesByDate.get(d)!.push(s);
   }
-  const dates = Array.from(dateSet).sort();
+  for (const row of activity.refunds) dateSet.add(reportDate(row.created_at || row.created_date));
+  for (const row of activity.orderPayments) dateSet.add(reportDate(row.paid_at));
+  for (const row of activity.expenses) dateSet.add(reportDate(row.created_at || row.created_date));
+  const dates = Array.from(dateSet).filter(Boolean).sort();
 
   const shopsOut = shops.map((shop: any) => {
     const dayRows: any[] = [];
@@ -116,7 +113,7 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     let refunds = 0;
     for (const date of dates) {
       const ds = (salesByDate.get(date) || []).filter((s: any) => s.shop_id === shop.id);
-      const m = computeShopReport(ds, itemsBySale);
+      const m = activityMetrics(activity, shop.id, date);
       dayRows.push({
         date,
         revenue: m.revenue,
@@ -124,6 +121,7 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
         profit: m.realProfit,
         sales: m.saleCount,
         refunds: m.refundCount,
+        ...extraMetrics(m),
       });
       revenue += m.revenue;
       cost += m.cost;
@@ -134,14 +132,14 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     return {
       shop_id: shop.id,
       shop_name: shop.name,
-      totals: { revenue, cost, profit, sales: salesCount, refunds },
+      totals: { revenue, cost, profit, sales: salesCount, refunds, ...extraMetrics(activityMetrics(activity, shop.id)) },
       days: dayRows,
     };
   });
 
   const byDay = dates.map((date: string) => {
     const ds = salesByDate.get(date) || [];
-    const m = computeShopReport(ds, itemsBySale);
+    const m = activityMetrics(activity, "", date);
     return {
       date,
       revenue: m.revenue,
@@ -149,6 +147,7 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
       profit: m.realProfit,
       sales: m.saleCount,
       refunds: m.refundCount,
+      ...extraMetrics(m),
     };
   });
   const grand = byDay.reduce(
@@ -162,7 +161,10 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     { revenue: 0, cost: 0, profit: 0, sales: 0, refunds: 0 },
   );
 
-  return { date_from: f, date_to: t, dates, shops: shopsOut, byDay, grand };
+  return { date_from: f, date_to: t, dates, shops: shopsOut, byDay,
+    grand: { ...grand, ...extraMetrics(activityMetrics(activity)) },
+    notice: 'Buyurtma to‘lovlari pul tushumiga kiradi, lekin Kassa foydasiga qo‘shilmaydi. Noma’lum tannarx bo‘lsa foyda taxminiy.',
+  };
 }
 
 async function handleRange(service: any, body: any) {
