@@ -67,7 +67,7 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
           <div className="space-y-1">
             {sale.items?.map((it, i) => (
               <div key={i} className="flex justify-between gap-2">
-                <span className="truncate">{it.quantity}× {it.product_name}</span>
+                <span className="truncate">{it.quantity}{it.sale_unit === 'gram' ? ' g' : '×'} {it.product_name}</span>
                 <span className="shrink-0">{formatUZS(it.subtotal)}</span>
               </div>
             ))}
