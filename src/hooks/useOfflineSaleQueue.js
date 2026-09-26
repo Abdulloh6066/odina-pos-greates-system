@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   listPendingSales,
+  pendingSaleRetryDelay,
   savePendingSale,
   subscribePendingSales,
   syncErrorMessage,
@@ -36,7 +37,7 @@ export default function useOfflineSaleQueue(userId, onSynced) {
     }
   }, [userId]);
 
-  const syncNow = useCallback(async () => {
+  const syncNow = useCallback(async ({ retryFailed = true } = {}) => {
     if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       const current = await refresh();
       return { synced: 0, remaining: current.length, failed: null, skipped: true };
@@ -47,6 +48,7 @@ export default function useOfflineSaleQueue(userId, onSynced) {
     try {
       const result = await syncPendingSales({
         userId,
+        retryFailed,
         send: (request) => base44.functions.invoke('complete-sale', request),
       });
       await refresh();
@@ -92,8 +94,16 @@ export default function useOfflineSaleQueue(userId, onSynced) {
   }, []);
 
   useEffect(() => {
-    if (isOnline && userId) void syncNow();
+    if (isOnline && userId) void syncNow({ retryFailed: false });
   }, [isOnline, syncNow, userId]);
+
+  useEffect(() => {
+    if (!isOnline || !userId || syncing || storageError) return undefined;
+    const delay = pendingSaleRetryDelay(records);
+    if (delay === null) return undefined; // No polling when the queue is empty.
+    const timer = window.setTimeout(() => { void syncNow({ retryFailed: false }); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [isOnline, userId, syncing, storageError, records, syncNow]);
 
   return {
     isOnline,
