@@ -32,6 +32,7 @@ const extraMetrics = (m: any) => ({
 
 async function getConfig(service: any) {
   const rows = await service.entities.DailyExportConfig.filter({ key: CONFIG_KEY }, "created_date", 2);
+  if (rows.length > 1) throw new Error("Eksport sozlamalari takrorlangan. Avval egasi tekshirishi kerak.");
   if (rows.length) return rows[0];
   return await service.entities.DailyExportConfig.create({
     key: CONFIG_KEY,
@@ -195,16 +196,22 @@ async function upsertReport(service: any, r: any) {
     humo_total: r.humo_total,
     online_total: r.online_total,
     bank_transfer_total: r.bank_transfer_total,
-    generated_at: new Date().toISOString(),
+    order_payment_total: r.order_payment_total || 0,
+    collections_total: r.collections_total ?? r.total_revenue,
+    expenses_total: r.expenses_total || 0,
+    net_profit: r.net_profit ?? r.real_profit,
+    unknown_cost_count: r.unknown_cost_count || 0,
   };
-  if (existing.length) {
-    return await service.entities.DailyShopReport.update(existing[0].id, payload);
-  }
-  return await service.entities.DailyShopReport.create({
-    ...payload,
-    email_sent: false,
-    sheet_appended: false,
-  });
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(payload)));
+  const fingerprint = Array.from(new Uint8Array(bytes)).map(byte => byte.toString(16).padStart(2, "0")).join("");
+  if (existing.length > 1) throw new Error("Bir sana/do‘kon uchun takroriy hisobot topildi. Avtomatik yuborilmadi.");
+  const previous = existing[0];
+  const same = previous?.delivery_fingerprint === fingerprint;
+  const record = { ...payload, delivery_fingerprint: fingerprint, generated_at: new Date().toISOString(),
+    ...(!same ? { email_sent: false, sheet_appended: false, sent_at: "" } : {}),
+  };
+  if (previous) return await service.entities.DailyShopReport.update(previous.id, record);
+  return await service.entities.DailyShopReport.create(record);
 }
 
 // ---- Google Sheets ----
@@ -226,31 +233,17 @@ async function getSheetsToken(service: any): Promise<string> {
   }
 }
 
-const SHEET_HEADERS = [
-  "Sana",
-  "Do'kon",
-  "Tushum (UZS)",
-  "Tannarx (UZS)",
-  "Real foyda (UZS)",
-  "Sotuv soni",
-  "Qaytar soni",
-  "Naqd",
-  "Uzcard",
-  "Humo",
-  "Online",
-  "Bank",
-  "Yuborildi",
-  "Yuborilgan vaqt",
-];
+const SHEET_HEADERS = REPORT_HEADERS;
 
 function reportToSheetRow(r: any): any[] {
-  return reportToRow(r, "ha");
+  return reportToRow(r, "Google Sheets");
 }
 
 async function ensureSheet(service: any, token: string, config: any) {
   if (config.google_sheet_id) return config;
   const res = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
     method: "POST",
+    signal: AbortSignal.timeout(15000),
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       properties: { title: "Odina — Kunlik Hisobot" },
@@ -261,11 +254,8 @@ async function ensureSheet(service: any, token: string, config: any) {
   if (!res.ok) throw new Error(sheetErr(data));
   const spreadsheetId = data.spreadsheetId;
   const url = data.spreadsheetUrl;
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Hisobot!A1`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ values: [SHEET_HEADERS] }),
-  });
+  // Headers are written with the report rows after the new sheet ID is saved.
+  // A failed header response must not cause a second spreadsheet to be created.
   const updated = await service.entities.DailyExportConfig.update(config.id, {
     google_sheet_id: spreadsheetId,
     google_sheet_url: url,
@@ -274,15 +264,29 @@ async function ensureSheet(service: any, token: string, config: any) {
   return { ...config, google_sheet_id: spreadsheetId, google_sheet_url: url };
 }
 
-async function appendRows(token: string, sheetId: string, rows: any[][]) {
-  const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Hisobot!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ values: rows }),
-    },
-  );
+async function upsertSheetRows(token: string, sheetId: string, reports: any[]) {
+  const root = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}/values`;
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const read = await fetch(`${root}/Hisobot!A:T`, { headers, signal: AbortSignal.timeout(15000) });
+  const current = await read.json();
+  if (!read.ok) throw new Error(sheetErr(current));
+  const rows: any[][] = current.values || [];
+  const writes: any[] = [{ range: "Hisobot!A1:T1", values: [SHEET_HEADERS] }];
+  let nextRow = Math.max(2, rows.length + 1);
+  for (const report of reports) {
+    // New exports match stable shop ID; pre-existing 14-column rows match their
+    // original date/shop name without moving or deleting any historical rows.
+    const matches = rows.map((row, index) => ({ row, index })).filter(({ row, index }) => index > 0
+      && row[0] === report.business_date
+      && (row[19] ? row[19] === report.shop_id : row[1] === report.shop_name));
+    if (matches.length > 1) throw new Error("Google Sheetsda shu sana/do‘kon takrorlangan. Mavjud qatorlarga tegilmadi.");
+    const rowNumber = matches.length ? matches[0].index + 1 : nextRow++;
+    writes.push({ range: `Hisobot!A${rowNumber}:T${rowNumber}`, values: [reportToSheetRow(report)] });
+  }
+  const res = await fetch(`${root}:batchUpdate`, {
+    method: "POST", headers, signal: AbortSignal.timeout(15000),
+    body: JSON.stringify({ valueInputOption: "RAW", data: writes }),
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(sheetErr(data));
 }
