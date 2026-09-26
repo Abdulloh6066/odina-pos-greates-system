@@ -134,7 +134,7 @@ export function RoundingRow({ subtotal, discountCode, roundingTarget, adjustment
       </div>
       {manualOpen && !discountCode && (
         <div className="flex items-center gap-2">
-          <Input type="text" inputMode="numeric" aria-label="Ayiriladigan summa" placeholder="2000 yoki -2000" value={amount} onChange={(event) => setAmount(event.target.value)} className="h-11 min-w-0 flex-1" />
+          <Input type="number" step={1000} inputMode="numeric" aria-label="Ayiriladigan summa" placeholder="2000 yoki -2000" value={amount} onChange={(event) => setAmount(event.target.value)} className="h-11 min-w-0 flex-1" />
           <Button type="button" variant="outline" className="h-11 shrink-0" disabled={!amount.trim()} onClick={() => { if (onApplyManualDiscount(amount)) { setAmount(''); setManualOpen(false); } }}>Qo‘llash</Button>
         </div>
       )}
