@@ -301,14 +301,6 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
             <Label className="text-xs mb-1.5 block">Nomi</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Shokoladli tort" />
           </div>
-          <div>
-            <Label className="text-xs mb-1.5 block">Sotuv birligi</Label>
-            <OdinaSelect value={saleUnit} disabled={Boolean(product)} onChange={(e) => { setSaleUnit(e.target.value); if (e.target.value === 'gram') setProductionUnit('piece'); }} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
-              <option value="piece">Dona</option>
-              <option value="gram">Gramm — narx 1 kg uchun</option>
-            </OdinaSelect>
-            {saleUnit === 'gram' && <p className="text-xs text-muted-foreground mt-1">Kassada gramm kiritiladi. Ombor hisobi hozircha yuritilmaydi.</p>}
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs mb-1.5 block">{saleUnit === 'gram' ? '1 kg narxi (UZS)' : productionUnit === 'sheet' ? '1 bo‘lak narxi (UZS)' : '1 dona narxi (UZS)'}</Label>
@@ -345,12 +337,17 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
             </OdinaSelect>
             <p className="text-xs text-muted-foreground mt-1.5">Bu tanlov keyingi bosqichdagi retsept va avtomatik ombor qoidalari uchun ishlatiladi.</p>
           </div>
-          {saleUnit !== 'gram' && <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
+          <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
             <div>
-              <Label className="text-xs mb-1.5 block">Ishlab chiqarish va jo‘natish birligi</Label>
-              <OdinaSelect value={productionUnit} disabled={Boolean(product)} onChange={(e) => setProductionUnit(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
-                <option value="piece">Donali — kruassan, pechenye va boshqalar</option>
-                <option value="sheet">Listli tort — do‘konda bo‘laklab sotiladi</option>
+              <Label className="text-xs mb-1.5 block">Mahsulot turi</Label>
+              <OdinaSelect value={saleUnit === 'gram' ? 'gram' : productionUnit} disabled={Boolean(product)}
+                onChange={(e) => {
+                  setSaleUnit(e.target.value === 'gram' ? 'gram' : 'piece');
+                  setProductionUnit(e.target.value === 'sheet' ? 'sheet' : 'piece');
+                }} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
+                <option value="piece">Donali — narx 1 dona uchun</option>
+                <option value="sheet">Listli — kassada bo‘laklab sotiladi</option>
+                <option value="gram">Vaznli — narx 1 kg uchun</option>
               </OdinaSelect>
             </div>
             {productionUnit === 'sheet' && (
@@ -359,9 +356,9 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
                 <div><Label className="text-xs mb-1.5 block">1 list narxi (UZS)</Label><Input type="number" min="0" value={sheetPrice} onChange={(e) => setSheetPrice(e.target.value)} /></div>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">{productionUnit === 'sheet' ? `Markazda list. Do‘kon qabul qilganda 1 list → ${piecesPerSheet} bo‘lak. Kassa narxi — bitta bo‘lak uchun.` : 'Markazda va do‘konda dona hisobida yuritiladi. Retseptda bir tayyorlashdan chiqadigan dona sonini ko‘rsatasiz.'}</p>
+            <p className="text-xs text-muted-foreground">{saleUnit === 'gram' ? 'Kassada gramm kiritiladi va summa avtomatik hisoblanadi. Ombor hisobi hozircha yuritilmaydi.' : productionUnit === 'sheet' ? `Markazda list. Do‘kon qabul qilganda 1 list → ${piecesPerSheet} bo‘lak. Kassa narxi — bitta bo‘lak uchun.` : 'Narx bitta dona uchun. Kassada dona soni bilan sotiladi.'}</p>
             {product && <p className="text-xs text-muted-foreground">Qoldiq birliklari aralashmasligi uchun mavjud mahsulotning birligi va bo‘lak soni o‘zgarmaydi. Boshqa kesim uchun yangi mahsulot yarating.</p>}
-          </div>}
+          </div>
           <div>
             <Label className="text-xs mb-1.5 block">Tavsif</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ixtiyoriy" />
