@@ -4,14 +4,14 @@ import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-he
 const STAFF_ROLES = new Set(["manager", "cashier", "accountant", "production", "warehouse"]);
 
 // Hisob egasi — boshqa adminlar tomonidan o'chirilishi yoki o'zgartirilishi mumkin emas.
-const OWNER_EMAIL = "dota26066@gmail.com";
-const isOwner = (email: string) => Boolean(email) && String(email).trim().toLowerCase() === OWNER_EMAIL;
+const OWNER_USER_ID = "6a96eb22a9fd2b34081eb2de";
+const isOwner = (user: any) => Boolean(user?.id) && String(user.id) === OWNER_USER_ID;
 
 const safeUser = (user: any) => ({
   id: String(user?.id || ""),
   full_name: String(user?.full_name || ""),
   email: String(user?.email || ""),
-  is_owner: isOwner(String(user?.email || "")),
+  is_owner: isOwner(user),
   role: userRole(user),
   shop_id: userShopId(user),
   shop_name: String(user?.shop_name || user?.data?.shop_name || ""),
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
     // The existing protected owner identity is checked against both the
     // authenticated session and stored profile; a regular admin cannot claim it.
-    const canManageAdmins = isOwner(String(auth.email || "")) && isOwner(String(admin.email || ""));
+    const canManageAdmins = isOwner(auth) && isOwner(admin);
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "");
 
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     if (!target) {
       return Response.json({ error: "Xodim topilmadi." }, { status: 404 });
     }
-    if (isOwner(String(target.email || ""))) {
+    if (isOwner(target)) {
       return Response.json({ error: "Hisob egasi himoyalangan — uni o‘zgartirish yoki o‘chirish mumkin emas." }, { status: 403 });
     }
     // Owner alone may promote, demote, disable or re-enable another admin.
