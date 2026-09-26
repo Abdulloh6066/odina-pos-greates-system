@@ -28,6 +28,7 @@ function activityMetrics(activity: any, shopId = "", date = "") {
 const extraMetrics = (m: any) => ({
   orderPayments: m.orderPayments, collections: m.collections, expenses: m.expenses,
   netProfit: m.netProfit, unknownCostCount: m.unknownCostCount,
+  cash: m.cash, uzcard: m.uzcard, humo: m.humo, online: m.online, bank_transfer: m.bank_transfer,
 });
 
 async function getConfig(service: any) {
