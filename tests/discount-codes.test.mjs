@@ -700,8 +700,8 @@ test('manual discount of 2000 preserves original price and records 80000 paid', 
   assert.equal(f.db.Shift[0].total_sales,80000);
 });
 
-test('automatic rounding matches all three cashier examples', async () => {
-  for (const [price,target] of [[15500,15000],[84000,80000],[86000,85000]]) {
+test('automatic rounding follows the 5,000 UZS step even above ten percent', async () => {
+  for (const [price,target] of [[14000,10000],[16000,15000],[15500,15000],[84000,80000],[86000,85000]]) {
     const f = fixture(); f.db.Product[0].price = price;
     const result = await loadHandler(f.client)({ action:'complete_sale', shift_id:'shift',
       items:[{product_id:'cake',quantity:1}], rounding_total:target,
