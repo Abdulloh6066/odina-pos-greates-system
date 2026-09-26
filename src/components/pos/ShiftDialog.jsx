@@ -112,7 +112,7 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Smenani yopish</DialogTitle>
         </DialogHeader>
-        <div className="space-y-5 receipt-print">
+        <div className="space-y-5">
           <div className="text-center font-mono">
             <div className="font-bold text-lg">ODINA SHOP</div>
             <div className="text-sm">SMENA HISOBOTI</div>
