@@ -2,10 +2,12 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import {
   loadIngredientCosts, computeProductCost, aggregateReport, num,
 } from "../../shared/cost-engine.ts";
+import { loadReportActivity, readReportRows, reportDate } from "../../shared/report-activity.ts";
+import { computeShopReport } from "../../shared/daily-report-logic.ts";
 
 // Recorded shop expenses only — goods_payment is already in cost of goods,
 // owner_withdrawal is a capital distribution, not an operating expense.
-const EXPENSE_CATEGORIES = new Set(["shop_expense", "other_expense"]);
+const EXPENSE_CATEGORIES = new Set(["shop_expense", "other_expense", "other"]);
 
 function tashkentBusinessDate(value: unknown) {
   const date = new Date(String(value || ""));
@@ -40,15 +42,17 @@ export default async function (req) {
     const service = base44.asServiceRole;
     const body = await req.json();
     const action = String(body?.action || "report");
-    const dateFrom = String(body?.date_from || "");
-    const dateTo = String(body?.date_to || "");
+    const today = reportDate(new Date().toISOString());
+    const dateFrom = String(body?.date_from || `${today.slice(0, 7)}-01`);
+    const dateTo = String(body?.date_to || today);
     const shopId = String(body?.shop_id || "");
     const productId = String(body?.product_id || "");
     const categoryId = String(body?.category_id || "");
 
-    const ingredientCosts = await loadIngredientCosts(service).catch(() => new Map());
+    let ingredientCosts: Map<string, any> | null = null;
 
     if (action === "product_breakdown") {
+      ingredientCosts = await loadIngredientCosts(service).catch(() => new Map());
       const pid = String(body?.product_id || "");
       if (!pid) return Response.json({ error: "Mahsulot tanlanmagan." }, { status: 400 });
       const product = await service.entities.Product.get(pid).catch(() => null);
@@ -90,19 +94,26 @@ export default async function (req) {
       });
     }
 
-    // ---- report ----
-    const sales = await service.entities.Sale.list("-created_date", 1000);
-    let filtered = (sales || []).filter((s: any) => s.status === "completed");
-    if (dateFrom) filtered = filtered.filter((s: any) => saleBusinessDate(s) >= dateFrom);
-    if (dateTo) filtered = filtered.filter((s: any) => saleBusinessDate(s) <= dateTo);
-    if (shopId) filtered = filtered.filter((s: any) => s.shop_id === shopId);
-    const saleIds = new Set(filtered.map((s: any) => s.id));
-
-    const allItems = await service.entities.SaleItem.list("-created_date", 2000);
-    let items = (allItems || []).filter((it: any) => saleIds.has(it.sale_id));
-
-    const products = await service.entities.Product.list("name", 500);
-    const productMap = new Map((products || []).map((p: any) => [p.id, p]));
+    // Read complete activity for this date range. Refunds are read on their own
+    // date, including their original sale-time costs when the sale was earlier.
+    const activity = await loadReportActivity(service, dateFrom, dateTo, shopId ? [shopId] : []);
+    const filtered = activity.sales.filter((s: any) => ["completed", "refunded"].includes(s.status))
+      .map((s: any) => ({ ...s, status: "completed" }));
+    let items: any[] = filtered.flatMap((s: any) => activity.itemsBySale.get(s.id) || []);
+    const originalById = new Map<string, any>(activity.allSales.map((s: any) => [s.id, s]));
+    for (const refund of activity.refunds) {
+      const original = originalById.get(refund.sale_id);
+      const ratio = num(original?.total) > 0 ? Math.min(1, num(refund.amount) / num(original.total)) : 1;
+      const virtualId = `refund:${refund.id}`;
+      filtered.push({ ...original, id: virtualId, status: "completed", total: -num(refund.amount) });
+      for (const item of activity.itemsBySale.get(refund.sale_id) || []) {
+        // Read-only signed view: original immutable records are never updated.
+        items.push({ ...item, id: `${item.id}:${virtualId}`, sale_id: virtualId,
+          quantity: -num(item.quantity) * ratio, line_total: -num(item.line_total) * ratio });
+      }
+    }
+    const products = categoryId ? await readReportRows(service.entities.Product) : [];
+    const productMap = new Map<string, any>(products.map((p: any) => [p.id, p]));
     if (productId) items = items.filter((it: any) => it.product_id === productId);
     if (categoryId) {
       items = items.filter((it: any) => String(productMap.get(it.product_id)?.category_id || "") === categoryId);
@@ -113,10 +124,15 @@ export default async function (req) {
     const costById = new Map<string, any>();
     for (const it of items) {
       const snap = Number(it.unit_cost_at_sale);
-      if (snap > 0 && it.cost_is_estimate === false) {
+      if (Number.isFinite(snap) && snap >= 0 && it.cost_is_estimate === false) {
         costById.set(String(it.id), { unitCost: snap, isEstimate: false, unknown: false });
         continue;
       }
+      if (it.sale_unit === "gram") {
+        costById.set(String(it.id), { unitCost: 0, isEstimate: true, unknown: true });
+        continue; // A per-piece recipe price must never be multiplied by grams.
+      }
+      if (!ingredientCosts) ingredientCosts = await loadIngredientCosts(service).catch(() => new Map());
       if (!costCache.has(String(it.product_id))) {
         costCache.set(
           String(it.product_id),
@@ -134,20 +150,19 @@ export default async function (req) {
 
     const report = aggregateReport(filtered, items, costById);
 
-    // Recorded shop expenses (shop_expense + other_expense only).
-    const movements = await service.entities.CashMovement.list("-created_date", 1000);
-    let expenses = (movements || []).filter(
-      (m: any) => m.type === "withdrawal" && EXPENSE_CATEGORIES.has(m.expense_category),
-    );
-    if (dateFrom) expenses = expenses.filter((m: any) => tashkentBusinessDate(m.created_at || m.created_date) >= dateFrom);
-    if (dateTo) expenses = expenses.filter((m: any) => tashkentBusinessDate(m.created_at || m.created_date) <= dateTo);
-    if (shopId) expenses = expenses.filter((m: any) => m.shop_id === shopId);
+    const expenses = activity.expenses.filter((m: any) => EXPENSE_CATEGORIES.has(m.expense_category));
+    const cashflow = computeShopReport(activity.sales, activity.itemsBySale, {
+      refunds: activity.refunds, orderPayments: activity.orderPayments, expenses: activity.expenses, allSales: activity.allSales,
+    });
     const expensesTotal = Math.round(expenses.reduce((s: number, m: any) => s + num(m.amount), 0));
 
     const summary = {
       ...report.summary,
       expenses: expensesTotal,
       net_profit: report.summary.gross_profit - expensesTotal,
+      order_payment_total: cashflow.orderPayments,
+      collections_total: cashflow.collections,
+      incomplete_sale_count: filtered.filter((s: any) => num(s.total) !== 0 && !items.some((it: any) => it.sale_id === s.id)).length,
     };
 
     return Response.json({
