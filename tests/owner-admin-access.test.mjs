@@ -7,12 +7,11 @@ import ts from 'typescript';
 
 const read = (path) => readFileSync(path, 'utf8');
 const clone = (value) => value == null ? value : structuredClone(value);
-const OWNER_ID = '6a96eb22a9fd2b34081eb2de';
 
 function fixture() {
   const db = {
     User: [
-      { id: OWNER_ID, email: 'dota26066@gmail.com', role: 'admin', active: true },
+      { id: 'owner', email: 'owner@example.test', role: 'admin', is_owner: true, active: true },
       { id: 'other', email: 'second-admin@example.test', role: 'admin', active: true },
       { id: 'cashier', email: 'cashier@example.test', role: 'cashier', shop_id: 'center', active: true },
       { id: 'new', email: 'new-admin@example.test', role: 'user', active: true },
@@ -22,7 +21,7 @@ function fixture() {
     ActionHistory: [],
     SecuritySettings: [],
   };
-  let currentId = OWNER_ID;
+  let currentId = 'owner';
   let authEmailOverride;
   let inviteCalls = 0;
   let userWrites = 0;
@@ -111,7 +110,7 @@ test('owner alone can promote, demote, deactivate and reactivate another admin',
   const run = loadHandler('base44/functions/security-admin/entry.ts', f);
   const status = await run({ action: 'status' });
   assert.equal(status.data.can_manage_admins, true);
-  assert.equal(status.data.users.find((u) => u.id === OWNER_ID).is_owner, true);
+  assert.equal(status.data.users.find((u) => u.id === 'owner').is_owner, true);
   assert.equal(status.data.users.find((u) => u.id === 'other').is_owner, false);
 
   const promoted = await run({ action: 'update_user_access', target_user_id: 'cashier', role: 'admin' });
@@ -137,12 +136,12 @@ test('second admin cannot alter any admin or grant admin, but can still manage o
   f.as('other');
   assert.equal((await run({ action: 'status' })).data.can_manage_admins, false);
   assert.equal((await run({ action: 'update_user_access', target_user_id: 'cashier', role: 'admin' })).status, 403);
-  assert.equal((await run({ action: 'update_user_access', target_user_id: OWNER_ID, active: false })).status, 403);
+  assert.equal((await run({ action: 'update_user_access', target_user_id: 'owner', active: false })).status, 403);
   assert.equal(f.writes, 0);
   assert.equal((await run({ action: 'update_user_access', target_user_id: 'cashier', active: false })).status, 200);
   assert.equal(f.db.User[2].active, false);
-  f.as(OWNER_ID);
-  assert.equal((await run({ action: 'update_user_access', target_user_id: OWNER_ID, active: false })).status, 400);
+  f.as('owner');
+  assert.equal((await run({ action: 'update_user_access', target_user_id: 'owner', active: false })).status, 400);
   f.as('other', 'dota26066@gmail.com'); // forged session email alone is insufficient
   assert.equal((await run({ action: 'update_user_access', target_user_id: 'cashier', role: 'admin' })).status, 403);
 });
@@ -154,10 +153,10 @@ test('owner can invite admin; admin claim requires owner-issued invite; disabled
   const refused = await run({ action: 'invite', email: 'new-admin@example.test', role: 'admin' });
   assert.equal(refused.status, 403);
   assert.equal(f.inviteCalls, 0);
-  f.as(OWNER_ID);
+  f.as('owner');
   const invited = await run({ action: 'invite', email: 'new-admin@example.test', role: 'admin' });
   assert.equal(invited.status, 200, JSON.stringify(invited));
-  assert.equal(f.db.PendingStaffInvite[0].invited_by_id, OWNER_ID);
+  assert.equal(f.db.PendingStaffInvite[0].invited_by_id, 'owner');
   assert.equal(f.inviteCalls, 1);
   f.as('new');
   const claimed = await run({ action: 'claim' });
@@ -177,15 +176,14 @@ test('owner can invite admin; admin claim requires owner-issued invite; disabled
 test('RLS blocks direct admin privilege edits; UI obtains owner flag from authenticated backend', () => {
   const user = JSON.parse(read('base44/entities/User.jsonc'));
   const backend = read('base44/functions/security-admin/entry.ts');
-  const ownerId = backend.match(/const OWNER_USER_ID = "([^"]+)"/)[1];
-  assert.equal(ownerId, OWNER_ID);
+  assert.match(backend, /is_owner === true/);
   for (const operation of ['update', 'delete']) {
-    assert.equal(user.rls[operation].user_condition.id, ownerId);
+    assert.equal(user.rls[operation].user_condition.is_owner, true);
     assert.equal(user.rls[operation].user_condition.role, undefined);
   }
   for (const path of ['base44/entities/PendingStaffInvite.jsonc', 'base44/entities/pending-staff-invite.jsonc']) {
     const schema = JSON.parse(read(path));
-    for (const action of ['create', 'update', 'delete']) assert.equal(schema.rls[action].user_condition.id, ownerId);
+    for (const action of ['create', 'update', 'delete']) assert.equal(schema.rls[action].user_condition.is_owner, true);
   }
   const users = read('src/pages/Users.jsx');
   assert.match(users, /can_manage_admins/);
