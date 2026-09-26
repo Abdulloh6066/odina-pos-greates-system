@@ -87,6 +87,8 @@ export default function POS() {
 
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
+  const [shiftToClose, setShiftToClose] = useState(null);
+  const closingShiftRef = useRef(false);
   const [shiftLoading, setShiftLoading] = useState(false);
   const [discountApprovalOpen, setDiscountApprovalOpen] = useState(false);
   const [pendingDiscountCode, setPendingDiscountCode] = useState('');
@@ -958,19 +960,45 @@ export default function POS() {
         return;
       }
     }
-    setCloseShiftOpen(true);
+    if (!shift?.id) {
+      await loadAll().catch(() => {});
+      void odinaAlert('Ochiq smena topilmadi. Kassani yangilab, qayta urinib ko‘ring.');
+      return;
+    }
+    try {
+      const currentShift = await base44.entities.Shift.get(shift.id);
+      if (!currentShift || currentShift.status !== 'open') {
+        await loadAll().catch(() => {});
+        void odinaAlert('Bu smena allaqachon yopilgan yoki boshqa joyda o‘zgargan. Kassani yangilang.');
+        return;
+      }
+      setShift(currentShift);
+      setShiftToClose(currentShift);
+      setCloseShiftOpen(true);
+    } catch (error) {
+      void odinaAlert('Smenani tekshirib bo‘lmadi: ' + (error?.message || error));
+    }
   };
 
   const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift }) => {
-    if (!isOnline || offlineSales.some((record) => record.shift_id === shift?.id)) {
+    if (closingShiftRef.current) return;
+    const shiftId = shiftToClose?.id;
+    if (!shiftId) {
+      setCloseShiftOpen(false);
+      await loadAll().catch(() => {});
+      void odinaAlert('Smena ma’lumoti yangilandi. Qayta ochib, yopishni tasdiqlang.');
+      return;
+    }
+    if (!isOnline || offlineSales.some((record) => record.shift_id === shiftId)) {
       void odinaAlert('Smenani yopishdan oldin offline savdolarni serverga yuboring.');
       return;
     }
+    closingShiftRef.current = true;
     setShiftLoading(true);
     try {
       const result = await base44.functions.invoke('shift-close-v2', {
         action: 'close_shift',
-        shift_id: shift.id,
+        shift_id: shiftId,
         actual_cash,
         budget_cash_submitted,
         cash_left_for_next_shift,
@@ -980,9 +1008,19 @@ export default function POS() {
       setShiftReport(payload.shift);
       setShift(null);
       setCloseShiftOpen(false);
+      setShiftToClose(null);
     } catch (e) {
-      void odinaAlert('Smenani yopib bo‘lmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
-    } finally { setShiftLoading(false); }
+      const message = e?.response?.data?.error || e?.data?.error || e?.message || String(e);
+      if (e?.response?.status === 409) {
+        setCloseShiftOpen(false);
+        setShiftToClose(null);
+        await loadAll().catch(() => {});
+      }
+      void odinaAlert('Smenani yopib bo‘lmadi: ' + message);
+    } finally {
+      closingShiftRef.current = false;
+      setShiftLoading(false);
+    }
   };
 
   const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name, owner_pin }) => {
@@ -1324,7 +1362,7 @@ export default function POS() {
         mode={staffTicket?.mode} order={staffTicket?.order} shop={staffTicket?.shop}
         shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} autoPrint={staffTicket?.autoPrint} />
       <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
-      <CloseShiftDialog open={closeShiftOpen} shift={shift} onClose={() => setCloseShiftOpen(false)} onConfirm={closeShift} loading={shiftLoading} />
+      <CloseShiftDialog open={closeShiftOpen} shift={shiftToClose} onClose={() => { setCloseShiftOpen(false); setShiftToClose(null); }} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
         open={discountApprovalOpen}
         title="100% chegirmani tasdiqlash"
