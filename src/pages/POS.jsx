@@ -594,7 +594,7 @@ export default function POS() {
   const filtered = useMemo(() => {
     const shopId = shift?.shop_id || user?.shop_id;
     let list = products.map((product) => ({ ...product, price: priceForShop(product, shopId) }));
-    if (activeCat !== 'all') {
+    if (!showFav && activeCat !== 'all') {
       const selectedCategory = categories.find((c) => c.id === activeCat);
       const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
       list = list.filter((p) => sourceIds.includes(p.category_id));
