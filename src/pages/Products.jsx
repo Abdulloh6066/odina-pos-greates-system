@@ -164,6 +164,7 @@ export default function Products() {
 function ProductDialog({ open, product, categories, shops, onClose, onSaved, user, canArchive }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [saleUnit, setSaleUnit] = useState('piece');
   const [shopPrices, setShopPrices] = useState({});
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -182,6 +183,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
     if (open) {
       setName(product?.name || '');
       setPrice(product?.price ?? '');
+      setSaleUnit(product?.sale_unit || 'piece');
       setShopPrices(product?.shop_prices || {});
       setCategoryId(product?.category_id || (categories[0]?.id || ''));
       setImageUrl(product?.image_url || '');
@@ -230,10 +232,11 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
       description: description || undefined,
       source_type: sourceType,
       stock_unit: 'piece',
+      sale_unit: saleUnit,
       production_unit: productionUnit,
       pieces_per_sheet: productionUnit === 'sheet' ? Number(piecesPerSheet) : 1,
       sheet_price: productionUnit === 'sheet' ? Number(sheetPrice) : 0,
-      track_stock: true,
+      track_stock: saleUnit !== 'gram',
       is_favorite: isFavorite,
       active,
     };
@@ -298,9 +301,17 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
             <Label className="text-xs mb-1.5 block">Nomi</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Shokoladli tort" />
           </div>
+          <div>
+            <Label className="text-xs mb-1.5 block">Sotuv birligi</Label>
+            <OdinaSelect value={saleUnit} disabled={Boolean(product)} onChange={(e) => { setSaleUnit(e.target.value); if (e.target.value === 'gram') setProductionUnit('piece'); }} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+              <option value="piece">Dona</option>
+              <option value="gram">Gramm — narx 1 kg uchun</option>
+            </OdinaSelect>
+            {saleUnit === 'gram' && <p className="text-xs text-muted-foreground mt-1">Kassada gramm kiritiladi. Ombor hisobi hozircha yuritilmaydi.</p>}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs mb-1.5 block">{productionUnit === 'sheet' ? '1 bo‘lak narxi (UZS)' : '1 dona narxi (UZS)'}</Label>
+              <Label className="text-xs mb-1.5 block">{saleUnit === 'gram' ? '1 kg narxi (UZS)' : productionUnit === 'sheet' ? '1 bo‘lak narxi (UZS)' : '1 dona narxi (UZS)'}</Label>
               <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="45000" />
             </div>
             <div>
@@ -317,7 +328,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {shops.map((shop) => (
                   <div key={shop.id}>
-                    <Label className="text-xs mb-1.5 block">{shop.name} narxi (UZS)</Label>
+                    <Label className="text-xs mb-1.5 block">{shop.name} {saleUnit === 'gram' ? '1 kg' : ''} narxi (UZS)</Label>
                     <Input type="number" min="0" step="1" value={shopPrices[shop.id] ?? price}
                       onChange={(e) => setShopPrices((current) => ({ ...current, [shop.id]: e.target.value }))} />
                   </div>
@@ -334,7 +345,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
             </OdinaSelect>
             <p className="text-xs text-muted-foreground mt-1.5">Bu tanlov keyingi bosqichdagi retsept va avtomatik ombor qoidalari uchun ishlatiladi.</p>
           </div>
-          <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
+          {saleUnit !== 'gram' && <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-3">
             <div>
               <Label className="text-xs mb-1.5 block">Ishlab chiqarish va jo‘natish birligi</Label>
               <OdinaSelect value={productionUnit} disabled={Boolean(product)} onChange={(e) => setProductionUnit(e.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm disabled:opacity-60">
@@ -350,7 +361,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
             )}
             <p className="text-xs text-muted-foreground">{productionUnit === 'sheet' ? `Markazda list. Do‘kon qabul qilganda 1 list → ${piecesPerSheet} bo‘lak. Kassa narxi — bitta bo‘lak uchun.` : 'Markazda va do‘konda dona hisobida yuritiladi. Retseptda bir tayyorlashdan chiqadigan dona sonini ko‘rsatasiz.'}</p>
             {product && <p className="text-xs text-muted-foreground">Qoldiq birliklari aralashmasligi uchun mavjud mahsulotning birligi va bo‘lak soni o‘zgarmaydi. Boshqa kesim uchun yangi mahsulot yarating.</p>}
-          </div>
+          </div>}
           <div>
             <Label className="text-xs mb-1.5 block">Tavsif</Label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ixtiyoriy" />
