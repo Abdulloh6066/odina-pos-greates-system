@@ -12,11 +12,12 @@ import { Button } from '@/components/ui/button';
 import { RefundDialog } from '@/components/pos/KassaActionDialogs';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 
-export default function SalesHistory() {
+export default function SalesHistory({ embedded = false }) {
   const { user } = useOutletContext();
   const role = user?.role || 'cashier';
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [selected, setSelected] = useState(null);
@@ -26,9 +27,15 @@ export default function SalesHistory() {
 
   const load = async () => {
     setLoading(true);
-    const all = await base44.entities.Sale.list('-created_date', 500);
-    setSales(all || []);
-    setLoading(false);
+    setLoadError('');
+    try {
+      const all = await base44.entities.Sale.list('-created_date', 500);
+      setSales(all || []);
+    } catch (error) {
+      setLoadError(error?.response?.data?.error || error?.message || 'Tarixni yuklab bo‘lmadi.');
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
 
@@ -77,8 +84,13 @@ export default function SalesHistory() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
-      <PageHeader title="Savdolar tarixi" subtitle={`${formatNum(visible.length)} ta savdo · ${formatUZS(totalRev)}`} icon={ReceiptText} />
+    <div className={embedded ? 'min-w-0 space-y-4' : 'odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in'}>
+      {embedded
+        ? <p className="text-sm text-muted-foreground">{formatNum(visible.length)} ta savdo · {formatUZS(totalRev)}</p>
+        : <PageHeader title="Savdolar tarixi" subtitle={`${formatNum(visible.length)} ta savdo · ${formatUZS(totalRev)}`} icon={ReceiptText} />}
+      {loadError && <div role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive">
+        {loadError} <Button variant="outline" onClick={load} disabled={loading}>Qayta urinish</Button>
+      </div>
 
       <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
