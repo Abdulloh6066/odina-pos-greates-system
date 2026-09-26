@@ -61,12 +61,12 @@
   "rls": {
     "create": {
       "user_condition": {
-        "id": "6a96eb22a9fd2b34081eb2de"
+        "is_owner": true
       }
     },
     "delete": {
       "user_condition": {
-        "id": "6a96eb22a9fd2b34081eb2de"
+        "is_owner": true
       }
     },
     "read": {
@@ -76,7 +76,7 @@
     },
     "update": {
       "user_condition": {
-        "id": "6a96eb22a9fd2b34081eb2de"
+        "is_owner": true
       }
     }
   },
