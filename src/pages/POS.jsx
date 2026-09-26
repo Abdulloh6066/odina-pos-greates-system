@@ -77,6 +77,8 @@ export default function POS() {
   const [roundingError, setRoundingError] = useState('');
 
   const [payOpen, setPayOpen] = useState(false);
+  const checkoutCancelledRef = useRef(false);
+  const checkoutReadyRef = useRef(false);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
@@ -643,6 +645,8 @@ export default function POS() {
   };
 
   const openPayment = (offline) => {
+    if (checkoutCancelledRef.current) return;
+    checkoutReadyRef.current = true;
     checkoutRequestKeyRef.current = createSaleIdempotencyKey();
     checkoutRecordedAtRef.current = new Date().toISOString();
     setCheckoutOffline(offline);
@@ -695,7 +699,7 @@ export default function POS() {
       }
       return;
     }
-    if (!cart.length || stockChecking || offlineSyncing || tableLocked) return;
+    if (!cart.length || payOpen || stockChecking || offlineSyncing || tableLocked) return;
     if (total <= 0 && !(discountPct === 100 && subtotal > 0)) {
       await odinaAlert('To‘lov summasi 0 UZS. Mahsulot narxini yoki savatni tekshiring.', {
         title: 'Savdoni yakunlab bo‘lmaydi',
@@ -703,10 +707,14 @@ export default function POS() {
       });
       return;
     }
-    if (selectedTable && (tableCartDirty || !tableOrder?.id) && !(await saveTableOrder())) return;
-
+    checkoutCancelledRef.current = false;
+    checkoutReadyRef.current = false;
     setStockChecking(true);
+    setCheckoutOffline(false);
+    setPayOpen(true);
     try {
+      if (selectedTable && (tableCartDirty || !tableOrder?.id) && !(await saveTableOrder())) return;
+      if (checkoutCancelledRef.current) return;
       if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
         await openOfflinePayment();
         return;
@@ -732,6 +740,7 @@ export default function POS() {
           table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
         items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
       });
+      if (checkoutCancelledRef.current) return;
       const payload = result?.data || result;
       const accepted = await confirmStockWarnings(
         payload?.shortages || [],
@@ -739,6 +748,7 @@ export default function POS() {
       );
       if (accepted) openPayment(false);
     } catch (error) {
+      if (checkoutCancelledRef.current) return;
       if (isRetryableSyncError(error) && !selectedTable) {
         await openOfflinePayment();
         return;
@@ -749,11 +759,14 @@ export default function POS() {
         .join('\n');
       void odinaAlert((payload.error || error?.message || 'Qoldiqni tekshirib bo‘lmadi.') + (details ? '\n\n' + details : ''));
     } finally {
+      if (!checkoutReadyRef.current || checkoutCancelledRef.current) setPayOpen(false);
       setStockChecking(false);
     }
   };
 
   const closePayment = () => {
+    checkoutCancelledRef.current = true;
+    checkoutReadyRef.current = false;
     setPayOpen(false);
     if (paying) return;
     checkoutRequestKeyRef.current = '';
@@ -1328,9 +1341,10 @@ export default function POS() {
       <PaymentModal
         open={payOpen}
         total={total}
+        checking={stockChecking}
         discountPending={discountLoading}
         discountControls={
-          <fieldset disabled={paying || discountLoading} className="min-w-0 space-y-2.5 disabled:opacity-60">
+          <fieldset disabled={paying || stockChecking || discountLoading} className="min-w-0 space-y-2.5 disabled:opacity-60">
             <DiscountRow discountCode={discountCode} discount={couponDiscount}
               onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError} />
             <RoundingRow subtotal={subtotal} discountCode={discountCode}
