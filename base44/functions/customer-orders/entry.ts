@@ -81,7 +81,7 @@ async function reversePaymentOnShift(
   ).catch(() => {});
 }
 
-async function normalizeOrderItems(service: any, requestedItems: any[], orderType: string) {
+async function normalizeOrderItems(service: any, requestedItems: any[], orderType: string, shopId: string) {
   const normalized: any[] = [];
   for (const requested of requestedItems) {
     const productId = String(requested?.product_id || "");
@@ -95,7 +95,7 @@ async function normalizeOrderItems(service: any, requestedItems: any[], orderTyp
     }
     const isSheet = product.production_unit === "sheet";
     const unit = isSheet ? "sheet" : "piece";
-    const unitPrice = isSheet ? money(product.sheet_price) : money(product.price);
+    const unitPrice = isSheet ? money(product.sheet_price) : money(product?.shop_prices?.[shopId] ?? product.price);
     if (!unitPrice || unitPrice <= 0) {
       throw httpError(`${product.name || "Mahsulot"} narxi sozlanmagan.`, 409);
     }
@@ -260,7 +260,7 @@ export default async function(req: Request): Promise<Response> {
       if (!requestedItems.length) {
         return Response.json({ error: "Kamida bitta mahsulot qo‘shing." }, { status: 400 });
       }
-      const normalizedItems = await normalizeOrderItems(service, requestedItems, orderType);
+      const normalizedItems = await normalizeOrderItems(service, requestedItems, orderType, shop.id);
       const subtotal = normalizedItems.reduce((sum, item) => sum + item.line_total, 0);
 
       let deliveryFee = 0;
