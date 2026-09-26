@@ -81,5 +81,6 @@ test('receipt remains 80mm and includes wishes and per-shop snapshotted contacts
   assert.match(css, /@page \{ size: 80mm auto; margin: 0; \}/);
   assert.match(receipt, /receiptWishForSale\(sale\)/);
   for (const field of ['receipt_instagram_snapshot', 'receipt_phone_snapshot', 'receipt_address_snapshot']) assert.match(receipt, new RegExp(field));
-  assert.match(receipt, /window\.print\(\)/);
+  assert.match(receipt, /startReceiptPrint\(/);
+  assert.match(read('src/lib/receipt-print-lifecycle.js'), /win\.print\(\)/);
 });
