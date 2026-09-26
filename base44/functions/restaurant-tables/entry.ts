@@ -35,7 +35,7 @@ const ordersVersionCondition = (version: number) => version === 0
   : { restaurant_table_orders_version: version };
 const orderSummary = (order: any) => ({
   number: order.number, ticket_number: order.ticket_number, state: order.state, revision: order.revision,
-  total: order.total, item_count: (order.items || []).reduce((sum: number, item: any) => sum + item.quantity, 0),
+  total: order.total, item_count: (order.items || []).reduce((sum: number, item: any) => sum + (item.sale_unit === "gram" ? 1 : item.quantity), 0),
   started_at: order.started_at, updated_at: order.updated_at,
 });
 const DEFAULT_ENTRANCE = { side: "top", offset: 500 };
@@ -377,7 +377,7 @@ Deno.serve(async (req) => {
       for (const row of requested) {
         const productId = String(row?.product_id || "");
         const quantity = row?.quantity;
-        if (!productId || seen.has(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000) {
+        if (!productId || seen.has(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000000) {
           return Response.json({ error: "Takroriy mahsulot yoki dona soni noto‘g‘ri." }, { status: 400 });
         }
         seen.add(productId);
@@ -390,11 +390,13 @@ Deno.serve(async (req) => {
         if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(price * quantity)) {
           return Response.json({ error: "Mahsulot narxi yoki miqdori noto‘g‘ri." }, { status: 400 });
         }
+        const saleUnit = (previous || product).sale_unit === "gram" ? "gram" : "piece";
+        if (saleUnit !== "gram" && quantity > 1000) return Response.json({ error: "Dona soni chegaradan oshdi." }, { status: 400 });
         items.push({ product_id: productId,
           product_name: previous?.product_name || String(product.name || "Mahsulot"),
           image_url: previous?.image_url || String(product.image_url || ""),
-          price, quantity, subtotal: price * quantity,
-          stock_tracked: previous ? previous.stock_tracked !== false : product.track_stock !== false,
+          price, quantity, sale_unit: saleUnit, subtotal: Math.round(price * quantity / (saleUnit === "gram" ? 1000 : 1)),
+          stock_tracked: saleUnit !== "gram" && (previous ? previous.stock_tracked !== false : product.track_stock !== false),
           source_type: previous?.source_type || product.source_type || "central_produced",
           variant_name: String(row?.variant_name || row?.variant || previous?.variant_name || "").trim(),
           notes: String(row?.notes || previous?.notes || "").trim() });
