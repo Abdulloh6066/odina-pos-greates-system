@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import ProductCard from '@/components/pos/ProductCard';
-import Cart from '@/components/pos/Cart';
+import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import Receipt from '@/components/pos/Receipt';
 import ShiftReport from '@/components/pos/ShiftReport';
@@ -1323,6 +1323,17 @@ export default function POS() {
       <PaymentModal
         open={payOpen}
         total={total}
+        discountPending={discountLoading}
+        discountControls={
+          <fieldset disabled={paying || discountLoading} className="min-w-0 space-y-2.5 disabled:opacity-60">
+            <DiscountRow discountCode={discountCode} discount={couponDiscount}
+              onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError} />
+            <RoundingRow subtotal={subtotal} discountCode={discountCode}
+              roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
+              onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
+              onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }} />
+          </fieldset>
+        }
         onClose={closePayment}
         onConfirm={completeSale}
         loading={paying}
