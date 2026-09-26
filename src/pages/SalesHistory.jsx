@@ -168,7 +168,7 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose })
         <div className="space-y-2 mb-3">
           {sale.items?.map((it, i) => (
             <div key={i} className="flex justify-between text-sm">
-              <span>{it.quantity}× {it.product_name}</span>
+              <span>{it.quantity}{it.sale_unit === 'gram' ? ' g' : '×'} {it.product_name}</span>
               <span className="font-medium">{formatUZS(it.subtotal)}</span>
             </div>
           ))}
