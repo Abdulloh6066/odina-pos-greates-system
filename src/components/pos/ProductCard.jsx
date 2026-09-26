@@ -28,7 +28,7 @@ export default function ProductCard({ product, stockQuantity = null, onAdd, disa
       <div className="odina-product-info p-3 sm:p-3.5">
         <div className="odina-product-name text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5rem]">{product.name}</div>
         <div className="odina-product-meta">
-          <span className="odina-product-price">{formatUZS(product.price)}</span>
+          <span className="odina-product-price">{formatUZS(product.price)}{product.sale_unit === 'gram' ? ' / kg' : ''}</span>
         </div>
       </div>
     </button>
