@@ -90,7 +90,7 @@ export default function SalesHistory({ embedded = false }) {
         : <PageHeader title="Savdolar tarixi" subtitle={`${formatNum(visible.length)} ta savdo · ${formatUZS(totalRev)}`} icon={ReceiptText} />}
       {loadError && <div role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive">
         {loadError} <Button variant="outline" onClick={load} disabled={loading}>Qayta urinish</Button>
-      </div>
+      </div>}
 
       <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
         <div className="relative flex-1">
