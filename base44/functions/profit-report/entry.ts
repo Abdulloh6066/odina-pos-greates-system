@@ -112,6 +112,8 @@ export default async function (req) {
           quantity: -num(item.quantity) * ratio, line_total: -num(item.line_total) * ratio });
       }
     }
+    const incompleteSaleCount = filtered.filter((s: any) => num(s.total) !== 0
+      && !items.some((it: any) => it.sale_id === s.id)).length;
     const products = categoryId ? await readReportRows(service.entities.Product) : [];
     const productMap = new Map<string, any>(products.map((p: any) => [p.id, p]));
     if (productId) items = items.filter((it: any) => it.product_id === productId);
@@ -156,13 +158,19 @@ export default async function (req) {
     });
     const expensesTotal = Math.round(expenses.reduce((s: number, m: any) => s + num(m.amount), 0));
 
+    const netRevenue = !productId && !categoryId ? cashflow.revenue : report.summary.net_revenue;
+    const grossProfit = netRevenue - report.summary.cost_of_goods;
     const summary = {
       ...report.summary,
+      net_revenue: netRevenue,
+      gross_profit: grossProfit,
+      margin: netRevenue > 0 ? Math.round(grossProfit / netRevenue * 10000) / 100 : 0,
+      unknown_count: report.summary.unknown_count + incompleteSaleCount,
       expenses: expensesTotal,
-      net_profit: report.summary.gross_profit - expensesTotal,
+      net_profit: grossProfit - expensesTotal,
       order_payment_total: cashflow.orderPayments,
       collections_total: cashflow.collections,
-      incomplete_sale_count: filtered.filter((s: any) => num(s.total) !== 0 && !items.some((it: any) => it.sale_id === s.id)).length,
+      incomplete_sale_count: incompleteSaleCount,
     };
 
     return Response.json({
