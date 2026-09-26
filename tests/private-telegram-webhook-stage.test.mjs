@@ -15,7 +15,8 @@ function mod(path, imports = {}) {
 const daily = mod('base44/shared/daily-report-logic.ts');
 const logic = mod('base44/shared/private-telegram-report-logic.ts', {'./daily-report-logic.ts':daily});
 const stageSource = readFileSync('base44/shared/private-telegram-webhook-stage.ts','utf8');
-const stage = mod('base44/shared/private-telegram-webhook-stage.ts', {'./private-telegram-report-logic.ts':logic});
+const activity = mod('base44/shared/report-activity.ts');
+const stage = mod('base44/shared/private-telegram-webhook-stage.ts', {'./private-telegram-report-logic.ts':logic, './report-activity.ts':activity});
 const owner = '123456789';
 const now = Date.parse('2026-09-16T11:00:00Z');
 const shops = [
@@ -30,7 +31,7 @@ const sales = [
 ];
 function fixture() {
   const reads=[]; const writes=[];
-  const data={Shop:shops,Sale:sales,SaleItem:[{id:'itemA',sale_id:'saleA',total_cost_at_sale:50000}]};
+  const data={Shop:shops,Sale:sales,SaleItem:[{id:'itemA',sale_id:'saleA',total_cost_at_sale:50000}],Refund:[],OrderPayment:[],CashMovement:[]};
   const matches=(row,q)=>Object.entries(q).every(([key,val])=>val && typeof val==='object' ?
     ('$in' in val ? val.$in.includes(row[key]) : ('$gte' in val && '$lte' in val && row[key]>=val.$gte && row[key]<=val.$lte)) : row[key]===val);
   const service={entities:Object.fromEntries(Object.keys(data).map(key=>[key,{
