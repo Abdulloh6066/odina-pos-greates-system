@@ -4,8 +4,7 @@ import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-he
 const STAFF_ROLES = new Set(["manager", "cashier", "accountant", "production", "warehouse"]);
 
 // Hisob egasi — boshqa adminlar tomonidan o'chirilishi yoki o'zgartirilishi mumkin emas.
-const OWNER_USER_ID = "6a96eb22a9fd2b34081eb2de";
-const isOwner = (user: any) => Boolean(user?.id) && String(user.id) === OWNER_USER_ID;
+const isOwner = (user: any) => user?.is_owner === true || user?.data?.is_owner === true;
 
 const safeUser = (user: any) => ({
   id: String(user?.id || ""),
@@ -43,7 +42,7 @@ Deno.serve(async (req) => {
 
     // The existing protected owner identity is checked against both the
     // authenticated session and stored profile; a regular admin cannot claim it.
-    const canManageAdmins = isOwner(auth) && isOwner(admin);
+    const canManageAdmins = String(auth.id) === String(admin.id) && isOwner(admin);
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "");
 
