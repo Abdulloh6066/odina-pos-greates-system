@@ -6,6 +6,7 @@ import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, Clou
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
+import { priceForShop } from '@/lib/shop-pricing';
 import ProductCard from '@/components/pos/ProductCard';
 import Cart from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
@@ -556,7 +557,8 @@ export default function POS() {
   };
 
   const filtered = useMemo(() => {
-    let list = products;
+    const shopId = shift?.shop_id || user?.shop_id;
+    let list = products.map((product) => ({ ...product, price: priceForShop(product, shopId) }));
     if (activeCat !== 'all') {
       const selectedCategory = categories.find((c) => c.id === activeCat);
       const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
@@ -572,7 +574,7 @@ export default function POS() {
       list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     }
     return list;
-  }, [products, categories, activeCat, showFav, search]);
+  }, [products, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id]);
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id),
