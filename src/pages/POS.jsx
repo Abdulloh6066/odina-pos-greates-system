@@ -102,6 +102,8 @@ export default function POS() {
   const [discountLoading, setDiscountLoading] = useState(false);
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
+  const cashWithdrawalSubmittingRef = useRef(false);
+  const cashWithdrawalRequestRef = useRef(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
@@ -1082,14 +1084,23 @@ export default function POS() {
   };
 
   const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name, owner_pin }) => {
-    if (!shift) return;
+    if (!shift || cashWithdrawalSubmittingRef.current) return;
     if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       void odinaAlert('Kassadan pul olishni saqlash uchun internet kerak.');
       return;
     }
+    const isDebtPayment = expense_category === 'goods_payment';
+    const fingerprint = JSON.stringify([shift.id, amount, reason, expense_category, recipient_id || '', recipient_name || '']);
+    if (!isDebtPayment && cashWithdrawalRequestRef.current && cashWithdrawalRequestRef.current.fingerprint !== fingerprint) {
+      void odinaAlert('Avvalgi pul operatsiyasi natijasini tekshiring. Uni boshqa summa bilan takrorlamang; avvalgi summa va izoh bilan qayta tekshiring.');
+      return;
+    }
+    if (!isDebtPayment && !cashWithdrawalRequestRef.current) {
+      cashWithdrawalRequestRef.current = { key: createSaleIdempotencyKey(), fingerprint };
+    }
+    cashWithdrawalSubmittingRef.current = true;
     setCashWithdrawalLoading(true);
     try {
-      const isDebtPayment = expense_category === 'goods_payment';
       const result = await base44.functions.invoke(isDebtPayment ? 'supplier-ledger' : 'complete-sale', isDebtPayment ? {
         action: 'pay_debt',
         shift_id: shift.id,
@@ -1099,6 +1110,7 @@ export default function POS() {
         owner_pin,
       } : {
         action: 'cash_withdrawal',
+        idempotency_key: cashWithdrawalRequestRef.current.key,
         shift_id: shift.id,
         amount,
         reason,
@@ -1115,10 +1127,14 @@ export default function POS() {
           [recipient_id]: Math.max(0, Number(current[recipient_id] || 0) - Number(amount || 0)),
         }));
       }
+      cashWithdrawalRequestRef.current = null;
       setCashWithdrawalOpen(false);
     } catch (e) {
-      void odinaAlert('Pul olish amalga oshmadi: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
+      const pending = e?.response?.data?.operation_pending || e?.data?.operation_pending;
+      if (!pending && !isRetryableSyncError(e)) cashWithdrawalRequestRef.current = null;
+      void odinaAlert('Pul olish natijasini tekshiring: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
+      cashWithdrawalSubmittingRef.current = false;
       setCashWithdrawalLoading(false);
     }
   };
