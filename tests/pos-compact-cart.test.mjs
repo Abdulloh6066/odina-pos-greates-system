@@ -74,7 +74,7 @@ test('compact quantity and touch-friendly removal controls retain names and call
 test('locked cart still disables editing; table-save, discount and checkout actions remain present', () => {
   const locked = render({ locked: true, tableMode: true, tableDirty: true,
     onSaveTable: noop, onCancelTable: noop });
-  assert.match(locked, /Buyurtmani stolga saqlash/);
+  assert.match(locked, /Stolga saqlash/);
   assert.match(locked, /Hisobni yopish · To‘lov/);
   assert.match(locked, /Chegirma kodi/);
   assert.match(locked, /disabled=""/);
