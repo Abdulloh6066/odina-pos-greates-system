@@ -17,7 +17,7 @@ function savedReceiptPreference() {
   }
 }
 
-export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false }) {
+export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false, checking = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
@@ -82,6 +82,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
   const removeRow = (idx) => setPayments((prev) => prev.filter((_, i) => i !== idx));
 
   const handleConfirm = () => {
+    if (checking || loading || discountPending) return;
     if (total <= 0) {
       if (!fullDiscount) {
         setError('To‘lov summasi 0 UZS. Mahsulot narxini yoki savatni tekshiring.');
@@ -112,6 +113,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           <span className="text-sm font-medium text-brand-ink">To‘lanadigan jami</span>
           <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
+
+        {checking && <p role="status" className="rounded-xl bg-primary/10 px-3 py-2 text-sm text-brand-ink">Qoldiq tekshirilmoqda… To‘lov usulini tanlashingiz mumkin.</p>}
 
         {discountControls && <div className="border-b border-border pb-4 mb-1">{discountControls}</div>}
 
@@ -248,12 +251,12 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={loading || discountPending || (total <= 0 && !fullDiscount)}
+            disabled={checking || loading || discountPending || (total <= 0 && !fullDiscount)}
             className="col-span-2 min-h-11 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary-strong sm:col-span-1"
           >
             {loading
               ? 'Amalga oshirilmoqda…'
-              : (offline ? 'Qurilmaga saqlash' : 'Yakunlash')}
+              : checking ? 'Tekshirilmoqda…' : (offline ? 'Qurilmaga saqlash' : 'Yakunlash')}
           </Button>
         </div>
       </DialogContent>
