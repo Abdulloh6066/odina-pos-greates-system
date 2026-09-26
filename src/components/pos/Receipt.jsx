@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { startReceiptPrint } from '@/lib/receipt-print-lifecycle';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
 
 export default function Receipt({ sale, settings, print, onAfterPrint }) {
-  const afterPrintRef = useRef(null);
   const onAfterPrintRef = useRef(onAfterPrint);
 
   useEffect(() => {
@@ -13,33 +13,8 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
   }, [onAfterPrint]);
 
   useEffect(() => {
-    if (!print || !sale || afterPrintRef.current) return undefined;
-
-    const finishPrint = () => {
-      if (afterPrintRef.current !== finishPrint) return;
-      afterPrintRef.current = null;
-      window.removeEventListener('afterprint', finishPrint);
-      document.body.classList.remove('odina-sale-printing');
-      onAfterPrintRef.current?.(sale);
-    };
-
-    afterPrintRef.current = finishPrint;
-    window.addEventListener('afterprint', finishPrint, { once: true });
-    document.body.classList.add('odina-sale-printing');
-    const printTimer = window.setTimeout(() => {
-      try {
-        window.print();
-      } catch {
-        finishPrint();
-      }
-    }, 50);
-
-    return () => {
-      window.clearTimeout(printTimer);
-      window.removeEventListener('afterprint', finishPrint);
-      if (afterPrintRef.current === finishPrint) afterPrintRef.current = null;
-      document.body.classList.remove('odina-sale-printing');
-    };
+    if (!print || !sale) return undefined;
+    return startReceiptPrint({ onDone: () => onAfterPrintRef.current?.(sale) });
   }, [print, sale]);
 
   if (!sale || !print) return null;
@@ -75,7 +50,7 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
           <div className="border-t border-dashed border-border my-2" />
           <div className="flex justify-between"><span>Oraliq summa</span><span>{formatUZS(sale.subtotal)}</span></div>
           {sale.discount_amount > 0 && (
-            <div className="flex justify-between"><span>Chegirma ({sale.discount_code})</span><span>−{formatUZS(sale.discount_amount)}</span></div>
+            <div className="flex justify-between"><span>{sale.discount_code === 'QAYTIB_BERISH' ? 'Qaytib berish' : sale.discount_code === 'YAXLITLASH' ? 'Yaxlitlash' : `Chegirma (${sale.discount_code || ''})`}</span><span>−{formatUZS(sale.discount_amount)}</span></div>
           )}
           <div className="flex justify-between font-bold text-sm"><span>JAMI</span><span>{formatUZS(sale.total)}</span></div>
           <div className="border-t border-dashed border-border my-2" />
