@@ -303,14 +303,14 @@ async function sendEmailReport(
   const html =
     `<h2>Odina — kunlik hisobot (${businessDate})</h2>` +
     `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:13px">` +
-    `<tr><th>Do'kon</th><th>Tushum</th><th>Tannarx</th><th>Real foyda</th><th>Sotuv</th><th>Qaytar</th></tr>` +
+    `<tr><th>Do'kon</th><th>Kassa sof savdo</th><th>Kassa tannarxi</th><th>Kassa yalpi foyda</th><th>Sotuv</th><th>Qaytar</th><th>Buyurtma to‘lovlari</th><th>Jami olingan pul</th><th>Xarajatlar</th><th>Tannarx holati</th></tr>` +
     reports
       .map(
         (r: any) =>
-          `<tr><td>${r.shop_name}</td><td>${Math.round(r.total_revenue).toLocaleString("en-US")}</td><td>${Math.round(r.total_cost).toLocaleString("en-US")}</td><td>${Math.round(r.real_profit).toLocaleString("en-US")}</td><td>${r.sale_count}</td><td>${r.refund_count}</td></tr>`,
+          `<tr><td>${String(r.shop_name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c))}</td><td>${Math.round(r.total_revenue).toLocaleString("en-US")}</td><td>${Math.round(r.total_cost).toLocaleString("en-US")}</td><td>${Math.round(r.real_profit).toLocaleString("en-US")}</td><td>${r.sale_count}</td><td>${r.refund_count}</td><td>${Math.round(r.order_payment_total || 0).toLocaleString("en-US")}</td><td>${Math.round(r.collections_total ?? r.total_revenue).toLocaleString("en-US")}</td><td>${Math.round(r.expenses_total || 0).toLocaleString("en-US")}</td><td>${r.unknown_cost_count ? 'Taxminiy / noma’lum' : 'Saqlangan tannarx'}</td></tr>`,
       )
       .join("") +
-    `</table>`;
+    `</table><p>Buyurtma to‘lovlari olingan kunida pul tushumiga kiradi; ular Kassa foydasiga qo‘shilmaydi. Yalpi foydadan boshqa xarajatlar ayrilmagan. Noma’lum tannarx bo‘lsa natija taxminiy.</p>`;
   await service.integrations.Core.SendEmail({
     to: recipientEmail,
     subject: `Odina — kunlik hisobot ${businessDate}`,
@@ -395,6 +395,9 @@ async function deliverReports(
       for (const rec of eligibleEmail) {
         await service.entities.DailyShopReport.update(rec.id, { email_delivery_state: "sending",
           email_attempted_at: new Date().toISOString(), email_recipient_snapshot: recipient });
+        rec.email_delivery_state = "sending";
+        rec.email_sent = false;
+        rec.email_recipient_snapshot = recipient;
       }
       try {
         await sendEmailReport(service, recipient, businessDate, eligibleEmail);
