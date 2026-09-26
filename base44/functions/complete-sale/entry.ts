@@ -1102,6 +1102,14 @@ export default async function(req) {
             error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan.",
           }, { status: 409 });
         }
+        const existingShift = await service.entities.Shift.get(existingSale.shift_id).catch(() => null);
+        // Queue retries must not discard a sale while its original request is
+        // still saving. This marker is added in the EXISTING final shift write;
+        // it adds no request or wait to the normal cashier checkout path.
+        if (existingSale.financial_records_version >= 3
+          && !(existingShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
+          return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi." }, { status: 503 });
+        }
         let tableReleased = true;
         if (existingSale.table_order_id_snapshot) {
           try {
@@ -1109,7 +1117,6 @@ export default async function(req) {
               existingSale.table_order_id_snapshot, idempotencyKey, true);
           } catch { tableReleased = false; }
         }
-        const existingShift = await service.entities.Shift.get(existingSale.shift_id).catch(() => null);
         return Response.json({
           sale: existingSale,
           shift: existingShift,
@@ -1341,6 +1348,11 @@ export default async function(req) {
           && completedSale.shift_id === shift.id
           && (!completedSale.request_fingerprint || completedSale.request_fingerprint === requestFingerprint)
         ) {
+          const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
+          if (completedSale.financial_records_version >= 3
+            && !(completedShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
+            return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi." }, { status: 503 });
+          }
           let tableReleased = true;
           if (completedSale.table_order_id_snapshot) {
             try {
@@ -1348,7 +1360,6 @@ export default async function(req) {
                 completedSale.table_order_id_snapshot, idempotencyKey, true);
             } catch { tableReleased = false; }
           }
-          const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
           return Response.json({
             sale: completedSale,
             shift: completedShift,
@@ -1430,7 +1441,7 @@ export default async function(req) {
       request_fingerprint: requestFingerprint || undefined,
       sold_at: soldAt,
       business_date: businessDate,
-      financial_records_version: 2,
+      financial_records_version: 3,
       sale_items_count: normalizedItems.length,
       shift_id: shift.id,
       user_id: user.id,
@@ -1575,6 +1586,7 @@ export default async function(req) {
           expected_cash: cashIncrement,
           order_count: 1,
         },
+        ...(idempotencyKey ? { $push: { sale_request_keys: `sale-completed:${idempotencyKey}` } } : {}),
       },
     );
 
