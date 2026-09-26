@@ -62,7 +62,7 @@
   "rls": {
     "create": {
       "user_condition": {
-        "email": "dota26066@gmail.com"
+        "id": "6a96eb22a9fd2b34081eb2de"
       }
     },
     "read": {
@@ -72,12 +72,12 @@
     },
     "update": {
       "user_condition": {
-        "email": "dota26066@gmail.com"
+        "id": "6a96eb22a9fd2b34081eb2de"
       }
     },
     "delete": {
       "user_condition": {
-        "email": "dota26066@gmail.com"
+        "id": "6a96eb22a9fd2b34081eb2de"
       }
     }
   }
