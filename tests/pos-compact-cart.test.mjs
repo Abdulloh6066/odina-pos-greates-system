@@ -12,8 +12,8 @@ const source = readFileSync('src/components/pos/Cart.jsx', 'utf8');
 const css = readFileSync('src/styles/odina-retail.css', 'utf8');
 const start = source.indexOf('export default function Cart(');
 assert.ok(start >= 0);
-const componentSource = source.slice(start).replace('export default function Cart(', 'function Cart(');
-const transformed = transformSync(`${componentSource}\nglobalThis.TestCart = Cart;`, {
+const componentSource = source.slice(start).replace('export default function Cart(', 'function Cart(').replace(/export function /g, 'function ');
+const transformed = transformSync(`${componentSource}\nglobalThis.TestCart = Cart; globalThis.TestDiscountRow = DiscountRow;`, {
   loader: 'jsx', jsx: 'transform',
 }).code;
 const Icon = () => React.createElement('span', { 'aria-hidden': true });
@@ -76,7 +76,11 @@ test('locked cart still disables editing; table-save, discount and checkout acti
     onSaveTable: noop, onCancelTable: noop });
   assert.match(locked, /Stolga saqlash/);
   assert.match(locked, /Hisobni yopish · To‘lov/);
-  assert.match(locked, /Chegirma kodi/);
+  // Discount controls now render in the payment modal, not the compact cart.
+  const discount = renderToStaticMarkup(React.createElement(context.TestDiscountRow, {
+    discountCode: '', discount: 0, onApplyDiscount: noop, onRemoveDiscount: noop,
+  }));
+  assert.match(discount, /Chegirma kodi/);
   assert.match(locked, /disabled=""/);
   assert.match(source, /disabled=\{disabled \|\| locked \|\| cart\.length === 0\}/);
   const empty = render({ cart: [], subtotal: 0, total: 0 });
