@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, X, Check, CreditCard, Smartphone, Banknote, ReceiptText } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
-export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false }) {
+export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
@@ -75,7 +75,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">To‘lov</DialogTitle>
         </DialogHeader>
@@ -84,6 +84,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           <span className="text-sm font-medium text-brand-ink">To‘lanadigan jami</span>
           <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
+
+        {discountControls && <div className="border-b border-border pb-4 mb-1">{discountControls}</div>}
 
         {total <= 0 && fullDiscount && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-700 flex items-center gap-2">
@@ -218,7 +220,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={loading || (total <= 0 && !fullDiscount)}
+            disabled={loading || discountPending || (total <= 0 && !fullDiscount)}
             className="col-span-2 min-h-11 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary-strong sm:col-span-1"
           >
             {loading
