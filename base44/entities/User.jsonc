@@ -23,6 +23,10 @@
     "active": {
       "type": "boolean",
       "default": true
+    },
+    "is_owner": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [],
