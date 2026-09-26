@@ -71,6 +71,14 @@
     "created_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "sale_unit": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "gram"
+      ],
+      "default": "piece"
     }
   },
   "required": [
