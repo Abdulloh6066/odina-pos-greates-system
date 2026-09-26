@@ -1091,7 +1091,7 @@ export default function POS() {
     }
     const isDebtPayment = expense_category === 'goods_payment';
     const fingerprint = JSON.stringify([shift.id, amount, reason, expense_category, recipient_id || '', recipient_name || '']);
-    if (!isDebtPayment && cashWithdrawalRequestRef.current && cashWithdrawalRequestRef.current.fingerprint !== fingerprint) {
+    if (cashWithdrawalRequestRef.current && cashWithdrawalRequestRef.current.fingerprint !== fingerprint) {
       void odinaAlert('Avvalgi pul operatsiyasi natijasini tekshiring. Uni boshqa summa bilan takrorlamang; avvalgi summa va izoh bilan qayta tekshiring.');
       return;
     }
