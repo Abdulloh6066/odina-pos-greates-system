@@ -2,9 +2,8 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 
 const STAFF_ROLES = ["manager", "cashier", "accountant", "production", "warehouse"];
-// Match the protected owner already used by security-admin and User RLS.
-const OWNER_USER_ID = "6a96eb22a9fd2b34081eb2de";
-const isOwner = (user: any) => Boolean(user?.id) && String(user.id) === OWNER_USER_ID;
+// Match the protected owner flag used by security-admin and User RLS.
+const isOwner = (user: any) => user?.is_owner === true || user?.data?.is_owner === true;
 
 const errorMessage = (error: unknown) => {
   if (error && typeof error === "object") {
@@ -31,8 +30,9 @@ Deno.serve(async (req) => {
 
     if (action === "claim") {
       const email = String(currentUser.email || "").trim().toLowerCase();
-      if (!email || isOwner(currentUser)) return Response.json({ applied: false });
+      if (!email) return Response.json({ applied: false });
       const storedInvitee = await base44.asServiceRole.entities.User.get(currentUser.id).catch(() => null);
+      if (isOwner(storedInvitee)) return Response.json({ applied: false });
       if (storedInvitee?.active === false || storedInvitee?.data?.active === false) {
         return Response.json({ error: "O‘chirilgan hisob taklifni qabul qila olmaydi." }, { status: 403 });
       }
@@ -125,15 +125,15 @@ Deno.serve(async (req) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return Response.json({ error: "To‘g‘ri email manzilini kiriting." }, { status: 400 });
       }
-      const owner = isOwner(currentUser) && isOwner(admin);
+      const owner = String(currentUser.id) === String(admin.id) && isOwner(admin);
       if (desiredRole === "admin" && !owner) {
         return Response.json({ error: "Admin taklifini faqat hisob egasi yubora oladi." }, { status: 403 });
       }
       if (desiredRole !== "admin" && !STAFF_ROLES.includes(desiredRole)) {
         return Response.json({ error: "Lavozimni tanlang." }, { status: 400 });
       }
-      const ownerAccount = await base44.asServiceRole.entities.User.get(OWNER_USER_ID).catch(() => null);
-      if (ownerAccount && email === String(ownerAccount.email || "").trim().toLowerCase()) {
+      const matchingUsers = await base44.asServiceRole.entities.User.filter({ email }, "-updated_date", 5);
+      if ((matchingUsers || []).some((user: any) => isOwner(user))) {
         return Response.json({ error: "Himoyalangan egasi hisobiga xodim taklifi yuborilmaydi." }, { status: 403 });
       }
 
