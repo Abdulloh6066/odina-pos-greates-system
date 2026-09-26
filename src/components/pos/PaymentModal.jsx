@@ -102,6 +102,9 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     onConfirm(valid.map((p) => ({ method: p.method, amount: Number(p.amount) })), printReceipt);
   };
 
+  // Remove the modal immediately on close; printing must not interrupt its exit animation.
+  if (!open) return null;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
