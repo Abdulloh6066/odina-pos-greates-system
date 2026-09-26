@@ -48,6 +48,10 @@
     "price": {
       "type": "number"
     },
+    "shop_prices": {
+      "type": "object",
+      "description": "Do\u2018kon ID bo\u2018yicha alohida sotuv narxlari; qolgan do\u2018konlar asosiy narxdan foydalanadi"
+    },
     "source_type": {
       "default": "central_produced",
       "enum": [
