@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,13 +13,27 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [printReceipt, setPrintReceipt] = useState(true);
 
+  const previous = useRef({ open: false, total });
   useEffect(() => {
-    if (open) {
+    const before = previous.current;
+    if (open && !before.open) {
       setPayments(total > 0 ? [{ method: 'cash', amount: total }] : []);
       setError('');
       setShowMethodPicker(false);
       setPrintReceipt(true);
+    } else if (open && total !== before.total) {
+      setPayments((rows) => {
+        if (total <= 0) return [];
+        if (rows.length === 0) return [{ method: 'cash', amount: total }];
+        if (rows.length === 1 && Number(rows[0].amount) === before.total) {
+          return [{ ...rows[0], amount: total }];
+        }
+        // Keep manually entered split payments; the balance shows any difference.
+        return rows;
+      });
+      setError('');
     }
+    previous.current = { open, total };
   }, [open, total]);
 
   const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
