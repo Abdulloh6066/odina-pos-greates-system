@@ -14,9 +14,9 @@ test('User RLS allows admin-wide read and self read; only protected owner may up
   const readRules = schema.rls?.read?.$or || [];
   assert.ok(readRules.some((rule) => rule?.user_condition?.role === 'admin'));
   assert.ok(readRules.some((rule) => rule?.id === '{{user.id}}'));
-  const ownerId = read('base44/functions/security-admin/entry.ts').match(/const OWNER_USER_ID = "([^"]+)"/)[1];
-  assert.equal(schema.rls?.update?.user_condition?.id, ownerId);
-  assert.equal(schema.rls?.delete?.user_condition?.id, ownerId);
+  assert.equal(schema.properties?.is_owner?.type, "boolean");
+  assert.equal(schema.rls?.update?.user_condition?.is_owner, true);
+  assert.equal(schema.rls?.delete?.user_condition?.is_owner, true);
   assert.equal(schema.rls?.create, undefined);
 });
 
