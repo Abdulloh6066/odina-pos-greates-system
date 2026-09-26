@@ -569,7 +569,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
                             );
                             return (
                               <div key={item.id || index} className="flex justify-between gap-3 text-sm">
-                                <span className="min-w-0">{formatNum(quantity)}× {name}</span>
+                                <span className="min-w-0">{formatNum(quantity)}{item.sale_unit === 'gram' ? ' g' : '×'} {name}</span>
                                 <span className="font-medium whitespace-nowrap">{formatUZS(amount)}</span>
                               </div>
                             );
