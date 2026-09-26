@@ -294,20 +294,37 @@ async function withSyncLock(work) {
   return run;
 }
 
-export async function syncPendingSales({ userId, send }) {
+export function pendingSaleRetryDelay(records, now = Date.now()) {
+  const pending = (records || []).filter((row) => row.status !== 'failed');
+  if (!pending.length) return null;
+  return Math.max(1000, Math.min(...pending.map((row) => {
+    const next = Date.parse(row.next_retry_at || '');
+    return Number.isFinite(next) ? next - now : 1000;
+  })));
+}
+
+// Storage injection is used by memory-only regression tests; production defaults
+// remain IndexedDB. Failed records are retained until an explicit manual retry.
+export async function syncPendingSales({ userId, send, retryFailed = false,
+  storage = { list: listPendingSales, update: updatePendingSale, remove: removePendingSale },
+  lock = withSyncLock, now = () => Date.now(),
+}) {
   if (!userId || typeof send !== 'function') {
     return { synced: 0, remaining: 0, failed: null };
   }
 
-  const result = await withSyncLock(async () => {
-    const records = await listPendingSales(userId);
+  const result = await lock(async () => {
+    const records = await storage.list(userId);
     let synced = 0;
-    let failed = null;
+    const priorFailure = records.find((row) => row.status === 'failed');
+    let failed = priorFailure && !retryFailed
+      ? { id: priorFailure.id, retryable: false, message: priorFailure.last_error } : null;
 
     for (const record of records) {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
+      if (!retryFailed && (record.status === 'failed' || Date.parse(record.next_retry_at || '') > now())) continue;
 
-      await updatePendingSale(record.id, {
+      await storage.update(record.id, {
         status: 'syncing',
         attempts: Number(record.attempts || 0) + 1,
         last_error: '',
@@ -324,26 +341,32 @@ export async function syncPendingSales({ userId, send }) {
           error.status = 500;
           throw error;
         }
-        await removePendingSale(record.id);
+        await storage.remove(record.id);
         synced += 1;
       } catch (error) {
-        const retryable = isRetryableSyncError(error);
+        const status = Number(error?.response?.status || error?.status || 0);
+        const sessionBlocked = status === 401 || status === 403;
+        const retryable = isRetryableSyncError(error) || sessionBlocked;
         const message = syncErrorMessage(error);
-        await updatePendingSale(record.id, {
+        const delay = sessionBlocked ? 60000 : Math.min(60000, 5000 * (2 ** Math.min(Number(record.attempts || 0), 4)));
+        await storage.update(record.id, {
           status: retryable ? 'pending' : 'failed',
           last_error: message,
+          next_retry_at: retryable ? new Date(now() + delay).toISOString() : '',
         });
-        failed = { id: record.id, retryable, message };
-        break;
+        failed = failed || { id: record.id, retryable, message };
+        // Connection, throttling and session errors affect the whole queue.
+        // A permanently rejected independent POS sale must not block the rest.
+        if (retryable) break;
       }
     }
 
-    const remaining = (await listPendingSales(userId)).length;
+    const remaining = (await storage.list(userId)).length;
     return { synced, remaining, failed };
   });
 
   if (result?.skipped) {
-    return { synced: 0, remaining: (await listPendingSales(userId)).length, failed: null, skipped: true };
+    return { synced: 0, remaining: (await storage.list(userId)).length, failed: null, skipped: true };
   }
   return result;
 }
