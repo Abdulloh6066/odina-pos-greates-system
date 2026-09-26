@@ -594,7 +594,9 @@ test('simultaneous untracked offline retries still create one sale', async () =>
   assert.equal(f.db.StockMovement.length, 0);
   assert.equal(f.db.ProductStock[0].quantity, 10);
   assert.equal(f.db.Shift[0].order_count, 1);
-  assert.deepEqual(f.db.Shift[0].sale_request_keys, [request.idempotency_key]);
+  assert.deepEqual(f.db.Shift[0].sale_request_keys, [
+    request.idempotency_key, `sale-completed:${request.idempotency_key}`,
+  ]);
 });
 
 test('discount management hides used codes and creates one-time codes', () => {
