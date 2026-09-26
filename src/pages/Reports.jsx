@@ -1,10 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOutletContext, Navigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
 import { BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey } from '@/lib/pos';
-import { formatUzbekistan } from '@/lib/uzbekistan-time';
+import { formatUZS, formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import RealProfitDashboard from '@/components/reports/RealProfitDashboard';
 
@@ -15,66 +13,38 @@ export default function Reports() {
   const { user } = useOutletContext();
   const role = user?.role;
 
-  const [sales, setSales] = useState([]);
+  // All charts share the same filtered result as the summary above them.
+  // No separate latest-1,000-sale download or contradictory date scope.
+  const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const s = await base44.entities.Sale.list('-created_date', 1000);
-        setSales(s || []);
-      } catch {}
-      setLoading(false);
-    })();
-  }, []);
-
-  const completedSales = useMemo(() => sales.filter((sale) => sale.status !== 'refunded'), [sales]);
-
-  const last7 = useMemo(() => {
-    const days = [];
-    const now = Date.now();
-    for (let i = 6; i >= 0; i--) {
-      const day = new Date(now - i * 24 * 60 * 60 * 1000);
-      const dateKey = tashkentDateKey(day);
-      const daySales = completedSales.filter((sale) => saleBusinessDate(sale) === dateKey);
-      days.push({
-        date: formatUzbekistan(day, { weekday: 'short' }),
-        total: daySales.reduce((sum, sale) => sum + sale.total, 0),
-        orders: daySales.length,
-      });
-    }
-    return days;
-  }, [completedSales]);
-
-  const byMethod = useMemo(() => {
-    const map = {};
-    completedSales.forEach((s) => s.payments?.forEach((p) => { map[p.method] = (map[p.method] || 0) + p.amount; }));
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [completedSales]);
-
-  const byShop = useMemo(() => {
-    const map = {};
-    completedSales.forEach((s) => { if (s.shop_name) map[s.shop_name] = (map[s.shop_name] || 0) + s.total; });
-    return Object.entries(map).map(([name, total]) => ({ name, total }));
-  }, [completedSales]);
-
-  const totalRev = completedSales.reduce((s, x) => s + x.total, 0);
+  const acceptReport = (data) => { setReportData(data); setLoading(false); };
+  const last7 = useMemo(() => (reportData?.byDay || []).map(row => ({
+    date: row.date, total: row.collections ?? row.revenue, orders: row.sales,
+  })), [reportData]);
+  const allMethods = useMemo(() => ['cash', 'uzcard', 'humo', 'online', 'bank_transfer'].map(name => ({
+    name, value: Number(reportData?.grand?.[name] || 0),
+  })), [reportData]);
+  const byMethod = allMethods.filter(row => row.value > 0);
+  const byShop = useMemo(() => (reportData?.shops || []).map(shop => ({
+    name: shop.shop_name, total: shop.totals.collections ?? shop.totals.revenue,
+  })), [reportData]);
+  const totalRev = reportData?.grand?.collections ?? reportData?.grand?.revenue ?? 0;
 
   if (role === 'cashier') return <Navigate to="/pos" replace />;
 
   return (
     <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
-      <PageHeader title="Hisobotlar" subtitle={`${formatNum(sales.length)} ta savdo · jami ${formatUZS(totalRev)}`} icon={BarChart3} />
+      <PageHeader title="Hisobotlar" subtitle={reportData ? `${reportData.date_from} — ${reportData.date_to} · ${formatNum(reportData.grand?.sales || 0)} ta Kassa savdosi · olingan pul ${formatUZS(totalRev)}` : 'Davr bo‘yicha pul tushumi va Kassa foydasi'} icon={BarChart3} />
 
-      <RealProfitDashboard />
+      <RealProfitDashboard onData={acceptReport} />
 
       {loading ? (
         <div className="grid lg:grid-cols-2 gap-5">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-64 rounded-2xl bg-secondary animate-pulse" />)}</div>
-      ) : sales.length === 0 ? (
+      ) : !reportData || last7.length === 0 ? (
         <div className="text-center py-20"><div className="text-5xl mb-3">📊</div><p className="text-sm text-muted-foreground">Hali savdo ma’lumotlari yo‘q.</p></div>
       ) : (
         <div className="grid lg:grid-cols-2 gap-5">
-          <Panel title="Savdo — oxirgi 7 kun">
+          <Panel title="Olingan pul — tanlangan davr">
             <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={last7} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                 <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.5} /><stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient></defs>
@@ -87,7 +57,7 @@ export default function Reports() {
             </ResponsiveContainer>
           </Panel>
 
-          <Panel title="To‘lov usuli bo‘yicha savdo">
+          <Panel title="To‘lov usuli bo‘yicha olingan pul">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie data={byMethod} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} innerRadius={45}>
@@ -96,6 +66,7 @@ export default function Reports() {
                 <Tooltip formatter={(v) => formatUZS(v)} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--border))' }} />
               </PieChart>
             </ResponsiveContainer>
+            {allMethods.some(row => row.value < 0) && <p className="text-xs text-muted-foreground">Qaytarish sababli manfiy usullar doirada ko‘rsatilmaydi: {allMethods.filter(row => row.value < 0).map(row => `${PAY_LABELS[row.name]} ${formatUZS(row.value)}`).join(', ')}.</p>}
             <div className="flex flex-wrap gap-3 justify-center mt-2">
               {byMethod.map((m) => (
                 <div key={m.name} className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full" style={{ background: PAY_COLORS[m.name] || 'hsl(0 0% 60%)' }} /><span>{PAY_LABELS[m.name] || m.name}</span></div>
@@ -103,7 +74,7 @@ export default function Reports() {
             </div>
           </Panel>
 
-          <Panel title="Do‘konlar bo‘yicha savdo" className="lg:col-span-2">
+          <Panel title="Do‘konlar bo‘yicha olingan pul" className="lg:col-span-2">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={byShop} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
