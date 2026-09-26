@@ -7,11 +7,26 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, X, Check, CreditCard, Smartphone, Banknote, ReceiptText } from 'lucide-react';
 import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
+const RECEIPT_PRINT_KEY = 'odina-pos:print-receipt';
+
+function savedReceiptPreference() {
+  try {
+    return window.localStorage.getItem(RECEIPT_PRINT_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
 export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false }) {
   const [payments, setPayments] = useState(total > 0 ? [{ method: 'cash', amount: total }] : []);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
-  const [printReceipt, setPrintReceipt] = useState(true);
+  const [printReceipt, setPrintReceipt] = useState(savedReceiptPreference);
+
+  const changePrintReceipt = (enabled) => {
+    setPrintReceipt(enabled);
+    try { window.localStorage.setItem(RECEIPT_PRINT_KEY, enabled ? 'on' : 'off'); } catch { /* Keep the choice for this page when storage is unavailable. */ }
+  };
 
   const previous = useRef({ open: false, total });
   useEffect(() => {
@@ -20,7 +35,6 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
       setPayments(total > 0 ? [{ method: 'cash', amount: total }] : []);
       setError('');
       setShowMethodPicker(false);
-      setPrintReceipt(true);
     } else if (open && total !== before.total) {
       setPayments((rows) => {
         if (total <= 0) return [];
@@ -223,7 +237,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
             <Switch
               id="print-receipt"
               checked={printReceipt}
-              onCheckedChange={setPrintReceipt}
+              onCheckedChange={changePrintReceipt}
               disabled={loading}
               aria-label="Savdo chekini chop etish"
             />
