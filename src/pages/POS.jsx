@@ -59,6 +59,8 @@ export default function POS() {
   const [search, setSearch] = useState('');
   const [showFav, setShowFav] = useState(false);
   const [cart, setCart] = useState([]);
+  const [weightProduct, setWeightProduct] = useState(null);
+  const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -490,19 +492,43 @@ export default function POS() {
     return applyAdjustment(Math.floor(subtotal / step) * step, 'rounding');
   };
 
+  const openWeight = (product, editing = false) => {
+    if (tableLocked || paying || payOpen || stockChecking) return;
+    const existing = cart.find((row) => row.product_id === (product.id || product.product_id));
+    setWeightProduct({ ...product, id: product.id || product.product_id,
+      name: product.name || product.product_name, price: existing?.price ?? product.price, editing });
+    setGrams(editing ? String(existing?.quantity || '') : '');
+  };
+  const saveWeight = () => {
+    const quantity = Number(grams);
+    if (!weightProduct || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000
+      || tableLocked || paying || payOpen || stockChecking) return;
+    const product = weightProduct;
+    setCart((rows) => {
+      const existing = rows.find((row) => row.product_id === product.id);
+      const combined = product.editing ? quantity : quantity + (existing?.quantity || 0);
+      if (combined > 1000000) return rows;
+      const row = { ...existing, product_id: product.id, product_name: product.name,
+        image_url: product.image_url, price: product.price, sale_unit: 'gram',
+        quantity: combined, subtotal: Math.round(product.price * combined / 1000) };
+      return existing ? rows.map((item) => item.product_id === product.id ? row : item) : [...rows, row];
+    });
+    setWeightProduct(null);
+  };
   const addToCart = (product) => {
-    if (tableLocked || paying) return;
+    if (tableLocked || paying || payOpen || stockChecking) return;
+    if (product.sale_unit === 'gram') { openWeight(product); return; }
     setCart((prev) => {
       const existing = prev.find((i) => i.product_id === product.id);
       if (existing) {
         return prev.map((i) => i.product_id === product.id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i);
       }
-      return [...prev, { product_id: product.id, product_name: product.name, image_url: product.image_url, price: product.price, quantity: 1, subtotal: product.price }];
+      return [...prev, { product_id: product.id, product_name: product.name, image_url: product.image_url, price: product.price, sale_unit: 'piece', quantity: 1, subtotal: product.price }];
     });
   };
 
-  const inc = (item) => { if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
-  const dec = (item) => { if (tableLocked || paying) return; setCart((p) => p.flatMap((i) => {
+  const inc = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
+  const dec = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (tableLocked || paying) return; setCart((p) => p.flatMap((i) => {
     if (i.product_id !== item.product_id) return [i];
     const q = i.quantity - 1;
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
@@ -1310,7 +1336,7 @@ export default function POS() {
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
       <div className={`lg:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
         <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-12 h-12 px-4 py-2 whitespace-nowrap text-sm sm:text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
-          Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
+          Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + (i.sale_unit === 'gram' ? 1 : i.quantity), 0)} ta)
         </Button>
       </div>
 
@@ -1338,6 +1364,22 @@ export default function POS() {
         activeShopId={shift?.shop_id || user?.shop_id}
         onSelect={(shopId, number, payDirect) => { void selectTableFromPicker(shopId, number, payDirect); }}
       />
+      <Dialog open={Boolean(weightProduct)} onOpenChange={(open) => !open && setWeightProduct(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{weightProduct?.name} — gramm</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">1 kg: {formatUZS(weightProduct?.price || 0)}</p>
+          <Input autoFocus type="number" inputMode="numeric" min="1" max="1000000" step="1"
+            aria-label="Og‘irlik (gramm)" placeholder="Masalan: 250" value={grams}
+            onChange={(e) => setGrams(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveWeight(); }} />
+          <p className="text-lg font-bold">Summa: {formatUZS(Math.round((weightProduct?.price || 0) * (Number(grams) || 0) / 1000))}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWeightProduct(null)}>Bekor qilish</Button>
+            <Button onClick={saveWeight} disabled={!Number.isSafeInteger(Number(grams)) || Number(grams) < 1 || Number(grams) > 1000000}>
+              {weightProduct?.editing ? 'Saqlash' : 'Qo‘shish'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <PaymentModal
         open={payOpen}
         total={total}
