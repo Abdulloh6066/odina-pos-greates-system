@@ -14,20 +14,35 @@ export default function Dashboard() {
   const [products, setProducts] = useState([]);
   const [expiredItems, setExpiredItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dailyTotals, setDailyTotals] = useState(null);
+  const [reportError, setReportError] = useState('');
 
   useEffect(() => {
     if (role === 'cashier') { navigate('/pos', { replace: true }); return; }
     let active = true;
     (async () => {
       try {
-        const [s, p, wasteResult] = await Promise.all([
+        const [s, p, wasteResult, dailyResult] = await Promise.all([
           base44.entities.Sale.list('-created_date', 500),
           base44.entities.Product.list(),
           (role === 'admin' || role === 'manager')
             ? base44.functions.invoke('waste-ledger', { action: 'get_alerts' }).catch(() => ({ data: { expired_items: [] } }))
             : Promise.resolve({ data: { expired_items: [] } }),
+          base44.functions.invoke('daily-sales-export', { action: 'preview', business_date: tashkentDateKey() })
+            .catch(error => ({ reportError: error?.response?.data?.error || error?.message || 'Kunlik hisobot yuklanmadi.' })),
         ]);
         if (!active) return;
+        if (dailyResult.reportError) setReportError(dailyResult.reportError);
+        else {
+          setReportError('');
+          const rows = (dailyResult?.data || dailyResult)?.reports || [];
+          setDailyTotals(rows.reduce((totals, row) => ({
+            revenue: totals.revenue + Number(row.total_revenue || 0),
+            collections: totals.collections + Number(row.collections_total ?? row.total_revenue ?? 0),
+            orderPayments: totals.orderPayments + Number(row.order_payment_total || 0),
+            sales: totals.sales + Number(row.sale_count || 0),
+          }), { revenue: 0, collections: 0, orderPayments: 0, sales: 0 }));
+        }
         setSales(s || []);
         setProducts(p || []);
         setExpiredItems((wasteResult?.data || wasteResult)?.expired_items || []);
@@ -37,8 +52,8 @@ export default function Dashboard() {
   }, [role]);
 
   const today = useMemo(() => sales.filter((s) => s.status !== 'refunded' && saleBusinessDate(s) === tashkentDateKey()), [sales]);
-  const todayTotal = today.reduce((sum, s) => sum + s.total, 0);
-  const todayOrders = today.length;
+  const todayTotal = dailyTotals?.revenue || 0;
+  const todayOrders = dailyTotals?.sales || 0;
   const avgOrder = todayOrders ? todayTotal / todayOrders : 0;
 
   const bestSellers = useMemo(() => {
@@ -85,14 +100,16 @@ export default function Dashboard() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <StatCard icon={TrendingUp} label="Bugungi savdo" value={formatUZS(todayTotal)} accent />
-            <StatCard icon={Receipt} label="Bugungi buyurtmalar" value={formatNum(todayOrders)} />
-            <StatCard icon={ShoppingBag} label="O‘rtacha buyurtma" value={formatUZS(avgOrder)} />
+            <StatCard icon={TrendingUp} label="Bugungi olingan pul" value={dailyTotals ? formatUZS(dailyTotals.collections) : '—'} accent />
+            <StatCard icon={Receipt} label="Kassa savdolari" value={dailyTotals ? formatNum(todayOrders) : '—'} />
+            <StatCard icon={ShoppingBag} label="Kassa o‘rtacha sof savdosi" value={dailyTotals ? formatUZS(avgOrder) : '—'} />
             <StatCard icon={Star} label="Mahsulotlar" value={formatNum(products.filter((product) => product.archived !== true).length)} />
           </div>
 
+          {reportError ? <p role="alert" className="mt-3 text-sm text-destructive">Kunlik jami yuklanmadi: {reportError}</p>
+            : dailyTotals && <p className="mt-3 text-xs text-muted-foreground">Kassa sof savdo: {formatUZS(dailyTotals.revenue)} · Buyurtma to‘lovlari: {formatUZS(dailyTotals.orderPayments)}. Jami olingan pul foyda emas.</p>}
           <div className="grid lg:grid-cols-2 gap-5 mt-6">
-            <Panel title="Bugungi eng ko‘p sotilganlar" icon={Star}>
+            <Panel title="Bugungi Kassa mahsulotlari" icon={Star}>
               {bestSellers.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
                 <div className="space-y-2.5">
                   {bestSellers.map(([name, qty], i) => (
@@ -106,7 +123,7 @@ export default function Dashboard() {
               )}
             </Panel>
 
-            <Panel title="Bugungi eng faol xodimlar" icon={UsersIcon}>
+            <Panel title="Bugungi Kassa xodimlari" icon={UsersIcon}>
               {topEmployees.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
                 <div className="space-y-2.5">
                   {topEmployees.map(([name, amt], i) => (
