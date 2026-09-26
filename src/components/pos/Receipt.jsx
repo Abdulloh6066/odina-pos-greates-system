@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { startReceiptPrint } from '@/lib/receipt-print-lifecycle';
+import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
@@ -14,7 +15,10 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
 
   useEffect(() => {
     if (!print || !sale) return undefined;
-    return startReceiptPrint({ onDone: () => onAfterPrintRef.current?.(sale) });
+    return startReceiptPrint({
+      onDone: () => onAfterPrintRef.current?.(sale),
+      onWarning: (description) => toast({ title: 'Chekni tekshiring', description, variant: 'destructive' }),
+    });
   }, [print, sale]);
 
   if (!sale || !print) return null;
