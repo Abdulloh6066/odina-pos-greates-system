@@ -10,6 +10,7 @@ import { priceForShop } from '@/lib/shop-pricing';
 import ProductCard from '@/components/pos/ProductCard';
 import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
+import SalesHistory from '@/pages/SalesHistory';
 import Receipt from '@/components/pos/Receipt';
 import ShiftReport from '@/components/pos/ShiftReport';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
@@ -76,6 +77,7 @@ export default function POS() {
   const [roundingError, setRoundingError] = useState('');
 
   const [payOpen, setPayOpen] = useState(false);
+  const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
@@ -1092,11 +1094,14 @@ export default function POS() {
           className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 sm:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <Armchair className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Stollar</span>
         </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => setSalesHistoryOpen(true)}
+          aria-label="Savdolar tarixini ochish"
+          className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl px-0 sm:px-3 font-semibold touch-manipulation">
+          <ReceiptText className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Savdolar tarixi</span>
+        </Button>
         {shift ? (
           <>
-            <div className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
-              <Clock className="w-3.5 h-3.5" /> Smena ochiq
-            </div>
+
             <Button variant="outline" size="sm" aria-label="Kassadan pul olish" onClick={() => setCashWithdrawalOpen(true)} className="h-10 px-3 touch-manipulation">
               <Banknote className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pul olish</span>
             </Button>
@@ -1340,6 +1345,18 @@ export default function POS() {
         offline={checkoutOffline || (!isOnline && !selectedTable)}
         fullDiscount={discountPct === 100 && subtotal > 0 && total === 0}
       />
+      <Dialog open={salesHistoryOpen} onOpenChange={setSalesHistoryOpen}>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-6xl max-h-[90dvh] flex flex-col overflow-hidden p-4 sm:p-6">
+          <DialogHeader className="shrink-0 border-b border-border pb-4 pr-12">
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <ReceiptText className="h-5 w-5 text-brand-ink" /> Savdolar tarixi
+            </DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {salesHistoryOpen && <SalesHistory embedded />}
+          </div>
+        </DialogContent>
+      </Dialog>
       <ShiftReport shift={shiftReport} onAfterPrint={() => setShiftReport(null)} />
       <Receipt
         sale={receiptPrintSale}
