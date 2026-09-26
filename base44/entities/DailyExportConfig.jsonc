@@ -26,6 +26,13 @@
     "sheet_created_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "delivery_lock_token": {
+      "type": "string"
+    },
+    "delivery_lock_until": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [
