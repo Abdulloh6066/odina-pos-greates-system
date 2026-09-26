@@ -75,9 +75,11 @@ test('report isolates shop and date, aggregates payment methods and refunds via 
   ];
   const items = [{sale_id:'s1',total_cost_at_sale:20000},{sale_id:'s2',total_cost_at_sale:5000},{sale_id:'s3',total_cost_at_sale:1}];
   const text = report.renderPrivateReport(plan, shops, sales, items);
-  assert.match(text, /80,000 so‘m/);
-  assert.match(text, /40,000 so‘m/);
-  assert.match(text, /65,000 so‘m/);
+  // A refunded original is offset once; remaining sale revenue is 100,000.
+  assert.match(text, /Tushum: 100,000 so‘m/);
+  assert.match(text, /Naqd: 60,000 so‘m/);
+  assert.match(text, /Uzcard: 40,000 so‘m/);
+  assert.match(text, /foydasi.*80,000 so‘m/);
   assert.match(text, /Qaytarishlar: 1/);
   assert.doesNotMatch(text, /800,000|999,999|Production|Odina Branch/);
   assert.match(text, /Bu sof foyda emas/);
