@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import StaffOrderTicketModal from './StaffOrderTicketModal';
 import TableGroupDialog from './TableGroupDialog';
+import odinaMark from '@/components/brand/odina-mark';
+import { receiptWishForSale } from '@/lib/receipt-wishes';
 
 export default function TableDetailSheet({
   open,
@@ -216,6 +218,7 @@ export default function TableDetailSheet({
               {/* Printable Pre-check Section */}
               {createPortal(<div ref={printRef} className="receipt-print table-precheck font-mono text-[12px] leading-relaxed hidden">
                 <div className="text-center space-y-1">
+                  <img src={odinaMark} alt="Odina" width="72" height="72" style={{ display: 'block', margin: '0 auto 6px', objectFit: 'contain', filter: 'grayscale(1) contrast(2)' }} />
                   <div className="font-display text-lg font-bold">{shop?.name || 'Odina'}</div>
                   <div className="text-[11px] font-bold uppercase tracking-wider">HISOB VARAQASI (PRE-CHECK)</div>
                   <div className="text-sm font-bold">{displayNumbers.join(' + ')}-stol</div>
@@ -236,8 +239,10 @@ export default function TableDetailSheet({
                   <span>{formatUZS(totalAmount)}</span>
                 </div>
                 <div className="border-t border-dashed border-border my-2" />
+                <div className="text-center text-[12px] py-1">Sizning tabassumingiz biz uchun muhim! ❤️</div>
+                <div className="text-center text-[12px] py-1 font-semibold">{receiptWishForSale(tableOrder)}</div>
                 <div className="text-center text-[10px] pt-1 text-muted-foreground">
-                  Xizmatingizdan mamnunmiz! Ushbu varaq to‘lov hujjati hisoblanmaydi.
+                  Ushbu varaq to‘lov hujjati hisoblanmaydi.
                 </div>
               </div>, document.body)}
             </div>
