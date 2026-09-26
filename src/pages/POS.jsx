@@ -1215,7 +1215,7 @@ export default function POS() {
         {/* Center: categories + grid */}
         <div className="flex-1 flex min-w-0">
           {/* Category rail */}
-          <div className="odina-category-rail hidden md:flex w-44 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
+          <div className="odina-category-rail hidden md:flex w-36 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
             <p className="odina-category-title">KATEGORIYALAR</p>
             <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="Barchasi" />
             <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
@@ -1245,7 +1245,7 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 xl:pb-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
               {loadingData ? (
                 <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
@@ -1273,7 +1273,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="odina-cart-wrap hidden xl:flex w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
+        <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
@@ -1290,14 +1290,14 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className={`xl:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
+      <div className={`lg:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
         <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-12 h-12 px-4 py-2 whitespace-nowrap text-sm sm:text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + i.quantity, 0)} ta)
         </Button>
       </div>
 
       <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
-        <SheetContent side="bottom" className="odina-cart-sheet xl:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
+        <SheetContent side="bottom" className="odina-cart-sheet lg:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
