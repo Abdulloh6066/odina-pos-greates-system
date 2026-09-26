@@ -59,26 +59,14 @@
     "invited_at"
   ],
   "rls": {
-    "create": {
-      "user_condition": {
-        "is_owner": true
-      }
-    },
-    "delete": {
-      "user_condition": {
-        "is_owner": true
-      }
-    },
+    "create": false,
+    "delete": false,
     "read": {
       "user_condition": {
         "role": "admin"
       }
     },
-    "update": {
-      "user_condition": {
-        "is_owner": true
-      }
-    }
+    "update": false
   },
   "type": "object"
 }
