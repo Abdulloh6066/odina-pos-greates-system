@@ -142,7 +142,7 @@ test('second admin cannot alter any admin or grant admin, but can still manage o
   assert.equal(f.db.User[2].active, false);
   f.as('owner');
   assert.equal((await run({ action: 'update_user_access', target_user_id: 'owner', active: false })).status, 400);
-  f.as('other', 'dota26066@gmail.com'); // forged session email alone is insufficient
+  f.as('other', 'owner@example.test'); // forged session email alone is insufficient
   assert.equal((await run({ action: 'update_user_access', target_user_id: 'cashier', role: 'admin' })).status, 403);
 });
 
