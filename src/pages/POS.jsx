@@ -83,6 +83,7 @@ export default function POS() {
   const checkoutReadyRef = useRef(false);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const saleSubmittingRef = useRef(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
   const checkoutRecordedAtRef = useRef('');
@@ -832,6 +833,8 @@ export default function POS() {
   };
 
   const presentCompletedSale = (sale, printReceipt) => {
+    checkoutCancelledRef.current = true;
+    checkoutReadyRef.current = false;
     if (printReceipt) setReceiptPrintSale(sale);
     else finishSalePresentation(sale);
   };
@@ -882,6 +885,10 @@ export default function POS() {
   };
 
   const completeSale = async (payments, printReceipt = true) => {
+    if (saleSubmittingRef.current || !cart.length || stockChecking || discountLoading || !checkoutReadyRef.current) return;
+    saleSubmittingRef.current = true;
+    let saleCommitted = false;
+    setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
     // never leave a stale 0 UZS payment window on screen after a successful sale.
     setPayOpen(false);
@@ -914,6 +921,7 @@ export default function POS() {
           throw new Error('Chegirmali savdoni offline saqlab bo‘lmaydi. Internetni kuting.');
         }
         await enqueueOfflineSale(pendingRecord);
+        saleCommitted = true;
         finishQueuedSale(pendingRecord, printReceipt);
         return;
       }
@@ -940,13 +948,21 @@ export default function POS() {
         const result = await base44.functions.invoke('complete-sale', request);
         const payload = result?.data || result;
         if (!payload?.sale) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
+        saleCommitted = true;
         applyCompletedSale(payload, printReceipt);
       } catch (error) {
-        if (!pendingRecord || !isRetryableSyncError(error)) throw error;
+        if (saleCommitted || !pendingRecord || !isRetryableSyncError(error)) throw error;
         await enqueueOfflineSale(pendingRecord);
+        saleCommitted = true;
         finishQueuedSale(pendingRecord, printReceipt);
       }
     } catch (error) {
+      if (saleCommitted) {
+        setPayOpen(false);
+        console.error('Completed sale presentation failed:', error);
+        void odinaAlert('Savdo saqlandi. Chek oynasini ochishda xato yuz berdi. Qayta pul olmang; Savdolar tarixidan tekshiring.');
+        return;
+      }
       setPayOpen(true);
       const message = syncErrorMessage(error);
       const discountHint = (discountCode || roundingTarget !== null || selectedTable) && isRetryableSyncError(error)
@@ -954,6 +970,7 @@ export default function POS() {
         : '';
       void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
     } finally {
+      saleSubmittingRef.current = false;
       setPaying(false);
     }
   };
@@ -1381,7 +1398,7 @@ export default function POS() {
         </DialogContent>
       </Dialog>
       <PaymentModal
-        open={payOpen}
+        open={payOpen && cart.length > 0 && !paying}
         total={total}
         checking={stockChecking}
         discountPending={discountLoading}
