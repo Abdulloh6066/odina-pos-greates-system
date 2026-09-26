@@ -1,29 +1,20 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
 
-// Frozen from the read-only archive made on 2026-09-26. Any new or changed
-// transaction IDs stop the reset before it touches data.
-const EXPECTED: Record<string, [number, string]> = {
-  SaleItem: [82, "7f3ed1ab9bf0fa3047853760a31f8cf2376a91549a58d51b65df6938f6f197dd"],
-  Payment: [54, "635d5012cf766d5410b98441bfabccae08757a489ba0bcb2e91a78b625cd4b59"],
-  Refund: [0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
-  CashMovement: [0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
-  StockMovement: [82, "a52ffa9dbcb0b3a2836b06738592982ec22cb12a98e9d5adad0270c1bb86dea6"],
-  ShiftProductSnapshot: [489, "49e4ea4342c21a292917b5afd7710279288a70fe44adad9175418b0b7d0d3b1a"],
-  Sale: [54, "51a0391ac1624b8fb0c26b47b61d0093cfcc2d844146f47fa99a2d120b374af9"],
-  Shift: [6, "156cccdd85d349697bcf293d68e6a97fbf57febfb637b1fb4dacba65f5f8758b"],
-  DailyShopReport: [17, "7fa0ac0baff7489e2629f38770250bc6e916ed1c4df92a743a414a4db4c78606"],
-  BudgetTransaction: [3, "57929cb8e399a989c6588f48c0292fc0ad422a34db3b50d4476a6270b9f64b07"],
-};
+// Immutable archive allowlist: only these prelaunch records may be removed.
+// A new sale or shift stops every subsequent batch before any write.
+const ALLOWED_IDS: Record<string, string[]> = {"SaleItem":["6aac0a2854385ba96d4d08bc","6aad1779ea1c6317e1b26ddd","6aad17866d1865a8d6b582a6","6aad1d816bc993a2b300d496","6aad1dc5baf9fd86f29e5ccf","6aad403085af5f063b7dafd2","6aad7f9a7b05bd0ea3afea3e","6aad7fac3941ab29fda30d6a","6aadb2069dd9f99c982fd8f1","6aadc69c29f19bd5c40a437a","6aadc6b4a94b7125b99a79f2","6aae5625495084ea66e291d3","6aaeb4a07d74ef44a65d9ba9","6aaeb4ddefcc4f389d2f1bda","6aaeb5c8048ddd36a7f690c6","6aaeb5fc9d7ed9307a15ed5f","6aaec536ba1cec8b4dfd2abd","6aaec7fe26d8cbc2b1bc03bb","6aaec80af74618143c9592be","6aaed56203d71623ee19d0a0","6aaed9a764b278bce95340c5","6aaed9d3cb7eff9dc7c1decc","6aaee4a62e1d7424e63de1e2","6aaee4a62e1d7424e63de1e3","6aaee4a62e1d7424e63de1e4","6aaee4a62e1d7424e63de1e5","6aaee5e5d3df5c4364887c85","6aaee5e5d3df5c4364887c86","6aaee746cc366d15acc2c549","6aaee746cc366d15acc2c54a","6aaef2b2710e1f0c33d80330","6aaef2b2710e1f0c33d80331","6aaef6b716e0715ce68453f5","6aaef6b716e0715ce68453f6","6aaef6b716e0715ce68453f7","6aaefda62d409bf286320dbf","6aaefda62d409bf286320dc0","6aaefda62d409bf286320dc1","6ab10ad63b51147b5826d77e","6ab10ae5052403c135a56231","6ab14406b38786d876a3f2a8","6ab14406b38786d876a3f2a9","6ab66b3f85e7c80b3945db4d","6ab66d0f57cb6fa58694ebca","6ab66d221fa4321fe385f08e","6ab6700ebcefcdf66810c9aa","6ab6700ebcefcdf66810c9ab","6ab67086384ddff1d597c125","6ab67086384ddff1d597c126","6ab6723cf0fb047851310c79","6ab6723cf0fb047851310c7a","6ab6733632d76fdbe8fd97a3","6ab6a930ff3e0a78c0c73583","6ab6a930ff3e0a78c0c73584","6ab6a9d4af4a45fb93f10dbd","6ab6a9d4af4a45fb93f10dbe","6ab6a9d4af4a45fb93f10dbf","6ab6aa97b527e796a3cef491","6ab6ad36d1a9ab6adf1e293a","6ab6ad36d1a9ab6adf1e293b","6ab6ad36d1a9ab6adf1e293c","6ab6ad36d1a9ab6adf1e293d","6ab6aeaa9d191f7b1ca5f1ee","6ab6b292b9fbfcb07b410c47","6ab6b3cc60b57a84b48e150b","6ab6b4416cd43772ffa59892","6ab6b5ca68c3a384431f3f33","6ab6b77a21eb763215d0ce64","6ab6b85aba4b2f6d00cb320d","6ab6bab3e9ed2d3776cfd376","6ab6bab3e9ed2d3776cfd377","6ab6bace8ca7068174f727a0","6ab6bace8ca7068174f727a1","6ab6bb9d4b3e97c2ad8ea3b9","6ab6bb9d4b3e97c2ad8ea3ba","6ab6bb9d4b3e97c2ad8ea3bb","6ab6bb9d4b3e97c2ad8ea3bc","6ab6bb9d4b3e97c2ad8ea3bd","6ab6c300487f2b477fa28ee6","6ab6c300487f2b477fa28ee7","6ab6c3643b5969af80e9f224","6ab6c3643b5969af80e9f225"],"Payment":["6aac0a28a26bd53c23ba3968","6aad1779a97c71039edc50ff","6aad178685ed3e7e894d83d8","6aad1d81e7c7f0f977c443a7","6aad1dc5210f978fa7506053","6aad4030dd3e0a960a6eac98","6aad7f9b15e0d7d234c35f3c","6aad7facbcbbfd741f9f7a58","6aadb2069da0781849be773a","6aadc69ca34f35e11ee8b654","6aadc6b5e4f2452c847cd5b6","6aae56257ce1192eb8a5177c","6aaeb4a0075cca69b62b391b","6aaeb4dda0166b9ba59f22ac","6aaeb5c8efac148dc5478b45","6aaeb5fc791fea8d169ce4ed","6aaec536c8139958f3fb9035","6aaec7fed39652ce822113b5","6aaec80ad16f6b8f815e3493","6aaed56236cf63832f10e57e","6aaed9a7e4c2f80fcad286e1","6aaed9d31d1978f58284ac44","6aaee4a6e000f24256471859","6aaee5e6da58c3d7bd6f6e3a","6aaee746cd41d10a8adcc7b8","6aaef2b2c7acd4670540cfe1","6aaef6b756eb0a3f21ad600c","6aaefda6668e972dac9b99d2","6ab10ad68765987556247667","6ab10ae5b7edbf5273e48ed5","6ab144067d852a429df0b88f","6ab66b3f9fc50b33921adf39","6ab66d0fca98a016aca4d112","6ab66d222c9143c7d20c1827","6ab6700ecebe74d8696fb350","6ab670861cbf842e3bee68bf","6ab6723cd6a4754167c9f46e","6ab673368dd8a244622497e0","6ab6a930e36e3096ed1a17d6","6ab6a9d42996c21039542537","6ab6aa97c56cb9ac6512da31","6ab6ad364c6d9dfe5cfe871e","6ab6aeaa9f9fead9308382df","6ab6b292022e70749a1a4521","6ab6b3cc13f142a93ad0de4d","6ab6b441efdb464c751b0c37","6ab6b5ca35663b8a66034fd4","6ab6b77a85b9e00a8265a472","6ab6b85a5da9b83f2a70b6ec","6ab6bab35b7e7cd886375d09","6ab6bace467646fb6c4dd6fc","6ab6bb9e9d75e8b2013f70b3","6ab6c30084a95735c613eebb","6ab6c36489c635e67cb276e5"],"Refund":[],"CashMovement":[],"StockMovement":["6aac0a28fd3371bc34899da2","6aad177962f882379d350687","6aad17867850fb309c4cc05b","6aad1d81bca7611527cd1877","6aad1dc5e5608b3ea9fa112c","6aad40301967ac844913a9c3","6aad7f9b874aadd4f27d8acc","6aad7fac7ae975644ae03a2c","6aadb206f54066f373238e67","6aadc69c2ec0ba3b927cf919","6aadc6b5cb00361e3e92361e","6aae5625ba271fb799240b07","6aaeb4a08c9431da6fc31002","6aaeb4dd41d5aba46f84d771","6aaeb5c8912a139d574ccc69","6aaeb5fcbed8061ea4f00dca","6aaec5360b42d0120d933ec8","6aaec7fe7cd23ebb33f40057","6aaec80ada2c72f1f8cffa67","6aaed5633f66e7d58c7f5fc6","6aaed9a714fbd39c69b264f3","6aaed9d3ff7b57d616e7d69b","6aaee4a640a1a506543a47be","6aaee4a6d495b86d3bfa3778","6aaee4a6f809984e10cadb63","6aaee4a7f9e1cb62489cc095","6aaee5e680ac8310879d6f35","6aaee5e6b36d3a5526f399a2","6aaee7465fa4f38b7b84ae64","6aaee746d744299916719b84","6aaef2b29a89635c300fc4d5","6aaef2b29d523611378638d2","6aaef6b7297a9c3982168006","6aaef6b76c8f27c2b91ca48a","6aaef6b795f17d52d09af852","6aaefda6cf718a4a9174f36d","6aaefda715437ebb0a58b385","6aaefda7ab8700b6e9cf18c9","6ab10ad6c114775b64af3991","6ab10ae5f72176208bb0be33","6ab144063ed64f8b55f03132","6ab14406ca46ab28f6e128e0","6ab66b3f07f1d000a31becce","6ab66d0f96cf27ecce0db599","6ab66d22e927fcf7e9d20662","6ab6700e48769b860072ecbf","6ab6700e9a5b51b38ec41bc8","6ab670866a24b118769c1d5a","6ab67086b51d9aafa1856ad5","6ab6723c1d17258ba675a711","6ab6723cfeaa91af31f6f8fa","6ab67336d59a310b5a461aa5","6ab6a93101321bc0f157f71b","6ab6a93167541ae6b579ef85","6ab6a9d41bb6875184fa7746","6ab6a9d4690e8b00c3d09051","6ab6a9d4b1616dd02e950384","6ab6aa97499050a53826a390","6ab6ad3615e72ad855e836df","6ab6ad36298f71316f58644c","6ab6ad36739c54506cbdfc95","6ab6ad3753ba30c55c994f5c","6ab6aeaac0522fccd9b83ccc","6ab6b292f72b9c1db61f97bf","6ab6b3cdf41a789ab906c505","6ab6b441249a70f646c2fb8a","6ab6b5caecc4bbe39d4dc7ba","6ab6b77a67b64a16b5fc549f","6ab6b85adc0b480dd71cc337","6ab6bab3a3e4bf23f31f95e6","6ab6bab47ee4dc9373e825f0","6ab6bace0fa5347570e89be1","6ab6baced28d300bc1e33e1c","6ab6bb9e043d2d5da2271ea4","6ab6bb9e0e5a68006d65f65c","6ab6bb9e901de67b2691f697","6ab6bb9e96f24dfb94410548","6ab6bb9ec0fb40523ba79763","6ab6c3005325ffccdc191ff5","6ab6c30056db29bae83bf904","6ab6c3648053a0313905b90e","6ab6c364ff48e345df3a37a6"],"ShiftProductSnapshot":["6ab7424330e2f9503a889a91","6ab7424330e2f9503a889a92","6ab7424330e2f9503a889a93","6ab7424330e2f9503a889a94","6ab7424330e2f9503a889a95","6ab7424330e2f9503a889a96","6ab7424330e2f9503a889a97","6ab7424330e2f9503a889a98","6ab7424330e2f9503a889a99","6ab7424330e2f9503a889a9a","6ab7424330e2f9503a889a9b","6ab7424330e2f9503a889a9c","6ab7424330e2f9503a889a9d","6ab7424330e2f9503a889a9e","6ab7424330e2f9503a889a9f","6ab7424330e2f9503a889aa0","6ab7424330e2f9503a889aa1","6ab7424330e2f9503a889aa2","6ab7424330e2f9503a889aa3","6ab7424330e2f9503a889aa4","6ab7424330e2f9503a889aa5","6ab7424330e2f9503a889aa6","6ab7424330e2f9503a889aa7","6ab7424330e2f9503a889aa8","6ab7424330e2f9503a889aa9","6ab7424330e2f9503a889aaa","6ab7424330e2f9503a889aab","6ab7424330e2f9503a889aac","6ab7424330e2f9503a889aad","6ab7424330e2f9503a889aae","6ab7424330e2f9503a889aaf","6ab7424330e2f9503a889ab0","6ab7424330e2f9503a889ab1","6ab7424330e2f9503a889ab2","6ab7424330e2f9503a889ab3","6ab7424330e2f9503a889ab4","6ab7424330e2f9503a889ab5","6ab7424330e2f9503a889ab6","6ab7424330e2f9503a889ab7","6ab7424330e2f9503a889ab8","6ab7424330e2f9503a889ab9","6ab7424330e2f9503a889aba","6ab7424330e2f9503a889abb","6ab7424330e2f9503a889abc","6ab7424330e2f9503a889abd","6ab7424330e2f9503a889abe","6ab7424330e2f9503a889abf","6ab7424330e2f9503a889ac0","6ab7424330e2f9503a889ac1","6ab7424330e2f9503a889ac2","6ab7424330e2f9503a889ac3","6ab7424330e2f9503a889ac4","6ab7424330e2f9503a889ac5","6ab7424330e2f9503a889ac6","6ab7424330e2f9503a889ac7","6ab7424330e2f9503a889ac8","6ab7424330e2f9503a889ac9","6ab7424330e2f9503a889aca","6ab7424330e2f9503a889acb","6ab7424330e2f9503a889acc","6ab7424330e2f9503a889acd","6ab7424330e2f9503a889ace","6ab7424330e2f9503a889acf","6ab7424330e2f9503a889ad0","6ab7424330e2f9503a889ad1","6ab7424330e2f9503a889ad2","6ab7424330e2f9503a889ad3","6ab7424330e2f9503a889ad4","6ab7424330e2f9503a889ad5","6ab7424330e2f9503a889ad6","6ab7424330e2f9503a889ad7","6ab7424330e2f9503a889ad8","6ab7424330e2f9503a889ad9","6ab7424330e2f9503a889ada","6ab7424330e2f9503a889adb","6ab7424330e2f9503a889adc","6ab7424330e2f9503a889add","6ab7424330e2f9503a889ade","6ab7424330e2f9503a889adf","6ab7424330e2f9503a889ae0","6ab7424330e2f9503a889ae1","6ab7424330e2f9503a889ae2","6ab7424330e2f9503a889ae3","6ab7424330e2f9503a889ae4","6ab7424330e2f9503a889ae5","6ab7424330e2f9503a889ae6","6ab7424330e2f9503a889ae7","6ab7424330e2f9503a889ae8","6ab7424330e2f9503a889ae9","6ab7424330e2f9503a889aea","6ab7424330e2f9503a889aeb","6ab7424330e2f9503a889aec","6ab7424330e2f9503a889aed","6ab7424330e2f9503a889aee","6ab7424330e2f9503a889aef","6ab7424330e2f9503a889af0","6ab7424330e2f9503a889af1","6ab7424330e2f9503a889af2","6ab7424330e2f9503a889af3","6ab7424330e2f9503a889af4","6ab7424330e2f9503a889af5","6ab7424330e2f9503a889af6","6ab7424330e2f9503a889af7","6ab7424330e2f9503a889af8","6ab7424330e2f9503a889af9","6ab7424330e2f9503a889afa","6ab7424330e2f9503a889afb","6ab7424330e2f9503a889afc","6ab7424330e2f9503a889afd","6ab7424330e2f9503a889afe","6ab7424330e2f9503a889aff","6ab7424330e2f9503a889b00","6ab7424330e2f9503a889b01","6ab7424330e2f9503a889b02","6ab7424330e2f9503a889b03","6ab7424330e2f9503a889b04","6ab7424330e2f9503a889b05","6ab7424330e2f9503a889b06","6ab7424330e2f9503a889b07","6ab7424330e2f9503a889b08","6ab7424330e2f9503a889b09","6ab7424330e2f9503a889b0a","6ab7424330e2f9503a889b0b","6ab7424330e2f9503a889b0c","6ab7424330e2f9503a889b0d","6ab7424330e2f9503a889b0e","6ab7424330e2f9503a889b0f","6ab7424330e2f9503a889b10","6ab7424330e2f9503a889b11","6ab7424330e2f9503a889b12","6ab7424330e2f9503a889b13","6ab7424330e2f9503a889b14","6ab7424330e2f9503a889b15","6ab7424330e2f9503a889b16","6ab7424330e2f9503a889b17","6ab7424330e2f9503a889b18","6ab7424330e2f9503a889b19","6ab7424330e2f9503a889b1a","6ab7424330e2f9503a889b1b","6ab7424330e2f9503a889b1c","6ab7424330e2f9503a889b1d","6ab7424330e2f9503a889b1e","6ab7424330e2f9503a889b1f","6ab7424330e2f9503a889b20","6ab7424330e2f9503a889b21","6ab7424330e2f9503a889b22","6ab7424330e2f9503a889b23","6ab7424330e2f9503a889b24","6ab7424330e2f9503a889b25","6ab7424330e2f9503a889b26","6ab7424330e2f9503a889b27","6ab7424330e2f9503a889b28","6ab7424330e2f9503a889b29","6ab7424330e2f9503a889b2a","6ab7424330e2f9503a889b2b","6ab7424330e2f9503a889b2c","6ab7424330e2f9503a889b2d","6ab7424330e2f9503a889b2e","6ab7424330e2f9503a889b2f","6ab7424330e2f9503a889b30","6ab7424330e2f9503a889b31","6ab7424330e2f9503a889b32","6ab7424330e2f9503a889b33","6ab74ab3c644285362ba476a","6ab74ab3c644285362ba476b","6ab74ab3c644285362ba476c","6ab74ab3c644285362ba476d","6ab74ab3c644285362ba476e","6ab74ab3c644285362ba476f","6ab74ab3c644285362ba4770","6ab74ab3c644285362ba4771","6ab74ab3c644285362ba4772","6ab74ab3c644285362ba4773","6ab74ab3c644285362ba4774","6ab74ab3c644285362ba4775","6ab74ab3c644285362ba4776","6ab74ab3c644285362ba4777","6ab74ab3c644285362ba4778","6ab74ab3c644285362ba4779","6ab74ab3c644285362ba477a","6ab74ab3c644285362ba477b","6ab74ab3c644285362ba477c","6ab74ab3c644285362ba477d","6ab74ab3c644285362ba477e","6ab74ab3c644285362ba477f","6ab74ab3c644285362ba4780","6ab74ab3c644285362ba4781","6ab74ab3c644285362ba4782","6ab74ab3c644285362ba4783","6ab74ab3c644285362ba4784","6ab74ab3c644285362ba4785","6ab74ab3c644285362ba4786","6ab74ab3c644285362ba4787","6ab74ab3c644285362ba4788","6ab74ab3c644285362ba4789","6ab74ab3c644285362ba478a","6ab74ab3c644285362ba478b","6ab74ab3c644285362ba478c","6ab74ab3c644285362ba478d","6ab74ab3c644285362ba478e","6ab74ab3c644285362ba478f","6ab74ab3c644285362ba4790","6ab74ab3c644285362ba4791","6ab74ab3c644285362ba4792","6ab74ab3c644285362ba4793","6ab74ab3c644285362ba4794","6ab74ab3c644285362ba4795","6ab74ab3c644285362ba4796","6ab74ab3c644285362ba4797","6ab74ab3c644285362ba4798","6ab74ab3c644285362ba4799","6ab74ab3c644285362ba479a","6ab74ab3c644285362ba479b","6ab74ab3c644285362ba479c","6ab74ab3c644285362ba479d","6ab74ab3c644285362ba479e","6ab74ab3c644285362ba479f","6ab74ab3c644285362ba47a0","6ab74ab3c644285362ba47a1","6ab74ab3c644285362ba47a2","6ab74ab3c644285362ba47a3","6ab74ab3c644285362ba47a4","6ab74ab3c644285362ba47a5","6ab74ab3c644285362ba47a6","6ab74ab3c644285362ba47a7","6ab74ab3c644285362ba47a8","6ab74ab3c644285362ba47a9","6ab74ab3c644285362ba47aa","6ab74ab3c644285362ba47ab","6ab74ab3c644285362ba47ac","6ab74ab3c644285362ba47ad","6ab74ab3c644285362ba47ae","6ab74ab3c644285362ba47af","6ab74ab3c644285362ba47b0","6ab74ab3c644285362ba47b1","6ab74ab3c644285362ba47b2","6ab74ab3c644285362ba47b3","6ab74ab3c644285362ba47b4","6ab74ab3c644285362ba47b5","6ab74ab3c644285362ba47b6","6ab74ab3c644285362ba47b7","6ab74ab3c644285362ba47b8","6ab74ab3c644285362ba47b9","6ab74ab3c644285362ba47ba","6ab74ab3c644285362ba47bb","6ab74ab3c644285362ba47bc","6ab74ab3c644285362ba47bd","6ab74ab3c644285362ba47be","6ab74ab3c644285362ba47bf","6ab74ab3c644285362ba47c0","6ab74ab3c644285362ba47c1","6ab74ab3c644285362ba47c2","6ab74ab3c644285362ba47c3","6ab74ab3c644285362ba47c4","6ab74ab3c644285362ba47c5","6ab74ab3c644285362ba47c6","6ab74ab3c644285362ba47c7","6ab74ab3c644285362ba47c8","6ab74ab3c644285362ba47c9","6ab74ab3c644285362ba47ca","6ab74ab3c644285362ba47cb","6ab74ab3c644285362ba47cc","6ab74ab3c644285362ba47cd","6ab74ab3c644285362ba47ce","6ab74ab3c644285362ba47cf","6ab74ab3c644285362ba47d0","6ab74ab3c644285362ba47d1","6ab74ab3c644285362ba47d2","6ab74ab3c644285362ba47d3","6ab74ab3c644285362ba47d4","6ab74ab3c644285362ba47d5","6ab74ab3c644285362ba47d6","6ab74ab3c644285362ba47d7","6ab74ab3c644285362ba47d8","6ab74ab3c644285362ba47d9","6ab74ab3c644285362ba47da","6ab74ab3c644285362ba47db","6ab74ab3c644285362ba47dc","6ab74ab3c644285362ba47dd","6ab74ab3c644285362ba47de","6ab74ab3c644285362ba47df","6ab74ab3c644285362ba47e0","6ab74ab3c644285362ba47e1","6ab74ab3c644285362ba47e2","6ab74ab3c644285362ba47e3","6ab74ab3c644285362ba47e4","6ab74ab3c644285362ba47e5","6ab74ab3c644285362ba47e6","6ab74ab3c644285362ba47e7","6ab74ab3c644285362ba47e8","6ab74ab3c644285362ba47e9","6ab74ab3c644285362ba47ea","6ab74ab3c644285362ba47eb","6ab74ab3c644285362ba47ec","6ab74ab3c644285362ba47ed","6ab74ab3c644285362ba47ee","6ab74ab3c644285362ba47ef","6ab74ab3c644285362ba47f0","6ab74ab3c644285362ba47f1","6ab74ab3c644285362ba47f2","6ab74ab3c644285362ba47f3","6ab74ab3c644285362ba47f4","6ab74ab3c644285362ba47f5","6ab74ab3c644285362ba47f6","6ab74ab3c644285362ba47f7","6ab74ab3c644285362ba47f8","6ab74ab3c644285362ba47f9","6ab74ab3c644285362ba47fa","6ab74ab3c644285362ba47fb","6ab74ab3c644285362ba47fc","6ab74ab3c644285362ba47fd","6ab74ab3c644285362ba47fe","6ab74ab3c644285362ba47ff","6ab74ab3c644285362ba4800","6ab74ab3c644285362ba4801","6ab74ab3c644285362ba4802","6ab74ab3c644285362ba4803","6ab74ab3c644285362ba4804","6ab74ab3c644285362ba4805","6ab74ab3c644285362ba4806","6ab74ab3c644285362ba4807","6ab74ab3c644285362ba4808","6ab74ab3c644285362ba4809","6ab74ab3c644285362ba480a","6ab74ab3c644285362ba480b","6ab74ab3c644285362ba480c","6ab74ade2278b3bc75ae601e","6ab74ade2278b3bc75ae601f","6ab74ade2278b3bc75ae6020","6ab74ade2278b3bc75ae6021","6ab74ade2278b3bc75ae6022","6ab74ade2278b3bc75ae6023","6ab74ade2278b3bc75ae6024","6ab74ade2278b3bc75ae6025","6ab74ade2278b3bc75ae6026","6ab74ade2278b3bc75ae6027","6ab74ade2278b3bc75ae6028","6ab74ade2278b3bc75ae6029","6ab74ade2278b3bc75ae602a","6ab74ade2278b3bc75ae602b","6ab74ade2278b3bc75ae602c","6ab74ade2278b3bc75ae602d","6ab74ade2278b3bc75ae602e","6ab74ade2278b3bc75ae602f","6ab74ade2278b3bc75ae6030","6ab74ade2278b3bc75ae6031","6ab74ade2278b3bc75ae6032","6ab74ade2278b3bc75ae6033","6ab74ade2278b3bc75ae6034","6ab74ade2278b3bc75ae6035","6ab74ade2278b3bc75ae6036","6ab74ade2278b3bc75ae6037","6ab74ade2278b3bc75ae6038","6ab74ade2278b3bc75ae6039","6ab74ade2278b3bc75ae603a","6ab74ade2278b3bc75ae603b","6ab74ade2278b3bc75ae603c","6ab74ade2278b3bc75ae603d","6ab74ade2278b3bc75ae603e","6ab74ade2278b3bc75ae603f","6ab74ade2278b3bc75ae6040","6ab74ade2278b3bc75ae6041","6ab74ade2278b3bc75ae6042","6ab74ade2278b3bc75ae6043","6ab74ade2278b3bc75ae6044","6ab74ade2278b3bc75ae6045","6ab74ade2278b3bc75ae6046","6ab74ade2278b3bc75ae6047","6ab74ade2278b3bc75ae6048","6ab74ade2278b3bc75ae6049","6ab74ade2278b3bc75ae604a","6ab74ade2278b3bc75ae604b","6ab74ade2278b3bc75ae604c","6ab74ade2278b3bc75ae604d","6ab74ade2278b3bc75ae604e","6ab74ade2278b3bc75ae604f","6ab74ade2278b3bc75ae6050","6ab74ade2278b3bc75ae6051","6ab74ade2278b3bc75ae6052","6ab74ade2278b3bc75ae6053","6ab74ade2278b3bc75ae6054","6ab74ade2278b3bc75ae6055","6ab74ade2278b3bc75ae6056","6ab74ade2278b3bc75ae6057","6ab74ade2278b3bc75ae6058","6ab74ade2278b3bc75ae6059","6ab74ade2278b3bc75ae605a","6ab74ade2278b3bc75ae605b","6ab74ade2278b3bc75ae605c","6ab74ade2278b3bc75ae605d","6ab74ade2278b3bc75ae605e","6ab74ade2278b3bc75ae605f","6ab74ade2278b3bc75ae6060","6ab74ade2278b3bc75ae6061","6ab74ade2278b3bc75ae6062","6ab74ade2278b3bc75ae6063","6ab74ade2278b3bc75ae6064","6ab74ade2278b3bc75ae6065","6ab74ade2278b3bc75ae6066","6ab74ade2278b3bc75ae6067","6ab74ade2278b3bc75ae6068","6ab74ade2278b3bc75ae6069","6ab74ade2278b3bc75ae606a","6ab74ade2278b3bc75ae606b","6ab74ade2278b3bc75ae606c","6ab74ade2278b3bc75ae606d","6ab74ade2278b3bc75ae606e","6ab74ade2278b3bc75ae606f","6ab74ade2278b3bc75ae6070","6ab74ade2278b3bc75ae6071","6ab74ade2278b3bc75ae6072","6ab74ade2278b3bc75ae6073","6ab74ade2278b3bc75ae6074","6ab74ade2278b3bc75ae6075","6ab74ade2278b3bc75ae6076","6ab74ade2278b3bc75ae6077","6ab74ade2278b3bc75ae6078","6ab74ade2278b3bc75ae6079","6ab74ade2278b3bc75ae607a","6ab74ade2278b3bc75ae607b","6ab74ade2278b3bc75ae607c","6ab74ade2278b3bc75ae607d","6ab74ade2278b3bc75ae607e","6ab74ade2278b3bc75ae607f","6ab74ade2278b3bc75ae6080","6ab74ade2278b3bc75ae6081","6ab74ade2278b3bc75ae6082","6ab74ade2278b3bc75ae6083","6ab74ade2278b3bc75ae6084","6ab74ade2278b3bc75ae6085","6ab74ade2278b3bc75ae6086","6ab74ade2278b3bc75ae6087","6ab74ade2278b3bc75ae6088","6ab74ade2278b3bc75ae6089","6ab74ade2278b3bc75ae608a","6ab74ade2278b3bc75ae608b","6ab74ade2278b3bc75ae608c","6ab74ade2278b3bc75ae608d","6ab74ade2278b3bc75ae608e","6ab74ade2278b3bc75ae608f","6ab74ade2278b3bc75ae6090","6ab74ade2278b3bc75ae6091","6ab74ade2278b3bc75ae6092","6ab74ade2278b3bc75ae6093","6ab74ade2278b3bc75ae6094","6ab74ade2278b3bc75ae6095","6ab74ade2278b3bc75ae6096","6ab74ade2278b3bc75ae6097","6ab74ade2278b3bc75ae6098","6ab74ade2278b3bc75ae6099","6ab74ade2278b3bc75ae609a","6ab74ade2278b3bc75ae609b","6ab74ade2278b3bc75ae609c","6ab74ade2278b3bc75ae609d","6ab74ade2278b3bc75ae609e","6ab74ade2278b3bc75ae609f","6ab74ade2278b3bc75ae60a0","6ab74ade2278b3bc75ae60a1","6ab74ade2278b3bc75ae60a2","6ab74ade2278b3bc75ae60a3","6ab74ade2278b3bc75ae60a4","6ab74ade2278b3bc75ae60a5","6ab74ade2278b3bc75ae60a6","6ab74ade2278b3bc75ae60a7","6ab74ade2278b3bc75ae60a8","6ab74ade2278b3bc75ae60a9","6ab74ade2278b3bc75ae60aa","6ab74ade2278b3bc75ae60ab","6ab74ade2278b3bc75ae60ac","6ab74ade2278b3bc75ae60ad","6ab74ade2278b3bc75ae60ae","6ab74ade2278b3bc75ae60af","6ab74ade2278b3bc75ae60b0","6ab74ade2278b3bc75ae60b1","6ab74ade2278b3bc75ae60b2","6ab74ade2278b3bc75ae60b3","6ab74ade2278b3bc75ae60b4","6ab74ade2278b3bc75ae60b5","6ab74ade2278b3bc75ae60b6","6ab74ade2278b3bc75ae60b7","6ab74ade2278b3bc75ae60b8","6ab74ade2278b3bc75ae60b9","6ab74ade2278b3bc75ae60ba","6ab74ade2278b3bc75ae60bb","6ab74ade2278b3bc75ae60bc","6ab74ade2278b3bc75ae60bd","6ab74ade2278b3bc75ae60be","6ab74ade2278b3bc75ae60bf","6ab74ade2278b3bc75ae60c0"],"Sale":["6aac0a27c20ebe328a0beb24","6aad17791eac7f33db6e91ca","6aad178599a3cbe7283c7df6","6aad1d81abe0530ac7d9c061","6aad1dc53e9289ed14c0312d","6aad4030a7406a991691860c","6aad7f9a6876fa0931bfb00f","6aad7fac54473620b4b4bf9d","6aadb20670ff4e7dfdc4fbac","6aadc69ce237b42b234d8674","6aadc6b47c86e405e3cc78d8","6aae56254b8a1d240d9556a9","6aaeb49f72f503d77af73e2e","6aaeb4dd3db707b53e7e2922","6aaeb5c85a1f48f12b1723ce","6aaeb5fc0f47947d184786b3","6aaec5368ed19b4b96933051","6aaec7feeec0973c8f0879f1","6aaec80afa7e6f99e34800aa","6aaed56222174e0654c8e50e","6aaed9a6bdb18fca0e602132","6aaed9d392ae726f1cb7425e","6aaee4a6bf2c604bb36996b8","6aaee5e5da2598de34221019","6aaee746e99aa5df75da7ed5","6aaef2b26fb5591f93192abd","6aaef6b7a02e103bf7306418","6aaefda6ac93a898eb1947f4","6ab10ad679b30a843d52129a","6ab10ae575ccdb4fb5515c4c","6ab14406383eef6cf4a2e00b","6ab66b3f730cdeb23fdea9c6","6ab66d0f660504c279efad64","6ab66d22b0b3af20ca8c39e7","6ab6700e52dc9b763fae59c9","6ab67086f97b5d11a7f756c6","6ab6723c2b0ed5c9fbdaff12","6ab6733650fc1fa3bea1a020","6ab6a930e36e3096ed1a17d5","6ab6a9d31b0652dea24ef8e6","6ab6aa971fc736595136fa89","6ab6ad368497610ac8547601","6ab6aeaa18e16baeba3a19e8","6ab6b292223c7f2fad3455a9","6ab6b3cc10df4d7c0dcf20fd","6ab6b441c4c2e23b38475c6c","6ab6b5ca67541ae6b57a1dd9","6ab6b77af58a056adba9f868","6ab6b85a18e16baeba3a97b4","6ab6bab30d768bd187554af5","6ab6bace733910282a779cbe","6ab6bb9dff563a85339f612c","6ab6c300a4570f1cb7f1cc39","6ab6c363780ba55cd9152b4a"],"Shift":["6aa991fdc68ab872e429555a","6aad175916e51588e3ed9a95","6aaed999d7ffafbc95dd0671","6ab743f0222fd876ff71ee58","6ab74a8ae4f2875dd3149558","6ab74ad05a4d5aa4b227797c"],"DailyShopReport":["6aa987b89d21da286c2e3a44","6aa987b90bd733718d038e5b","6aa987b97eee010ac429271a","6aaad9a31d4a7cf27c816319","6aaad9a37ab1887ef071b52c","6aac2ad59abb4898c34a022d","6aac2ad5e781525ef46b2225","6aad7c25464d0125fc3570df","6aad7c25c73d97338c941812","6aaecdf503b7be5d563c1968","6aaecdf55da58b032ab0d6ea","6ab01f211f8e7b2228b7d699","6ab170a450f860d1f8d8aae0","6ab2c2a6d68b281e95a70bc7","6ab4148b2b4b6e56af7a1963","6ab56526faadcfa9dfd376c5","6ab6b6a59553c70505832cbf"],"BudgetTransaction":["6ab74243254deb4665a6d059","6ab742438babf70fd8ce8f97","6ab7424599c569dd82b20c29"]};
 const ORDER = [
   "SaleItem", "Payment", "Refund", "CashMovement", "StockMovement",
   "ShiftProductSnapshot", "Sale", "Shift", "DailyShopReport", "BudgetTransaction",
 ];
-async function fingerprint(rows: any[]) {
-  const ids = rows.map((row) => String(row.id)).sort().join("\n");
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ids));
-  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
+const CHUNK_SIZE = 20;
+const EXPECTED_BUDGET: Record<string, [number, number, number]> = {
+  cash: [825097, 500000, 325097],
+  uzcard: [309000, 27000, 282000],
+  online: [111000, 0, 111000],
+};
+
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405 });
@@ -39,62 +30,80 @@ Deno.serve(async (req) => {
     if (body?.scope !== "prelaunch_sales_shifts" || body?.confirm !== "SOTUVNI_TOZALASH") {
       return Response.json({ error: "Tasdiq noto‘g‘ri." }, { status: 400 });
     }
+
     const rows: Record<string, any[]> = {};
     for (const name of ORDER) {
       const all = await service.entities[name].list("-created_date", 500);
-      const [count, digest] = EXPECTED[name];
-      if (all.length !== count || await fingerprint(all) !== digest) {
-        return Response.json({ error: name + " zaxiradan keyin o‘zgargan. Hech narsa o‘chirilmadi." }, { status: 409 });
+      const allowed = new Set(ALLOWED_IDS[name]);
+      if (all.length > allowed.size || all.some((row: any) => !allowed.has(row.id))) {
+        return Response.json({ error: name + " zaxiradan keyin o‘zgargan. Yangi yozuvlarga tegilmadi." }, { status: 409 });
       }
       rows[name] = all;
     }
-    const saleIds = new Set(rows.Sale.map((row) => row.id));
-    const shiftIds = new Set(rows.Shift.map((row) => row.id));
-    if (rows.StockMovement.some((row) => row.reference_type !== "sale" || !saleIds.has(row.reference_id)) ||
-        rows.SaleItem.some((row) => !saleIds.has(row.sale_id)) ||
-        rows.Payment.some((row) => !saleIds.has(row.sale_id)) ||
-        rows.Sale.some((row) => !shiftIds.has(row.shift_id)) ||
-        rows.ShiftProductSnapshot.some((row) => !shiftIds.has(row.shift_id)) ||
-        rows.BudgetTransaction.some((row) => row.type !== "shift_deposit" || !shiftIds.has(row.shift_id))) {
-      return Response.json({ error: "Sotuv/smena bog‘lanishlari mos emas. Hech narsa o‘chirilmadi." }, { status: 409 });
+    const archivedSaleIds = new Set(ALLOWED_IDS.Sale);
+    const archivedShiftIds = new Set(ALLOWED_IDS.Shift);
+    if (rows.StockMovement.some((row) => row.reference_type !== "sale" || !archivedSaleIds.has(row.reference_id)) ||
+        rows.SaleItem.some((row) => !archivedSaleIds.has(row.sale_id)) ||
+        rows.Payment.some((row) => !archivedSaleIds.has(row.sale_id)) ||
+        rows.Sale.some((row) => !archivedShiftIds.has(row.shift_id)) ||
+        rows.ShiftProductSnapshot.some((row) => !archivedShiftIds.has(row.shift_id)) ||
+        rows.BudgetTransaction.some((row) => row.type !== "shift_deposit" || !archivedShiftIds.has(row.shift_id))) {
+      return Response.json({ error: "Zaxiradagi sotuv va smena bog‘lanishlari mos emas." }, { status: 409 });
     }
-    const expectedBudget = {
-      cash: [825097, 500000, 325097],
-      uzcard: [309000, 27000, 282000],
-      online: [111000, 0, 111000],
-    } as Record<string, [number, number, number]>;
+
     const balances = await service.entities.BudgetBalance.list("-created_date", 500);
-    if (balances.length !== 5 || rows.BudgetTransaction.length !== 3) {
-      return Response.json({ error: "Byudjet holati o‘zgargan. Hech narsa o‘chirilmadi." }, { status: 409 });
-    }
-    for (const [account, [current, before, amount]] of Object.entries(expectedBudget)) {
+    if (balances.length !== 5) return Response.json({ error: "Byudjet hisoblari o‘zgargan." }, { status: 409 });
+    for (const [account, [current, before, amount]] of Object.entries(EXPECTED_BUDGET)) {
       const balance = balances.find((row: any) => row.account === account);
       const deposit = rows.BudgetTransaction.find((row) => row.account === account);
-      if (!balance || Number(balance.balance) !== current || !deposit ||
-          Number(deposit.balance_before) !== before || Number(deposit.balance_after) !== current ||
-          Number(deposit.amount) !== amount || deposit.direction !== "in") {
-        return Response.json({ error: "Byudjet mablag‘i zaxiradan keyin o‘zgargan. Hech narsa o‘chirilmadi." }, { status: 409 });
+      if (!balance || ![current, before].includes(Number(balance.balance)) ||
+          (deposit && (Number(balance.balance) !== current || Number(deposit.amount) !== amount ||
+            Number(deposit.balance_before) !== before || Number(deposit.balance_after) !== current ||
+            deposit.direction !== "in"))) {
+        return Response.json({ error: "Byudjet mablag‘i zaxiradan keyin o‘zgargan." }, { status: 409 });
       }
     }
-    const deleted: Record<string, number> = {};
-    for (const name of ORDER) {
-      for (let i = 0; i < rows[name].length; i += 10) {
-        await Promise.all(rows[name].slice(i, i + 10).map((row) => service.entities[name].delete(row.id)));
+
+    const name = ORDER.find((entityName) => rows[entityName].length);
+    if (name) {
+      const batch = rows[name].slice(0, CHUNK_SIZE);
+      let deleted = 0;
+      for (const row of batch) {
+        try {
+          await service.entities[name].delete(row.id);
+          deleted += 1;
+        } catch (error) {
+          return Response.json({
+            error: name + " o‘chirish " + deleted + " yozuvdan keyin to‘xtadi: " + String(error?.message || error),
+            stage: name, deleted_this_step: deleted,
+          }, { status: 503 });
+        }
       }
-      deleted[name] = rows[name].length;
+      return Response.json({ ok: true, done: false, stage: name, deleted_this_step: deleted });
     }
-    for (const [account, [, before]] of Object.entries(expectedBudget)) {
+
+    // Only the archived shift deposits have been removed. Preserve the money
+    // that was in each account before them. This is safe to resume if one
+    // account was already updated by a previous invocation.
+    for (const [account, [current, before]] of Object.entries(EXPECTED_BUDGET)) {
       const balance = balances.find((row: any) => row.account === account);
-      await service.entities.BudgetBalance.update(balance.id, { balance: before, updated_at: new Date().toISOString() });
+      if (Number(balance.balance) === current && current !== before) {
+        await service.entities.BudgetBalance.update(balance.id, {
+          balance: before, updated_at: new Date().toISOString(),
+        });
+      }
     }
-    await service.entities.ActionHistory.create({
-      user_id: String(admin.id || auth.id),
-      user_name: String(admin.full_name || auth.full_name || auth.email || "Egasi"),
-      action: "prelaunch_sales_shifts_cleared",
-      details: "54 sotuv, 6 smena va bog‘liq yozuvlar tozalandi; uchta smena byudjet tushumi qaytarildi. Mahsulotlar va qoldiqlar saqlandi.",
-    });
-    return Response.json({ ok: true, deleted, preserved: ["Product", "ProductStock", "Category", "Recipe", "CustomerOrder", "BudgetBalance", "ActionHistory"] });
-  } catch {
-    return Response.json({ error: "Tozalash qisman to‘xtagan bo‘lishi mumkin. Qayta urinishdan oldin Admin bilan tekshiring." }, { status: 500 });
+    const actions = await service.entities.ActionHistory.list("-created_date", 500);
+    if (!actions.some((row: any) => row.action === "prelaunch_sales_shifts_cleared")) {
+      await service.entities.ActionHistory.create({
+        user_id: String(admin.id || auth.id),
+        user_name: String(admin.full_name || auth.full_name || auth.email || "Egasi"),
+        action: "prelaunch_sales_shifts_cleared",
+        details: "Zaxiradagi 54 sotuv, 6 smena va bog‘liq tarix tozalandi. Uchta smena byudjet tushumi qaytarildi. Mahsulot va joriy qoldiqlar saqlandi.",
+      });
+    }
+    return Response.json({ ok: true, done: true, preserved: ["Product", "ProductStock", "Category", "Recipe", "CustomerOrder", "BudgetBalance", "ActionHistory"] });
+  } catch (error) {
+    return Response.json({ error: "Tozalash to‘xtadi: " + String(error?.message || error) }, { status: 500 });
   }
 });
