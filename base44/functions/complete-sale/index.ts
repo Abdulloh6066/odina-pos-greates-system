@@ -295,7 +295,7 @@ async function rollbackBudgetBalance(service: any, change: any, user: any) {
   ).catch(() => {});
 }
 
-async function normalizeSaleItems(service: any, requestedItems: any[]) {
+async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
     const quantity = Math.floor(Number(requested?.quantity));
@@ -312,7 +312,7 @@ async function normalizeSaleItems(service: any, requestedItems: any[]) {
     if (!product || product.active === false || product.archived === true) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
     }
-    const unitPrice = money(product.price);
+    const unitPrice = money(product?.shop_prices?.[shopId] ?? product.price);
     const isShopPrepared = String(product.source_type || "central_produced") === "shop_prepared";
     // Shop-prepared drinks deduct their tech-card ingredients instead of finished ProductStock.
     const stockTracked = !isShopPrepared && product.track_stock !== false;
@@ -792,7 +792,7 @@ export default async function(req) {
       if (user.role === "cashier" && user.shop_id !== shift.shop_id) {
         return Response.json({ error: "Kassir boshqa do‘konga biriktirilgan." }, { status: 403 });
       }
-      const normalizedItems = await normalizeSaleItems(service, requestedItems);
+      const normalizedItems = await normalizeSaleItems(service, requestedItems, shift.shop_id);
       const allowNegativeStock = await stockPolicy(service);
       const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
       const ingredientPrep = await prepareSaleIngredientDeduction(service, shift.shop_id, normalizedItems);
@@ -1161,7 +1161,7 @@ export default async function(req) {
       phone: String(body?.customer_phone || ""),
     });
 
-    const normalizedItems = await normalizeSaleItems(service, requestedItems);
+    const normalizedItems = await normalizeSaleItems(service, requestedItems, shift.shop_id);
     const allowNegativeStock = await stockPolicy(service);
     const { plans: stockPlans, shortages: stockWarnings } =
       await planSaleStock(service, shift.shop_id, normalizedItems);
