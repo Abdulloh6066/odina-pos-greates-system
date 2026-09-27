@@ -117,6 +117,19 @@ export default function POS() {
   const cashWithdrawalSubmittingRef = useRef(false);
   const cashWithdrawalRequestRef = useRef(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  // Match the cart's lg:hidden breakpoint, including tablets and window resizing.
+  const [compactCartViewport, setCompactCartViewport] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const syncCartViewport = () => {
+      setCompactCartViewport(media.matches);
+      if (!media.matches) setMobileCartOpen(false);
+    };
+    syncCartViewport();
+    media.addEventListener('change', syncCartViewport);
+    return () => media.removeEventListener('change', syncCartViewport);
+  }, []);
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
   const [tableOrderLoading, setTableOrderLoading] = useState(false);
@@ -338,7 +351,7 @@ export default function POS() {
       setTakeawayOrder(result.order);
       setCart(result.order.items);
       setOpenOrdersOpen(false);
-      setMobileCartOpen(true);
+      setMobileCartOpen(window.matchMedia('(max-width: 1023px)').matches);
     } catch (error) {
       setOpenOrdersError(error?.response?.data?.error || error?.message || 'Buyurtma ochilmadi.');
     } finally { setOpenOrdersLoading(false); }
@@ -1541,7 +1554,7 @@ export default function POS() {
         </Button>
       </div>
 
-      <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}>
+      <Sheet open={mobileCartOpen && compactCartViewport} onOpenChange={setMobileCartOpen}>
         <SheetContent side="bottom" className="odina-cart-sheet lg:hidden h-[88dvh] p-0 rounded-t-[28px] overflow-hidden">
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
