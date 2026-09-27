@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductCard from '@/components/pos/ProductCard';
 import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
@@ -92,6 +93,16 @@ export default function POS() {
   const [shiftReport, setShiftReport] = useState(null);
   const [staffTicketPrompt, setStaffTicketPrompt] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
+  const [takeawayOrder, setTakeawayOrder] = useState(null);
+  const [takeawaySaving, setTakeawaySaving] = useState(false);
+  const takeawaySavingRef = useRef(false);
+  const takeawayRequestIdRef = useRef('');
+  const [openOrdersOpen, setOpenOrdersOpen] = useState(false);
+  const [openOrders, setOpenOrders] = useState([]);
+  const [openOrdersLoading, setOpenOrdersLoading] = useState(false);
+  const [openOrdersError, setOpenOrdersError] = useState('');
+  const takeawayDirty = Boolean(takeawayOrder) && JSON.stringify(cart.map(({ product_id, quantity }) => ({ product_id, quantity })))
+    !== JSON.stringify((takeawayOrder?.items || []).map(({ product_id, quantity }) => ({ product_id, quantity })));
 
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
@@ -120,6 +131,8 @@ export default function POS() {
   useEffect(() => {
     if (priorTableKey.current === tableKey) return;
     priorTableKey.current = tableKey;
+    setTakeawayOrder(null);
+    takeawayRequestIdRef.current = '';
     setCart([]);
     setDiscountCode('');
     setDiscountPct(0);
@@ -187,16 +200,17 @@ export default function POS() {
       return !saved || saved.quantity !== row.quantity || saved.price !== row.price;
     })
   );
-  const tableLocked = Boolean(selectedTable) && (tableOrderLoading || savingTable
-    || Boolean(tableOrderError) || tableOrder?.state === 'paying');
+  const tableLocked = takeawaySaving || takeawayOrder?.state === 'paying'
+    || (Boolean(selectedTable) && (tableOrderLoading || savingTable
+    || Boolean(tableOrderError) || tableOrder?.state === 'paying'));
   // A browser refresh or tab close must warn about edits not yet acknowledged
   // by the server. Saved orders remain available after any reload.
   useEffect(() => {
-    if (!selectedTable || !tableCartDirty) return undefined;
+    if (!(selectedTable && tableCartDirty) && !takeawayDirty) return undefined;
     const warnUnsaved = (event) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warnUnsaved);
     return () => window.removeEventListener('beforeunload', warnUnsaved);
-  }, [tableKey, tableCartDirty]);
+  }, [tableKey, tableCartDirty, takeawayDirty]);
   const saveTableOrder = async () => {
     if (!selectedTable || !tableCartDirty) return !selectedTable || Boolean(tableOrder?.id);
     if (savingTableRef.current || tableOrderLoading || tableOrderError || tableOrder?.state === 'paying') return false;
@@ -242,6 +256,115 @@ export default function POS() {
       savingTableRef.current = false;
       setSavingTable(false);
     }
+  };
+
+  const saveTakeawayOrder = async () => {
+    if (takeawaySavingRef.current || selectedTable || !cart.length || !shift) return null;
+    if (!isOnline || navigator.onLine === false) {
+      void odinaAlert('Buyurtmani saqlash uchun internet kerak. Savatingiz saqlanib turadi.');
+      return null;
+    }
+    if (takeawayOrder && !takeawayDirty) return takeawayOrder;
+    takeawaySavingRef.current = true;
+    setTakeawaySaving(true);
+    const orderId = takeawayOrder?.id || takeawayRequestIdRef.current || createSaleIdempotencyKey();
+    takeawayRequestIdRef.current = orderId;
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'save_takeaway_order', shop_id: shift.shop_id, shift_id: shift.id,
+        order_id: orderId, expected_revision: takeawayOrder?.revision || 0,
+        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity,
+          variant_name: row.variant_name || row.variant || '', notes: row.notes || '' })),
+      });
+      const result = response?.data || response;
+      if (!result?.ok || !result.order?.id) throw new Error(result?.error || 'Buyurtma saqlanmadi.');
+      setTakeawayOrder(result.order);
+      setCart(result.order.items);
+      return result.order;
+    } catch (error) {
+      void odinaAlert(error?.response?.data?.error || error?.message || 'Buyurtma saqlanmadi. Qayta urinib ko‘ring.');
+      return null;
+    } finally {
+      takeawaySavingRef.current = false;
+      setTakeawaySaving(false);
+    }
+  };
+
+  const showTakeawayTicket = async () => {
+    if (paying || payOpen || stockChecking) return;
+    const saved = await saveTakeawayOrder();
+    if (!saved) return;
+    setMobileCartOpen(false);
+    setStaffTicket({ mode: 'takeaway', order: saved, shop: shops.find((row) => row.id === shift.shop_id) });
+    setTakeawayOrder(null);
+    resetCart();
+  };
+
+  const loadOpenOrders = async () => {
+    const shopId = shift?.shop_id || user?.shop_id;
+    if (!shopId) { void odinaAlert('Avval do‘kon smenasini oching.'); return; }
+    setOpenOrdersOpen(true);
+    setMobileCartOpen(false);
+    setOpenOrdersLoading(true);
+    setOpenOrdersError('');
+    setOpenOrders([]);
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'list_takeaway_orders', shop_id: shopId,
+      });
+      const result = response?.data || response;
+      if (!result?.ok) throw new Error(result?.error || 'Buyurtmalar yuklanmadi.');
+      setOpenOrders(result.orders || []);
+    } catch (error) {
+      setOpenOrdersError(error?.response?.data?.error || error?.message || 'Buyurtmalar yuklanmadi.');
+    } finally { setOpenOrdersLoading(false); }
+  };
+
+  const openTakeaway = async (order) => {
+    if (paying || payOpen || stockChecking || takeawaySavingRef.current || savingTableRef.current) return;
+    if (cart.length && !(await odinaConfirm({
+      title: 'Buyurtmani ochish',
+      description: 'Joriy savat o‘rniga saqlangan buyurtma ochiladi. Saqlanmagan o‘zgarishlar bekor qilinadi. Davom etasizmi?',
+      confirmLabel: 'Ochish',
+    }))) return;
+    setOpenOrdersLoading(true);
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'get_takeaway_order', shop_id: shift?.shop_id || user?.shop_id, order_id: order.id,
+      });
+      const result = response?.data || response;
+      if (!result?.ok || !result.order) throw new Error('Buyurtma yopilgan. Ro‘yxatni yangilang.');
+      resetCart();
+      setTakeawayOrder(result.order);
+      setCart(result.order.items);
+      setOpenOrdersOpen(false);
+      setMobileCartOpen(true);
+    } catch (error) {
+      setOpenOrdersError(error?.response?.data?.error || error?.message || 'Buyurtma ochilmadi.');
+    } finally { setOpenOrdersLoading(false); }
+  };
+
+  const leaveTakeaway = async () => {
+    if (takeawaySavingRef.current || paying || payOpen || stockChecking) return;
+    if (takeawayDirty && !(await saveTakeawayOrder())) return;
+    setTakeawayOrder(null);
+    resetCart();
+  };
+
+  const reconcileTakeaway = async (order) => {
+    setOpenOrdersLoading(true);
+    setOpenOrdersError('');
+    try {
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'reconcile_takeaway_payment', shop_id: shift?.shop_id || user?.shop_id, order_id: order.id,
+      });
+      const result = response?.data || response;
+      if (!result?.ok || !result.released) throw new Error(result?.error || 'To‘lov tasdiqlanmadi.');
+      if (takeawayOrder?.id === order.id) { setTakeawayOrder(null); resetCart(); }
+      await loadOpenOrders();
+    } catch (error) {
+      setOpenOrdersError(error?.response?.data?.error || error?.message || 'To‘lovni tekshirib bo‘lmadi.');
+    } finally { setOpenOrdersLoading(false); }
   };
 
   const reconcileTablePayment = async () => {
@@ -370,6 +493,7 @@ export default function POS() {
       return;
     }
     if (selectedTable && tableCartDirty && !(await saveTableOrder())) return;
+    if (takeawayDirty && !(await saveTakeawayOrder())) return;
     setMobileCartOpen(false);
     setTablePickerOpen(true);
   };
@@ -560,8 +684,8 @@ export default function POS() {
     return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
   })); };
   const removeItem = (item) => { if (!tableLocked && !paying) setCart((p) => p.filter((i) => i.product_id !== item.product_id)); };
-  const resetCart = () => { setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
-  const clearCart = () => { if (!tableLocked && !paying && (!selectedTable || !tableOrder)) resetCart(); }; 
+  const resetCart = () => { takeawayRequestIdRef.current = ''; setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
+  const clearCart = () => { if (!tableLocked && !paying && (!selectedTable || !tableOrder) && !takeawayOrder) resetCart(); }; 
 
   const validateDiscount = async (code, ownerPin = '') => {
     setDiscountLoading(true);
@@ -714,7 +838,7 @@ export default function POS() {
   };
 
   const openOfflinePayment = async () => {
-    if (selectedTable) {
+    if (selectedTable || takeawayOrder || takeawayRequestIdRef.current) {
       await odinaAlert('Stolga bog‘langan savdo faqat internet orqali yakunlanadi. Savat saqlanib turadi.');
       return false;
     }
@@ -747,7 +871,7 @@ export default function POS() {
       await odinaAlert(tableSelectionError || 'Stol uchun do‘kon va smenani tekshiring.');
       return;
     }
-    if (selectedTable && (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false))) {
+    if ((selectedTable || takeawayOrder || takeawayRequestIdRef.current) && (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false))) {
       await odinaAlert('Stol savdosini internet qaytmaguncha yakunlab bo‘lmaydi. Savat saqlanib turadi.');
       return;
     }
@@ -774,6 +898,8 @@ export default function POS() {
     setPayOpen(true);
     try {
       if (selectedTable && (tableCartDirty || !tableOrder?.id) && !(await saveTableOrder())) return;
+      const savedTakeaway = takeawayOrder || takeawayRequestIdRef.current ? await saveTakeawayOrder() : null;
+      if ((takeawayOrder || takeawayRequestIdRef.current) && !savedTakeaway) return;
       if (checkoutCancelledRef.current) return;
       if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
         await openOfflinePayment();
@@ -795,6 +921,7 @@ export default function POS() {
       const result = await base44.functions.invoke('complete-sale', {
         action: 'check_stock',
         shift_id: shift.id,
+        ...(savedTakeaway ? { takeaway_order_id: savedTakeaway.id, takeaway_order_revision: savedTakeaway.revision } : {}),
         ...(selectedTable ? { table_shop_id: selectedTable.shopId,
           table_number: selectedTable.number,
           table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
@@ -809,7 +936,7 @@ export default function POS() {
       if (accepted) openPayment(false);
     } catch (error) {
       if (checkoutCancelledRef.current) return;
-      if (isRetryableSyncError(error) && !selectedTable) {
+      if (isRetryableSyncError(error) && !selectedTable && !takeawayOrder && !takeawayRequestIdRef.current) {
         await openOfflinePayment();
         return;
       }
@@ -857,7 +984,7 @@ export default function POS() {
 
   const finishSalePresentation = (sale) => {
     setReceiptPrintSale(null);
-    if (sale?.items?.length && !sale?.table_number_snapshot) {
+    if (sale?.items?.length && !sale?.table_number_snapshot && !sale?.table_order_id_snapshot) {
       setStaffTicketPrompt(sale);
     } else if (selectedTable && !sale?.offline_pending) {
       navigate(posHomePath, { replace: true });
@@ -908,9 +1035,10 @@ export default function POS() {
     checkoutRecordedAtRef.current = '';
     resetCart();
     setTableOrder(null);
+    setTakeawayOrder(null);
     presentCompletedSale(payload.sale, printReceipt);
     if (payload.table_released === false) {
-      void odinaAlert('Savdo yozildi, lekin stolni bo‘shatish tasdiqlanmadi. Qayta pul olmang! Stollar xaritasida «To‘lovni tekshirish» orqali yakunlang.');
+      void odinaAlert('Savdo yozildi, lekin ochiq buyurtmani yopish tasdiqlanmadi. Qayta pul olmang! Ochiq buyurtmalar yoki Stollar ichida «To‘lovni tekshirish» orqali yakunlang.');
     }
     base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
       .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
@@ -936,7 +1064,10 @@ export default function POS() {
       if (selectedTable && (tableCartDirty || !tableOrder?.id || tableOrder.state !== 'occupied')) {
         throw new Error('Buyurtma serverda saqlanganini tekshiring. To‘lovni qayta oching.');
       }
-      if (!selectedTable && !discountCode && roundingTarget === null) {
+      if (takeawayOrder && (takeawayDirty || takeawayOrder.state !== 'occupied')) {
+        throw new Error('Buyurtmani saqlang va to‘lovni qayta oching.');
+      }
+      if (!selectedTable && !takeawayOrder && !takeawayRequestIdRef.current && !discountCode && roundingTarget === null) {
         pendingRecord = buildPendingSale({
           idempotencyKey,
           recordedAt,
@@ -949,7 +1080,7 @@ export default function POS() {
       }
 
       if (checkoutOffline || !isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
-        if (selectedTable) throw new Error('Stol savdosini internet orqali tasdiqlash kerak. Savat saqlanib turadi.');
+        if (selectedTable || takeawayOrder || takeawayRequestIdRef.current) throw new Error('Saqlangan buyurtmani internet orqali to‘lash kerak. Savat saqlanib turadi.');
         if (!pendingRecord) {
           throw new Error('Chegirmali savdoni offline saqlab bo‘lmaydi. Internetni kuting.');
         }
@@ -962,6 +1093,7 @@ export default function POS() {
       const request = pendingRecord?.request || {
         action: 'complete_sale',
         shift_id: shift.id,
+        ...(takeawayOrder ? { takeaway_order_id: takeawayOrder.id, takeaway_order_revision: takeawayOrder.revision } : {}),
         ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number,
           table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
         items: cart.map((item) => ({
@@ -998,7 +1130,7 @@ export default function POS() {
       }
       setPayOpen(true);
       const message = syncErrorMessage(error);
-      const discountHint = (discountCode || roundingTarget !== null || selectedTable) && isRetryableSyncError(error)
+      const discountHint = (discountCode || roundingTarget !== null || selectedTable || takeawayOrder) && isRetryableSyncError(error)
         ? ' Natija noaniq bo‘lishi mumkin. To‘lov oynasi qayta ochildi; avval Savdolar tarixini tekshiring, keyin kerak bo‘lsa shu tugmani yana bosing.'
         : '';
       void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
@@ -1393,6 +1525,9 @@ export default function POS() {
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
+            takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable ? showTakeawayTicket : undefined}
+            onOpenOrders={!selectedTable ? loadOpenOrders : undefined} onLeaveTakeaway={leaveTakeaway}
+            savingTakeaway={takeawaySaving}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
             onSaveTable={() => void saveAndStartNextOrder()} onCancelTable={() => void cancelTableSelection()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
@@ -1420,12 +1555,44 @@ export default function POS() {
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
+            takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable ? showTakeawayTicket : undefined}
+            onOpenOrders={!selectedTable ? loadOpenOrders : undefined} onLeaveTakeaway={leaveTakeaway}
+            savingTakeaway={takeawaySaving}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
             onSaveTable={() => void saveAndStartNextOrder()} onCancelTable={() => void cancelTableSelection()} savingTable={savingTable} locked={tableLocked || paying || payOpen || stockChecking}
           />
         </SheetContent>
       </Sheet>
 
+      <Dialog open={openOrdersOpen} onOpenChange={setOpenOrdersOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85dvh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Ochiq buyurtmalar · Olib ketish</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">To‘lanmagan buyurtmalar. To‘lov uchun buyurtmani oching.</p>
+          <Button variant="outline" onClick={loadOpenOrders} disabled={openOrdersLoading}>Yangilash</Button>
+          {openOrdersError && <p role="alert" className="text-sm text-destructive">{openOrdersError}</p>}
+          {openOrdersLoading ? <p>Yuklanmoqda…</p> : openOrders.length === 0 && !openOrdersError ? <p>Ochiq buyurtma yo‘q.</p> : (
+            <div className="space-y-3">{openOrders.map((order) => (
+              <div key={order.id} className="rounded-xl border border-brand-sand/50 p-3 space-y-2">
+                <div className="flex justify-between gap-2 font-semibold">
+                  <span>Buyurtma #{order.ticket_number}</span><span>{formatUZS(order.total)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{formatUzbekistanDateTime(order.started_at)} · {order.opened_by_name}</p>
+                <p className="text-sm break-words">{order.items.map((row) => row.product_name + ' × ' + row.quantity + (row.sale_unit === 'gram' ? ' g' : '')).join(', ')}</p>
+                <p className="text-xs font-semibold">{order.state === 'paying' ? 'To‘lov tekshirilmoqda — qayta pul olmang' : 'To‘lanmagan'}</p>
+                <div className="flex gap-2">
+                  <Button className="min-h-11 flex-1" onClick={() => order.state === 'paying' ? reconcileTakeaway(order) : openTakeaway(order)} disabled={openOrdersLoading}>
+                    {order.state === 'paying' ? 'To‘lovni tekshirish' : 'Ochish · To‘lov'}
+                  </Button>
+                  <Button variant="outline" className="min-h-11" onClick={() => {
+                    setOpenOrdersOpen(false);
+                    setStaffTicket({ mode: 'takeaway', order, shop: shops.find((row) => row.id === (shift?.shop_id || user?.shop_id)) });
+                  }}>Xizmat cheki</Button>
+                </div>
+              </div>
+            ))}</div>
+          )}
+        </DialogContent>
+      </Dialog>
       <PosTablePicker
         open={tablePickerOpen}
         onOpenChange={setTablePickerOpen}
@@ -1466,7 +1633,7 @@ export default function POS() {
         onClose={closePayment}
         onConfirm={completeSale}
         loading={paying}
-        offline={checkoutOffline || (!isOnline && !selectedTable)}
+        offline={checkoutOffline || (!isOnline && !selectedTable && !takeawayOrder)}
         fullDiscount={discountPct === 100 && subtotal > 0 && total === 0}
       />
       <Dialog open={salesHistoryOpen} onOpenChange={setSalesHistoryOpen}>
