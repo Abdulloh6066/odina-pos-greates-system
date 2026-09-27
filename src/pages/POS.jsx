@@ -59,6 +59,7 @@ export default function POS() {
   const [search, setSearch] = useState('');
   const [showFav, setShowFav] = useState(false);
   const [cart, setCart] = useState([]);
+  const [keyboardProductId, setKeyboardProductId] = useState(null);
   const [weightProduct, setWeightProduct] = useState(null);
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
@@ -520,6 +521,7 @@ export default function POS() {
   };
   const addToCart = (product) => {
     if (tableLocked || paying || payOpen || stockChecking) return;
+    setKeyboardProductId(product.id);
     if (product.sale_unit === 'gram') { openWeight(product); return; }
     setCart((prev) => {
       const existing = prev.find((i) => i.product_id === product.id);
@@ -529,6 +531,24 @@ export default function POS() {
       return [...prev, { product_id: product.id, product_name: product.name, image_url: product.image_url, price: product.price, sale_unit: 'piece', quantity: 1, subtotal: product.price }];
     });
   };
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key !== '+' && event.key !== '-') return;
+      const target = event.target;
+      if (target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="spinbutton"]')) return;
+      if (tableLocked || paying || payOpen || stockChecking || !cart.length) return;
+      // The mobile cart is itself a dialog; every other open dialog blocks shortcuts.
+      if ([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
+        .some((node) => node.getAttribute('data-state') !== 'closed' && !node.classList.contains('odina-cart-sheet'))) return;
+      const item = cart.find((row) => row.product_id === keyboardProductId) || cart[cart.length - 1];
+      event.preventDefault();
+      if (event.key === '+') inc(item); else dec(item);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   const inc = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
   const dec = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (tableLocked || paying) return; setCart((p) => p.flatMap((i) => {
@@ -1353,6 +1373,8 @@ export default function POS() {
         <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
+            selectedProductId={cart.some((row) => row.product_id === keyboardProductId) ? keyboardProductId : cart[cart.length - 1]?.product_id}
+            onSelectItem={(item) => setKeyboardProductId(item.product_id)}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
@@ -1378,6 +1400,8 @@ export default function POS() {
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
+            selectedProductId={cart.some((row) => row.product_id === keyboardProductId) ? keyboardProductId : cart[cart.length - 1]?.product_id}
+            onSelectItem={(item) => setKeyboardProductId(item.product_id)}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
