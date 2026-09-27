@@ -99,9 +99,26 @@ export default function StaffOrderTicketModal({
       return () => { active = false; };
     } else if (mode === 'takeaway') {
       setTicketOrder(initialOrder);
-      setLoading(false);
-      setError(initialOrder?.id ? '' : 'Buyurtma saqlanmagan.');
       setLocalPrintCount(getTicketPrintCount(initialOrder?.id, initialOrder?.revision));
+      if (!initialOrder?.id || !effectiveShopId) {
+        setError('Buyurtma yoki do‘kon topilmadi.');
+        return;
+      }
+      let active = true;
+      setLoading(true);
+      setError('');
+      base44.functions.invoke('restaurant-tables', {
+        action: 'get_takeaway_order', shop_id: effectiveShopId, order_id: initialOrder.id,
+      }).then((response) => {
+        if (!active) return;
+        const result = response?.data || response;
+        if (!result?.ok || !result.order) throw new Error('Buyurtma yopilgan. Ochiq buyurtmalarni yangilang.');
+        setTicketOrder(result.order);
+        setLocalPrintCount(getTicketPrintCount(result.order.id, result.order.revision));
+      }).catch((err) => {
+        if (active) setError(err?.response?.data?.error || err?.message || 'Buyurtma yuklanmadi.');
+      }).finally(() => { if (active) setLoading(false); });
+      return () => { active = false; };
     } else if (mode === 'customer') {
       if (!initialOrder?.id) {
         setError('Buyurtma saqlanmagan.');
