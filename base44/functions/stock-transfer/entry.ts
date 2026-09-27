@@ -124,7 +124,12 @@ export default async function(req) {
         )
         : (allTransfers || []);
 
+      const assignedLocation = role === "manager" && effectiveLocationId ? await service.entities.Shop.get(effectiveLocationId).catch(() => null) : null;
+      const destinations = assignedLocation?.location_type === "production"
+        ? (await service.entities.Shop.filter({ location_type: "shop", active: true }, "name", 500)).map(shop => ({ id: shop.id, name: shop.name, location_type: "shop", active: true }))
+        : [];
       return Response.json({
+        destinations,
         transfers,
         effective_location_id: effectiveLocationId || null,
         effective_location_name: canViewAllLocations ? null : (userShopName(user) || null),
@@ -137,8 +142,8 @@ export default async function(req) {
     }
 
     if (action === "create_transfer") {
-      if (role !== "admin") {
-        return Response.json({ error: "Transferni faqat egasi jo‘nata oladi." }, { status: 403 });
+      if (role !== "admin" && !(role === "manager" && userShopId(user) && userShopId(user) === String(body?.source_location_id || ""))) {
+        return Response.json({ error: "Faqat biriktirilgan markazdan transfer jo‘natish mumkin." }, { status: 403 });
       }
 
       const sourceId = String(body?.source_location_id || "");
