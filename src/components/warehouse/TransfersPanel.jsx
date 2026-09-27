@@ -76,7 +76,7 @@ export default function TransfersPanel({
 }) {
   const [sendOpen, setSendOpen] = useState(false);
   const [receivingId, setReceivingId] = useState('');
-  const canSend = user?.role === 'admin' && location?.location_type === 'production';
+  const canSend = ['admin', 'manager'].includes(user?.role) && location?.location_type === 'production';
   const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
   const effectiveLocationId = location?.id || assignedShopId;
   const normalizedSearch = search.toLowerCase().trim();
