@@ -733,3 +733,80 @@ test('takeaway concurrent saves do not overwrite orders, stale and paid orders c
   assert.equal((await f.run({ ...body, expected_revision: 1 })).status, 409);
 });
 
+
+const cancelTableRequest = (order, extra = {}) => ({ action: 'cancel_table_order',
+  shop_id: 'second-shop', table_number: 2, shift_id: 'shift-second',
+  table_order_id: order.id, expected_revision: order.revision, confirm_cancel: true, ...extra });
+
+async function cancellationFixture() {
+  const f = fixture(); f.as('cashier-2');
+  const saved = await f.run({ action: 'save_table_order', shop_id: 'second-shop',
+    table_number: 2, shift_id: 'shift-second', expected_revision: 0,
+    items: [{ product_id: 'coffee', quantity: 1 }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+  return { f, order: saved.data.order };
+}
+
+test('confirmed cancellation frees grouped tables, archives original unpaid order and never creates revenue', async () => {
+  const { f, order } = await cancellationFixture();
+  f.db.Shop[1].restaurant_table_groups = [{ id: 'group-cancel', numbers: [2, 3] }];
+  f.db.Shop[1].restaurant_table_orders.push({ id: 'untouched', number: 4, state: 'occupied' });
+  const result = await f.run(cancelTableRequest(order));
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(result.data.cancelled, true);
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Shop[1].restaurant_table_orders[0].id, 'untouched');
+  assert.equal(f.db.Shop[1].restaurant_table_groups.length, 0);
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.Shift[1].total_sales, undefined);
+  const audit = f.db.ActionHistory.find((row) => row.action === 'restaurant_table_order_cancelled');
+  assert.equal(audit.user_id, 'cashier-2');
+  assert.equal(audit.user_name, 'cashier2@example.test');
+  const snapshot = JSON.parse(audit.details);
+  assert.equal(snapshot.order_snapshot.items[0].product_name, 'Kofe');
+  assert.equal(snapshot.order_snapshot.total, 20000);
+  assert.ok(Date.parse(snapshot.cancelled_at));
+  assert.deepEqual(snapshot.table_numbers, [2, 3]);
+  const retry = await f.run(cancelTableRequest(order));
+  assert.equal(retry.data.already_closed, true);
+  f.db.Shop[1].restaurant_table_orders.push({ id: 'new-order', number: 2, revision: 1, state: 'occupied' });
+  assert.equal((await f.run(cancelTableRequest(order))).status, 409);
+  assert.ok(f.db.Shop[1].restaurant_table_orders.some((row) => row.id === 'new-order'));
+});
+
+test('cancellation requires confirmation, assigned shop, own open shift and current unpaid revision', async () => {
+  const { f, order } = await cancellationFixture();
+  for (const extra of [
+    { confirm_cancel: false }, { expected_revision: 99 }, { table_order_id: 'wrong' },
+    { shift_id: 'shift-other' }, { shop_id: 'central-shop' },
+  ]) {
+    assert.notEqual((await f.run(cancelTableRequest(order, extra))).status, 200);
+    assert.equal(f.db.Shop[1].restaurant_table_orders[0].id, order.id);
+  }
+  f.db.Shop[1].restaurant_table_orders[0].state = 'paying';
+  assert.equal((await f.run(cancelTableRequest(order))).status, 409);
+  f.db.Shop[1].restaurant_table_orders[0].state = 'occupied';
+  f.db.Shift[1].status = 'closed';
+  assert.equal((await f.run(cancelTableRequest(order))).status, 403);
+});
+
+test('failed audit preservation leaves the original order untouched', async () => {
+  const { f, order } = await cancellationFixture();
+  f.db.ActionHistory.push = () => { throw new Error('Mock history unavailable'); };
+  const result = await f.run(cancelTableRequest(order));
+  assert.equal(result.status, 500);
+  assert.equal(f.db.Shop[1].restaurant_table_orders[0].id, order.id);
+  assert.equal(f.db.Sale.length, 0);
+});
+
+test('simultaneous edit and cancellation cannot silently discard a newly saved revision', async () => {
+  const { f, order } = await cancellationFixture();
+  const results = await Promise.all([
+    f.run(cancelTableRequest(order)),
+    f.run({ action: 'save_table_order', shop_id: 'second-shop', table_number: 2,
+      shift_id: 'shift-second', expected_revision: 1, items: [{ product_id: 'coffee', quantity: 2 }] }),
+  ]);
+  assert.equal(results.filter((r) => r.status === 200).length, 1, JSON.stringify(results));
+  assert.equal(results.filter((r) => r.status === 409).length, 1, JSON.stringify(results));
+});
+
