@@ -51,6 +51,9 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     if (!product || (!savedItem && (product.active === false || product.archived === true))) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
     }
+    if (!savedItem && product.available_shop_ids?.length && !product.available_shop_ids.includes(shopId)) {
+      throw httpError("Bu mahsulot ushbu do‘konda sotilmaydi.", 403);
+    }
     const unitPrice = savedItem ? savedItem.price : money(priceForShop(product, shopId));
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);

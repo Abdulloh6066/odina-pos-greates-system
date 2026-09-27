@@ -819,7 +819,7 @@ export default function POS() {
 
   const filtered = useMemo(() => {
     const shopId = shift?.shop_id || user?.shop_id;
-    let list = products.map((product) => ({ ...product, price: priceForShop(product, shopId) }));
+    let list = products.filter((product) => !product.available_shop_ids?.length || product.available_shop_ids.includes(shopId)).map((product) => ({ ...product, price: priceForShop(product, shopId) }));
     if (!showFav && activeCat !== 'all') {
       const selectedCategory = categories.find((c) => c.id === activeCat);
       const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];

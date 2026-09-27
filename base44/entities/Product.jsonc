@@ -1,6 +1,7 @@
 {
   "name": "Product",
   "properties": {
+    "available_shop_ids": {"type":"array","items":{"type":"string"},"default":[],"description":"Bo‘sh bo‘lsa barcha do‘konlarda, aks holda faqat sanalgan do‘konlarda sotiladi"},
     "display_before_product_id": {
       "type": "string",
       "description": "Kassada shu mahsulotdan oldin ko\u2018rsatish"

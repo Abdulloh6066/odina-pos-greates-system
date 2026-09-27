@@ -457,6 +457,9 @@ Deno.serve(async (req) => {
         if (!previous && (!product || product.active === false || product.archived === true)) {
           return Response.json({ error: "Yangi qo‘shilgan mahsulot sotuvda mavjud emas." }, { status: 409 });
         }
+        if (!previous && product?.available_shop_ids?.length && !product.available_shop_ids.includes(shop.id)) {
+          return Response.json({ error: "Bu mahsulot ushbu do‘konda sotilmaydi." }, { status: 403 });
+        }
         const price = previous ? previous.price : Number(product?.shop_prices?.[shop.id] ?? product.price);
         if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(price * quantity)) {
           return Response.json({ error: "Mahsulot narxi yoki miqdori noto‘g‘ri." }, { status: 400 });
