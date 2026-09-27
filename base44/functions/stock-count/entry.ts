@@ -1,6 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { num, classifyItem, summarizeCount, isApprovalComplete, canApprove, validateCountedQuantity } from "../../shared/stock-count-logic.ts";
-import { userLabel, userRole, userShopId } from "../../shared/user-helpers.ts";
+import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
+import { resolveAppUser, userLabel, userRole, userShopId } from "../../shared/user-helpers.ts";
 
 const COUNT_ROLES = new Set(["admin", "manager", "cashier", "accountant"]);
 const MANAGE_ROLES = new Set(["admin", "manager"]);
@@ -13,12 +14,14 @@ export default async function (req) {
   const base44 = createClientFromRequest(req);
   const service = base44.asServiceRole;
   try {
-    const me = await base44.auth.me();
-    if (!me) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+    const auth = await base44.auth.me();
+    if (!auth) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+    const me = await resolveAppUser(service, auth);
     const role = userRole(me);
     const shopId = userShopId(me);
     const userName = userLabel(me);
     const body = await req.json().catch(() => ({}));
+    if (role === "manager") await assertManagerRequestScope(service, me, body);
     const action = String(body?.action || "list_counts");
 
     if (!COUNT_ROLES.has(role)) {
@@ -28,7 +31,7 @@ export default async function (req) {
     if (action === "list_counts") {
       let counts = await service.entities.StockCount.list("-created_date", 500);
       counts = (counts || []).filter((c: any) => c.status !== "cancelled");
-      if (!MANAGE_ROLES.has(role)) counts = counts.filter((c: any) => c.location_id === shopId);
+      if (role !== "admin") counts = counts.filter((c: any) => c.location_id === shopId);
       const locFilter = String(body?.location_id || "");
       if (locFilter) counts = counts.filter((c: any) => c.location_id === locFilter);
       return Response.json({ counts });
@@ -36,7 +39,7 @@ export default async function (req) {
 
     if (action === "start_count") {
       const requestedLocationId = String(body?.location_id || "");
-      const locationId = MANAGE_ROLES.has(role) ? requestedLocationId : shopId;
+      const locationId = role === "admin" ? requestedLocationId : shopId;
       if (!locationId) return Response.json({ error: "Do‘konni tanlang." }, { status: 400 });
       const location = await service.entities.Shop.get(locationId).catch(() => null);
       if (!location || location.active === false) {
@@ -207,7 +210,7 @@ export default async function (req) {
     }
 
     if (action === "approve_count") {
-      if (!canApprove(role)) {
+      if (!canApprove(role) && role !== "manager") {
         return Response.json({ error: "Tasdiqlashni faqat egasi amalga oshiradi." }, { status: 403 });
       }
       const countId = String(body?.count_id || "");

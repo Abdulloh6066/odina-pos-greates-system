@@ -12,7 +12,7 @@ const UNIT = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 
 export default function StockCountDraft({ user, data, onClose, onSaved }) {
   const role = user?.role || 'cashier';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'manager';
   const { count, items } = data;
   const isDraft = count.status === 'draft';
   const isSubmitted = count.status === 'submitted';

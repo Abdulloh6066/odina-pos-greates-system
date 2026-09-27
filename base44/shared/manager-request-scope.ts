@@ -13,6 +13,7 @@ export async function assertManagerRequestScope(service: any, user: any, body: a
   for (const [key, entity, scope] of [
     ["shift_id", "Shift", "shop_id"], ["sale_id", "Sale", "shop_id"],
     ["order_id", "CustomerOrder", "shop_id"], ["receipt_id", "SupplierReceipt", "location_id"],
+    ["count_id", "StockCount", "location_id"],
   ]) {
     if (!body?.[key]) continue;
     const row = await service.entities[entity].get(String(body[key])).catch(() => null);
