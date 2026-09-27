@@ -1,10 +1,12 @@
+import { resolveAppUser } from "../../shared/user-helpers.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const auth = await base44.auth.me();
+    if (!auth) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const user = await resolveAppUser(base44.asServiceRole, auth);
     if (!["admin", "manager", "cashier"].includes(user.role)) {
       return Response.json({ error: "Your role cannot open a Kassa shift." }, { status: 403 });
     }
@@ -26,7 +28,7 @@ Deno.serve(async (req) => {
     if (!shopId) return Response.json({ error: "A shop is required." }, { status: 400 });
 
     const shop = await base44.asServiceRole.entities.Shop.get(shopId);
-    if (!shop) return Response.json({ error: "Shop not found." }, { status: 404 });
+    if (!shop || shop.active === false || shop.allows_pos === false || shop.location_type === "production") return Response.json({ error: "Faol kassa do‘koni topilmadi." }, { status: 403 });
 
     const now = new Date().toISOString();
     const shift = await base44.asServiceRole.entities.Shift.create({

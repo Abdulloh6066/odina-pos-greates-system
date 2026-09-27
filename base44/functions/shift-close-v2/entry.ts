@@ -1,3 +1,4 @@
+import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 import {
   money, resolveAppUser, httpError, buildShiftStockReport,
@@ -81,6 +82,7 @@ export default async function(req) {
     }
 
     const body = await req.json();
+    if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "close_shift");
 
     if (action === "runtime_status") {

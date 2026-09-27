@@ -1,3 +1,4 @@
+import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 
 const COMPLETE_SALE_RUNTIME_VERSION = "offline-sales-v1-2026-09-12";
@@ -342,6 +343,7 @@ export default async function(req) {
     }
 
     const body = await req.json();
+    if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "complete_sale");
 
     if (action === "runtime_status") {
@@ -814,8 +816,8 @@ export default async function(req) {
     }
 
     if (action === "refund_sale") {
-      if (user.role !== "admin") {
-        return Response.json({ error: "Savdoni faqat egasi qaytarishi mumkin." }, { status: 403 });
+      if (!["admin", "manager"].includes(user.role)) {
+        return Response.json({ error: "Savdoni qaytarishga ruxsat yo‘q." }, { status: 403 });
       }
       if (!(await verifyOwnerPin(service, body?.owner_pin, user))) {
         return Response.json({ error: "Egasi PIN kodi noto‘g‘ri." }, { status: 403 });

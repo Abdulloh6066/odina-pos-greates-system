@@ -1,3 +1,4 @@
+import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { money, httpError, resolveAppUser, stockNumber } from "../../shared/shift-close-helpers.ts";
 import {
@@ -179,6 +180,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
     }
     const body = await req.json();
+    if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "");
     // Production staff may change production status only, never create orders
     // or accept payments. Authorize the requested action before any writes.

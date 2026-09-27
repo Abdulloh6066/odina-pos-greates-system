@@ -55,13 +55,13 @@ export default function SalesHistory({ embedded = false }) {
   const totalRev = visible.reduce((s, x) => s + (x.status === 'refunded' ? 0 : x.total), 0);
 
   const refundSale = (sale) => {
-    if (role !== 'admin') return;
+    if (!['admin', 'manager'].includes(role)) return;
     setSelected(sale);
     setRefundOpen(true);
   };
 
   const confirmRefund = async ({ reason, owner_pin }) => {
-    if (!selected || role !== 'admin') return;
+    if (!selected || !['admin', 'manager'].includes(role)) return;
     setRefundLoading(true);
     try {
       const result = await base44.functions.invoke('complete-sale', {
@@ -138,7 +138,7 @@ export default function SalesHistory({ embedded = false }) {
         </div>
       )}
 
-      <SaleDetailDialog sale={selected} canRefund={role === 'admin'} onRefund={refundSale}
+      <SaleDetailDialog sale={selected} canRefund={['admin', 'manager'].includes(role)} onRefund={refundSale}
         onStaffTicket={(sale) => { setSelected(null); setStaffTicketSale(sale); }} onClose={() => setSelected(null)} />
       <StaffOrderTicketModal open={!!staffTicketSale} mode="sale" order={staffTicketSale} forceReprint
         onClose={() => { setSelected(staffTicketSale); setStaffTicketSale(null); }} />
