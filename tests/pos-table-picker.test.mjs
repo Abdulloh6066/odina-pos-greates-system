@@ -147,7 +147,7 @@ test('Kassa selection stays a real authenticated completed sale with no prematur
   assert.match(checkout, /requestedTableShopId !== shift\.shop_id/);
   assert.match(checkout, /requestedTableNumber > receiptShop\.restaurant_table_count/);
   assert.match(checkout, /table_number_snapshot: requestedTableNumber/);
-  assert.match(pos, /Stol savdosini internet orqali tasdiqlash kerak/);
+  assert.match(pos, /Saqlangan buyurtmani internet orqali to‘lash kerak/);
   assert.doesNotMatch(pos, /entities\.(Sale|SaleItem|Payment|StockMovement)\.create\(/);
 });
 
