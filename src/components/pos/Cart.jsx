@@ -10,6 +10,7 @@ export default function Cart({
   roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding,
   total, onCheckout, disabled, tableMode = false, tableDirty = false,
   tableSaved = false, onSaveTable, savingTable = false, locked = false, onCancelTable,
+  takeawayOrder, onServiceTicket, onOpenOrders, onLeaveTakeaway, savingTakeaway = false,
 }) {
   return (
     <div className="odina-cart flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
@@ -21,13 +22,17 @@ export default function Cart({
             <p className="text-xs text-muted-foreground">{cart.reduce((s, i) => s + (i.sale_unit === 'gram' ? 1 : i.quantity), 0)} ta mahsulot</p>
           </div>
         </div>
-        {cart.length > 0 && !tableSaved && (
+        {cart.length > 0 && !tableSaved && !takeawayOrder && (
           <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
             <Trash2 className="w-3.5 h-3.5" /> Tozalash
           </button>
         )}
       </div>
 
+      {takeawayOrder && <div className="px-4 py-2 border-b border-brand-sand/40 flex items-center justify-between gap-2 text-xs">
+        <span className="font-semibold">Olib ketish #{takeawayOrder.ticket_number} · To‘lanmagan</span>
+        <Button type="button" variant="ghost" className="min-h-11 text-xs" disabled={locked} onClick={onLeaveTakeaway}>Yangi buyurtma</Button>
+      </div>}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-16">
@@ -84,6 +89,19 @@ export default function Cart({
           <span className="font-display text-lg font-bold">Jami</span>
           <span className="text-2xl font-bold tracking-tight text-brand-ink text-right break-words">{formatUZS(total)}</span>
         </div>
+        {!tableMode && <div className="flex gap-2">
+          {onServiceTicket && <Button type="button" variant="outline" onClick={onServiceTicket}
+            disabled={disabled || locked || savingTakeaway || cart.length === 0}
+            className="flex-1 min-w-0 min-h-11 h-auto py-2 whitespace-normal rounded-xl border-brand-olive/50 text-brand-ink">
+            <ReceiptText className="w-4 h-4 mr-1.5 shrink-0" />
+            {savingTakeaway ? 'Saqlanmoqda…' : 'Xizmat cheki'}
+          </Button>}
+          {onOpenOrders && <Button type="button" variant="outline" onClick={onOpenOrders}
+            disabled={savingTakeaway || locked && takeawayOrder?.state !== 'paying'}
+            className="flex-1 min-w-0 min-h-11 h-auto py-2 whitespace-normal rounded-xl">
+            Ochiq buyurtmalar
+          </Button>}
+        </div>}
         {tableMode && <div className="flex items-center gap-2 min-w-0">
           <Button type="button" variant="outline" onClick={onSaveTable}
             disabled={locked || (!tableDirty && !tableSaved) || cart.length === 0 || savingTable}
