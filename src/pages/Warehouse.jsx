@@ -202,7 +202,9 @@ export default function Warehouse() {
         failedSections.push('Transferlar');
       }
 
-      setLocations(activeLocations);
+      setLocations(user?.role === 'manager'
+        ? [...new Map([...activeLocations, ...(transferPayload?.destinations || [])].map(item => [item.id, item])).values()]
+        : activeLocations);
       setIngredients((ingredientList || []).filter((item) => item.active !== false));
       setArchivedProductIds([
         ...(productList || []).filter((item) => item.archived === true).map((item) => item.id),
