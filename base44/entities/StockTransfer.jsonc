@@ -1,5 +1,6 @@
 {
   "name": "StockTransfer",
+  "type": "object",
   "properties": {
     "transfer_number": {
       "type": "string"
@@ -107,26 +108,6 @@
         "role": "admin"
       }
     },
-    "read": {
-      "$or": [
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "manager"
-          }
-        },
-        {
-          "data.source_location_id": "{{user.data.shop_id}}"
-        },
-        {
-          "data.destination_location_id": "{{user.data.shop_id}}"
-        }
-      ]
-    },
     "update": {
       "user_condition": {
         "role": "admin"
@@ -136,7 +117,82 @@
       "user_condition": {
         "role": "admin"
       }
+    },
+    "read": {
+      "$and": [
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.source_location_id": "{{user.data.shop_id}}"
+            },
+            {
+              "data.destination_location_id": "{{user.data.shop_id}}"
+            }
+          ]
+        },
+        {
+          "$or": [
+            {
+              "$nor": [
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "$and": [
+                        {
+                          "data.source_location_id": {
+                            "$nin": [
+                              "",
+                              null
+                            ]
+                          }
+                        },
+                        {
+                          "data.source_location_id": "{{user.data.shop_id}}"
+                        }
+                      ]
+                    },
+                    {
+                      "$and": [
+                        {
+                          "data.destination_location_id": {
+                            "$nin": [
+                              "",
+                              null
+                            ]
+                          }
+                        },
+                        {
+                          "data.destination_location_id": "{{user.data.shop_id}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
-  },
-  "type": "object"
+  }
 }

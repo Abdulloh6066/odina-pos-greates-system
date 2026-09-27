@@ -90,33 +90,6 @@
         "role": "admin"
       }
     },
-    "read": {
-      "$or": [
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "manager"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "warehouse"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
-          }
-        },
-        {
-          "data.user_id": "{{user.id}}"
-        }
-      ]
-    },
     "update": {
       "user_condition": {
         "role": "admin"
@@ -126,6 +99,75 @@
       "user_condition": {
         "role": "admin"
       }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.payment_source": {
+                "$ne": "budget"
+              }
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "warehouse"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "$and": [
+                    {
+                      "$nor": [
+                        {
+                          "user_condition": {
+                            "role": "manager"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "data.user_id": "{{user.id}}"
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "data.shop_id": {
+                        "$nin": [
+                          "",
+                          null
+                        ]
+                      }
+                    },
+                    {
+                      "data.shop_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   }
 }

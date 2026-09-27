@@ -63,6 +63,16 @@
         "role": "admin"
       }
     },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "read": {
       "$or": [
         {
@@ -72,7 +82,7 @@
         },
         {
           "user_condition": {
-            "role": "manager"
+            "role": "accountant"
           }
         },
         {
@@ -88,21 +98,27 @@
           ]
         },
         {
-          "user_condition": {
-            "role": "accountant"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "manager",
+                "active": true
+              }
+            },
+            {
+              "data.location_id": {
+                "$nin": [
+                  "",
+                  null
+                ]
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
         }
       ]
-    },
-    "update": {
-      "user_condition": {
-        "role": "admin"
-      }
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }

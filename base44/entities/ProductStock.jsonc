@@ -1,5 +1,6 @@
 {
   "name": "ProductStock",
+  "type": "object",
   "properties": {
     "location_id": {
       "type": "string"
@@ -58,28 +59,60 @@
         "role": "admin"
       }
     },
-    "read": {
-      "$or": [
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "manager"
-          }
-        },
-        {
-          "data.location_id": "{{user.data.shop_id}}"
-        }
-      ]
-    },
     "update": {
       "user_condition": {
         "role": "admin"
       }
+    },
+    "read": {
+      "$and": [
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
+        },
+        {
+          "$or": [
+            {
+              "$nor": [
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
-  },
-  "type": "object"
+  }
 }
