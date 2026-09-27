@@ -1,5 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
+import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-helpers.ts";
 import { TELEGRAM_GROUP_ID, localClock } from "../../shared/telegram-alert-logic.ts";
 import {
   computeShopReport,
@@ -13,6 +13,15 @@ const VIEW_ROLES = ["admin", "manager", "accountant"];
 const ADMIN_ROLES = ["admin"];
 
 const readAll = readReportRows;
+
+function scopeReportActivity(activity: any, shopId: string) {
+  if (!shopId) return activity;
+  const scoped = { ...activity };
+  for (const key of ["sales", "allSales", "refunds", "orderPayments", "expenses"]) {
+    if (Array.isArray(activity[key])) scoped[key] = activity[key].filter((row: any) => row.shop_id === shopId);
+  }
+  return scoped;
+}
 
 function activityMetrics(activity: any, shopId = "", date = "") {
   const match = (row: any, day: string) => (!shopId || row.shop_id === shopId) && (!date || day === date);
@@ -44,10 +53,10 @@ async function getConfig(service: any) {
 }
 
 // Compute per-shop metrics for one business date from Sale + SaleItem records.
-async function computeReportsForDate(service: any, businessDate: string) {
+async function computeReportsForDate(service: any, businessDate: string, scopedShopId = "") {
   const allShops = await readAll(service.entities.Shop, {}, "name");
-  const shops = allShops.filter((s: any) => s.active !== false);
-  const activity = await loadReportActivity(service, businessDate, businessDate);
+  const shops = allShops.filter((s: any) => s.active !== false && (!scopedShopId || s.id === scopedShopId));
+  const activity = scopeReportActivity(await loadReportActivity(service, businessDate, businessDate), scopedShopId);
   const sales = activity.sales;
 
   const reports: any[] = [];
@@ -80,9 +89,9 @@ async function computeReportsForDate(service: any, businessDate: string) {
 }
 
 // Compute per-shop, per-day metrics across a date range (for the real-profit dashboard).
-async function computeReportsForRange(service: any, dateFrom: string, dateTo: string) {
+async function computeReportsForRange(service: any, dateFrom: string, dateTo: string, scopedShopId = "") {
   const allShops = await readAll(service.entities.Shop, {}, "name");
-  const shops = allShops.filter((s: any) => s.active !== false);
+  const shops = allShops.filter((s: any) => s.active !== false && (!scopedShopId || s.id === scopedShopId));
   let f = dateFrom;
   let t = dateTo;
   if (f > t) {
@@ -90,7 +99,7 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     f = t;
     t = tmp;
   }
-  const activity = await loadReportActivity(service, f, t);
+  const activity = scopeReportActivity(await loadReportActivity(service, f, t), scopedShopId);
   const sales = activity.sales;
 
   const dateSet = new Set<string>();
@@ -169,11 +178,11 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
   };
 }
 
-async function handleRange(service: any, body: any) {
+async function handleRange(service: any, body: any, scopedShopId = "") {
   const clock = localClock(Date.now());
   const dateFrom = String(body.date_from || clock.today);
   const dateTo = String(body.date_to || dateFrom);
-  const data = await computeReportsForRange(service, dateFrom, dateTo);
+  const data = await computeReportsForRange(service, dateFrom, dateTo, scopedShopId);
   return Response.json(data);
 }
 
@@ -449,8 +458,8 @@ async function deliverReports(
 
 // ---- Actions ----
 
-async function handlePreview(service: any, businessDate: string) {
-  const reports = await computeReportsForDate(service, businessDate);
+async function handlePreview(service: any, businessDate: string, scopedShopId = "") {
+  const reports = await computeReportsForDate(service, businessDate, scopedShopId);
   return Response.json({ business_date: businessDate, reports });
 }
 
@@ -558,6 +567,11 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: "Hisob o‘chirilgan." }, { status: 403 });
     }
     const role = userRole(stored);
+    const scopedShopId = role === "manager" ? userShopId(stored) : "";
+    if (role === "manager") {
+      const assigned = scopedShopId ? await service.entities.Shop.get(scopedShopId).catch(() => null) : null;
+      if (!assigned || assigned.active === false) return Response.json({ error: "Faol ish joyi kerak." }, { status: 403 });
+    }
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || "getConfig");
     const ctx = {
@@ -573,9 +587,12 @@ export default async function(req: Request): Promise<Response> {
     if (action === "preview" || action === "getConfig" || action === "range") {
       if (!VIEW_ROLES.includes(role))
         return Response.json({ error: "Ruxsat yo‘q." }, { status: 403 });
-      if (action === "getConfig") return await handleGetConfig(service);
-      if (action === "range") return await handleRange(service, body);
-      return await handlePreview(service, String(body.business_date || localClock(Date.now()).today));
+      if (action === "getConfig") {
+        if (role === "manager") return Response.json({ error: "Global eksport sozlamalari egasi uchun." }, { status: 403 });
+        return await handleGetConfig(service);
+      }
+      if (action === "range") return await handleRange(service, body, scopedShopId);
+      return await handlePreview(service, String(body.business_date || localClock(Date.now()).today), scopedShopId);
     }
 
     // Everything else: admin only.
