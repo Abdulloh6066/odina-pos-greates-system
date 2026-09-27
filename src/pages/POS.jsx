@@ -627,6 +627,14 @@ export default function POS() {
       const q = search.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q));
     }
+    // Keep related variants immediately before their configured original.
+    for (const product of [...list]) {
+      if (!product.display_before_product_id || product.display_before_product_id === product.id) continue;
+      if (!list.some((row) => row.id === product.display_before_product_id)) continue;
+      list = list.filter((row) => row.id !== product.id);
+      const targetIndex = list.findIndex((row) => row.id === product.display_before_product_id);
+      list.splice(targetIndex, 0, product);
+    }
     const activeCategory = categories.find((c) => c.id === activeCat);
     if (activeCategory?.name?.trim().toLowerCase() === 'tortlar') {
       list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
