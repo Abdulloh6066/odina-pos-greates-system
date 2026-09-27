@@ -102,8 +102,7 @@ export default function TransfersPanel({
   const pending = visibleGroups.filter((group) => ['pending', 'receiving'].includes(group.status));
   const completed = visibleGroups.filter((group) => ['received', 'archived'].includes(group.status));
 
-  const canReceive = (group) => user?.role !== 'manager'
-    && group.status === 'pending'
+  const canReceive = (group) => group.status === 'pending'
     && group.items.every((item) => item.status === 'pending')
     && group.destination_location_id === effectiveLocationId
     && (user?.role === 'admin' || assignedShopId === group.destination_location_id);

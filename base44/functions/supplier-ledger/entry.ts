@@ -1,3 +1,5 @@
+import { resolveAppUser } from "../../shared/user-helpers.ts";
+import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
@@ -91,18 +93,20 @@ export default async function(req) {
   const service = base44.asServiceRole;
 
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Tizimga kirish talab qilinadi." }, { status: 401 });
+    const auth = await base44.auth.me();
+    if (!auth) return Response.json({ error: "Tizimga kirish talab qilinadi." }, { status: 401 });
+    const user = await resolveAppUser(service, auth);
 
     const body = await req.json();
+    if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "");
 
     if (action === "get_debts") {
-      if (!["admin", "cashier", "warehouse", "accountant"].includes(user.role)) {
+      if (!["admin", "manager", "cashier", "warehouse", "accountant"].includes(user.role)) {
         return Response.json({ error: "Qarzlarni ko‘rishga ruxsat yo‘q." }, { status: 403 });
       }
       const openReceipts = (await service.entities.SupplierReceipt.filter(
-        { remaining_debt: { $gt: 0 } }, "received_at", 500,
+        { remaining_debt: { $gt: 0 }, ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500,
       )) || [];
       const totals: Record<string, number> = {};
       for (const receipt of openReceipts) {
@@ -112,7 +116,7 @@ export default async function(req) {
     }
 
     if (action === "create_receipt") {
-      if (!["admin", "warehouse"].includes(user.role)) {
+      if (!["admin", "manager", "warehouse"].includes(user.role)) {
         return Response.json({ error: "Faqat owner yoki Omborchi kirim qila oladi." }, { status: 403 });
       }
 
@@ -125,7 +129,7 @@ export default async function(req) {
       if (!supplierId || !locationId || inputItems.length === 0 || inputItems.length > 100) {
         return Response.json({ error: "Yetkazib beruvchi, ombor va kamida bitta masalliq majburiy." }, { status: 400 });
       }
-      if (user.role === "warehouse" && (!user.shop_id || user.shop_id !== locationId)) {
+      if (["warehouse", "manager"].includes(user.role) && (!user.shop_id || user.shop_id !== locationId)) {
         return Response.json({ error: "Siz faqat biriktirilgan omborga kirim qila olasiz." }, { status: 403 });
       }
 
@@ -307,7 +311,7 @@ export default async function(req) {
     }
 
     if (action === "cancel_receipt") {
-      if (!["admin", "warehouse"].includes(user.role)) {
+      if (!["admin", "manager", "warehouse"].includes(user.role)) {
         return Response.json({ error: "Faqat owner yoki Omborchi kirimni bekor qila oladi." }, { status: 403 });
       }
       if (!(await verifyOwnerPin(service, body?.owner_pin, user))) {
@@ -328,7 +332,7 @@ export default async function(req) {
       if (receipt.status === "cancelling") {
         return Response.json({ error: "Bu kirim bekor qilinish jarayonida. Owner tekshirishi kerak." }, { status: 409 });
       }
-      if (user.role === "warehouse" && (!user.shop_id || user.shop_id !== receipt.location_id)) {
+      if (["warehouse", "manager"].includes(user.role) && (!user.shop_id || user.shop_id !== receipt.location_id)) {
         return Response.json({ error: "Siz faqat biriktirilgan ombordagi kirimni bekor qila olasiz." }, { status: 403 });
       }
 
@@ -504,7 +508,7 @@ export default async function(req) {
     }
 
     if (action === "pay_debt") {
-      if (!["admin", "cashier"].includes(user.role)) {
+      if (!["admin", "manager", "cashier"].includes(user.role)) {
         return Response.json({ error: "Faqat owner yoki kassir qarzni to‘lay oladi." }, { status: 403 });
       }
       if (user.role === "cashier" && !(await verifyOwnerPin(service, body?.owner_pin, user))) {
@@ -531,7 +535,7 @@ export default async function(req) {
       }
 
       const debts = (await service.entities.SupplierReceipt.filter(
-        { supplier_id: supplier.id, remaining_debt: { $gt: 0 } }, "received_at", 500,
+        { supplier_id: supplier.id, remaining_debt: { $gt: 0 }, ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500,
       )) || [];
       const totalDebt = debts.reduce((sum: number, debt: any) => sum + money(debt.remaining_debt), 0);
       if (totalDebt <= 0) return Response.json({ error: "Bu yetkazib beruvchida qarz yo‘q." }, { status: 409 });

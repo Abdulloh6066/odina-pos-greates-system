@@ -1,7 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveAppUser, userLabel, userRole, userShopId, userShopName } from "../../shared/user-helpers.ts";
 const TRANSFER_VIEW_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
-const TRANSFER_ACTION_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
+const TRANSFER_ACTION_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 
 // The production unit is frozen on every transfer: one sheet is converted to the product's configured piece count only when the shop receives it.
 

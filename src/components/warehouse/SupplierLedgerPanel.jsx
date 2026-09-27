@@ -156,7 +156,7 @@ export default function SupplierLedgerPanel({
   const cancelledTotal = visible
     .filter((receipt) => isCancelled(receipt))
     .reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
-  const canReceive = ["admin", "warehouse"].includes(user?.role);
+  const canReceive = ["admin", "manager", "warehouse"].includes(user?.role);
 
   const supplierRows = useMemo(() => {
     const grouped = new Map();

@@ -41,7 +41,7 @@ export default function ProductionPanel({
   const [productionProduct, setProductionProduct] = useState(null);
 
   const canManageRecipes = ['admin', 'accountant'].includes(user?.role);
-  const canProduce = ['admin', 'production'].includes(user?.role);
+  const canProduce = ['admin', 'manager', 'production'].includes(user?.role);
 
   const load = async () => {
     setLoading(true);

@@ -1,9 +1,11 @@
+import { resolveAppUser } from "../../shared/user-helpers.ts";
+import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { loadIngredientCosts, recipeCostFromMap } from "../../shared/cost-engine.ts";
 import { buildProductionIngredientForecast } from "../../shared/production-forecast-logic.ts";
 
 const RECIPE_ROLES = new Set(["admin", "accountant"]);
-const PRODUCTION_ROLES = new Set(["admin", "production"]);
+const PRODUCTION_ROLES = new Set(["admin", "manager", "production"]);
 
 // Recipe and production units always follow the product: central stock uses sheets, while shop stock uses pieces.
 
@@ -36,10 +38,12 @@ export default async function(req) {
   const service = base44.asServiceRole;
 
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+    const auth = await base44.auth.me();
+    if (!auth) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+    const user = await resolveAppUser(service, auth);
 
     const body = await req.json();
+    if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "");
 
     if (action === "save_recipe") {
@@ -194,7 +198,7 @@ export default async function(req) {
 
       const requestedLocationId = String(body?.location_id || "");
       let location: any = null;
-      if (user.role === "production") {
+      if (["production", "manager"].includes(user.role)) {
         location = locations.find((row: any) => row.id === user.shop_id) || null;
         if (!location) {
           return Response.json({
@@ -266,7 +270,7 @@ export default async function(req) {
       if (!locationId || !productId || !Number.isInteger(producedQuantity) || producedQuantity <= 0) {
         return Response.json({ error: "Ishlab chiqarish joyi, mahsulot va musbat butun miqdor kiriting." }, { status: 400 });
       }
-      if (user.role === "production" && (!user.shop_id || user.shop_id !== locationId)) {
+      if (["production", "manager"].includes(user.role) && (!user.shop_id || user.shop_id !== locationId)) {
         return Response.json({ error: "Siz faqat biriktirilgan ishlab chiqarish omborida ishlashingiz mumkin." }, { status: 403 });
       }
 
