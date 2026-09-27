@@ -97,6 +97,11 @@ export default function StaffOrderTicketModal({
       });
 
       return () => { active = false; };
+    } else if (mode === 'takeaway') {
+      setTicketOrder(initialOrder);
+      setLoading(false);
+      setError(initialOrder?.id ? '' : 'Buyurtma saqlanmagan.');
+      setLocalPrintCount(getTicketPrintCount(initialOrder?.id, initialOrder?.revision));
     } else if (mode === 'customer') {
       if (!initialOrder?.id) {
         setError('Buyurtma saqlanmagan.');
@@ -179,6 +184,7 @@ export default function StaffOrderTicketModal({
 
       <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-3'}`} />
 
+      {mode === 'takeaway' && <p className="text-xs font-black mb-2">TO‘LANMAGAN</p>}
       {/* Row 2 & 3: Metadata */}
       <div className={`space-y-1.5 text-black ${isPrint ? 'text-[11px]' : 'text-sm'}`}>
         <div className="flex justify-between items-baseline gap-3">
