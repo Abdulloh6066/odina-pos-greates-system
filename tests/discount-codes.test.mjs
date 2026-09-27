@@ -174,6 +174,7 @@ function loadHandler(client) {
   }).outputText;
 
   let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
+    .replace(/^import .*manager-request-scope.*;$/gm, '')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace(/import \{ loadIngredientCosts, computeProductCost \} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
