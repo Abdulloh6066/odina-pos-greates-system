@@ -679,3 +679,57 @@ test('integration is a separate page with role guard and no pretend sales, stock
   assert.match(page, /mahsulotlar stolda to‘lovgacha saqlanadi/i);
   assert.match(page, /Bron qilish hali qo‘shilmagan/i);
 });
+
+test('takeaway ticket saves without a table or sale, survives reload, and retries reuse its number', async () => {
+  const f = fixture(); f.as('cashier-1');
+  f.db.Product[1].shop_prices = { 'central-shop': 25000 };
+  const body = { action: 'save_takeaway_order', shop_id: 'central-shop', shift_id: 'shift-main',
+    order_id: 'takeaway-test-0001', expected_revision: 0, opened_by_name: 'FORGED',
+    items: [{ product_id: 'coffee', quantity: 2 }] };
+  const first = await f.run(body);
+  assert.equal(first.status, 200, JSON.stringify(first));
+  assert.equal(first.data.order.total, 50000);
+  assert.equal(first.data.order.order_type, 'takeaway');
+  assert.equal(first.data.order.number, undefined);
+  assert.notEqual(first.data.order.opened_by_name, 'FORGED');
+  const retry = await f.run(body);
+  assert.equal(retry.data.order.ticket_number, first.data.order.ticket_number);
+  assert.equal(retry.data.order.revision, 1);
+  assert.equal(f.db.Shop[0].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Sale.length, 0);
+  assert.equal(f.db.Shift[0].total_sales, undefined);
+  const list = await f.run({ action: 'list_takeaway_orders', shop_id: 'central-shop' });
+  assert.equal(list.data.orders[0].id, body.order_id);
+  const restored = await f.run({ action: 'get_takeaway_order', shop_id: 'central-shop', order_id: body.order_id });
+  assert.equal(restored.data.order.items[0].quantity, 2);
+  assert.equal((await f.run({ action: 'status' })).data.shops[0].orders.length, 0);
+  assert.equal((await f.run({ ...body, items: [{ product_id: 'coffee', quantity: 3 }] })).status, 409);
+  assert.equal((await f.run({ ...body, shop_id: 'second-shop' })).status, 403);
+  assert.equal((await f.run({ action: 'list_takeaway_orders', shop_id: 'second-shop' })).status, 403);
+  f.db.Product[1].price = 99000;
+  f.db.Product[1].shop_prices['central-shop'] = 99000;
+  const edit = await f.run({ ...body, expected_revision: 1, items: [{ product_id: 'coffee', quantity: 3 }] });
+  assert.equal(edit.data.order.total, 75000);
+  assert.equal(edit.data.order.ticket_number, first.data.order.ticket_number);
+});
+
+test('takeaway concurrent saves do not overwrite orders, stale and paid orders cannot be resurrected', async () => {
+  const f = fixture(); f.as('cashier-2');
+  const body = { action: 'save_takeaway_order', shop_id: 'second-shop', shift_id: 'shift-second',
+    order_id: 'takeaway-test-0002', expected_revision: 0, items: [{ product_id: 'coffee', quantity: 1 }] };
+  const results = await Promise.all([f.run(body), f.run(body)]);
+  assert.ok(results.some((r) => r.status === 200), JSON.stringify(results));
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 1);
+  const order = f.db.Shop[1].restaurant_table_orders[0];
+  order.state = 'paying'; order.checkout_key = 'checkout-test';
+  assert.equal((await f.run({ ...body, expected_revision: 1 })).status, 409);
+  const reconcile = { action: 'reconcile_takeaway_payment', shop_id: 'second-shop', order_id: order.id };
+  assert.equal((await f.run(reconcile)).status, 409);
+  f.db.Sale.push({ id: 'paid', status: 'completed', shop_id: 'second-shop',
+    table_order_id_snapshot: order.id, idempotency_key: order.checkout_key });
+  assert.equal((await f.run(reconcile)).data.released, true);
+  assert.equal(f.db.Shop[1].restaurant_table_orders.length, 0);
+  assert.equal((await f.run(body)).status, 409);
+  assert.equal((await f.run({ ...body, expected_revision: 1 })).status, 409);
+});
+
