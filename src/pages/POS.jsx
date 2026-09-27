@@ -535,19 +535,22 @@ export default function POS() {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.defaultPrevented || event.isComposing || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (event.key !== '+' && event.key !== '-') return;
+      const increase = event.key === '+' || event.key === 'Add' || event.code === 'NumpadAdd' || event.code === 'Equal';
+      const decrease = event.key === '-' || event.key === 'Subtract' || event.code === 'NumpadSubtract' || event.code === 'Minus';
+      if (!increase && !decrease) return;
       const target = event.target;
       if (target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="spinbutton"]')) return;
       if (tableLocked || paying || payOpen || stockChecking || !cart.length) return;
       // The mobile cart is itself a dialog; every other open dialog blocks shortcuts.
       if ([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
-        .some((node) => node.getAttribute('data-state') !== 'closed' && !node.classList.contains('odina-cart-sheet'))) return;
+        .some((node) => node.getAttribute('data-state') !== 'closed' && !node.classList.contains('odina-cart-sheet')
+          && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden')) return;
       const item = cart.find((row) => row.product_id === keyboardProductId) || cart[cart.length - 1];
       event.preventDefault();
-      if (event.key === '+') inc(item); else dec(item);
+      if (increase) inc(item); else dec(item);
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   });
 
   const inc = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
