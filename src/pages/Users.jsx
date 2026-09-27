@@ -142,7 +142,7 @@ export default function Users() {
         actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
 
-      <p className="mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi faqat biriktirilgan faol do‘kon yoki ishlab chiqarish markazidagi ruxsat etilgan amallarni boshqaradi. Budget, global sozlamalar, xodim ruxsatlari, egasi PIN amallari, qaytarish va 100% chegirma unga ochilmaydi. Yordam: @Abdulloh1100.</p>
+      <p className="mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi biriktirilgan faol ish joyida kassa, buyurtmalar, stollar, ombor, kirim va do‘kon narxlarini boshqaradi. Budget, global katalog va sozlamalar hamda xodim ruxsatlari egasi boshqaruvida qoladi. Qaytarish va 100% chegirma egasi PIN kodi bilan tasdiqlanadi. Yordam: @Abdulloh1100.</p>
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
