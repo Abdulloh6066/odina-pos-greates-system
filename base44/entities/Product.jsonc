@@ -1,6 +1,10 @@
 {
   "name": "Product",
   "properties": {
+    "display_before_product_id": {
+      "type": "string",
+      "description": "Kassada shu mahsulotdan oldin ko\u2018rsatish"
+    },
     "production_unit": {
       "type": "string",
       "enum": [
