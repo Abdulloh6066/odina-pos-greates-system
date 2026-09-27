@@ -76,7 +76,7 @@ export default async function(req) {
     if (user.active === false) {
       return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
     }
-    if (!["admin", "cashier"].includes(user.role)) {
+    if (!["admin", "manager", "cashier"].includes(user.role)) {
       return Response.json({ error: "Your role cannot close Kassa shifts." }, { status: 403 });
     }
 

@@ -135,12 +135,12 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
             {(() => {
               const canComplete = (order.order_status === 'tayyor' || order.order_status === 'yuborildi_olib_ketildi')
                 && order.order_status !== 'bekor_qilindi'
-                && (user?.role === 'admin' || (user?.role === 'cashier' && user?.shop_id === order.shop_id));
-              const canRepeat = user?.role === 'admin' || user?.role === 'cashier';
+                && (user?.role === 'admin' || (['cashier', 'manager'].includes(user?.role) && user?.shop_id === order.shop_id));
+              const canRepeat = user?.role === 'admin' || ['cashier', 'manager'].includes(user?.role);
               const handoffLabel = order.fulfilment_type === 'delivery' ? 'Yuborildi' : 'Olib ketildi';
               const showPay = order.remaining_balance > 0 && order.order_status !== 'bekor_qilindi';
               const canPrint = items.length > 0 && order.order_status !== 'bekor_qilindi'
-                && (user?.role === 'admin' || (user?.role === 'cashier' && user?.shop_id === order.shop_id));
+                && (user?.role === 'admin' || (['cashier', 'manager'].includes(user?.role) && user?.shop_id === order.shop_id));
               if (!canComplete && !showPay && !canRepeat && !canPrint) return null;
               return (
                 <div className="flex flex-wrap justify-end gap-2 sticky bottom-0 bg-card pt-3">

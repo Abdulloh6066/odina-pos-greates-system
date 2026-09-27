@@ -101,7 +101,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   }, [open]);
 
   useEffect(() => {
-    if (open && role === 'cashier') setForm((f) => ({ ...f, shop_id: user?.shop_id || '' }));
+    if (open && ['cashier', 'manager'].includes(role)) setForm((f) => ({ ...f, shop_id: user?.shop_id || '' }));
   }, [open, role, user]);
 
   const appliedPrefillId = useRef('');

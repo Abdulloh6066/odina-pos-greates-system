@@ -183,7 +183,7 @@ export default async function(req: Request): Promise<Response> {
     // Production staff may change production status only, never create orders
     // or accept payments. Authorize the requested action before any writes.
     const allowedRoles = action === "update_production_status"
-      ? ["admin", "production"] : ["admin", "cashier"];
+      ? ["admin", "production"] : ["admin", "manager", "cashier"];
     if (!allowedRoles.includes(user.role)) {
       return Response.json({ error: "Bu buyurtma amali uchun ruxsat yo‘q." }, { status: 403 });
     }
@@ -199,6 +199,7 @@ export default async function(req: Request): Promise<Response> {
       }
       const existingOrders = await service.entities.CustomerOrder.filter({ idempotency_key: idempotencyKey });
       if (existingOrders && existingOrders.length) {
+        if (user.role === "manager" && existingOrders[0].shop_id !== user.shop_id) return Response.json({ error: "Boshqa do‘kon buyurtmasiga ruxsat yo‘q." }, { status: 403 });
         return Response.json({ order: existingOrders[0], already_exists: true });
       }
 
@@ -245,7 +246,7 @@ export default async function(req: Request): Promise<Response> {
       });
 
       let shopId = String(body?.shop_id || "");
-      if (user.role === "cashier") {
+      if (["cashier", "manager"].includes(user.role)) {
         if (!user.shop_id) {
           return Response.json({ error: "Sizga do‘kon biriktirilmagan." }, { status: 403 });
         }
@@ -447,7 +448,7 @@ export default async function(req: Request): Promise<Response> {
       if (!order) {
         return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
       }
-      if (user.role === "cashier" && order.shop_id !== user.shop_id) {
+      if (["cashier", "manager"].includes(user.role) && order.shop_id !== user.shop_id) {
         return Response.json({ error: "Bu buyurtma boshqa do‘konga tegishli." }, { status: 403 });
       }
       if (order.order_status === "bekor_qilindi") {
@@ -638,7 +639,7 @@ export default async function(req: Request): Promise<Response> {
       if (!orderId) {
         return Response.json({ error: "Buyurtma ID majburiy." }, { status: 400 });
       }
-      if (!["admin", "cashier"].includes(user.role)) {
+      if (!["admin", "manager", "cashier"].includes(user.role)) {
         return Response.json({ error: "Buyurtmani yakunlash uchun ruxsat yo‘q." }, { status: 403 });
       }
 
@@ -649,7 +650,7 @@ export default async function(req: Request): Promise<Response> {
       if (String(order.order_status || "") === "yakunlandi") {
         return Response.json({ order, already_completed: true, runtime_version: ORDER_RUNTIME_VERSION });
       }
-      if (user.role === "cashier" && order.shop_id !== user.shop_id) {
+      if (["cashier", "manager"].includes(user.role) && order.shop_id !== user.shop_id) {
         return Response.json({ error: "Bu buyurtma boshqa do‘konga tegishli." }, { status: 403 });
       }
       const prevStatus = String(order.order_status || "");

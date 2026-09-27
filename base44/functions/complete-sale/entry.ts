@@ -337,7 +337,7 @@ export default async function(req) {
     if (user.active === false) {
       return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
     }
-    if (!["admin", "cashier"].includes(user.role)) {
+    if (!["admin", "manager", "cashier"].includes(user.role)) {
       return Response.json({ error: "Your role cannot complete Kassa sales." }, { status: 403 });
     }
 
@@ -354,7 +354,7 @@ export default async function(req) {
       const existing = await service.entities.Shift.filter({ user_id: user.id, status: "open" });
       if (existing?.length) return Response.json({ error: "You already have an open shift." }, { status: 409 });
       let shopId = String(body?.shop_id || "");
-      if (user.role === "cashier") {
+      if (["cashier", "manager"].includes(user.role)) {
         if (!user.shop_id) return Response.json({ error: "Owner must assign this cashier to a shop first." }, { status: 403 });
         shopId = user.shop_id;
       }
@@ -623,7 +623,7 @@ export default async function(req) {
       if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
         return Response.json({ error: "Chegirma foizi noto‘g‘ri." }, { status: 409 });
       }
-      const requiresOwnerPin = user.role === "cashier" && percentage === 100;
+      const requiresOwnerPin = ["cashier", "manager"].includes(user.role) && percentage === 100;
       if (requiresOwnerPin && !(await verifyOwnerPin(service, body?.owner_pin, user))) {
         return Response.json({
           error: "100% chegirma uchun OWNER PIN noto‘g‘ri yoki kiritilmagan.",
@@ -765,7 +765,7 @@ export default async function(req) {
       if (shift.user_id !== user.id) {
         return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
       }
-      if (user.role === "cashier" && user.shop_id !== shift.shop_id) {
+      if (["cashier", "manager"].includes(user.role) && user.shop_id !== shift.shop_id) {
         return Response.json({ error: "Kassir boshqa do‘konga biriktirilgan." }, { status: 403 });
       }
       // Stock precheck must use the same verified, frozen table order as final
@@ -1138,10 +1138,10 @@ export default async function(req) {
     if (shift.user_id !== user.id) {
       return Response.json({ error: "This shift belongs to another user." }, { status: 403 });
     }
-    if (user.role === "cashier" && !user.shop_id) {
+    if (["cashier", "manager"].includes(user.role) && !user.shop_id) {
       return Response.json({ error: "Owner must assign this cashier to a shop first." }, { status: 403 });
     }
-    if (user.role === "cashier" && user.shop_id !== shift.shop_id) {
+    if (["cashier", "manager"].includes(user.role) && user.shop_id !== shift.shop_id) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
     }
 
@@ -1251,7 +1251,7 @@ export default async function(req) {
       discountCode = discount.code;
       claimedDiscount = discount;
       if (
-        user.role === "cashier" &&
+        ["cashier", "manager"].includes(user.role) &&
         discountPercentage === 100 &&
         !(await verifyOwnerPin(service, body?.owner_pin, user))
       ) {

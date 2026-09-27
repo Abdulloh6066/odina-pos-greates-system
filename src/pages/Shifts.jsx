@@ -128,7 +128,7 @@ export default function Shifts() {
     setDetailError("");
     setDetailLoading(true);
 
-    const canViewMovements = role === "admin" || role === "cashier";
+    const canViewMovements = role === "admin" || role === "manager" || role === "cashier";
     const requests = [
       base44.entities.Sale.filter({ shift_id: shift.id }, "-created_date", 500),
       base44.entities.SaleItem.filter({ shift_id: shift.id }, "-created_at", 500),

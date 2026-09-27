@@ -16,7 +16,7 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
 
   useEffect(() => {
     if (open) {
-      if (user?.role === 'cashier') {
+      if (['cashier', 'manager'].includes(user?.role)) {
         setShopId(assignedShopId);
       } else {
         const main = shops.find((s) => s.is_main);
@@ -41,7 +41,7 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Do‘kon</label>
-            {user?.role === 'cashier' ? (
+            {['cashier', 'manager'].includes(user?.role) ? (
               <div className={`w-full min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${assignedShopId ? 'border-input bg-secondary/60' : 'border-destructive/40 bg-destructive/5 text-destructive'}`}>
                 {assignedShopId
                   ? assignedShopName

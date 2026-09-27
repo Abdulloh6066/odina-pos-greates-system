@@ -5,7 +5,7 @@ Deno.serve(async (req) => {
   try {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: "Authentication required." }, { status: 401 });
-    if (!["admin", "cashier"].includes(user.role)) {
+    if (!["admin", "manager", "cashier"].includes(user.role)) {
       return Response.json({ error: "Your role cannot open a Kassa shift." }, { status: 403 });
     }
 
@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     if (existing?.length) return Response.json({ error: "You already have an open shift." }, { status: 409 });
 
     let shopId = String(body?.shop_id || "");
-    if (user.role === "cashier") {
+    if (["cashier", "manager"].includes(user.role)) {
       if (!user.shop_id) return Response.json({ error: "Owner must assign this cashier to a shop first." }, { status: 403 });
       shopId = user.shop_id;
     }

@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
         const assignedShop = await service.entities.Shop.get(assignedId).catch(() => null);
         if (!isShop(assignedShop)) {          return Response.json({ error: "Biriktirilgan do‘kon faol emas yoki topilmadi." }, { status: 403 });
         }
-        return Response.json({ can_manage: false, shops: [safeShop(assignedShop)], invalid_records: [] });
+        return Response.json({ can_manage: role === "manager", shops: [safeShop(assignedShop)], invalid_records: [] });
       }
 
       const allShops = await service.entities.Shop.list("name", 100);
@@ -435,8 +435,8 @@ Deno.serve(async (req) => {
     if (action !== "set_table_count" && action !== "set_table_layout") {
       return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     }
-    if (role !== "admin") {
-      return Response.json({ error: "Stollarni faqat admin o‘zgartiradi." }, { status: 403 });
+    if (role !== "admin" && !(role === "manager" && userShopId(actor) && userShopId(actor) === shopId)) {
+      return Response.json({ error: "Faqat o‘z do‘koningiz stollarini o‘zgartira olasiz." }, { status: 403 });
     }
     if (action === "set_table_layout") {
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;

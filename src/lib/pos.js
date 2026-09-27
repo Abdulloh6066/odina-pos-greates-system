@@ -9,7 +9,7 @@ export const PAYMENT_METHODS = [
 
 export const ROLE_MENU = {
   admin: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
-  manager: ['dashboard', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
+  manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
   cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
   production: ['warehouse', 'products', 'customers', 'screens'],
