@@ -1,5 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { APP_ROLES, userLabel, userRole, userShopId, userShopName } from "../../shared/user-helpers.ts";
+import { resolveAppUser, userLabel, userRole, userShopId, userShopName } from "../../shared/user-helpers.ts";
 const TRANSFER_VIEW_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const TRANSFER_ACTION_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
 
@@ -12,33 +12,7 @@ const cleanNumber = (value: unknown) => {
 
 
 
-const resolveAppUser = async (service: any, authenticatedUser: any) => {
-  let storedUser: any = null;
-  const authenticatedId = String(authenticatedUser?.id || "");
-  const email = String(authenticatedUser?.email || "").trim().toLowerCase();
 
-  if (authenticatedId) {
-    storedUser = await service.entities.User.get(authenticatedId).catch(() => null);
-  }
-  if (!storedUser && email) {
-    const matches = await service.entities.User.filter({ email }, "-updated_date", 5);
-    storedUser = (matches || []).find(
-      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === email,
-    ) || null;
-  }
-
-  const storedRole = userRole(storedUser);
-  return {
-    ...authenticatedUser,
-    id: authenticatedUser?.id || storedUser?.id,
-    email: authenticatedUser?.email || storedUser?.email,
-    full_name: authenticatedUser?.full_name || storedUser?.full_name,
-    role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
-    shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
-    shop_name: userShopName(storedUser) || userShopName(authenticatedUser),
-    active: storedUser?.active ?? authenticatedUser?.active,
-  };
-};
 
 const findStock = async (service: any, locationId: string, productId: string) => {
   const rows = await service.entities.ProductStock.filter({
@@ -135,7 +109,7 @@ export default async function(req) {
     }
 
     if (action === "list_transfers") {
-      const canViewAllLocations = role === "admin" || role === "manager";
+      const canViewAllLocations = role === "admin";
       const effectiveLocationId = canViewAllLocations ? "" : userShopId(user);
 
       if (!canViewAllLocations && !effectiveLocationId) {

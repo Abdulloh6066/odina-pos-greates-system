@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveAppUser } from "../../shared/user-helpers.ts";
 
 const ACCOUNTS = new Set(["cash", "uzcard", "humo", "online", "bank"]);
 const ACCOUNT_LABELS: Record<string, string> = {
@@ -169,8 +170,9 @@ export default async function(req) {
   const service = base44.asServiceRole;
 
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Tizimga kirish talab qilinadi." }, { status: 401 });
+    const auth = await base44.auth.me();
+    if (!auth) return Response.json({ error: "Tizimga kirish talab qilinadi." }, { status: 401 });
+    const user = await resolveAppUser(service, auth);
     if (user.role !== "admin") {
       return Response.json({ error: "Budget faqat egasi uchun ochiq." }, { status: 403 });
     }

@@ -1,6 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveAppUser } from "../../shared/user-helpers.ts";
 
-const ALLOWED_ROLES = new Set(["admin", "cashier", "accountant", "production"]);
+const ALLOWED_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const ALLOWED_TYPES = new Set(["opening", "adjustment"]);
 
 const number = (value: unknown) => {
@@ -13,8 +14,9 @@ export default async function(req) {
   const service = base44.asServiceRole;
 
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const auth = await base44.auth.me();
+    if (!auth) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const user = await resolveAppUser(service, auth);
     if (!ALLOWED_ROLES.has(user.role)) {
       return Response.json({ error: "Your role cannot manage warehouse stock." }, { status: 403 });
     }
@@ -162,6 +164,6 @@ export default async function(req) {
   } catch (error) {
     return Response.json({
       error: error instanceof Error ? error.message : "Could not update warehouse stock.",
-    }, { status: 500 });
+    }, { status: Number(error?.status) || 500 });
   }
 }

@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
         patch.shop_id = "";
         patch.shop_name = "";
       }
-    } else if (hasRole || hasShop) {
+    } else if (hasRole || hasShop || (nextRole === "manager" && hasActive && body.active === true)) {
       // A former admin must receive a real location before losing admin rights.
       const requestedShopId = hasShop ? String(body.shop_id || "") : userShopId(target);
       if (!requestedShopId) {

@@ -77,7 +77,7 @@ export default function Users() {
   const updateRole = async (target, role) => {
     if (role === target.role) return;
     if ((role === 'admin' || target.role === 'admin') && !canManageAdmins) return;
-    if (target.role === 'admin' && role !== 'admin') {
+    if ((target.role === 'admin' && role !== 'admin') || role === 'manager') {
       setPendingDemotion({ target, role });
       setDemotionShopId(target.shop_id || '');
       return;
@@ -142,6 +142,7 @@ export default function Users() {
         actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
 
+      <p className="mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi faqat biriktirilgan faol do‘kon yoki ishlab chiqarish markazidagi ruxsat etilgan amallarni boshqaradi. Budget, global sozlamalar, xodim ruxsatlari, egasi PIN amallari, qaytarish va 100% chegirma unga ochilmaydi. Yordam: @Abdulloh1100.</p>
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
@@ -186,8 +187,8 @@ export default function Users() {
                       <p className="min-h-11 flex items-center text-xs text-muted-foreground">Barcha do‘konlar · lavozimni o‘zgartirishda ish joyi tanlanadi</p>
                     ) : (
                       <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-11 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                        <option value="">Joy biriktirilmagan</option>
-                        {shops.map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
+                        <option value="" disabled={u.role === 'manager'}>Joy biriktirilmagan</option>
+                        {shops.filter((s) => s.active !== false).map((s) => <option key={s.id} value={s.id}>{s.name}{s.location_type === 'production' ? ' · Ishlab chiqarish markazi' : ' · Do‘kon'}</option>)}
                       </OdinaSelect>
                     )}
                   </div>
@@ -227,7 +228,7 @@ export default function Users() {
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} canManageAdmins={canManageAdmins} />
       <Dialog open={Boolean(pendingDemotion)} onOpenChange={(open) => { if (!open) setPendingDemotion(null); }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Admin huquqini qaytarib olish</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Lavozim va ish joyini biriktirish</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{pendingDemotion?.target.full_name || pendingDemotion?.target.email} yangi lavozimga o‘tadi. Oldingi savdo va moliyaviy tarix saqlanadi.</p>
           <div className="space-y-2">
             <Label>Yangi ish joyi</Label>

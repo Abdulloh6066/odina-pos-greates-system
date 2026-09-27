@@ -44,7 +44,7 @@ export default function StockCountPanel({ user, location, locations }) {
   };
 
   const startNew = async () => {
-    const locId = (role === 'admin' || role === 'manager')
+    const locId = (role === 'admin')
       ? newLoc
       : (user?.shop_id || user?.data?.shop_id || '');
     if (!locId) { void odinaAlert("Do'konni tanlang."); return; }
@@ -104,7 +104,7 @@ export default function StockCountPanel({ user, location, locations }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle className="font-display text-xl">Yangi ombor sanog‘i</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            {(role === 'admin' || role === 'manager') ? (
+            {(role === 'admin') ? (
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Do‘kon</label>
                 <OdinaSelect value={newLoc} onChange={(e) => setNewLoc(e.target.value)} className="h-11 w-full">

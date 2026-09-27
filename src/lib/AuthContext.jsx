@@ -32,14 +32,14 @@ const hydrateAppUser = async (value) => {
     const storedUser = normalizeAppUser(await base44.entities.User.get(sessionUser.id));
     return {
       ...sessionUser,
-      role: APP_ROLES.has(storedUser?.role) ? storedUser.role : sessionUser.role,
-      shop_id: storedUser?.shop_id || sessionUser.shop_id || '',
-      shop_name: storedUser?.shop_name || sessionUser.shop_name || '',
-      active: storedUser?.active ?? sessionUser.active,
+      role: storedUser?.role || '',
+      shop_id: storedUser?.shop_id || '',
+      shop_name: storedUser?.shop_name || '',
+      active: storedUser?.active !== false && storedUser?.data?.active !== false,
     };
   } catch (error) {
-    console.warn('Stored user profile could not be refreshed; session profile will be used.', error);
-    return sessionUser;
+    console.warn('Stored user profile could not be refreshed.', error);
+    throw error;
   }
 };
 

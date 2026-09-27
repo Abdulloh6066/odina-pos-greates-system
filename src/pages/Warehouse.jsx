@@ -77,7 +77,7 @@ export default function Warehouse() {
   const [movements, setMovements] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [recipients, setRecipients] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState(['admin', 'manager'].includes(user?.role) ? '' : assignedShopId);
+  const [selectedLocation, setSelectedLocation] = useState((user?.role === 'admin') ? '' : assignedShopId);
   const requestedTab = searchParams.get('tab');
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
@@ -120,7 +120,7 @@ export default function Warehouse() {
       const payload = response?.data || response;
       const returnedTransfers = payload?.transfers || [];
 
-      if (!['admin', 'manager'].includes(user?.role) && assignedShopId && returnedTransfers.length === 0) {
+      if (!(user?.role === 'admin') && assignedShopId && returnedTransfers.length === 0) {
         const exactTransfers = await loadAssignedTransfers().catch(() => []);
         if (exactTransfers.length > 0) {
           return {
@@ -218,7 +218,7 @@ export default function Warehouse() {
         ? `Vaqtincha yuklanmagan bo‘limlar: ${failedSections.join(', ')}. Qayta yuklashni bosing.`
         : '');
 
-      const canChooseLocation = ['admin', 'manager'].includes(user?.role);
+      const canChooseLocation = (user?.role === 'admin');
       if (!canChooseLocation) {
         const effectiveLocation = transferPayload?.effective_location_id
           || activeLocations.find((location) => location.id === assignedShopId)?.id
@@ -333,7 +333,7 @@ export default function Warehouse() {
 
       <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
         <div className="flex flex-col sm:flex-row gap-3">
-          {['admin', 'manager'].includes(user?.role) ? (
+          {(user?.role === 'admin') ? (
             <label className="sm:w-72 space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
               <OdinaSelect
@@ -456,7 +456,7 @@ export default function Warehouse() {
                 stockMap={stockMap}
                 location={selectedLocationRecord}
                 kind={tab === 'products' ? 'product' : 'ingredient'}
-                onAdjust={['warehouse', 'manager'].includes(user?.role) ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
+                onAdjust={user?.role === 'warehouse' ? null : (item) => setAdjusting({ item, kind: tab === 'products' ? 'product' : 'ingredient' })}
               />
             </>
           )}

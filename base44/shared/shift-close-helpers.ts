@@ -75,47 +75,7 @@ export async function finishServiceTicketCycleIfLastShift(service: any, shopId: 
 
 export const money = (value: unknown) => Math.round(Number(value) || 0);
 
-export const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
-
-export const userRole = (value: any) => {
-  const rootRole = String(value?.role || "");
-  const nestedRole = String(value?.data?.role || "");
-  if (APP_ROLES.has(rootRole)) return rootRole;
-  if (APP_ROLES.has(nestedRole)) return nestedRole;
-  return rootRole || nestedRole;
-};
-
-export const userShopId = (value: any) =>
-  String(value?.shop_id || value?.data?.shop_id || "");
-
-export const resolveAppUser = async (service: any, authenticatedUser: any) => {
-  let storedUser: any = null;
-  const authenticatedId = String(authenticatedUser?.id || "");
-  const email = String(authenticatedUser?.email || "").trim().toLowerCase();
-
-  if (authenticatedId) {
-    storedUser = await service.entities.User.get(authenticatedId).catch(() => null);
-  }
-  if (!storedUser && email) {
-    const matches = await service.entities.User.filter({ email }, "-updated_date", 5);
-    storedUser = (matches || []).find(
-      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === email,
-    ) || null;
-  }
-
-  const storedRole = userRole(storedUser);
-  return {
-    ...authenticatedUser,
-    id: authenticatedUser?.id || storedUser?.id,
-    email: authenticatedUser?.email || storedUser?.email,
-    full_name: storedUser?.full_name || authenticatedUser?.full_name,
-    role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
-    shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
-    shop_name: storedUser?.shop_name || storedUser?.data?.shop_name
-      || authenticatedUser?.shop_name || authenticatedUser?.data?.shop_name || "",
-    active: storedUser?.active ?? authenticatedUser?.active,
-  };
-};
+export { APP_ROLES, userRole, userShopId, resolveAppUser } from "./user-helpers.ts";
 
 export const stockNumber = (value: unknown) => {
   const parsed = Number(value);

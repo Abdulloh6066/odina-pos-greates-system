@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveAppUser, assertManagerLocation } from "../../shared/user-helpers.ts";
 
 const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
 const VIEW_ROLES = new Set(["admin", "manager", "cashier"]);
@@ -38,33 +39,7 @@ const httpError = (message: string, status: number) => {
   return error;
 };
 
-const resolveAppUser = async (service: any, authenticatedUser: any) => {
-  let storedUser: any = null;
-  const authenticatedId = String(authenticatedUser?.id || "");
-  const email = String(authenticatedUser?.email || "").trim().toLowerCase();
 
-  if (authenticatedId) {
-    storedUser = await service.entities.User.get(authenticatedId).catch(() => null);
-  }
-  if (!storedUser && email) {
-    const matches = await service.entities.User.filter({ email }, "-updated_date", 5);
-    storedUser = (matches || []).find(
-      (candidate: any) => String(candidate?.email || "").trim().toLowerCase() === email,
-    ) || null;
-  }
-
-  const storedRole = userRole(storedUser);
-  return {
-    ...authenticatedUser,
-    id: authenticatedUser?.id || storedUser?.id,
-    email: authenticatedUser?.email || storedUser?.email,
-    full_name: storedUser?.full_name || authenticatedUser?.full_name,
-    role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
-    shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
-    shop_name: userShopName(storedUser) || userShopName(authenticatedUser),
-    active: storedUser?.active ?? authenticatedUser?.active,
-  };
-};
 
 const stockKey = (locationId: string, productId: string) => `${locationId}:${productId}`;
 
@@ -141,7 +116,7 @@ const getRetailShops = async (service: any) => {
 const permittedShops = async (service: any, user: any) => {
   const role = userRole(user);
   const shops = await getRetailShops(service);
-  if (role === "cashier") {
+  if (role === "cashier" || role === "manager") {
     const assignedId = userShopId(user);
     if (!assignedId) throw httpError("Kassirga do‘kon biriktirilmagan.", 400);
     const assigned = shops.find((shop: any) => shop.id === assignedId);
@@ -297,6 +272,7 @@ export default async function(req) {
       }
       const shops = await permittedShops(service, user);
       const requestedLocationId = String(body?.location_id || "");
+      assertManagerLocation(user, requestedLocationId);
       const locationId = role === "cashier" ? userShopId(user) : requestedLocationId;
       const location = shops.find((shop: any) => shop.id === locationId);
       if (!location) {
@@ -475,6 +451,7 @@ export default async function(req) {
       if (!wasteId) return Response.json({ error: "Chiqit yozuvi tanlanmagan." }, { status: 400 });
       const waste = await service.entities.WasteRecord.get(wasteId);
       if (!waste) return Response.json({ error: "Chiqit yozuvi topilmadi." }, { status: 404 });
+      assertManagerLocation(user, waste.location_id);
       if (waste.status !== "recorded") {
         return Response.json({ error: "Bu chiqit allaqachon bekor qilingan yoki qayta ishlanmoqda." }, { status: 409 });
       }

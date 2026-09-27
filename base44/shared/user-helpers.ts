@@ -43,14 +43,33 @@ export const resolveAppUser = async (service: any, authenticatedUser: any) => {
   const storedUser = await resolveStoredAppUser(service, authenticatedUser);
 
   const storedRole = userRole(storedUser);
+  if (!storedUser || !APP_ROLES.has(storedRole)
+    || storedUser.active === false || storedUser.data?.active === false) {
+    throw Object.assign(new Error("Faol xodim ruxsati topilmadi."), { status: 403 });
+  }
+  const shopId = userShopId(storedUser);
+  if (storedRole === "manager") {
+    const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
+    if (!shop || shop.active === false) {
+      throw Object.assign(new Error("Boshqaruvchiga faol ish joyi biriktirilishi kerak."), { status: 403 });
+    }
+  }
   return {
-    ...authenticatedUser,
-    id: authenticatedUser?.id || storedUser?.id,
-    email: authenticatedUser?.email || storedUser?.email,
-    full_name: authenticatedUser?.full_name || storedUser?.full_name,
-    role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
-    shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
-    shop_name: userShopName(storedUser) || userShopName(authenticatedUser),
-    active: storedUser?.active ?? authenticatedUser?.active,
+    ...storedUser,
+    data: { ...(storedUser.data || {}), role: storedRole, shop_id: shopId },
+    id: storedUser.id,
+    email: storedUser.email || authenticatedUser?.email,
+    full_name: storedUser.full_name || authenticatedUser?.full_name,
+    role: storedRole,
+    shop_id: shopId,
+    shop_name: userShopName(storedUser),
+    active: true,
+    is_owner: storedRole === "admin" && (storedUser.is_owner === true || storedUser.data?.is_owner === true),
   };
+};
+
+export const assertManagerLocation = (user: any, locationId: unknown) => {
+  if (userRole(user) === "manager" && (!userShopId(user) || !locationId || userShopId(user) !== String(locationId))) {
+    throw Object.assign(new Error("Faqat biriktirilgan ish joyi uchun ruxsat berilgan."), { status: 403 });
+  }
 };
