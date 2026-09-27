@@ -56,7 +56,7 @@
     "unit_cost_at_sale": {
       "type": "number",
       "default": 0,
-      "description": "Sotuv vaqtidagi o\u2018zgartirib bo\u2018lmaydigan tannarx (1 dona)"
+      "description": "Sotuv vaqtidagi o‘zgartirib bo‘lmaydigan tannarx (1 dona)"
     },
     "total_cost_at_sale": {
       "type": "number",
@@ -66,7 +66,7 @@
     "cost_is_estimate": {
       "type": "boolean",
       "default": true,
-      "description": "Tannarx ishonchli hisoblanmagan (retsept/xarid narxi yetishmagan) \u2014 Taxminiy"
+      "description": "Tannarx ishonchli hisoblanmagan (retsept/xarid narxi yetishmagan) — Taxminiy"
     },
     "created_at": {
       "type": "string",
@@ -100,22 +100,60 @@
     "read": {
       "$or": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$and": [
+            {
+              "$nor": [
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.cashier_id": "{{user.id}}"
+                }
+              ]
+            }
+          ]
         },
         {
-          "user_condition": {
-            "role": "manager"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
-          }
-        },
-        {
-          "data.cashier_id": "{{user.id}}"
+          "$and": [
+            {
+              "user_condition": {
+                "role": "manager",
+                "active": true
+              }
+            },
+            {
+              "data.shop_id": {
+                "$nin": [
+                  "",
+                  null
+                ]
+              }
+            },
+            {
+              "data.shop_id": "{{user.data.shop_id}}"
+            }
+          ]
         }
       ]
     },

@@ -8,16 +8,16 @@
     "service_ticket_number": {
       "type": "integer",
       "minimum": 1,
-      "description": "Oshxona xizmat chekining savdo paytida saqlangan do\u2018kon bo\u2018yicha raqami; asl sale_number o\u2018zgarmaydi"
+      "description": "Oshxona xizmat chekining savdo paytida saqlangan do‘kon bo‘yicha raqami; asl sale_number o‘zgarmaydi"
     },
     "idempotency_key": {
       "type": "string",
       "maxLength": 128,
-      "description": "Kassa so\u2018rovini takroran yozishni oldini oladigan qurilma kaliti"
+      "description": "Kassa so‘rovini takroran yozishni oldini oladigan qurilma kaliti"
     },
     "request_fingerprint": {
       "type": "string",
-      "description": "Idempotency kalitiga bog\u2018langan server hisoblagan so\u2018rov izi"
+      "description": "Idempotency kalitiga bog‘langan server hisoblagan so‘rov izi"
     },
     "sold_at": {
       "type": "string",
@@ -27,7 +27,7 @@
     "business_date": {
       "type": "string",
       "format": "date",
-      "description": "Asia/Tashkent bo\u2018yicha savdo kuni"
+      "description": "Asia/Tashkent bo‘yicha savdo kuni"
     },
     "financial_records_version": {
       "type": "number",
@@ -54,30 +54,30 @@
     },
     "table_order_id_snapshot": {
       "type": "string",
-      "description": "To\u2018langan stol buyurtmasining o\u2018zgarmas identifikatori"
+      "description": "To‘langan stol buyurtmasining o‘zgarmas identifikatori"
     },
     "table_order_revision_snapshot": {
       "type": "integer",
       "minimum": 1,
-      "description": "To\u2018lov paytidagi stol buyurtmasi versiyasi"
+      "description": "To‘lov paytidagi stol buyurtmasi versiyasi"
     },
     "table_number_snapshot": {
       "type": "integer",
       "minimum": 1,
       "maximum": 30,
-      "description": "Kassadan savdo yakunlangan vaqtdagi restoran stoli; keyin o\u2018zgartirilmaydi"
+      "description": "Kassadan savdo yakunlangan vaqtdagi restoran stoli; keyin o‘zgartirilmaydi"
     },
     "receipt_instagram_snapshot": {
       "type": "string",
-      "description": "Savdo paytidagi do\u2018kon Instagram username; keyingi sozlama o\u2018zgarishlaridan mustaqil"
+      "description": "Savdo paytidagi do‘kon Instagram username; keyingi sozlama o‘zgarishlaridan mustaqil"
     },
     "receipt_phone_snapshot": {
       "type": "string",
-      "description": "Savdo paytidagi do\u2018kon telefon raqami"
+      "description": "Savdo paytidagi do‘kon telefon raqami"
     },
     "receipt_address_snapshot": {
       "type": "string",
-      "description": "Savdo paytidagi do\u2018kon manzili"
+      "description": "Savdo paytidagi do‘kon manzili"
     },
     "customer_id": {
       "type": "string",
@@ -204,22 +204,60 @@
     "read": {
       "$or": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$and": [
+            {
+              "$nor": [
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.user_id": "{{user.id}}"
+                }
+              ]
+            }
+          ]
         },
         {
-          "user_condition": {
-            "role": "manager"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
-          }
-        },
-        {
-          "data.user_id": "{{user.id}}"
+          "$and": [
+            {
+              "user_condition": {
+                "role": "manager",
+                "active": true
+              }
+            },
+            {
+              "data.shop_id": {
+                "$nin": [
+                  "",
+                  null
+                ]
+              }
+            },
+            {
+              "data.shop_id": "{{user.data.shop_id}}"
+            }
+          ]
         }
       ]
     },

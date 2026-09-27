@@ -61,7 +61,7 @@
     "unit_cost": {
       "type": "number",
       "default": 0,
-      "description": "1 natija birligi (dona/varaq) tannarxi \u2014 ishlab chiqarish yakunida saqlanadi"
+      "description": "1 natija birligi (dona/varaq) tannarxi — ishlab chiqarish yakunida saqlanadi"
     },
     "total_cost": {
       "type": "number",
@@ -116,22 +116,60 @@
     "read": {
       "$or": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$and": [
+            {
+              "$nor": [
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
         },
         {
-          "user_condition": {
-            "role": "manager"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
-          }
-        },
-        {
-          "data.location_id": "{{user.data.shop_id}}"
+          "$and": [
+            {
+              "user_condition": {
+                "role": "manager",
+                "active": true
+              }
+            },
+            {
+              "data.location_id": {
+                "$nin": [
+                  "",
+                  null
+                ]
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
         }
       ]
     },

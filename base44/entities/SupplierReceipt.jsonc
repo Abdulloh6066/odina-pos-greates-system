@@ -96,31 +96,69 @@
     "read": {
       "$or": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "manager"
-          }
+          "$and": [
+            {
+              "$nor": [
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "manager"
+                  }
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "warehouse"
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "$and": [
             {
               "user_condition": {
-                "role": "warehouse"
+                "role": "manager",
+                "active": true
+              }
+            },
+            {
+              "data.location_id": {
+                "$nin": [
+                  "",
+                  null
+                ]
               }
             },
             {
               "data.location_id": "{{user.data.shop_id}}"
             }
           ]
-        },
-        {
-          "user_condition": {
-            "role": "accountant"
-          }
         }
       ]
     },
