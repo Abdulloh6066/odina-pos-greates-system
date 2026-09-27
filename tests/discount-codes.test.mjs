@@ -677,7 +677,7 @@ test('rounding idempotency key is tied to requested target', async () => {
 test('rounding UI requires online checkout; existing offline queue remains unmodified', () => {
   const source = readFileSync('src/pages/POS.jsx','utf8');
   assert.match(source,/discountCode \|\| roundingTarget !== null/);
-  assert.match(source,/!selectedTable && !discountCode && roundingTarget === null/);
+  assert.match(source,/!selectedTable && !takeawayOrder && !takeawayRequestIdRef.current && !discountCode && roundingTarget === null/);
   assert.match(source,/rounding_total: adjustmentMode === 'rounding'/);
   assert.match(source,/manual_discount_amount: adjustmentMode === 'manual'/);
   const cart = readFileSync('src/components/pos/Cart.jsx','utf8');
@@ -820,3 +820,79 @@ test('cashier cannot refund even with owner PIN; backend blocks before writing a
 });
 
 console.log('Discount, manual adjustment, rounding, shop receipt contacts and idempotency tests passed. No live data was used.');
+
+function takeawayFixture() {
+  const f = fixture();
+  const order = { id: 'takeaway-order-0001', order_type: 'takeaway', ticket_number: 42,
+    revision: 1, state: 'occupied', total: 100000, started_at: '2026-09-11T20:00:00Z',
+    items: [{ product_id: 'cake', product_name: 'Original cake', quantity: 1, price: 100000,
+      subtotal: 100000, stock_tracked: true, sale_unit: 'piece', source_type: 'central_produced' }] };
+  Object.assign(f.db.Shop[0], { location_type: 'shop', active: true, allows_pos: true,
+    restaurant_table_orders: [order], restaurant_table_orders_version: 1,
+    service_ticket_counter: 42, service_ticket_cycle_active: true });
+  const request = { action: 'complete_sale', shift_id: 'shift',
+    takeaway_order_id: order.id, takeaway_order_revision: 1,
+    items: [{ product_id: 'cake', quantity: 1 }], payments: [{ method: 'cash', amount: 100000 }],
+    idempotency_key: 'pos-takeaway-test-00001', recorded_at: '2026-09-11T20:30:00.000Z' };
+  return { ...f, order, request, call: loadHandler(f.client) };
+}
+
+test('takeaway payment uses saved price, records once, releases only its order and preserves kitchen number', async () => {
+  const f = takeawayFixture();
+  f.db.Shop[0].restaurant_table_orders.push({ id: 'other-open-order', number: 3, state: 'occupied' });
+  f.db.Product[0].price = 150000;
+  const check = await f.call({ ...f.request, action: 'check_stock' });
+  assert.equal(check.status, 200, JSON.stringify(check));
+  assert.equal(f.db.Sale.length, 0);
+  const paid = await f.call(f.request);
+  assert.equal(paid.status, 200, JSON.stringify(paid));
+  assert.equal(paid.data.sale.total, 100000);
+  assert.equal(paid.data.sale.service_ticket_number, 42);
+  assert.equal(paid.data.sale.table_number_snapshot, undefined);
+  assert.equal(paid.data.sale.table_order_id_snapshot, f.order.id);
+  assert.equal(f.db.SaleItem[0].unit_price, 100000);
+  assert.equal(f.db.SaleItem[0].product_name, 'Original cake');
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  assert.equal(f.db.Payment[0].amount, 100000);
+  assert.equal(f.db.Shift[0].total_sales, 100000);
+  assert.equal(f.db.Shop[0].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Shop[0].restaurant_table_orders[0].id, 'other-open-order');
+  const retry = await f.call(f.request);
+  assert.equal(retry.status, 200, JSON.stringify(retry));
+  assert.equal(retry.data.already_processed, true);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  const altered = await f.call({ ...f.request, takeaway_order_id: 'another-order-id' });
+  assert.equal(altered.status, 409);
+});
+
+test('takeaway rejects stale, cross-shop, changed-quantity and mixed table checkout before mutations', async () => {
+  for (const change of [
+    { takeaway_order_id: 'other-shop-order' },
+    { takeaway_order_revision: 2 },
+    { items: [{ product_id: 'cake', quantity: 2 }] },
+    { table_number: 1, table_shop_id: 'shop' },
+  ]) {
+    const f = takeawayFixture();
+    for (const action of ['check_stock', 'complete_sale']) {
+      const response = await f.call({ ...f.request, ...change, action });
+      assert.notEqual(response.status, 200, JSON.stringify(response));
+      assert.equal(f.db.Sale.length, 0);
+      assert.equal(f.db.ProductStock[0].quantity, 10);
+      assert.equal(f.db.Shop[0].restaurant_table_orders[0].state, 'occupied');
+    }
+  }
+});
+
+test('two cashiers cannot pay one takeaway twice under different payment keys', async () => {
+  const f = takeawayFixture();
+  const results = await Promise.all([
+    f.call(f.request),
+    f.call({ ...f.request, idempotency_key: 'pos-takeaway-test-00002' }),
+  ]);
+  assert.equal(results.filter((r) => r.status === 200).length, 1, JSON.stringify(results));
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Payment.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+});
+
