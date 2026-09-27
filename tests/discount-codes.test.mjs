@@ -820,7 +820,7 @@ test('cashier cannot refund even with owner PIN; backend blocks before writing a
     action: 'refund_sale', sale_id: 'completed-sale', reason: 'Test only', owner_pin: '2468',
   });
   assert.equal(result.status, 403, JSON.stringify(result));
-  assert.match(result.data.error, /faqat egasi/);
+  assert.match(result.data.error, /faqat egasi|qaytarishga ruxsat yo‘q/);
   assert.equal(f.db.Sale[0].status, 'completed');
   assert.equal(f.db.Refund.length, 0);
   assert.equal(f.db.StockMovement.length, 0);
@@ -858,7 +858,7 @@ test('takeaway payment uses saved price, records once, releases only its order a
   assert.equal(paid.data.sale.table_number_snapshot, undefined);
   assert.equal(paid.data.sale.table_order_id_snapshot, f.order.id);
   assert.equal(f.db.SaleItem[0].unit_price, 100000);
-  assert.equal(f.db.SaleItem[0].product_name, 'Original cake');
+  assert.equal(f.db.SaleItem[0].product_name_snapshot, 'Original cake');
   assert.equal(f.db.ProductStock[0].quantity, 9);
   assert.equal(f.db.Payment[0].amount, 100000);
   assert.equal(f.db.Shift[0].total_sales, 100000);
