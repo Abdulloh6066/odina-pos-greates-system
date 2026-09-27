@@ -33,7 +33,7 @@ export default function Settings() {
 
   const load = async () => {
     setLoading(true);
-    const [s, sh] = await Promise.all([base44.entities.Settings.list(), base44.entities.Shop.list()]);
+    const [s, sh] = await Promise.all([base44.entities.Settings.list(), base44.entities.Shop.list('created_date')]);
     setShops(sh || []);
     const existing = (s || [])[0];
     setSettings(existing);
