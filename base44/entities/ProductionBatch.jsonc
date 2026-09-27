@@ -61,7 +61,7 @@
     "unit_cost": {
       "type": "number",
       "default": 0,
-      "description": "1 natija birligi (dona/varaq) tannarxi — ishlab chiqarish yakunida saqlanadi"
+      "description": "1 natija birligi (dona/varaq) tannarxi \u2014 ishlab chiqarish yakunida saqlanadi"
     },
     "total_cost": {
       "type": "number",
@@ -113,10 +113,37 @@
         "role": "admin"
       }
     },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "$and": [
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "accountant"
+              }
+            },
+            {
+              "data.location_id": "{{user.data.shop_id}}"
+            }
+          ]
+        },
+        {
+          "$or": [
             {
               "$nor": [
                 {
@@ -127,20 +154,19 @@
               ]
             },
             {
-              "$or": [
+              "$and": [
                 {
                   "user_condition": {
-                    "role": "admin"
+                    "role": "manager",
+                    "active": true
                   }
                 },
                 {
-                  "user_condition": {
-                    "role": "manager"
-                  }
-                },
-                {
-                  "user_condition": {
-                    "role": "accountant"
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
                   }
                 },
                 {
@@ -149,39 +175,8 @@
               ]
             }
           ]
-        },
-        {
-          "$and": [
-            {
-              "user_condition": {
-                "role": "manager",
-                "active": true
-              }
-            },
-            {
-              "data.location_id": {
-                "$nin": [
-                  "",
-                  null
-                ]
-              }
-            },
-            {
-              "data.location_id": "{{user.data.shop_id}}"
-            }
-          ]
         }
       ]
-    },
-    "update": {
-      "user_condition": {
-        "role": "admin"
-      }
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }
