@@ -237,6 +237,8 @@ function canonicalSaleRequest(body: any) {
     ...(body?.table_number !== undefined && body?.table_number !== null
       ? { table_number: body.table_number, table_shop_id: String(body?.table_shop_id || ""),
           table_order_id: String(body?.table_order_id || ""), table_order_revision: body?.table_order_revision } : {}),
+    ...(body?.takeaway_order_id ? { takeaway_order_id: String(body.takeaway_order_id),
+      takeaway_order_revision: body.takeaway_order_revision } : {}),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
     ...(body?.rounding_total !== undefined && body?.rounding_total !== null
@@ -773,16 +775,23 @@ export default async function(req) {
       // Stock precheck must use the same verified, frozen table order as final
       // checkout; otherwise an archived product or price change blocks payment.
       let tableItems: any[] | null = null;
-      if (body?.table_number !== undefined || body?.table_order_id !== undefined) {
+      if (body?.table_number !== undefined || body?.table_order_id !== undefined || body?.takeaway_order_id) {
+        const takeaway = Boolean(body?.takeaway_order_id);
+        if (takeaway && (body?.table_number !== undefined || body?.table_order_id !== undefined)) {
+          return Response.json({ error: "Buyurtma turi noto‘g‘ri." }, { status: 400 });
+        }
         const number = body?.table_number;
-        if (String(body?.table_shop_id || "") !== shift.shop_id || !Number.isInteger(number)) {
+        if (!takeaway && (String(body?.table_shop_id || "") !== shift.shop_id || !Number.isInteger(number))) {
           return Response.json({ error: "Stol do‘koni yoki raqami noto‘g‘ri." }, { status: 403 });
         }
         const shop = await service.entities.Shop.get(shift.shop_id).catch(() => null);
-        const order = tableOrderForNumber(shop, number);
+        const order = takeaway
+          ? tableOrders(shop).find((row: any) => row.order_type === "takeaway" && row.id === body.takeaway_order_id)
+          : tableOrderForNumber(shop, number);
         if (!shop || shop.active === false || shop.location_type !== "shop"
-          || shop.allows_pos === false || number < 1 || number > shop.restaurant_table_count
-          || !order || order.id !== body.table_order_id || order.revision !== body.table_order_revision
+          || shop.allows_pos === false || (!takeaway && (number < 1 || number > shop.restaurant_table_count))
+          || !order || order.id !== (takeaway ? body.takeaway_order_id : body.table_order_id)
+          || order.revision !== (takeaway ? body.takeaway_order_revision : body.table_order_revision)
           || order.state !== "occupied") {
           return Response.json({ error: "Stol buyurtmasi eskirgan yoki to‘lovda. Yangilang." }, { status: 409 });
         }
@@ -1151,6 +1160,10 @@ export default async function(req) {
     // Direct table checkout is online-only in POS; inventory remains deducted
     // solely by this completed-sale path, not when a table is selected.
     const hasTable = body?.table_number !== undefined && body?.table_number !== null;
+    const hasTakeaway = Boolean(body?.takeaway_order_id);
+    if (hasTakeaway && (hasTable || body?.table_order_id || body?.table_shop_id)) {
+      return Response.json({ error: "Buyurtma turi noto‘g‘ri." }, { status: 400 });
+    }
     const requestedTableNumber = body?.table_number;
     const requestedTableShopId = String(body?.table_shop_id || "");
     if ((!hasTable && requestedTableShopId)
@@ -1180,12 +1193,18 @@ export default async function(req) {
     }
 
     // A paid table must match the server-stored order, not browser totals.
-    const tableOrder: any = hasTable
-      ? tableOrderForNumber(receiptShop, requestedTableNumber) : null;
-    if (hasTable) {
-      if (!tableOrder || !body?.table_order_id || body.table_order_id !== tableOrder.id
-        || !Number.isInteger(body?.table_order_revision)
-        || body.table_order_revision !== tableOrder.revision) {
+    const tableOrder: any = hasTakeaway
+      ? tableOrders(receiptShop).find((row: any) => row.order_type === "takeaway" && row.id === body.takeaway_order_id)
+      : hasTable ? tableOrderForNumber(receiptShop, requestedTableNumber) : null;
+    if (hasTable || hasTakeaway) {
+      const orderId = hasTakeaway ? body.takeaway_order_id : body?.table_order_id;
+      const revision = hasTakeaway ? body.takeaway_order_revision : body?.table_order_revision;
+      if (hasTakeaway && (!receiptShop || receiptShop.active === false
+        || receiptShop.location_type !== "shop" || receiptShop.allows_pos === false)) {
+        return Response.json({ error: "Buyurtma do‘koni faol emas." }, { status: 409 });
+      }
+      if (!tableOrder || !orderId || orderId !== tableOrder.id
+        || !Number.isInteger(revision) || revision !== tableOrder.revision) {
         return Response.json({ error: "Stol buyurtmasi eski yoki saqlanmagan. Stolni yangilang va qayta tekshiring." }, { status: 409 });
       }
       if (tableOrder.state !== "occupied") {
@@ -1309,7 +1328,7 @@ export default async function(req) {
     if (tableOrder) {
       if (!idempotencyKey) return Response.json({ error: "Stol to‘lovi uchun takrorlanmas kalit kerak." }, { status: 400 });
       const claim = await service.entities.Shop.updateMany(
-        { id: receiptShop.id, restaurant_table_count: receiptShop.restaurant_table_count,
+        { id: receiptShop.id, ...(hasTable ? { restaurant_table_count: receiptShop.restaurant_table_count } : {}),
           ...tableVersionQuery(tableOrdersVersion(receiptShop)) },
         { $set: { restaurant_table_orders: tableOrders(receiptShop).map((row: any) => row.id === tableOrder.id
           ? { ...row, state: "paying", checkout_key: idempotencyKey } : row) },
@@ -1450,8 +1469,9 @@ export default async function(req) {
       user_name: user.full_name || user.email,
       shop_id: shift.shop_id,
       shop_name: shift.shop_name,
-      ...(hasTable ? { table_number_snapshot: requestedTableNumber,
-        table_order_id_snapshot: tableOrder.id, table_order_revision_snapshot: tableOrder.revision } : {}),
+      ...(hasTable ? { table_number_snapshot: requestedTableNumber } : {}),
+      ...(tableOrder ? { table_order_id_snapshot: tableOrder.id,
+        table_order_revision_snapshot: tableOrder.revision } : {}),
       receipt_instagram_snapshot: String(receiptShop?.instagram || "").trim().replace(/^@/, ""),
       receipt_phone_snapshot: String(receiptShop?.phone || "").trim(),
       receipt_address_snapshot: String(receiptShop?.address || "").trim(),
