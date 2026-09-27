@@ -27,6 +27,24 @@ export default function Products() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
+  const [shopPriceProduct, setShopPriceProduct] = useState(null);
+  const [shopPrice, setShopPrice] = useState('');
+  const [savingShopPrice, setSavingShopPrice] = useState(false);
+
+  const saveShopPrice = async () => {
+    if (savingShopPrice || !shopPriceProduct) return;
+    const value = Number(shopPrice);
+    if (!shopPrice.trim() || !Number.isSafeInteger(value) || value < 0) return;
+    setSavingShopPrice(true);
+    try {
+      const response = await base44.functions.invoke('manager-shop', { action: 'set_product_price', product_id: shopPriceProduct.id, price: value });
+      const result = response?.data || response;
+      if (!result?.ok) throw new Error(result?.error || 'Narx saqlanmadi.');
+      setProducts((rows) => rows.map((row) => row.id === result.product_id ? { ...row, shop_prices: { ...(row.shop_prices || {}), [result.shop_id]: result.price } } : row));
+      setShopPriceProduct(null);
+    } catch (error) { void odinaAlert(error?.response?.data?.error || error?.message || 'Narx saqlanmadi.'); }
+    finally { setSavingShopPrice(false); }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -145,6 +163,7 @@ export default function Products() {
                     {shops.map((shop) => `${shop.name}: ${formatUZS(priceForShop(p, shop.id))}`).join(' · ')}
                   </div>
                 )}
+                {role === 'manager' && <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => { setShopPriceProduct(p); setShopPrice(String(priceForShop(p, user.shop_id))); }}>Do‘kon narxi: {formatUZS(priceForShop(p, user.shop_id))}</Button>}
                 {(role === 'production' || canManageCatalog) && (
                   <Button variant="outline" size="sm" className="w-full mt-3 h-9 rounded-lg px-2 text-[11px] font-semibold whitespace-nowrap touch-manipulation" onClick={() => setAvailability(p)}>
                     {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
@@ -156,6 +175,13 @@ export default function Products() {
         </div>
       )}
 
+      <Dialog open={Boolean(shopPriceProduct)} onOpenChange={(value) => { if (!value && !savingShopPrice) setShopPriceProduct(null); }}>
+        <DialogContent><DialogHeader><DialogTitle>{shopPriceProduct?.name} — do‘kon narxi</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">{user?.shop_name} uchun sotuv narxi</p>
+          <Label>Narx (so‘m)</Label><Input type="number" min="0" step="1000" value={shopPrice} onChange={(event) => setShopPrice(event.target.value)} />
+          <DialogFooter><Button disabled={savingShopPrice || !shopPrice.trim() || !Number.isSafeInteger(Number(shopPrice)) || Number(shopPrice) < 0} onClick={saveShopPrice}>{savingShopPrice ? 'Saqlanmoqda…' : 'Saqlash'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ProductDialog open={open} product={editing} categories={categories} shops={shops} onClose={() => setOpen(false)} onSaved={onSaved} user={user} canArchive={role === 'admin'} />
     </div>
   );
