@@ -310,25 +310,36 @@ Deno.serve(async (req) => {
       return Response.json({ ok: true, group, shop: safeShop(saved) });
     }
 
-    if (action === "get_table_order" || action === "save_table_order" || action === "reconcile_table_payment") {
+    if (["get_table_order", "save_table_order", "reconcile_table_payment",
+      "list_takeaway_orders", "get_takeaway_order", "save_takeaway_order", "reconcile_takeaway_payment"].includes(action)) {
+      const takeaway = action.includes("takeaway");
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
       if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
       if (role !== "admin" && userShopId(actor) !== shop.id) {
         return Response.json({ error: "Boshqa do‘kon stoliga ruxsat yo‘q." }, { status: 403 });
       }
       const number = body?.table_number;
-      if (!Number.isInteger(number) || number < 1 || number > safeShop(shop).table_count) {
+      const orderId = String(body?.order_id || "");
+      if (takeaway && action === "list_takeaway_orders") {
+        return Response.json({ ok: true, orders: ordersOf(shop).filter((row: any) => row.order_type === "takeaway") });
+      }
+      if (takeaway && !/^[a-zA-Z0-9_-]{8,128}$/.test(orderId)) {
+        return Response.json({ error: "Buyurtma identifikatori noto‘g‘ri." }, { status: 400 });
+      }
+      if (!takeaway && (!Number.isInteger(number) || number < 1 || number > safeShop(shop).table_count)) {
         return Response.json({ error: "Bu do‘konda stol topilmadi." }, { status: 400 });
       }
       const stored = ordersOf(shop);
-      const group = groupForNumber(shop, number);
-      const primaryNumber = canonicalNumber(shop, number);
-      const existing = orderForNumber(shop, number);
-      if (action === "get_table_order") {
+      const group = takeaway ? null : groupForNumber(shop, number);
+      const primaryNumber = takeaway ? undefined : canonicalNumber(shop, number);
+      const existing = takeaway
+        ? stored.find((row: any) => row.order_type === "takeaway" && row.id === orderId)
+        : orderForNumber(shop, number);
+      if (action === "get_table_order" || action === "get_takeaway_order") {
         return Response.json({ ok: true, order: existing, group,
           primary_table_number: primaryNumber });
       }
-      if (action === "reconcile_table_payment") {
+      if (action === "reconcile_table_payment" || action === "reconcile_takeaway_payment") {
         if (!existing || existing.state !== "paying" || !existing.checkout_key) {
           return Response.json({ error: "To‘lov tekshiriladigan stol topilmadi." }, { status: 409 });
         }
@@ -337,7 +348,7 @@ Deno.serve(async (req) => {
         }, "-created_date", 2);
         if ((matches || []).length !== 1 || matches[0].status !== "completed"
           || matches[0].shop_id !== shop.id
-          || !((group?.numbers || [number]).includes(matches[0].table_number_snapshot))) {
+          || (takeaway ? Boolean(matches[0].table_number_snapshot) : !((group?.numbers || [number]).includes(matches[0].table_number_snapshot)))) {
           return Response.json({ error: "To‘lov tasdiqlanmadi. Qayta to‘lov olmang — egasi Savdolar tarixini tekshirsin." }, { status: 409 });
         }
         const version = ordersVersion(shop);
@@ -359,6 +370,25 @@ Deno.serve(async (req) => {
       const shiftId = String(body?.shift_id || "");      const shift = shiftId ? await service.entities.Shift.get(shiftId).catch(() => null) : null;
       if (!shift || shift.status !== "open" || shift.user_id !== actor.id || shift.shop_id !== shop.id) {
         return Response.json({ error: "Stol buyurtmasini faqat shu do‘kondagi ochiq smenangizda saqlang." }, { status: 403 });
+      }
+      // A retry after a lost save response returns the same unpaid order.
+      if (takeaway && existing && body?.expected_revision === 0 && existing.revision === 1
+        && existing.opened_by === actor.id && existing.state === "occupied"
+        && Array.isArray(body?.items) && body.items.length === existing.items.length
+        && new Set(body.items.map((row: any) => row.product_id)).size === body.items.length
+        && body.items.every((row: any) => existing.items.some((item: any) =>
+          item.product_id === row.product_id && item.quantity === row.quantity
+          && item.notes === String(row.notes || "").trim()
+          && item.variant_name === String(row.variant_name || "").trim()))) {
+        return Response.json({ ok: true, order: existing, unchanged: true });
+      }
+      if (takeaway && !existing && (body?.expected_revision !== 0
+        || stored.filter((row: any) => row.order_type === "takeaway").length >= 200)) {
+        return Response.json({ error: "Buyurtma yopilgan yoki ochiq buyurtmalar chegarasi to‘lgan. Ro‘yxatni yangilang." }, { status: 409 });
+      }
+      if (takeaway && !existing) {
+        const paid = await service.entities.Sale.filter({ shop_id: shop.id, table_order_id_snapshot: orderId }, "-created_date", 1);
+        if (paid?.length) return Response.json({ error: "Bu buyurtma allaqachon to‘langan. Ochiq buyurtmalarni yangilang." }, { status: 409 });
       }
       const revision = body?.expected_revision;
       if (!Number.isInteger(revision) || revision < 0 || revision !== (existing?.revision || 0)) {
@@ -410,26 +440,27 @@ Deno.serve(async (req) => {
       const ticketNumber = Number.isSafeInteger(existing?.ticket_number) && existing.ticket_number > 0
         ? existing.ticket_number : await allocateServiceTicketNumber(service, shop.id);
       const now = new Date().toISOString();
-      const order = { id: existing?.id || crypto.randomUUID(), number: primaryNumber, ticket_number: ticketNumber,
+      const order = { id: existing?.id || (takeaway ? orderId : crypto.randomUUID()),
+        ...(takeaway ? { order_type: "takeaway" } : { number: primaryNumber }), ticket_number: ticketNumber,
         revision: revision + 1,
         state: "occupied", items, total, started_at: existing?.started_at || now,
         opened_by: existing?.opened_by || actor.id,
-        opened_by_name: existing?.opened_by_name || String(body?.opened_by_name || userLabel(actor)),
+        opened_by_name: existing?.opened_by_name || userLabel(actor),
         customer_name: String(body?.customer_name || existing?.customer_name || "").trim(),
         notes: String(body?.notes || existing?.notes || "").trim(),
         updated_by: actor.id, updated_at: now };
       const version = ordersVersion(shop);
       const updated = await service.entities.Shop.updateMany(
-        { id: shop.id, restaurant_table_count: safeShop(shop).table_count, ...ordersVersionCondition(version) },
-        { $set: { restaurant_table_orders: [...stored.filter((row: any) => row.number !== primaryNumber), order] },
+        { id: shop.id, ...(!takeaway ? { restaurant_table_count: safeShop(shop).table_count } : {}), ...ordersVersionCondition(version) },
+        { $set: { restaurant_table_orders: [...stored.filter((row: any) => takeaway ? row.id !== orderId : row.number !== primaryNumber), order] },
           $inc: { restaurant_table_orders_version: 1 } },
       );
       if (!updated?.success || Number(updated.updated || 0) !== 1) {
         return Response.json({ error: "Xarita boshqa qurilmada o‘zgardi. Savatni saqlagan holda yangilang." }, { status: 409 });
       }
       await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
-        action: "restaurant_table_order_saved",
-        details: `${shop.name} · ${(group?.numbers || [number]).join(" + ")}-stol · ${revision + 1}-tahrir · ${total} UZS (to‘lanmagan)` }).catch(() => {});
+        action: takeaway ? "takeaway_order_saved" : "restaurant_table_order_saved",
+        details: `${shop.name} · ${takeaway ? "Olib ketish #" + ticketNumber : (group?.numbers || [number]).join(" + ") + "-stol"} · ${revision + 1}-tahrir · ${total} UZS (to‘lanmagan)` }).catch(() => {});
       return Response.json({ ok: true, order, summary: orderSummary(order) });
     }
     if (action !== "set_table_count" && action !== "set_table_layout") {
