@@ -666,6 +666,6 @@ export default async function(req) {
   } catch (error) {
     return Response.json({
       error: error instanceof Error ? error.message : "Yetkazib beruvchi amali bajarilmadi.",
-    }, { status: 500 });
+    }, { status: Number((error as any)?.status) || 500 });
   }
 }
