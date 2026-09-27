@@ -690,13 +690,79 @@ export default function POS() {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   });
 
+  // Keep the final row visible until the cashier confirms and the server acknowledges cancellation.
+  const cancelLastTableItem = async () => {
+    if (!selectedTable || savingTableRef.current || tableLocked || paying || payOpen || stockChecking) return;
+    const cancellingTableKey = tableKey;
+    savingTableRef.current = true;
+    setSavingTable(true);
+    setTableSaveError('');
+    try {
+      const confirmed = await odinaConfirm({
+        title: 'Stol buyurtmasi bekor qilinsinmi?',
+        description: 'Oxirgi mahsulot olib tashlanadi va stol bo‘shaydi. Pul tushumi yozilmaydi.',
+        confirmLabel: 'Ha, bekor qilish',
+        cancelLabel: 'Yo‘q, qolsin',
+        tone: 'warning',
+      });
+      if (!confirmed) return;
+      let result = null;
+      if (tableOrder?.id) {
+        if (!shift || shift.shop_id !== selectedTable.shopId) throw new Error('Bekor qilish uchun shu do‘kondagi smenani oching.');
+        if (!isOnline || navigator.onLine === false) throw new Error('Internet yo‘q. Buyurtma bekor qilinmadi; mahsulot savatda qoldi.');
+        const response = await base44.functions.invoke('restaurant-tables', {
+          action: 'cancel_table_order', shop_id: selectedTable.shopId,
+          table_number: selectedTable.number, shift_id: shift.id,
+          table_order_id: tableOrder.id, expected_revision: tableOrder.revision, confirm_cancel: true,
+        });
+        result = response?.data || response;
+        if (!result?.ok) throw new Error(result?.error || 'Buyurtma bekor qilingani tasdiqlanmadi.');
+      }
+      if (priorTableKey.current !== cancellingTableKey) return;
+      resetCart();
+      setTableOrder(null);
+      lastSavedOrderRef.current = null;
+      setMobileCartOpen(false);
+      checkoutRequestKeyRef.current = '';
+      checkoutRecordedAtRef.current = '';
+      navigate(posHomePath, { replace: true });
+      if (result?.audit_warning) {
+        void odinaAlert('Stol bo‘shatildi. Buyurtma nusxasi va bekor qilish so‘rovi tarixda saqlandi, yakuniy tarix yozuvi tasdiqlanmadi.');
+      } else if (result?.already_closed) {
+        void odinaAlert('Buyurtma allaqachon yopilgan. Stol holati yangilandi.');
+      }
+    } catch (error) {
+      const message = error?.response?.data?.error || error?.message || 'Buyurtma bekor qilinmadi.';
+      setTableSaveError(message);
+      void odinaAlert(message);
+    } finally {
+      savingTableRef.current = false;
+      setSavingTable(false);
+    }
+  };
+
   const inc = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
-  const dec = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (tableLocked || paying) return; setCart((p) => p.flatMap((i) => {
-    if (i.product_id !== item.product_id) return [i];
-    const q = i.quantity - 1;
-    return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
-  })); };
-  const removeItem = (item) => { if (!tableLocked && !paying) setCart((p) => p.filter((i) => i.product_id !== item.product_id)); };
+  const dec = (item) => {
+    if (tableLocked || paying || payOpen || stockChecking || savingTableRef.current) return;
+    if (item.sale_unit === 'gram') { openWeight(item, true); return; }
+    if (selectedTable && cart.length === 1 && cart[0].product_id === item.product_id && item.quantity <= 1) {
+      void cancelLastTableItem();
+      return;
+    }
+    setCart((p) => p.flatMap((i) => {
+      if (i.product_id !== item.product_id) return [i];
+      const q = i.quantity - 1;
+      return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
+    }));
+  };
+  const removeItem = (item) => {
+    if (tableLocked || paying || payOpen || stockChecking || savingTableRef.current) return;
+    if (selectedTable && cart.length === 1 && cart[0].product_id === item.product_id) {
+      void cancelLastTableItem();
+      return;
+    }
+    setCart((p) => p.filter((i) => i.product_id !== item.product_id));
+  };
   const resetCart = () => { takeawayRequestIdRef.current = ''; setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
   const clearCart = () => { if (!tableLocked && !paying && (!selectedTable || !tableOrder) && !takeawayOrder) resetCart(); }; 
 
