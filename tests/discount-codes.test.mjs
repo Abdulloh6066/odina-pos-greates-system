@@ -159,7 +159,12 @@ function fixture(percentage = 5) {
 }
 
 function loadHandler(client) {
-  const sharedSrc = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, '');
+  const userHelpers = readFileSync('base44/shared/user-helpers.ts', 'utf8').replace(/export /g, '');
+  const managerScope = readFileSync('base44/shared/manager-request-scope.ts', 'utf8')
+    .replace(/^import .*;$/gm, '').replace(/export /g, '');
+  const sharedSrc = userHelpers + '\n' + managerScope + '\n'
+    + readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
+      .replace(/^export \{[^\n]*\} from [^\n]*;$/gm, '').replace(/export /g, '');
   const sharedCode = ts.transpileModule(sharedSrc, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
@@ -176,6 +181,7 @@ function loadHandler(client) {
       /async function verifyOwnerPin\(service: any, pinValue: unknown, actor: any\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
       'async function verifyOwnerPin(_service, pinValue, _actor) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN',
     )
+    .replace(/^import .*manager-request-scope.*;$/gm, '')
     .replace('export default async function(req)', 'async function handler(req)')
     .replace(
       'error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",',
