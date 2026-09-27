@@ -6,8 +6,8 @@ import { memoryBackend } from './helpers/memory-backend.mjs';
 const manager = { id: 'manager-a', role: 'manager', shop_id: 'shop-a', active: true, full_name: 'Manager A' };
 const seed = () => ({
   User: [manager],
-  Shop: [{ id: 'shop-a', name: 'A', active: true, location_type: 'shop', allows_pos: true, restaurant_table_count: 2 },
-    { id: 'shop-b', name: 'B', active: true, location_type: 'shop', allows_pos: true, restaurant_table_count: 2 }],
+  Shop: [{ id: 'shop-a', name: 'A', active: true, location_type: 'shop', allows_pos: true, restaurant_table_count: 2, restaurant_table_layout_version: 0 },
+    { id: 'shop-b', name: 'B', active: true, location_type: 'shop', allows_pos: true, restaurant_table_count: 2, restaurant_table_layout_version: 0 }],
   Shift: [{ id: 'other-shift', shop_id: 'shop-b', user_id: 'manager-a', status: 'open' }],
   Sale: [{ id: 'other-sale', shop_id: 'shop-b', status: 'completed' }],
   CustomerOrder: [{ id: 'other-order', shop_id: 'shop-b' }],
@@ -20,12 +20,15 @@ const seed = () => ({
 test('manager table settings use own active shop only', async () => {
   const f = memoryBackend(seed());
   const path = 'base44/functions/restaurant-tables/entry.ts';
-  const status = await f.invoke(path, { action: 'status', shop_id: 'shop-b' });
+  let handler;
+  f.load(path, { Deno: { serve: (fn) => { handler = fn; } } });
+  const invoke = async (_path, body) => { const r = await handler({ json: async () => body }); return { status: r.status, data: await r.json() }; };
+  const status = await invoke(path, { action: 'status', shop_id: 'shop-b' });
   assert.equal(status.status, 200);
   assert.equal(status.data.can_manage, true);
   assert.deepEqual(status.data.shops.map(s => s.id), ['shop-a']);
-  assert.equal((await f.invoke(path, { action: 'set_table_count', shop_id: 'shop-b', table_count: 3 })).status, 403);
-  assert.equal((await f.invoke(path, { action: 'set_table_count', shop_id: 'shop-a', table_count: 3 })).status, 200);
+  assert.equal((await invoke(path, { action: 'set_table_count', shop_id: 'shop-b', table_count: 3 })).status, 403);
+  assert.equal((await invoke(path, { action: 'set_table_count', shop_id: 'shop-a', table_count: 3 })).status, 200);
   assert.equal(f.db.Shop[1].restaurant_table_count, 2);
 });
 
