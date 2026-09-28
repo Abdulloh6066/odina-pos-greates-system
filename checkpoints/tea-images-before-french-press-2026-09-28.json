@@ -1,0 +1,15 @@
+{
+  "checkpoint": "6ab9ed7dd35398486db2088b",
+  "products": [
+    {
+      "id": "6ab66ca8ae6223ce0f93e60c",
+      "name": "Ko'k / qora choy",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f828eff44_10.png"
+    },
+    {
+      "id": "6ab66ca8ae6223ce0f93e60d",
+      "name": "Yagodniy choy",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/264dbf184_11.png"
+    }
+  ]
+}
