@@ -1,8 +1,14 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
 import { formatUZS } from '@/lib/pos';
+import { posThumbnailFor } from '@/lib/pos-thumbnails';
 
 export default function ProductCard({ product, stockQuantity = null, onAdd, disabled = false }) {
+  const [failedThumbnail, setFailedThumbnail] = React.useState(null);
+  const thumbnail = posThumbnailFor(product);
+  const useThumbnail = Boolean(thumbnail && thumbnail !== failedThumbnail);
+  const imageSrc = useThumbnail ? thumbnail : product.image_url;
+
   return (
     <button
       type="button"
@@ -14,7 +20,10 @@ export default function ProductCard({ product, stockQuantity = null, onAdd, disa
       <div className="odina-product-photo relative aspect-square bg-white overflow-hidden">
         {product.image_url ? (
           <Image
-            src={product.image_url}
+            src={imageSrc}
+            loading={useThumbnail ? 'eager' : undefined}
+            decoding={useThumbnail ? 'async' : undefined}
+            onError={useThumbnail ? () => setFailedThumbnail(thumbnail) : undefined}
             alt={product.name}
             fittingType="fill"
             className="w-full h-full transition-transform duration-300 group-hover:scale-105"
