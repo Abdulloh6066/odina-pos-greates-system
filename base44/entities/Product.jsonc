@@ -31,6 +31,12 @@
       "default": false,
       "type": "boolean"
     },
+    "shop_category_ids": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "default": {},
+      "description": "Do‘kon ID bo‘yicha kassadagi kategoriya; belgilanmasa umumiy category_id ishlatiladi"
+    },
     "category_id": {
       "type": "string"
     },

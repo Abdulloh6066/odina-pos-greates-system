@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, GripVertical, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { categoryForShop } from '@/lib/shop-category';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -41,8 +42,8 @@ export default function ProductOrderDialog({ shopId, shopName, products, categor
     const sourceIds = chosen?.sourceCategoryIds || [category];
     const q = search.trim().toLowerCase();
     return order.map(id => byId.get(id)).filter(Boolean).filter(p =>
-      (category === 'all' || sourceIds.includes(p.category_id)) && (!q || p.name.toLowerCase().includes(q)));
-  }, [order, byId, categories, category, search]);
+      (category === 'all' || sourceIds.includes(categoryForShop(p, shopId))) && (!q || p.name.toLowerCase().includes(q)));
+  }, [order, byId, categories, category, search, shopId]);
   const dirty = order.join('|') !== original.join('|');
   const move = (from, to) => {
     if (submitting.current) return;

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
+import { categoryForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductCard from '@/components/pos/ProductCard';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
@@ -831,7 +832,7 @@ export default function POS() {
     if (!showFav && activeCat !== 'all') {
       const selectedCategory = categories.find((c) => c.id === activeCat);
       const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
-      list = list.filter((p) => sourceIds.includes(p.category_id));
+      list = list.filter((p) => sourceIds.includes(categoryForShop(p, shopId)));
     }
     if (showFav) list = list.filter((p) => p.is_favorite || (shopId && p.favorite_shop_ids?.includes(shopId)));
     if (search.trim()) {
