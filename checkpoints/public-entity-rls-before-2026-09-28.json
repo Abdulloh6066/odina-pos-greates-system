@@ -1,0 +1,2022 @@
+{
+  "checkpoint": "6ab9f1f5967b87c49e884540",
+  "created_at": "2026-09-28T04:52:40.458Z",
+  "roles": [
+    "admin",
+    "manager",
+    "cashier",
+    "accountant",
+    "production",
+    "warehouse"
+  ],
+  "entities": {
+    "CashMovement": {
+      "path": "base44/entities/CashMovement.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "data.user_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "5e97929798b0ddb79b73791dd3ce8d62999434b1dc595019113e449de44660f1",
+      "original_sha256": "e0d9b6450b832410f958c38793d4b13c99af47748491955fc02b7d995a350822"
+    },
+    "CustomerOrder": {
+      "path": "base44/entities/CustomerOrder.jsonc",
+      "rls": {
+        "create": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.shop_id": "{{user.data.shop_id}}"
+            }
+          ]
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "production"
+                      }
+                    },
+                    {
+                      "data.shop_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "cad74e5d05f128b9541c344a16bebc2fa24f21176ec16b26df1307b84306f1b1",
+      "original_sha256": "9b4e620e9de0b893963a96d771a9985ffde44071a9cbdce3373ab6b949a0269d"
+    },
+    "CustomerOrderItem": {
+      "path": "base44/entities/CustomerOrderItem.jsonc",
+      "rls": {
+        "create": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.shop_id": "{{user.data.shop_id}}"
+            }
+          ]
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "production"
+                      }
+                    },
+                    {
+                      "data.shop_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "f35176355395a7134bbad635cbc46ff56b995eef9721c10ece3b27d3d6bc46c3",
+      "original_sha256": "b3ce0b008dadc4f2de97d75d134c662967801681217f073a94662813f0447d9b"
+    },
+    "DailyShopReport": {
+      "path": "base44/entities/DailyShopReport.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "0bbb3998ac6c1d2acc8aadecee9d16d46f0ee6b07d919996703563e6d9c244f3",
+      "original_sha256": "a20e04756610312c96ad52238c68f5f43188a13f4669326d31f1037350859b64"
+    },
+    "IngredientStock": {
+      "path": "base44/entities/IngredientStock.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$and": [
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "data.location_id": {
+                        "$nin": [
+                          "",
+                          null
+                        ]
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "586bd4d0ceb022b796a3cd1ac84467aa3d478a360b1a659e4c1a64ad949f53b1",
+      "original_sha256": "9f002bcd7b0c70f60bd35fe2602455c68523f94f4a214178df83d88fbb0e5d12"
+    },
+    "OrderPayment": {
+      "path": "base44/entities/OrderPayment.jsonc",
+      "rls": {
+        "create": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.shop_id": "{{user.data.shop_id}}"
+            }
+          ]
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.shop_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "c06e1f7e3a7f6d9212cd0a6319151f1d4618ae4262439513781bf4c50513d827",
+      "original_sha256": "342dc68c0e4f08491579ae625ed9d31fd3beaa75e714fbc11daf6fb55aa6de18"
+    },
+    "Payment": {
+      "path": "base44/entities/Payment.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.cashier_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "cab00f9522af5624c91f797b9f96adb482797083df9196b7d68a159e6f385ac5",
+      "original_sha256": "0f45bbd4a90b317abf5b683917c9e1fd10e865c2837a8d7489c82022250aff1a"
+    },
+    "ProductStock": {
+      "path": "base44/entities/ProductStock.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$and": [
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "data.location_id": {
+                        "$nin": [
+                          "",
+                          null
+                        ]
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "754fa6d1006353b36d211373ae927a8adc4e34c31352cf1ed4d6c907b1c2bd91",
+      "original_sha256": "721a87c8b4b9fa56e0328c21fa077deac9510674acbcc9a6d1742f6e6751d52a"
+    },
+    "ProductionBatch": {
+      "path": "base44/entities/ProductionBatch.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$and": [
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "data.location_id": {
+                        "$nin": [
+                          "",
+                          null
+                        ]
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "f201a7b7b691cd8053abacaeeb7e27f0b72e146c1b31c226131af67739249443",
+      "original_sha256": "798cd94a9451932f55682a24496f83b327356bc643038d87ed4b985063897b6e"
+    },
+    "ProductionBatchItem": {
+      "path": "base44/entities/ProductionBatchItem.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$and": [
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "data.location_id": {
+                        "$nin": [
+                          "",
+                          null
+                        ]
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "b0f681fbbceb399f3b74b732bc9a759d06c2e9b83c418e4452e354e227a37eef",
+      "original_sha256": "3aac9d0ff335f8e015c62ef222735d766f7acdd0b15d4eddd36ae7b3ef58dc86"
+    },
+    "Refund": {
+      "path": "base44/entities/Refund.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.cashier_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "7971981bd0dccff884bc624bbc2f6a9666878b7503be126a9e6591a6ab2003e4",
+      "original_sha256": "253225835994f03d9c84f62891226ea043d166cd31ca790315700b7c20502acb"
+    },
+    "Sale": {
+      "path": "base44/entities/Sale.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.user_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "d47124dc5a87f19bc4371dbd7d004a5de825f14c22fbbbf99feab2bedf22c032",
+      "original_sha256": "c33b2e7ca9b05df2eee3fdbf4ccb529db473fd06e6175ccb107b2385e56ad16f"
+    },
+    "SaleItem": {
+      "path": "base44/entities/SaleItem.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.cashier_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "ba71cfa101acc67bc4796168836d17f8e3c41a5dc8341efa56b6e3aba1279c38",
+      "original_sha256": "31484f8a12e4a72ac5fc0e81727c95cf47669a1e06af1d2f31582bd78229aed3"
+    },
+    "Shift": {
+      "path": "base44/entities/Shift.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.user_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "cac11aea9ef1f441cb5e496572495bef908b88d39ee70c23b3950008fa997ca0",
+      "original_sha256": "5741e5b7f1d33618d1db667ef8f94b5a97077a19be9978efacfa2ae6fa2c91a6"
+    },
+    "ShiftProductSnapshot": {
+      "path": "base44/entities/ShiftProductSnapshot.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": false,
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.cashier_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": false
+      },
+      "non_rls_sha256": "91dfa23cf6ced87b62ba7e8dad5b58bd0c64edaec669d9938fb89d61d6822286",
+      "original_sha256": "97f3e21996c675add59b99d96443776fc5f81cb7c3579619784a22dda437f572"
+    },
+    "shift-product-snapshot": {
+      "path": "base44/entities/shift-product-snapshot.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "data.cashier_id": "{{user.id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.shop_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.shop_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": false,
+        "delete": false
+      },
+      "non_rls_sha256": "8180b495689f7eca0e90e8df2173dcd747bcf8b0a9728bc2d848de96ddcf1918",
+      "original_sha256": "e21fecff2e48567d744d590c95f27074985d7f0251bc92fa1892bd087794880e"
+    },
+    "Shop": {
+      "path": "base44/entities/Shop.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "b9de98bca82febcbad9be5013dc65298e61d5ad6f701cc0b1efaf1b2d47bde25",
+      "original_sha256": "3308d875d04c49892d7803a0a2ad49f96dcfea21eec46d1ab5c477eb414fcffd"
+    },
+    "StockCount": {
+      "path": "base44/entities/StockCount.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "cashier"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "cbb41e2c001b9ac96e199725e7d00f6f5c46750386758001665a4f86982772a2",
+      "original_sha256": "f6e6762cf7a42595dc24f9ecc9cecdb74af323ebcf02b5d2653994462a64f70b"
+    },
+    "StockCountItem": {
+      "path": "base44/entities/StockCountItem.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "accountant"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "cashier"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "0478bb8ccea931666a7e715f77208350361b44bdb5f4dfca620915faa4973e1c",
+      "original_sha256": "80a1a6c5d2af5d8a58253272565dd2b6e3bf5a7bf2e8c43aab6a2a302183d6dd"
+    },
+    "StockMovement": {
+      "path": "base44/entities/StockMovement.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "d330b02765fb6bf88a8676f1851deb185ab976bab335a56bb75ff2061756a01e",
+      "original_sha256": "95ae87f85de8e30f1fce007c0c740b63b6bf4b4326113aae0d2296109cc7b2e5"
+    },
+    "StockTransfer": {
+      "path": "base44/entities/StockTransfer.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$and": [
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "data.source_location_id": "{{user.data.shop_id}}"
+                },
+                {
+                  "data.destination_location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "$or": [
+                        {
+                          "$and": [
+                            {
+                              "data.source_location_id": {
+                                "$nin": [
+                                  "",
+                                  null
+                                ]
+                              }
+                            },
+                            {
+                              "data.source_location_id": "{{user.data.shop_id}}"
+                            }
+                          ]
+                        },
+                        {
+                          "$and": [
+                            {
+                              "data.destination_location_id": {
+                                "$nin": [
+                                  "",
+                                  null
+                                ]
+                              }
+                            },
+                            {
+                              "data.destination_location_id": "{{user.data.shop_id}}"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "735c6a95c3ad1e99e095a6103d91a284594bd15928ff2a3f5a07eff5d41eff14",
+      "original_sha256": "ccacf8a19947c4628156f72a902b4cc49d28084c81dc3da4a4d2844357fb5780"
+    },
+    "SupplierPayment": {
+      "path": "base44/entities/SupplierPayment.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "data.payment_source": {
+                    "$ne": "budget"
+                  }
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "warehouse"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "$and": [
+                        {
+                          "$nor": [
+                            {
+                              "user_condition": {
+                                "role": "manager"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "data.user_id": "{{user.id}}"
+                        }
+                      ]
+                    },
+                    {
+                      "$and": [
+                        {
+                          "user_condition": {
+                            "role": "manager",
+                            "active": true
+                          }
+                        },
+                        {
+                          "data.shop_id": {
+                            "$nin": [
+                              "",
+                              null
+                            ]
+                          }
+                        },
+                        {
+                          "data.shop_id": "{{user.data.shop_id}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "bd8b050b0b458e069555acf74df7a310a736919f7f95f459c5cbe62e9dfdb70f",
+      "original_sha256": "22718a485787727fdd3542602b51f962dad93482836870261f82698d48ab9e5c"
+    },
+    "SupplierReceipt": {
+      "path": "base44/entities/SupplierReceipt.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "$and": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "$and": [
+                        {
+                          "user_condition": {
+                            "role": "warehouse"
+                          }
+                        },
+                        {
+                          "data.location_id": "{{user.data.shop_id}}"
+                        }
+                      ]
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      },
+      "non_rls_sha256": "ba8a940885e7bbc90f3e80d753bb109dd1d003a233a84220c0a462763ce201bf",
+      "original_sha256": "8d8a8480e5dfa3c1072df7b8961b3d93039e98aa17c2148fdbbc570e805cbd5e"
+    },
+    "SupplierReceiptItem": {
+      "path": "base44/entities/SupplierReceiptItem.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "accountant"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "warehouse"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "manager",
+                    "active": true
+                  }
+                },
+                {
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "8d4dfb6e2613acddab7e66dc36dfcae2fa953fe8b925c797ba1b0568867279b8",
+      "original_sha256": "a854311ac8e5e86862a78a5cb89ac9271d67b71018306731d0595c4a9421d5f5"
+    },
+    "WasteRecord": {
+      "path": "base44/entities/WasteRecord.jsonc",
+      "rls": {
+        "create": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "update": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "delete": {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        "read": {
+          "$and": [
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "data.location_id": "{{user.data.shop_id}}"
+                }
+              ]
+            },
+            {
+              "$or": [
+                {
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$and": [
+                    {
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
+                    },
+                    {
+                      "data.location_id": {
+                        "$nin": [
+                          "",
+                          null
+                        ]
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "non_rls_sha256": "57f16a7e838b7d22ce69ead34027fb23a9f43dff1a9cf73e3a550512ccf6899f",
+      "original_sha256": "2a2dde6c9f703b98b4a137de2c0e6461abfefcb5e4ea33af8e3242f21cd3fdf3"
+    }
+  }
+}
