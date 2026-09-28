@@ -1,0 +1,26 @@
+{
+  "checkpoint": "6aba3841180f468c81a50dd3",
+  "shop_id": "6a96f0a4ecc85c2fc57f3173",
+  "categories": [
+    {
+      "id": "6ab744e1ee8551b048a7e045",
+      "hidden_shop_ids_was_absent": true
+    },
+    {
+      "id": "6ab62a5a5b32bf782af6af96",
+      "hidden_shop_ids_was_absent": true
+    },
+    {
+      "id": "6ab62a44217bdac72d70b8da",
+      "hidden_shop_ids_was_absent": true
+    },
+    {
+      "id": "6ab62a0fd2c9f0bbf90f02ed",
+      "hidden_shop_ids_was_absent": true
+    },
+    {
+      "id": "6ab57e2368ca567b0056e4d3",
+      "hidden_shop_ids_was_absent": true
+    }
+  ]
+}
