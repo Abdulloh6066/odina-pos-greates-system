@@ -46,7 +46,7 @@ export default function StaffOrderTicketModal({
   const autoPrintedRef = useRef(false);
   const printRef = useRef(null);
 
-  const effectiveShopId = shop?.id || shopId;
+  const effectiveShopId = shop?.id || shopId || initialOrder?.shop_id;
   const effectiveShopName = shop?.name || ticketOrder?.shop_name || 'Odina';
 
   useEffect(() => {
