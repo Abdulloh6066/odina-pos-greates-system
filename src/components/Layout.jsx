@@ -8,7 +8,17 @@ export default function Layout() {
   const { user, isLoadingAuth, checkUserAuth } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('odina-sidebar-collapsed') === 'true');
+  const [posCompact, setPosCompact] = useState(() => localStorage.getItem('odina-pos-density') === 'compact');
+  const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
   const location = useLocation();
+  const compactPOS = location.pathname === '/pos' && posCompact;
+  const effectiveSidebarCollapsed = compactPOS ? !compactSidebarOpen : sidebarCollapsed;
+  const togglePosCompact = () => {
+    const next = !posCompact;
+    setPosCompact(next);
+    setCompactSidebarOpen(false);
+    localStorage.setItem('odina-pos-density', next ? 'compact' : 'normal');
+  };
   const screenMode = location.pathname === '/pos' && new URLSearchParams(location.search).get('screen') === '1';
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
@@ -21,6 +31,7 @@ export default function Layout() {
   }, []);
 
   const toggleSidebar = () => {
+    if (compactPOS) { setCompactSidebarOpen((open) => !open); return; }
     setSidebarCollapsed((current) => {
       const next = !current;
       localStorage.setItem('odina-sidebar-collapsed', String(next));
@@ -49,7 +60,7 @@ export default function Layout() {
       <div className="min-h-dvh bg-background flex flex-col">
         <main className="odina-workspace flex-1 min-w-0">
           <Suspense fallback={pageFallback}>
-            <Outlet context={{ user, sidebarCollapsed: false, reloadUser: checkUserAuth, screenMode: true }} />
+            <Outlet context={{ user, sidebarCollapsed: false, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: true }} />
           </Suspense>
         </main>
       </div>
@@ -62,7 +73,7 @@ export default function Layout() {
         user={user}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        collapsed={sidebarCollapsed}
+        collapsed={effectiveSidebarCollapsed}
         onToggle={toggleSidebar}
       />
       <div className="flex-1 flex flex-col min-w-0">
@@ -75,7 +86,7 @@ export default function Layout() {
         </div>
         <main className="odina-workspace flex-1 min-w-0">
           <Suspense fallback={pageFallback}>
-            <Outlet context={{ user, sidebarCollapsed, reloadUser: checkUserAuth, screenMode: false }} />
+            <Outlet context={{ user, sidebarCollapsed: effectiveSidebarCollapsed, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: false }} />
           </Suspense>
         </main>
       </div>
