@@ -75,6 +75,37 @@
 .odina-checkout:not(:disabled):hover { background:#f4c16d; }
 .odina-checkout:disabled { opacity:0.5; box-shadow:none; }
 .odina-cart-sheet .odina-cart { border-radius:24px 24px 0 0; border-bottom:0; }
+
+/* Optional device-local POS density. Mobile cart breakpoints stay unchanged. */
+@media screen and (min-width:1024px) {
+  .odina-pos-compact .odina-pos-header { min-height:60px; padding:8px 12px; gap:8px; }
+  .odina-pos-compact .odina-category-rail { width:112px; padding-top:6px; }
+  .odina-pos-compact .odina-category-title { padding:8px; letter-spacing:0.04em; }
+  .odina-pos-compact .odina-category-tab { margin:0 4px; padding:8px 6px; gap:5px; min-height:44px; overflow-wrap:anywhere; }
+  .odina-pos-compact .odina-pos-search { padding:10px 10px 8px; }
+  .odina-pos-compact .odina-catalog-toolbar { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"search count"; gap:6px; }
+  .odina-pos-compact .odina-catalog-toolbar h1 { display:none; }
+  .odina-pos-compact .odina-pos-search input { min-height:44px; height:44px; }
+  .odina-pos-compact .odina-product-scroll { padding:0 10px 10px; }
+  .odina-pos-compact .odina-product-grid { grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px; }
+  .odina-pos-compact .odina-product-card { padding:4px; border-radius:12px; }
+  .odina-pos-compact .odina-product-photo { aspect-ratio:1.55; border-radius:8px; }
+  .odina-pos-compact .odina-product-info { padding:6px 3px 4px; }
+  .odina-pos-compact .odina-product-name { font-size:12px; min-height:2.1rem; }
+  .odina-pos-compact .odina-product-price { font-size:13px; white-space:normal; overflow-wrap:anywhere; }
+  .odina-pos-compact .odina-cart-wrap { width:320px; padding:8px 8px 8px 0; }
+  .odina-pos-compact .odina-cart { border-radius:14px; }
+  .odina-pos-compact .odina-cart-header { padding:8px 10px; }
+  .odina-pos-compact .odina-cart-header h2 { font-size:16px; }
+  .odina-pos-compact .odina-cart-line { grid-template-columns:auto minmax(0,1fr) 44px; gap:4px 8px; padding:6px 0; }
+  .odina-pos-compact .odina-cart-line > :first-child { grid-column:1 / -1; }
+  .odina-pos-compact .odina-cart-line > :nth-child(2) button { width:44px; height:44px; }
+  .odina-pos-compact .odina-cart-summary { padding:8px; }
+  .odina-pos-compact .odina-cart-total { padding-top:6px; }
+  .odina-pos-compact .odina-cart-total > span:last-child { font-size:22px; }
+  .odina-pos-compact .odina-checkout { min-height:48px; padding:10px; font-size:14px; flex-wrap:wrap; }
+}
+
 @media (max-width:639px) {
   .odina-pos-header { min-height:68px; padding-left:14px; padding-right:14px; }
   .odina-pos-header .odina-store-icon { display:none; }
