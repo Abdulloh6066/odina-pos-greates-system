@@ -1,6 +1,6 @@
 export function sortByShopOrder(products, ids = []) {
   const ranks = new Map(ids.map((id, index) => [id, index]));
-  return [...products].sort((a, b) => (ranks.get(a.id) ?? Infinity) - (ranks.get(b.id) ?? Infinity));
+  return [...products].sort((a, b) => (ranks.get(a.id) ?? ids.length) - (ranks.get(b.id) ?? ids.length));
 }
 
 // Retain the legacy placement until a shop explicitly saves a custom order.
