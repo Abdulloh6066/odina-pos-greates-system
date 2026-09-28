@@ -1398,29 +1398,29 @@ export default function POS() {
         </div>
         <div className="flex-1" />
         {!screenMode && <Button asChild variant="outline" size="sm"
-          className="inline-flex h-10 w-10 lg:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 lg:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
+          className="inline-flex h-10 w-10 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <a href={`${window.location.origin}/pos?screen=1`} target="_blank" rel="noopener noreferrer" aria-label="Ekranlar — kassani yangi oynada ochish" title="Ekranlar">
-            <Monitor className="h-4 w-4 lg:mr-1.5" /> <span className="hidden lg:inline">Ekranlar</span>
+            <Monitor className="h-4 w-4" />
           </a>
         </Button>}
         <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
-          aria-label="Stollar sahifasini ochish"
-          className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 sm:px-3 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
-          <Armchair className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Stollar</span>
+          aria-label="Stollar sahifasini ochish" title="Stollar"
+          className="inline-flex h-10 w-10 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
+          <Armchair className="h-4 w-4" />
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => setSalesHistoryOpen(true)}
-          aria-label="Savdolar tarixini ochish"
-          className="inline-flex h-10 w-10 sm:w-auto shrink-0 rounded-xl px-0 sm:px-3 font-semibold touch-manipulation">
-          <ReceiptText className="h-4 w-4 sm:mr-1.5" /> <span className="hidden sm:inline">Savdolar tarixi</span>
+          aria-label="Savdolar tarixini ochish" title="Savdolar tarixi"
+          className="inline-flex h-10 w-10 shrink-0 rounded-xl px-0 font-semibold touch-manipulation">
+          <ReceiptText className="h-4 w-4" />
         </Button>
         {shift ? (
           <>
 
-            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" onClick={() => setCashWithdrawalOpen(true)} className="h-10 px-3 touch-manipulation">
-              <Banknote className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Pul olish</span>
+            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" title="Pul olish" onClick={() => setCashWithdrawalOpen(true)} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
+              <Banknote className="w-4 h-4" />
             </Button>
-            <Button variant="outline" size="sm" aria-label="Smenani yopish" onClick={requestCloseShift} disabled={offlineSyncing} className="h-10 px-3 touch-manipulation">
-              <Clock className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">Smenani yopish</span><span className="sm:hidden">Yopish</span>
+            <Button variant="outline" size="sm" aria-label="Smenani yopish" title="Smenani yopish" onClick={requestCloseShift} disabled={offlineSyncing} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
+              <Clock className="w-4 h-4" />
             </Button>
           </>
         ) : (
