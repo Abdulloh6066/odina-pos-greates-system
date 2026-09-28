@@ -312,7 +312,7 @@ export default function POS() {
     const saved = await saveTakeawayOrder();
     if (!saved) return;
     setMobileCartOpen(false);
-    setStaffTicket({ mode: 'takeaway', order: saved, shop: shops.find((row) => row.id === shift.shop_id) });
+    setStaffTicket({ mode: 'takeaway', order: saved, shopId: saved.shop_id || shift.shop_id, shop: shops.find((row) => row.id === (saved.shop_id || shift.shop_id)) });
     setTakeawayOrder(null);
     resetCart();
   };
@@ -1698,7 +1698,7 @@ export default function POS() {
                   </Button>
                   <Button variant="outline" className="min-h-11" onClick={() => {
                     setOpenOrdersOpen(false);
-                    setStaffTicket({ mode: 'takeaway', order, shop: shops.find((row) => row.id === (shift?.shop_id || user?.shop_id)) });
+                    setStaffTicket({ mode: 'takeaway', order, shopId: order.shop_id || shift?.shop_id || user?.shop_id, shop: shops.find((row) => row.id === (order.shop_id || shift?.shop_id || user?.shop_id)) });
                   }}>Xizmat cheki</Button>
                 </div>
               </div>
