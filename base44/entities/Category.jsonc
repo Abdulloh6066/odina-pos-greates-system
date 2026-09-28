@@ -2,6 +2,12 @@
   "name": "Category",
   "type": "object",
   "properties": {
+    "hidden_shop_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Ushbu do‘konlar kassasida kategoriya va uning mahsulotlari ko‘rsatilmaydi"
+    },
     "name": {
       "type": "string"
     },

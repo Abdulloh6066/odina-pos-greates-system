@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
-import { categoryForShop } from '@/lib/shop-category';
+import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductCard from '@/components/pos/ProductCard';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
@@ -822,13 +822,20 @@ export default function POS() {
   };
 
   const catalogShopId = shift?.shop_id || user?.shop_id;
+  const { categories: visibleCategories, products: catalogProducts } = useMemo(
+    () => catalogForShop(products, categories, catalogShopId),
+    [products, categories, catalogShopId],
+  );
+  useEffect(() => {
+    if (activeCat !== 'all' && categories.length && !visibleCategories.some(c => c.id === activeCat)) setActiveCat('all');
+  }, [activeCat, categories.length, visibleCategories]);
   const { order: shopProductOrder, accept: acceptProductOrder } = usePosProductOrder(catalogShopId, user?.id);
   const [productOrderOpen, setProductOrderOpen] = useState(false);
   const canEditProductOrder = ['admin', 'manager'].includes(user?.role);
 
   const filtered = useMemo(() => {
     const shopId = shift?.shop_id || user?.shop_id;
-    let list = products.filter((product) => !product.available_shop_ids?.length || product.available_shop_ids.includes(shopId)).map((product) => ({ ...product, price: priceForShop(product, shopId) }));
+    let list = catalogProducts.map((product) => ({ ...product, price: priceForShop(product, shopId) }));
     if (!showFav && activeCat !== 'all') {
       const selectedCategory = categories.find((c) => c.id === activeCat);
       const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
@@ -852,7 +859,7 @@ export default function POS() {
       list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     }
     return sortByShopOrder(list, shopProductOrder);
-  }, [products, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id, shopProductOrder]);
+  }, [catalogProducts, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id, shopProductOrder]);
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id),
@@ -1395,7 +1402,7 @@ export default function POS() {
       {productOrderOpen && canEditProductOrder && catalogShopId && <ProductOrderDialog
         key={catalogShopId} shopId={catalogShopId}
         shopName={shops.find(shop => shop.id === catalogShopId)?.name || shift?.shop_name || user?.shop_name || 'Do‘kon'}
-        products={products} categories={categories} initialCategory={showFav ? 'all' : activeCat}
+        products={catalogProducts} categories={visibleCategories} initialCategory={showFav ? 'all' : activeCat}
         onClose={() => setProductOrderOpen(false)} onSaved={acceptProductOrder} />}
       {/* Header */}
       <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
@@ -1565,7 +1572,7 @@ export default function POS() {
             <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="Barchasi" />
             <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
             <div className="h-px bg-border my-2 mx-3" />
-            {categories.map((c) => (
+            {visibleCategories.map((c) => (
               <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<CategoryIcon icon={c.icon} className="text-base" imgClassName="w-5 h-5" />} label={c.name.replaceAll('&', ' & ')} />
             ))}
           </div>
@@ -1584,7 +1591,7 @@ export default function POS() {
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
                 <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
                 <Chip active={showFav} onClick={() => setShowFav(true)}>★ Sevimlilar</Chip>
-                {categories.map((c) => (
+                {visibleCategories.map((c) => (
                   <Chip key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }}>{c.name.replaceAll('&', ' & ')}</Chip>
                 ))}
               </div>
