@@ -101,65 +101,103 @@
       }
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "$and": [
+          "$or": [
             {
-              "data.payment_source": {
-                "$ne": "budget"
+              "user_condition": {
+                "role": "admin"
               }
             },
             {
-              "$or": [
+              "user_condition": {
+                "role": "manager"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "cashier"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "accountant"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "production"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "warehouse"
+              }
+            }
+          ]
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
                 {
-                  "user_condition": {
-                    "role": "warehouse"
+                  "data.payment_source": {
+                    "$ne": "budget"
                   }
                 },
                 {
-                  "user_condition": {
-                    "role": "accountant"
-                  }
-                },
-                {
-                  "$and": [
+                  "$or": [
                     {
-                      "$nor": [
+                      "user_condition": {
+                        "role": "warehouse"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "accountant"
+                      }
+                    },
+                    {
+                      "$and": [
                         {
-                          "user_condition": {
-                            "role": "manager"
-                          }
+                          "$nor": [
+                            {
+                              "user_condition": {
+                                "role": "manager"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "data.user_id": "{{user.id}}"
                         }
                       ]
                     },
                     {
-                      "data.user_id": "{{user.id}}"
-                    }
-                  ]
-                },
-                {
-                  "$and": [
-                    {
-                      "user_condition": {
-                        "role": "manager",
-                        "active": true
-                      }
-                    },
-                    {
-                      "data.shop_id": {
-                        "$nin": [
-                          "",
-                          null
-                        ]
-                      }
-                    },
-                    {
-                      "data.shop_id": "{{user.data.shop_id}}"
+                      "$and": [
+                        {
+                          "user_condition": {
+                            "role": "manager",
+                            "active": true
+                          }
+                        },
+                        {
+                          "data.shop_id": {
+                            "$nin": [
+                              "",
+                              null
+                            ]
+                          }
+                        },
+                        {
+                          "data.shop_id": "{{user.data.shop_id}}"
+                        }
+                      ]
                     }
                   ]
                 }

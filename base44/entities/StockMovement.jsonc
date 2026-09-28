@@ -106,55 +106,93 @@
       }
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "$and": [
+          "$or": [
             {
-              "$nor": [
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "manager"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "cashier"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "accountant"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "production"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "warehouse"
+              }
+            }
+          ]
+        },
+        {
+          "$or": [
+            {
+              "$and": [
                 {
-                  "user_condition": {
-                    "role": "manager"
-                  }
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "$or": [
+                    {
+                      "user_condition": {
+                        "role": "admin"
+                      }
+                    },
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    },
+                    {
+                      "data.location_id": "{{user.data.shop_id}}"
+                    }
+                  ]
                 }
               ]
             },
             {
-              "$or": [
+              "$and": [
                 {
                   "user_condition": {
-                    "role": "admin"
+                    "role": "manager",
+                    "active": true
                   }
                 },
                 {
-                  "user_condition": {
-                    "role": "manager"
+                  "data.location_id": {
+                    "$nin": [
+                      "",
+                      null
+                    ]
                   }
                 },
                 {
                   "data.location_id": "{{user.data.shop_id}}"
                 }
               ]
-            }
-          ]
-        },
-        {
-          "$and": [
-            {
-              "user_condition": {
-                "role": "manager",
-                "active": true
-              }
-            },
-            {
-              "data.location_id": {
-                "$nin": [
-                  "",
-                  null
-                ]
-              }
-            },
-            {
-              "data.location_id": "{{user.data.shop_id}}"
             }
           ]
         }

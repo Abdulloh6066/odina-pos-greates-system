@@ -128,61 +128,99 @@
               }
             },
             {
-              "data.source_location_id": "{{user.data.shop_id}}"
+              "user_condition": {
+                "role": "manager"
+              }
             },
             {
-              "data.destination_location_id": "{{user.data.shop_id}}"
+              "user_condition": {
+                "role": "cashier"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "accountant"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "production"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "warehouse"
+              }
             }
           ]
         },
         {
-          "$or": [
+          "$and": [
             {
-              "$nor": [
+              "$or": [
                 {
                   "user_condition": {
-                    "role": "manager"
+                    "role": "admin"
                   }
+                },
+                {
+                  "data.source_location_id": "{{user.data.shop_id}}"
+                },
+                {
+                  "data.destination_location_id": "{{user.data.shop_id}}"
                 }
               ]
             },
             {
-              "$and": [
+              "$or": [
                 {
-                  "user_condition": {
-                    "role": "manager",
-                    "active": true
-                  }
+                  "$nor": [
+                    {
+                      "user_condition": {
+                        "role": "manager"
+                      }
+                    }
+                  ]
                 },
                 {
-                  "$or": [
+                  "$and": [
                     {
-                      "$and": [
-                        {
-                          "data.source_location_id": {
-                            "$nin": [
-                              "",
-                              null
-                            ]
-                          }
-                        },
-                        {
-                          "data.source_location_id": "{{user.data.shop_id}}"
-                        }
-                      ]
+                      "user_condition": {
+                        "role": "manager",
+                        "active": true
+                      }
                     },
                     {
-                      "$and": [
+                      "$or": [
                         {
-                          "data.destination_location_id": {
-                            "$nin": [
-                              "",
-                              null
-                            ]
-                          }
+                          "$and": [
+                            {
+                              "data.source_location_id": {
+                                "$nin": [
+                                  "",
+                                  null
+                                ]
+                              }
+                            },
+                            {
+                              "data.source_location_id": "{{user.data.shop_id}}"
+                            }
+                          ]
                         },
                         {
-                          "data.destination_location_id": "{{user.data.shop_id}}"
+                          "$and": [
+                            {
+                              "data.destination_location_id": {
+                                "$nin": [
+                                  "",
+                                  null
+                                ]
+                              }
+                            },
+                            {
+                              "data.destination_location_id": "{{user.data.shop_id}}"
+                            }
+                          ]
                         }
                       ]
                     }
