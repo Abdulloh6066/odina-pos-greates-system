@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, GripVertical, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -84,7 +85,7 @@ export default function ProductOrderDialog({ shopId, shopName, products, categor
             {provided => <div ref={provided.innerRef} {...provided.droppableProps}
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" style={{ minHeight: 100 }}>
               {visible.map((product, index) => <Draggable key={product.id} draggableId={product.id} index={index} isDragDisabled={saving}>
-                {(drag, state) => <div ref={drag.innerRef} {...drag.draggableProps}
+                {(drag, state) => { const row = <div ref={drag.innerRef} {...drag.draggableProps}
                   style={drag.draggableProps.style}
                   className={`flex items-center gap-1 sm:gap-2 rounded-xl border border-border bg-card mb-2 p-1.5 ${state.isDragging ? 'shadow-xl ring-2 ring-primary' : ''}`}>
                   <button type="button" {...drag.dragHandleProps} aria-label={product.name + ' joyini ko‘chirish'}
@@ -101,7 +102,11 @@ export default function ProductOrderDialog({ shopId, shopName, products, categor
                   ].map(([Icon, label, target, edge]) => <Button key={label} type="button" variant="ghost" size="icon"
                     disabled={saving || edge} title={label} aria-label={product.name + ' — ' + label}
                     className="h-11 w-8 sm:w-11 shrink-0" onClick={() => move(index, target)}><Icon className="h-4 w-4" /></Button>)}
-                </div>}
+                </div>;
+                  // Radix centers dialogs with a transform; reparent during drag
+                  // so fixed-position drag coordinates remain relative to the viewport.
+                  return state.isDragging ? createPortal(row, document.body) : row;
+                }}
               </Draggable>)}
               {provided.placeholder}
               {!visible.length && <p className="py-8 text-center text-sm text-muted-foreground">Mahsulot topilmadi.</p>}
