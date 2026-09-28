@@ -1,6 +1,8 @@
 {
   "name": "Shop",
   "properties": {
+    "pos_product_order": { "type": "array", "items": { "type": "string" }, "default": [], "maxItems": 5000, "description": "Do‘kon kassasidagi mahsulotlar tartibi" },
+    "pos_product_order_version": { "type": "integer", "minimum": 0, "default": 0, "description": "Mahsulot tartibini parallel tahrirlash nazorati" },
     "active": {
       "default": true,
       "type": "boolean"

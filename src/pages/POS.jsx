@@ -2,13 +2,16 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductCard from '@/components/pos/ProductCard';
+import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
+import usePosProductOrder from '@/hooks/usePosProductOrder';
+import { sortByShopOrder } from '@/lib/pos-product-order';
 import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import SalesHistory from '@/pages/SalesHistory';
@@ -817,6 +820,11 @@ export default function POS() {
     setPendingDiscountCode('');
   };
 
+  const catalogShopId = shift?.shop_id || user?.shop_id;
+  const { order: shopProductOrder, accept: acceptProductOrder } = usePosProductOrder(catalogShopId, user?.id);
+  const [productOrderOpen, setProductOrderOpen] = useState(false);
+  const canEditProductOrder = ['admin', 'manager'].includes(user?.role);
+
   const filtered = useMemo(() => {
     const shopId = shift?.shop_id || user?.shop_id;
     let list = products.filter((product) => !product.available_shop_ids?.length || product.available_shop_ids.includes(shopId)).map((product) => ({ ...product, price: priceForShop(product, shopId) }));
@@ -842,8 +850,8 @@ export default function POS() {
     if (activeCategory?.name?.trim().toLowerCase() === 'tortlar') {
       list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     }
-    return list;
-  }, [products, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id]);
+    return sortByShopOrder(list, shopProductOrder);
+  }, [products, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id, shopProductOrder]);
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id),
@@ -1383,6 +1391,11 @@ export default function POS() {
 
   return (
     <div className={`odina-pos ${posCompact ? 'odina-pos-compact' : ''} flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
+      {productOrderOpen && canEditProductOrder && catalogShopId && <ProductOrderDialog
+        key={catalogShopId} shopId={catalogShopId}
+        shopName={shops.find(shop => shop.id === catalogShopId)?.name || shift?.shop_name || user?.shop_name || 'Do‘kon'}
+        products={products} categories={categories} initialCategory={showFav ? 'all' : activeCat}
+        onClose={() => setProductOrderOpen(false)} onSaved={acceptProductOrder} />}
       {/* Header */}
       <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -1403,6 +1416,12 @@ export default function POS() {
           className="hidden lg:inline-flex h-11 shrink-0 rounded-xl px-3 touch-manipulation">
           {posCompact ? 'Ixcham ✓' : 'Ixcham'}
         </Button>
+        {canEditProductOrder && <Button type="button" variant="outline" size="icon"
+          title={catalogShopId ? 'Mahsulotlar tartibini tahrirlash' : 'Avval do‘kon smenasini oching'}
+          aria-label="Mahsulotlar tartibini tahrirlash" disabled={!catalogShopId || loadingData}
+          onClick={() => setProductOrderOpen(true)} className="h-11 w-10 shrink-0 rounded-xl touch-manipulation">
+          <ListOrdered className="h-4 w-4" />
+        </Button>}
         {!screenMode && <Button asChild variant="outline" size="sm"
           className="inline-flex h-10 w-10 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <a href={`${window.location.origin}/pos?screen=1`} target="_blank" rel="noopener noreferrer" aria-label="Ekranlar — kassani yangi oynada ochish" title="Ekranlar">
