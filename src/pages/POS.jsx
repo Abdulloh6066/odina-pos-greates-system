@@ -34,7 +34,7 @@ import {
 const SHOW_NEGATIVE_STOCK_CONFIRMATION = false;
 
 export default function POS() {
-  const { user, sidebarCollapsed, screenMode } = useOutletContext();
+  const { user, sidebarCollapsed, screenMode, posCompact, togglePosCompact } = useOutletContext();
   const navigate = useNavigate();
   const location = useLocation();
   const tableQuery = useMemo(() => {
@@ -1382,7 +1382,7 @@ export default function POS() {
   };
 
   return (
-    <div className={`odina-pos flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
+    <div className={`odina-pos ${posCompact ? 'odina-pos-compact' : ''} flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
       {/* Header */}
       <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -1397,6 +1397,12 @@ export default function POS() {
           </div>
         </div>
         <div className="flex-1" />
+        <Button type="button" variant="outline" size="sm" onClick={togglePosCompact}
+          aria-pressed={Boolean(posCompact)} aria-label="Ixcham kassa ko‘rinishi"
+          title={posCompact ? 'Oddiy ko‘rinishga qaytish' : 'Ixcham ko‘rinishga o‘tish'}
+          className="hidden lg:inline-flex h-11 shrink-0 rounded-xl px-3 touch-manipulation">
+          {posCompact ? 'Ixcham ✓' : 'Ixcham'}
+        </Button>
         {!screenMode && <Button asChild variant="outline" size="sm"
           className="inline-flex h-10 w-10 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <a href={`${window.location.origin}/pos?screen=1`} target="_blank" rel="noopener noreferrer" aria-label="Ekranlar — kassani yangi oynada ochish" title="Ekranlar">
@@ -1564,9 +1570,9 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
+            <div className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
               {loadingData ? (
-                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
+                <div className="odina-product-grid grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
                   {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
                 </div>
               ) : filtered.length === 0 ? (
@@ -1575,7 +1581,7 @@ export default function POS() {
                   <p className="text-sm font-medium text-muted-foreground">Mahsulot topilmadi</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
+                <div className="odina-product-grid grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
                   {filtered.map((p) => (
                     <ProductCard
                       key={p.id}
