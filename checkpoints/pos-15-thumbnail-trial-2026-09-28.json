@@ -1,0 +1,133 @@
+{
+  "checkpoint": "6aba3fd98949dce7e0c2d9ac",
+  "products": [
+    {
+      "id": "6ab546e601804895b9374e80",
+      "name": "SPARTAK",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8626ae888_spartak.png",
+      "original_bytes": 2067437,
+      "thumbnail": "/images/pos-15-v1/6ab546e601804895b9374e80.webp",
+      "thumbnail_bytes": 30014,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab546e3e87e400ee14b2c6c",
+      "name": "BISKVIT",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/291ecb623_biskvit.png",
+      "original_bytes": 2011513,
+      "thumbnail": "/images/pos-15-v1/6ab546e3e87e400ee14b2c6c.webp",
+      "thumbnail_bytes": 27350,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab546e0d3b3bba25340fb13",
+      "name": "GOZLI PIROJNI",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b40f830d8_gozli-pirojni.png",
+      "original_bytes": 1775459,
+      "thumbnail": "/images/pos-15-v1/6ab546e0d3b3bba25340fb13.webp",
+      "thumbnail_bytes": 22076,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab546d671c7683c19867ccf",
+      "name": "TVAROJNIY",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9ea742922_tvarojniy.png",
+      "original_bytes": 1915792,
+      "thumbnail": "/images/pos-15-v1/6ab546d671c7683c19867ccf.webp",
+      "thumbnail_bytes": 23286,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab546d28badecb776d7b864",
+      "name": "MEDAVIK KAYMOQ",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f9d5967a0_medavik-kaymoq.png",
+      "original_bytes": 2119929,
+      "thumbnail": "/images/pos-15-v1/6ab546d28badecb776d7b864.webp",
+      "thumbnail_bytes": 33680,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab546cfded029118ff61c26",
+      "name": "PRECHUDA",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/906e9b372_prechuda.png",
+      "original_bytes": 2047005,
+      "thumbnail": "/images/pos-15-v1/6ab546cfded029118ff61c26.webp",
+      "thumbnail_bytes": 30526,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab546cc9d99abaff9b7a539",
+      "name": "MEDAVIK DAMASHNIY",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/71c2f0df1_medavik-damashniy.png",
+      "original_bytes": 2254304,
+      "thumbnail": "/images/pos-15-v1/6ab546cc9d99abaff9b7a539.webp",
+      "thumbnail_bytes": 38622,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    },
+    {
+      "id": "6ab54689fddbaa9a6a528495",
+      "name": "TWIX",
+      "image_url": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e7fbb35db_twix.png",
+      "original_bytes": 2058430,
+      "thumbnail": "/images/pos-15-v1/6ab54689fddbaa9a6a528495.webp",
+      "thumbnail_bytes": 24680,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ]
+    }
+  ]
+}
