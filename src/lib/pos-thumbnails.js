@@ -34,7 +34,9 @@ const thumbnails = {
   }
 };
 
-export function posThumbnailFor(product) {
+export function posThumbnailFor(product, shopId) {
+  // Central-only trial; all other shops keep their original product photos.
+  if (shopId !== '6a96f0a4ecc85c2fc57f3173') return null;
   const entry = thumbnails[product?.id];
   return entry && entry.source === product?.image_url ? entry.thumbnail : null;
 }

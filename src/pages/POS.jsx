@@ -1613,6 +1613,7 @@ export default function POS() {
                     <ProductCard
                       key={p.id}
                       product={p}
+                      shopId={catalogShopId}
                       stockQuantity={p.track_stock === false || !shift ? null : Number(stockByProduct[p.id] || 0)}
                       onAdd={addToCart}
                       disabled={tableLocked || paying}

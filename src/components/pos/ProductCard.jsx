@@ -3,9 +3,9 @@ import { Image } from '@/components/ui/image';
 import { formatUZS } from '@/lib/pos';
 import { posThumbnailFor } from '@/lib/pos-thumbnails';
 
-export default function ProductCard({ product, stockQuantity = null, onAdd, disabled = false }) {
+export default function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false }) {
   const [failedThumbnail, setFailedThumbnail] = React.useState(null);
-  const thumbnail = posThumbnailFor(product);
+  const thumbnail = posThumbnailFor(product, shopId);
   const useThumbnail = Boolean(thumbnail && thumbnail !== failedThumbnail);
   const imageSrc = useThumbnail ? thumbnail : product.image_url;
 
