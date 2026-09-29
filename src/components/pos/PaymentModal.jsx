@@ -9,6 +9,15 @@ import { PAYMENT_METHODS, formatUZS } from '@/lib/pos';
 
 const RECEIPT_PRINT_KEY = 'odina-pos:print-receipt';
 
+// The first method covers the balance after the other methods.
+function balanceFirstPayment(rows, total) {
+  if (rows.length === 0) return rows;
+  const otherPayments = rows.slice(1).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+  return rows.map((row, index) => index === 0
+    ? { ...row, amount: Math.max(0, total - otherPayments) }
+    : row);
+}
+
 function savedReceiptPreference() {
   try {
     return window.localStorage.getItem(RECEIPT_PRINT_KEY) !== 'off';
@@ -42,7 +51,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
         if (rows.length === 1 && Number(rows[0].amount) === before.total) {
           return [{ ...rows[0], amount: total }];
         }
-        // Keep manually entered split payments; the balance shows any difference.
+        if (rows.length > 1) return balanceFirstPayment(rows, total);
         return rows;
       });
       setError('');
@@ -55,7 +64,13 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
   const overpay = Math.max(0, paid - total);
 
   const updatePayment = (idx, field, value) => {
-    setPayments((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: field === 'method' ? value : (value === '' ? '' : Number(value)) } : p));
+    setPayments((prev) => {
+      const rows = prev.map((p, i) => i === idx
+        ? { ...p, [field]: field === 'method' ? value : (value === '' ? '' : Math.max(0, Number(value) || 0)) }
+        : p);
+      return field === 'amount' && idx > 0 ? balanceFirstPayment(rows, total) : rows;
+    });
+    setError('');
   };
 
   const addPaymentMethod = (methodId) => {
@@ -79,7 +94,10 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     return CreditCard;
   };
 
-  const removeRow = (idx) => setPayments((prev) => prev.filter((_, i) => i !== idx));
+  const removeRow = (idx) => {
+    setPayments((prev) => balanceFirstPayment(prev.filter((_, i) => i !== idx), total));
+    setError('');
+  };
 
   const handleConfirm = () => {
     if (checking || loading || discountPending) return;
