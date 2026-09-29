@@ -20,6 +20,7 @@ import SalesHistory from '@/pages/SalesHistory';
 import Receipt from '@/components/pos/Receipt';
 import ShiftReport from '@/components/pos/ShiftReport';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
+import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 import PosTablePicker from '@/components/tables/PosTablePicker';
 import { OpenShiftDialog, CloseShiftDialog } from '@/components/pos/ShiftDialog';
 import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActionDialogs';
@@ -324,6 +325,7 @@ export default function POS() {
   };
 
   const showTakeawayTicket = async () => {
+    if (!isStaffTicketEnabled(shift?.shop_id || user?.shop_id)) return;
     if (paying || payOpen || stockChecking) return;
     const saved = await saveTakeawayOrder();
     if (!saved) return;
@@ -645,7 +647,7 @@ export default function POS() {
     setSearch('');
     setMobileCartOpen(false);
     navigate(posHomePath, { replace: true, state: { savedTableNumber: savedNumber, savedShopId } });
-    setStaffTicket({ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber });
+    if (isStaffTicketEnabled(savedShopId)) setStaffTicket({ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber });
   };
 
   const tableShop = selectedTable
@@ -1143,7 +1145,8 @@ export default function POS() {
 
   const finishSalePresentation = (sale) => {
     setReceiptPrintSale(null);
-    if (sale?.items?.length && !sale?.table_number_snapshot && !sale?.table_order_id_snapshot) {
+    if (isStaffTicketEnabled(sale?.shop_id || shift?.shop_id || user?.shop_id)
+      && sale?.items?.length && !sale?.table_number_snapshot && !sale?.table_order_id_snapshot) {
       setStaffTicket({ mode: 'sale', order: sale, autoPrint: true });
     } else if (selectedTable && !sale?.offline_pending) {
       navigate(posHomePath, { replace: true });
@@ -1532,13 +1535,13 @@ export default function POS() {
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-brand-ink" aria-hidden="true" />
           <p className="flex-1"><strong>{location.state.savedTableNumber}-stol buyurtmasi saqlandi.</strong> To‘lov olinmadi. Kassa yangi buyurtmaga tayyor.</p>
-          <Button type="button" variant="outline" onClick={() => setStaffTicket({
+          {isStaffTicketEnabled(location.state.savedShopId || shift?.shop_id || user?.shop_id) && <Button type="button" variant="outline" onClick={() => setStaffTicket({
             mode: 'table', shopId: location.state.savedShopId || shift?.shop_id,
             shop: shops.find((item) => item.id === (location.state.savedShopId || shift?.shop_id)),
             tableNumber: location.state.savedTableNumber,
           })} className="min-h-11 shrink-0 rounded-xl text-xs font-semibold">
             <ReceiptText className="h-4 w-4 mr-1.5" /> Xizmat cheki
-          </Button>
+          </Button>}
           <Button type="button" variant="ghost" size="icon" aria-label="Saqlash xabarini yopish"
             onClick={() => navigate(posHomePath, { replace: true, state: null })} className="h-11 w-11 shrink-0 rounded-xl"><X className="h-4 w-4" /></Button>
         </div>
@@ -1579,7 +1582,7 @@ export default function POS() {
               setTableSaveError('');
               setDiscountCode(''); setDiscountPct(0); setRoundingTarget(null); setAdjustmentMode(null);
             }}>Saqlangan holatga qaytish</Button>}
-            {tableOrder?.items?.length > 0 && !tableCartDirty && <Button type="button" variant="outline"
+            {isStaffTicketEnabled(selectedTable?.shopId) && tableOrder?.items?.length > 0 && !tableCartDirty && <Button type="button" variant="outline"
               onClick={() => setStaffTicket({ mode: 'table', shop: tableShop, shopId: selectedTable.shopId, tableNumber: selectedTable.number })}
               className="min-h-11 rounded-xl font-semibold text-brand-ink">
               <ReceiptText className="h-4 w-4 mr-1.5" /> Xizmat cheki
@@ -1589,7 +1592,7 @@ export default function POS() {
               if (tableCartDirty && !(await odinaConfirm('Saqlanmagan savat o‘chadi. Serverdagi buyurtmani qayta yuklaysizmi?'))) return;
               setTableReload((current) => current + 1);
             }}>Buyurtmani yangilash</Button>}
-            {Boolean(selectedTable && (tableOrder?.items?.length || cart.length)) && (
+            {isStaffTicketEnabled(selectedTable?.shopId) && Boolean(selectedTable && (tableOrder?.items?.length || cart.length)) && (
               <Button
                 type="button"
                 variant="outline"
@@ -1702,7 +1705,7 @@ export default function POS() {
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
-            takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable ? showTakeawayTicket : undefined}
+            takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable && isStaffTicketEnabled(shift?.shop_id || user?.shop_id) ? showTakeawayTicket : undefined}
             onOpenOrders={!selectedTable ? loadOpenOrders : undefined} onLeaveTakeaway={leaveTakeaway}
             savingTakeaway={takeawaySaving}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
@@ -1732,7 +1735,7 @@ export default function POS() {
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
             total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
-            takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable ? showTakeawayTicket : undefined}
+            takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable && isStaffTicketEnabled(shift?.shop_id || user?.shop_id) ? showTakeawayTicket : undefined}
             onOpenOrders={!selectedTable ? loadOpenOrders : undefined} onLeaveTakeaway={leaveTakeaway}
             savingTakeaway={takeawaySaving}
             tableMode={Boolean(selectedTable)} tableDirty={tableCartDirty} tableSaved={Boolean(tableOrder?.id)}
@@ -1760,10 +1763,10 @@ export default function POS() {
                   <Button className="min-h-11 flex-1" onClick={() => order.state === 'paying' ? reconcileTakeaway(order) : openTakeaway(order)} disabled={openOrdersLoading || Boolean(cancellingTakeawayId)}>
                     {order.state === 'paying' ? 'To‘lovni tekshirish' : 'Ochish · To‘lov'}
                   </Button>
-                  <Button variant="outline" className="min-h-11" disabled={Boolean(cancellingTakeawayId)} onClick={() => {
+                  {isStaffTicketEnabled(order.shop_id || shift?.shop_id || user?.shop_id) && <Button variant="outline" className="min-h-11" disabled={Boolean(cancellingTakeawayId)} onClick={() => {
                     setOpenOrdersOpen(false);
                     setStaffTicket({ mode: 'takeaway', order, shopId: order.shop_id || shift?.shop_id || user?.shop_id, shop: shops.find((row) => row.id === (order.shop_id || shift?.shop_id || user?.shop_id)) });
-                  }}>Xizmat cheki</Button>
+                  }}>Xizmat cheki</Button>}
                   <TakeawayCancelAction ticketNumber={order.ticket_number}
                     disabled={openOrdersLoading || Boolean(cancellingTakeawayId) || paying || payOpen || stockChecking || takeawaySaving || savingTable || order.state !== 'occupied' || Boolean(order.checkout_key)}
                     busy={cancellingTakeawayId === order.id}
