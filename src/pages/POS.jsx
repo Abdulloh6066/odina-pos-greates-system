@@ -104,6 +104,8 @@ export default function POS() {
   const [openOrders, setOpenOrders] = useState([]);
   const [openOrdersLoading, setOpenOrdersLoading] = useState(false);
   const [openOrdersError, setOpenOrdersError] = useState('');
+  const [cancellingTakeawayId, setCancellingTakeawayId] = useState('');
+  const cancellingTakeawayRef = useRef(false);
   const takeawayDirty = Boolean(takeawayOrder) && JSON.stringify(cart.map(({ product_id, quantity }) => ({ product_id, quantity })))
     !== JSON.stringify((takeawayOrder?.items || []).map(({ product_id, quantity }) => ({ product_id, quantity })));
 
@@ -358,6 +360,56 @@ export default function POS() {
     } catch (error) {
       setOpenOrdersError(error?.response?.data?.error || error?.message || 'Buyurtma ochilmadi.');
     } finally { setOpenOrdersLoading(false); }
+  };
+
+  const cancelTakeawayOrder = async (order) => {
+    if (!order?.id || order.state !== 'occupied' || order.checkout_key
+      || cancellingTakeawayRef.current || openOrdersLoading || paying || payOpen || stockChecking
+      || takeawaySavingRef.current || savingTableRef.current) return;
+    if (!shift || (order.shop_id && order.shop_id !== shift.shop_id)) {
+      setOpenOrdersError('Bekor qilish uchun shu do‘kondagi smenani oching.');
+      return;
+    }
+    if (!isOnline || navigator.onLine === false) {
+      setOpenOrdersError('Internet yo‘q. Buyurtma bekor qilinmadi.');
+      return;
+    }
+    cancellingTakeawayRef.current = true;
+    takeawaySavingRef.current = true;
+    setCancellingTakeawayId(order.id);
+    setTakeawaySaving(true);
+    setOpenOrdersError('');
+    try {
+      const confirmed = await odinaConfirm({
+        title: `Buyurtma #${order.ticket_number || ''} bekor qilinsinmi?`,
+        description: 'To‘lanmagan buyurtma ochiq ro‘yxatdan olinadi va tarixda saqlanadi. Pul tushumi yozilmaydi.',
+        confirmLabel: 'Ha, bekor qilish', cancelLabel: 'Yo‘q, qolsin', tone: 'warning',
+      });
+      if (!confirmed) return;
+      const response = await base44.functions.invoke('restaurant-tables', {
+        action: 'cancel_takeaway_order', shop_id: shift.shop_id, shift_id: shift.id,
+        order_id: order.id, expected_revision: order.revision, confirm_cancel: true,
+      });
+      const result = response?.data || response;
+      if (!result?.ok || (!result.cancelled && !result.already_closed)) {
+        throw new Error(result?.error || 'Buyurtma bekor qilingani tasdiqlanmadi.');
+      }
+      setOpenOrders((rows) => rows.filter((row) => row.id !== order.id));
+      if (takeawayOrder?.id === order.id) {
+        setTakeawayOrder(null);
+        resetCart();
+        checkoutRequestKeyRef.current = '';
+        checkoutRecordedAtRef.current = '';
+      }
+      if (result.audit_warning) setOpenOrdersError('Buyurtma bekor qilindi. Nusxasi va so‘rov tarixda saqlandi, yakuniy tarix yozuvi tasdiqlanmadi.');
+    } catch (error) {
+      setOpenOrdersError(error?.response?.data?.error || error?.message || 'Buyurtma bekor qilinmadi. Ro‘yxatni yangilab tekshiring.');
+    } finally {
+      cancellingTakeawayRef.current = false;
+      takeawaySavingRef.current = false;
+      setCancellingTakeawayId('');
+      setTakeawaySaving(false);
+    }
   };
 
   const leaveTakeaway = async () => {
@@ -1676,11 +1728,11 @@ export default function POS() {
         </SheetContent>
       </Sheet>
 
-      <Dialog open={openOrdersOpen} onOpenChange={setOpenOrdersOpen}>
+      <Dialog open={openOrdersOpen} onOpenChange={(open) => { if (!cancellingTakeawayRef.current) setOpenOrdersOpen(open); }}>
         <DialogContent className="sm:max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>Ochiq buyurtmalar · Olib ketish</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">To‘lanmagan buyurtmalar. To‘lov uchun buyurtmani oching.</p>
-          <Button variant="outline" onClick={loadOpenOrders} disabled={openOrdersLoading}>Yangilash</Button>
+          <Button variant="outline" onClick={loadOpenOrders} disabled={openOrdersLoading || Boolean(cancellingTakeawayId)}>Yangilash</Button>
           {openOrdersError && <p role="alert" className="text-sm text-destructive">{openOrdersError}</p>}
           {openOrdersLoading ? <p>Yuklanmoqda…</p> : openOrders.length === 0 && !openOrdersError ? <p>Ochiq buyurtma yo‘q.</p> : (
             <div className="space-y-3">{openOrders.map((order) => (
@@ -1691,14 +1743,20 @@ export default function POS() {
                 <p className="text-xs text-muted-foreground">{formatUzbekistanDateTime(order.started_at)} · {order.opened_by_name}</p>
                 <p className="text-sm break-words">{order.items.map((row) => row.product_name + ' × ' + row.quantity + (row.sale_unit === 'gram' ? ' g' : '')).join(', ')}</p>
                 <p className="text-xs font-semibold">{order.state === 'paying' ? 'To‘lov tekshirilmoqda — qayta pul olmang' : 'To‘lanmagan'}</p>
-                <div className="flex gap-2">
-                  <Button className="min-h-11 flex-1" onClick={() => order.state === 'paying' ? reconcileTakeaway(order) : openTakeaway(order)} disabled={openOrdersLoading}>
+                <div className="flex flex-wrap gap-2">
+                  <Button className="min-h-11 flex-1" onClick={() => order.state === 'paying' ? reconcileTakeaway(order) : openTakeaway(order)} disabled={openOrdersLoading || Boolean(cancellingTakeawayId)}>
                     {order.state === 'paying' ? 'To‘lovni tekshirish' : 'Ochish · To‘lov'}
                   </Button>
-                  <Button variant="outline" className="min-h-11" onClick={() => {
+                  <Button variant="outline" className="min-h-11" disabled={Boolean(cancellingTakeawayId)} onClick={() => {
                     setOpenOrdersOpen(false);
                     setStaffTicket({ mode: 'takeaway', order, shopId: order.shop_id || shift?.shop_id || user?.shop_id, shop: shops.find((row) => row.id === (order.shop_id || shift?.shop_id || user?.shop_id)) });
                   }}>Xizmat cheki</Button>
+                  <Button type="button" variant="outline"
+                    className="min-h-11 w-full text-destructive border-destructive/25 hover:bg-destructive/5"
+                    disabled={openOrdersLoading || Boolean(cancellingTakeawayId) || order.state !== 'occupied' || Boolean(order.checkout_key)}
+                    onClick={() => void cancelTakeawayOrder(order)}>
+                    {cancellingTakeawayId === order.id ? 'Bekor qilinmoqda…' : 'Bekor qilish'}
+                  </Button>
                 </div>
               </div>
             ))}</div>
