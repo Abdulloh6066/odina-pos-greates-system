@@ -29,7 +29,7 @@ test('receipt delegates print lifecycle, preserves the off preference, and suppl
 });
 
 test('POS decides post-print presentation without repeating the financial transaction', () => {
-  assert.match(pos, /if \(sale\?\.items\?\.length && !sale\?\.table_number_snapshot\)/);
+  assert.match(pos, /if \(sale\?\.items\?\.length && !sale\?\.table_number_snapshot && !sale\?\.table_order_id_snapshot\)/);
   assert.match(pos, /onAfterPrint=\{finishSalePresentation\}/);
   const start = pos.indexOf('  const finishSalePresentation =');
   const end = pos.indexOf('  const finishQueuedSale =', start);
