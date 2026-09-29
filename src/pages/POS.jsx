@@ -1750,7 +1750,7 @@ export default function POS() {
                     setStaffTicket({ mode: 'takeaway', order, shopId: order.shop_id || shift?.shop_id || user?.shop_id, shop: shops.find((row) => row.id === (order.shop_id || shift?.shop_id || user?.shop_id)) });
                   }}>Xizmat cheki</Button>
                   <TakeawayCancelAction ticketNumber={order.ticket_number}
-                    disabled={openOrdersLoading || Boolean(cancellingTakeawayId) || order.state !== 'occupied' || Boolean(order.checkout_key)}
+                    disabled={openOrdersLoading || Boolean(cancellingTakeawayId) || paying || payOpen || stockChecking || takeawaySaving || savingTable || order.state !== 'occupied' || Boolean(order.checkout_key)}
                     busy={cancellingTakeawayId === order.id}
                     error={takeawayCancelError?.orderId === order.id ? takeawayCancelError.message : ''}
                     onConfirm={() => void cancelTakeawayOrder(order)} />
