@@ -734,6 +734,74 @@ test('takeaway concurrent saves do not overwrite orders, stale and paid orders c
 });
 
 
+
+async function takeawayCancellationFixture() {
+  const f = fixture(); f.as('cashier-1');
+  const saved = await f.run({ action: 'save_takeaway_order', shop_id: 'central-shop',
+    shift_id: 'shift-main', order_id: 'takeaway-cancel-test', expected_revision: 0,
+    items: [{ product_id: 'coffee', quantity: 1 }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved));
+  return { f, order: saved.data.order };
+}
+const cancelTakeawayRequest = (order, extra = {}) => ({
+  action: 'cancel_takeaway_order', shop_id: 'central-shop', shift_id: 'shift-main',
+  order_id: order.id, expected_revision: order.revision, confirm_cancel: true, ...extra,
+});
+
+test('takeaway cancellation preserves audit, unrelated orders and groups, and creates no revenue', async () => {
+  const { f, order } = await takeawayCancellationFixture();
+  const groups = [{ id: 'untouched-group', numbers: [2, 3] }];
+  f.db.Shop[0].restaurant_table_groups = clone(groups);
+  f.db.Shop[0].restaurant_table_orders.push({ id: 'untouched', number: 2, state: 'occupied' });
+  const before = clone(f.db.Shift);
+  const result = await f.run(cancelTakeawayRequest(order));
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(result.data.cancelled, true);
+  assert.deepEqual(f.db.Shop[0].restaurant_table_groups, groups);
+  assert.equal(f.db.Shop[0].restaurant_table_orders.length, 1);
+  assert.equal(f.db.Shop[0].restaurant_table_orders[0].id, 'untouched');
+  assert.deepEqual(f.db.Shift, before); assert.equal(f.db.Sale.length, 0);
+  const audit = f.db.ActionHistory.find(row => row.action === 'restaurant_takeaway_order_cancelled');
+  assert.equal(audit.user_id, 'cashier-1');
+  const snapshot = JSON.parse(audit.details);
+  assert.deepEqual(snapshot.order_snapshot, order);
+  assert.equal(snapshot.order_type, 'takeaway');
+  assert.ok(Date.parse(snapshot.cancelled_at));
+  assert.equal((await f.run(cancelTakeawayRequest(order))).data.already_closed, true);
+});
+
+test('takeaway cancellation rejects wrong shop/shift, stale revision, missing confirmation and payment locks', async () => {
+  const { f, order } = await takeawayCancellationFixture();
+  for (const extra of [{ shop_id: 'second-shop' }, { shift_id: 'shift-second' },
+    { expected_revision: 2 }, { confirm_cancel: false }, { order_id: 'bad' }]) {
+    assert.notEqual((await f.run(cancelTakeawayRequest(order, extra))).status, 200);
+    assert.equal(f.db.Shop[0].restaurant_table_orders[0].id, order.id);
+  }
+  const stored = f.db.Shop[0].restaurant_table_orders[0];
+  stored.state = 'paying';
+  assert.equal((await f.run(cancelTakeawayRequest(order))).status, 409);
+  stored.state = 'occupied'; stored.checkout_key = 'payment-started';
+  assert.equal((await f.run(cancelTakeawayRequest(order))).status, 409);
+  delete stored.checkout_key;
+  f.db.Shift[0].status = 'closed';
+  assert.equal((await f.run(cancelTakeawayRequest(order))).status, 403);
+});
+
+test('takeaway cancellation preserves order when audit fails and serializes against edits', async () => {
+  const first = await takeawayCancellationFixture();
+  first.f.db.ActionHistory.push = () => { throw new Error('Mock audit unavailable'); };
+  assert.equal((await first.f.run(cancelTakeawayRequest(first.order))).status, 500);
+  assert.equal(first.f.db.Shop[0].restaurant_table_orders[0].id, first.order.id);
+  const { f, order } = await takeawayCancellationFixture();
+  const results = await Promise.all([
+    f.run(cancelTakeawayRequest(order)),
+    f.run({ action: 'save_takeaway_order', shop_id: 'central-shop', shift_id: 'shift-main',
+      order_id: order.id, expected_revision: 1, items: [{ product_id: 'coffee', quantity: 2 }] }),
+  ]);
+  assert.equal(results.filter(row => row.status === 200).length, 1, JSON.stringify(results));
+  assert.equal(results.filter(row => row.status === 409).length, 1, JSON.stringify(results));
+});
+
 const cancelTableRequest = (order, extra = {}) => ({ action: 'cancel_table_order',
   shop_id: 'second-shop', table_number: 2, shift_id: 'shift-second',
   table_order_id: order.id, expected_revision: order.revision, confirm_cancel: true, ...extra });
