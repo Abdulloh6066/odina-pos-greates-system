@@ -179,6 +179,9 @@
   body.odina-shift-printing .receipt-print.shift-report { display: block !important; }
   body.odina-shift-printing .receipt-print:not(.shift-report) { display: none !important; }
   body.odina-sale-printing > #root { display: none !important; }
+  body.odina-sale-printing .receipt-print:not(.sale-receipt) { display: none !important; }
+  body.odina-staff-printing > #root { display: none !important; }
+  body.odina-staff-printing .receipt-print:not(.staff-order-ticket) { display: none !important; }
   .receipt-print {
     position: absolute !important;
     left: 0; top: 0;
