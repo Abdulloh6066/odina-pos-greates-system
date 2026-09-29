@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import OrderForm from '@/components/orders/OrderForm';
 import OrderDetail from '@/components/orders/OrderDetail';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
+import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
 import OrderLedgerHero from '@/components/orders/OrderLedgerHero';
 import OrderFilterRail from '@/components/orders/OrderFilterRail';
@@ -143,7 +144,7 @@ export default function Orders() {
   const handleCreated = (order, items) => {
     setFormOpen(false);
     setRepeatPrefill(null);
-    setStaffTicket({ order, items });
+    if (isStaffTicketEnabled(order?.shop_id)) setStaffTicket({ order, items });
     loadOrders();
   };
 
