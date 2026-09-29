@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { RefundDialog } from '@/components/pos/KassaActionDialogs';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
+import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 
 export default function SalesHistory({ embedded = false }) {
   const { user } = useOutletContext();
@@ -189,9 +190,9 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose })
         )}
         <div className="flex flex-wrap gap-2 mt-4">
           {sale.status !== 'refunded' && sale.items?.length > 0 && (
-            <Button variant="outline" onClick={() => onStaffTicket(sale)} className="min-h-11 flex-1">
+            {isStaffTicketEnabled(sale.shop_id) && <Button variant="outline" onClick={() => onStaffTicket(sale)} className="min-h-11 flex-1">
               <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
-            </Button>
+            </Button>}
           )}
           {canRefund && sale.status === 'completed' && (
             <Button variant="destructive" onClick={() => onRefund(sale)} className="flex-1">
