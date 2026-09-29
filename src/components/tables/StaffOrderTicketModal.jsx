@@ -320,7 +320,7 @@ export default function StaffOrderTicketModal({
           <Button
             type="button"
             onClick={handlePrint}
-            disabled={!ticketReady || loading || Boolean(error) || items.length === 0 || printRequested}
+            disabled={!ticketReady || loading || Boolean(error) || items.length === 0 || autoPrint || printRequested}
             className="min-h-11 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary-strong shadow-sm px-5"
           >
             <Printer className="w-4 h-4 mr-1.5" />
