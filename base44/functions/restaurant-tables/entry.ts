@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
     }
 
     if (["get_table_order", "save_table_order", "reconcile_table_payment", "cancel_table_order",
-      "list_takeaway_orders", "get_takeaway_order", "save_takeaway_order", "reconcile_takeaway_payment"].includes(action)) {
+      "list_takeaway_orders", "get_takeaway_order", "save_takeaway_order", "reconcile_takeaway_payment", "cancel_takeaway_order"].includes(action)) {
       const takeaway = action.includes("takeaway");
       const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
       if (!isShop(shop)) return Response.json({ error: "Faol do‘kon topilmadi." }, { status: 404 });
@@ -371,8 +371,8 @@ Deno.serve(async (req) => {
       if (!shift || shift.status !== "open" || shift.user_id !== actor.id || shift.shop_id !== shop.id) {
         return Response.json({ error: "Stol buyurtmasini faqat shu do‘kondagi ochiq smenangizda saqlang." }, { status: 403 });
       }
-      if (action === "cancel_table_order") {
-        const expectedId = String(body?.table_order_id || "");
+      if (action === "cancel_table_order" || action === "cancel_takeaway_order") {
+        const expectedId = takeaway ? orderId : String(body?.table_order_id || "");
         if (!expectedId || !Number.isInteger(body?.expected_revision) || body.expected_revision < 1
           || body?.confirm_cancel !== true) {
           return Response.json({ error: "Bekor qilish uchun buyurtma va tasdiq kerak." }, { status: 400 });
@@ -380,36 +380,37 @@ Deno.serve(async (req) => {
         // A lost response may be retried. Never cancel a NEW order on the same table.
         if (!existing) return Response.json({ ok: true, already_closed: true });
         if (existing.id !== expectedId || existing.revision !== body.expected_revision) {
-          return Response.json({ error: "Stol buyurtmasi boshqa qurilmada o‘zgardi. Yangilang va qayta tekshiring." }, { status: 409 });
+          return Response.json({ error: "Buyurtma boshqa qurilmada o‘zgardi. Yangilang va qayta tekshiring." }, { status: 409 });
         }
         if (existing.state !== "occupied" || existing.checkout_key) {
           return Response.json({ error: "To‘lovi boshlangan buyurtmani bekor qilib bo‘lmaydi. Avval to‘lovni tekshiring." }, { status: 409 });
         }
         const cancelledAt = new Date().toISOString();
         const details = JSON.stringify({ shop_id: shop.id, shop_name: shop.name,
-          table_numbers: group?.numbers || [number], order_id: existing.id,
+          order_type: takeaway ? "takeaway" : "table",
+          table_numbers: takeaway ? [] : group?.numbers || [number], order_id: existing.id,
           ticket_number: existing.ticket_number, revision: existing.revision,
-          cancelled_at: cancelledAt, reason: "Oxirgi mahsulot olib tashlandi",
+          cancelled_at: cancelledAt, reason: takeaway ? "Ochiq buyurtma bekor qilindi" : "Oxirgi mahsulot olib tashlandi",
           order_snapshot: existing });
         // Preserve the original unpaid order BEFORE removal. If history is unavailable,
         // leave the table untouched. A conflict keeps an explicitly labelled request.
         await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
-          action: "restaurant_table_order_cancel_requested", details });
+          action: takeaway ? "restaurant_takeaway_order_cancel_requested" : "restaurant_table_order_cancel_requested", details });
         const cleared = await service.entities.Shop.updateMany(
           { id: shop.id, ...ordersVersionCondition(ordersVersion(shop)) },
           { $set: {
               restaurant_table_orders: stored.filter((row: any) => row.id !== existing.id),
-              restaurant_table_groups: group
+              ...(takeaway ? {} : { restaurant_table_groups: group
                 ? cleanGroups(shop, safeShop(shop).table_count).filter((row: any) => row.id !== group.id)
-                : cleanGroups(shop, safeShop(shop).table_count),
+                : cleanGroups(shop, safeShop(shop).table_count) }),
             }, $inc: { restaurant_table_orders_version: 1 } },
         );
         if (!cleared?.success || Number(cleared.updated || 0) !== 1) {
-          return Response.json({ error: "Stol boshqa kassada o‘zgardi. Buyurtma bekor qilinmadi; yangilang." }, { status: 409 });
+          return Response.json({ error: "Buyurtmalar boshqa kassada o‘zgardi. Buyurtma bekor qilinmadi; yangilang." }, { status: 409 });
         }
         let auditWarning = false;
         await service.entities.ActionHistory.create({ user_id: actor.id, user_name: userLabel(actor),
-          action: "restaurant_table_order_cancelled", details }).catch(() => { auditWarning = true; });
+          action: takeaway ? "restaurant_takeaway_order_cancelled" : "restaurant_table_order_cancelled", details }).catch(() => { auditWarning = true; });
         return Response.json({ ok: true, cancelled: true, order_id: existing.id, audit_warning: auditWarning });
       }
       // A retry after a lost save response returns the same unpaid order.
