@@ -140,6 +140,7 @@ export default function POS() {
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [tableOrder, setTableOrder] = useState(null);
   const [tableOrderLoading, setTableOrderLoading] = useState(false);
+  const [verifiedTableShop, setVerifiedTableShop] = useState(null);
   const [tableOrderError, setTableOrderError] = useState('');
   const [tableSaveError, setTableSaveError] = useState('');
   const [savingTable, setSavingTable] = useState(false);
@@ -199,10 +200,22 @@ export default function POS() {
     setTableSaveError('');
     base44.functions.invoke('restaurant-tables', {
       action: 'get_table_order', shop_id: selectedTable.shopId, table_number: selectedTable.number,
-    }).then((response) => {
+    }).then(async (response) => {
       if (!active) return;
       const result = response?.data || response;
       if (!result?.ok) throw new Error(result?.error || 'Stol buyurtmasi yuklanmadi.');
+      // Use the same authorized source that validated and loaded this table.
+      // The general Shop list may be stale or omitted by entity read permissions.
+      let verifiedShop = result.shop;
+      if (!verifiedShop) {
+        const statusResponse = await base44.functions.invoke('restaurant-tables', { action: 'status' });
+        const status = statusResponse?.data || statusResponse;
+        const currentShop = status?.shops?.find((row) => row.id === selectedTable.shopId);
+        if (currentShop) verifiedShop = { id: currentShop.id, name: currentShop.name, restaurant_table_count: currentShop.table_count };
+      }
+      if (!active) return;
+      if (verifiedShop?.id !== selectedTable.shopId) throw new Error('Stol do‘konini tekshirib bo‘lmadi. Xaritani yangilang.');
+      setVerifiedTableShop({ key: tableKey, shop: verifiedShop });
       setTableOrder(result.order || null);
       setCart(result.order?.items || []);
       setDiscountCode(''); setDiscountPct(0); setDiscountOwnerPin('');
@@ -635,10 +648,12 @@ export default function POS() {
     setStaffTicket({ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber });
   };
 
-  const tableShop = selectedTable ? shops.find((shop) => shop.id === selectedTable.shopId) : null;
+  const tableShop = selectedTable
+    ? (verifiedTableShop?.key === tableKey ? verifiedTableShop.shop : shops.find((shop) => shop.id === selectedTable.shopId))
+    : null;
   const tableSelectionError = tableQuery.invalid
     ? 'Stol havolasi noto‘g‘ri. Xaritadan qayta tanlang.'
-    : selectedTable && !loadingData && (!tableShop
+    : selectedTable && !loadingData && !tableOrderLoading && !tableOrderError && (!tableShop
       || !Number.isInteger(tableShop.restaurant_table_count)
       || selectedTable.number > tableShop.restaurant_table_count)
       ? 'Tanlangan stol bu do‘konda mavjud emas. Xaritani yangilang.'
