@@ -189,10 +189,10 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose })
           </div>
         )}
         <div className="flex flex-wrap gap-2 mt-4">
-          {sale.status !== 'refunded' && sale.items?.length > 0 && (
-            {isStaffTicketEnabled(sale.shop_id) && <Button variant="outline" onClick={() => onStaffTicket(sale)} className="min-h-11 flex-1">
+          {isStaffTicketEnabled(sale.shop_id) && sale.status !== 'refunded' && sale.items?.length > 0 && (
+            <Button variant="outline" onClick={() => onStaffTicket(sale)} className="min-h-11 flex-1">
               <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
-            </Button>}
+            </Button>
           )}
           {canRefund && sale.status === 'completed' && (
             <Button variant="destructive" onClick={() => onRefund(sale)} className="flex-1">
