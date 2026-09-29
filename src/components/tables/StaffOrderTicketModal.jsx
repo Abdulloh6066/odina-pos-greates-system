@@ -159,19 +159,19 @@ export default function StaffOrderTicketModal({
       : 'w-full max-w-[440px] min-w-0 bg-white text-black px-2 py-3 sm:px-3 font-sans leading-snug select-text'}>
       {/* The reference has no large reprint banner obscuring the order number. */}
       <div className="flex items-start justify-between gap-3">
-        <span className={`min-w-0 font-black tracking-tight text-black break-words ${isPrint ? 'text-[15px]' : 'text-lg sm:text-xl'}`}>
+        <span className={`min-w-0 font-black tracking-tight text-black break-words ${isPrint ? 'text-[16.5px]' : 'text-lg sm:text-xl'}`}>
           BUYURTMA № #{String(displayOrderNumber).replace(/^#/, '')}
         </span>
-        <span className={`shrink-0 text-right font-black tracking-tight text-black ${isPrint ? 'text-[15px]' : 'text-lg sm:text-xl'}`}>
+        <span className={`shrink-0 text-right font-black tracking-tight text-black ${isPrint ? 'text-[16.5px]' : 'text-lg sm:text-xl'}`}>
           {source}
         </span>
       </div>
 
       <div className={`border-b-2 border-black ${isPrint ? 'my-2' : 'my-3'}`} />
 
-      {mode === 'takeaway' && <p className="text-xs font-black mb-2">TO‘LANMAGAN</p>}
+      {mode === 'takeaway' && <p className={`${isPrint ? 'text-[13.2px]' : 'text-xs'} font-black mb-2`}>TO‘LANMAGAN</p>}
       {/* Row 2 & 3: Metadata */}
-      <div className={`space-y-1.5 text-black ${isPrint ? 'text-[11px]' : 'text-sm'}`}>
+      <div className={`space-y-1.5 text-black ${isPrint ? 'text-[12.1px]' : 'text-sm'}`}>
         <div className="flex justify-between items-baseline gap-3">
           <span className="shrink-0 font-black tracking-wide">VAQT</span>
           <span className="min-w-0 text-right font-medium tabular-nums">{formatUzbekistanDateTime(orderTime)}</span>
@@ -210,20 +210,20 @@ export default function StaffOrderTicketModal({
         {items.map((item, idx) => (
           <div key={idx}>
             <div className="flex justify-between items-baseline gap-3">
-              <span className={`min-w-0 font-black text-black uppercase break-words flex-1 leading-snug ${isPrint ? 'text-[13px]' : 'text-lg'}`}>
+              <span className={`min-w-0 font-black text-black uppercase break-words flex-1 leading-snug ${isPrint ? 'text-[14.3px]' : 'text-lg'}`}>
                 {item.product_name}
               </span>
-              <span className={`font-black text-black tabular-nums shrink-0 ${isPrint ? 'text-[15px]' : 'text-xl'}`}>
+              <span className={`font-black text-black tabular-nums shrink-0 ${isPrint ? 'text-[16.5px]' : 'text-xl'}`}>
                 {item.quantity}{item.sale_unit === 'gram' ? ' g' : ''}
               </span>
             </div>
             {Boolean(item.variant_name) && (
-              <div className={`font-bold mt-0.5 ${isPrint ? 'text-[10px]' : 'text-xs text-zinc-700'}`}>
+              <div className={`font-bold mt-0.5 ${isPrint ? 'text-[11px]' : 'text-xs text-zinc-700'}`}>
                 Variant: {item.variant_name}
               </div>
             )}
             {Boolean(item.notes) && (
-              <div className={`italic mt-0.5 ${isPrint ? 'text-[10px]' : 'text-xs text-zinc-700'}`}>
+              <div className={`italic mt-0.5 ${isPrint ? 'text-[11px]' : 'text-xs text-zinc-700'}`}>
                 Eslatma: {item.notes}
               </div>
             )}
@@ -234,7 +234,7 @@ export default function StaffOrderTicketModal({
         ))}
       </div>
       {/* Retain reprint traceability without the oversized boxed banner. */}
-      {isReprint && <p className={`text-right font-semibold text-black ${isPrint ? 'mt-2 text-[9px]' : 'mt-3 text-[10px]'}`}>
+      {isReprint && <p className={`text-right font-semibold text-black ${isPrint ? 'mt-2 text-[9.9px]' : 'mt-3 text-[10px]'}`}>
         Qayta chop · {revision}-tahrir
       </p>}
     </div>
@@ -299,7 +299,7 @@ export default function StaffOrderTicketModal({
           {open && typeof document !== 'undefined' && createPortal(
             <div
               ref={printRef}
-              className="receipt-print staff-order-ticket font-sans text-[13px] leading-relaxed hidden text-black"
+              className="receipt-print staff-order-ticket font-sans text-[14.3px] leading-relaxed hidden text-black"
             >
               {renderTicketContent(true)}
             </div>,
