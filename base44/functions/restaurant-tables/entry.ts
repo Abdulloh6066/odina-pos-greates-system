@@ -337,6 +337,7 @@ Deno.serve(async (req) => {
         : orderForNumber(shop, number);
       if (action === "get_table_order" || action === "get_takeaway_order") {
         return Response.json({ ok: true, order: existing, group,
+          shop: { id: shop.id, name: shop.name, restaurant_table_count: safeShop(shop).table_count },
           primary_table_number: primaryNumber });
       }
       if (action === "reconcile_table_payment" || action === "reconcile_takeaway_payment") {
