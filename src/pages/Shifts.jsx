@@ -407,7 +407,7 @@ function ShiftDetailDialog({ shift, detail, loading, error, onClose }) {
       }
     }
 
-    return Array.from(grouped.values()).sort((a, b) => b.quantity - a.quantity);
+    return Array.from(grouped.values()).sort((a, b) => b.amount - a.amount || b.quantity - a.quantity || a.name.localeCompare(b.name, 'uz'));
   }, [detail.sales, saleItemsBySale]);
 
   if (!shift) return null;
