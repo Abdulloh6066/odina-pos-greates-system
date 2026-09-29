@@ -9,6 +9,7 @@ import { Image } from '@/components/ui/image';
 import OrderPaymentDialog from '@/components/orders/OrderPaymentDialog';
 import OrderCompleteDialog from '@/components/orders/OrderCompleteDialog';
 import { useAuth } from '@/lib/AuthContext';
+import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 import { Calendar, Clock, Phone, MapPin, Store, User, CreditCard, Truck, PackageCheck, Repeat2, ReceiptText } from 'lucide-react';
 
 export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffTicket }) {
@@ -149,7 +150,7 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
                       <Repeat2 className="w-4 h-4" /> Qayta buyurtma
                     </Button>
                   )}
-                  {canPrint && <Button variant="outline" onClick={() => onStaffTicket(order, items)} className="min-h-11">
+                  {canPrint && isStaffTicketEnabled(order.shop_id) && <Button variant="outline" onClick={() => onStaffTicket(order, items)} className="min-h-11">
                     <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki
                   </Button>}
                   {showPay && <Button variant="outline" onClick={() => setPayOpen(true)}>To‘lov qo‘shish</Button>}
