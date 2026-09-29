@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { staffTicketFromSale, staffTicketFromCustomerOrder } from '@/lib/staff-order-ticket';
+import { staffTicketFromSale, staffTicketFromCustomerOrder, isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 import { startReceiptPrint } from '@/lib/receipt-print-lifecycle';
 import { toast } from '@/components/ui/use-toast';
 
@@ -30,7 +30,15 @@ function incrementTicketPrintCount(orderId, revision) {
   }
 }
 
-export default function StaffOrderTicketModal({
+export default function StaffOrderTicketModal(props) {
+  const enabled = isStaffTicketEnabled(props.shop?.id || props.shopId || props.order?.shop_id);
+  useEffect(() => {
+    if (props.open && !enabled) props.onClose?.();
+  }, [props.open, props.onClose, enabled]);
+  return enabled ? <EnabledStaffOrderTicketModal {...props} /> : null;
+}
+
+function EnabledStaffOrderTicketModal({
   open,
   onClose,
   shop,
