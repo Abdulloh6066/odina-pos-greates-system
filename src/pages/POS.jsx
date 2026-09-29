@@ -95,7 +95,6 @@ export default function POS() {
   const checkoutRecordedAtRef = useRef('');
   const [receiptPrintSale, setReceiptPrintSale] = useState(null);
   const [shiftReport, setShiftReport] = useState(null);
-  const [staffTicketPrompt, setStaffTicketPrompt] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
   const [takeawayOrder, setTakeawayOrder] = useState(null);
   const [takeawaySaving, setTakeawaySaving] = useState(false);
@@ -1080,7 +1079,7 @@ export default function POS() {
   const finishSalePresentation = (sale) => {
     setReceiptPrintSale(null);
     if (sale?.items?.length && !sale?.table_number_snapshot && !sale?.table_order_id_snapshot) {
-      setStaffTicketPrompt(sale);
+      setStaffTicket({ mode: 'sale', order: sale, autoPrint: true });
     } else if (selectedTable && !sale?.offline_pending) {
       navigate(posHomePath, { replace: true });
       setTablePickerOpen(true);
@@ -1768,28 +1767,6 @@ export default function POS() {
         print={!!receiptPrintSale}
         onAfterPrint={finishSalePresentation}
       />
-      <Dialog open={!!staffTicketPrompt} onOpenChange={(open) => !open && setStaffTicketPrompt(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl">
-              Olib ketish buyurtmasi uchun xizmat cheki kerakmi?
-            </DialogTitle>
-          </DialogHeader>
-          <DialogFooter className="flex flex-row gap-2">
-            <Button type="button" variant="outline" onClick={() => setStaffTicketPrompt(null)}
-              className="min-h-11 flex-1">
-              Yo‘q
-            </Button>
-            <Button type="button" onClick={() => {
-              const sale = staffTicketPrompt;
-              setStaffTicketPrompt(null);
-              setStaffTicket({ mode: 'sale', order: sale, autoPrint: true });
-            }} className="min-h-11 flex-1 bg-primary text-primary-foreground hover:bg-primary-strong">
-              Chop etish
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <StaffOrderTicketModal open={!!staffTicket} onClose={() => setStaffTicket(null)}
         mode={staffTicket?.mode} order={staffTicket?.order} shop={staffTicket?.shop}
         shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} autoPrint={staffTicket?.autoPrint} />
