@@ -802,6 +802,15 @@ test('takeaway cancellation preserves order when audit fails and serializes agai
   assert.equal(results.filter(row => row.status === 409).length, 1, JSON.stringify(results));
 });
 
+test('table lookup supplies authorized shop metadata even without a general Shop list', async () => {
+  const f = fixture(); f.as('cashier-2');
+  const result = await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 2 });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.data.shop, { id: 'second-shop', name: 'Odina Second', restaurant_table_count: 8 });
+  assert.equal((await f.run({ action: 'get_table_order', shop_id: 'central-shop', table_number: 2 })).status, 403);
+  assert.equal((await f.run({ action: 'get_table_order', shop_id: 'second-shop', table_number: 9 })).status, 400);
+});
+
 const cancelTableRequest = (order, extra = {}) => ({ action: 'cancel_table_order',
   shop_id: 'second-shop', table_number: 2, shift_id: 'shift-second',
   table_order_id: order.id, expected_revision: order.revision, confirm_cancel: true, ...extra });
