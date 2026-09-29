@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, AlertCircle, Loader2, UtensilsCrossed, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -6,6 +6,8 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { staffTicketFromSale, staffTicketFromCustomerOrder } from '@/lib/staff-order-ticket';
+import { startReceiptPrint } from '@/lib/receipt-print-lifecycle';
+import { toast } from '@/components/ui/use-toast';
 
 function getTicketPrintCount(orderId, revision) {
   if (!orderId || typeof window === 'undefined') return 0;
@@ -37,109 +39,80 @@ export default function StaffOrderTicketModal({
   order: initialOrder = null,
   mode = 'table',
   orderItems,
-  autoPrint = false,
+  autoPrint = true,
 }) {
   const [ticketOrder, setTicketOrder] = useState(initialOrder);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [localPrintCount, setLocalPrintCount] = useState(0);
-  const autoPrintedRef = useRef(false);
   const printRef = useRef(null);
 
   const effectiveShopId = shop?.id || shopId || initialOrder?.shop_id;
   const effectiveShopName = shop?.name || ticketOrder?.shop_name || 'Odina';
 
+  // Only print data loaded for this exact opening/order. A previous ticket may
+  // still be in React state while the next order is being fetched.
+  const [loadedRequest, setLoadedRequest] = useState(null);
+  const [printRequested, setPrintRequested] = useState(false);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
+    let active = true;
+    setLoadedRequest(null);
+    setPrintRequested(false);
+    setError('');
     if (!open) {
-      setError('');
       setLocalPrintCount(0);
-      autoPrintedRef.current = false;
       return;
     }
-
-    if (mode === 'table') {
-      if (initialOrder) {
-        setTicketOrder(initialOrder);
-        const existingPrints = getTicketPrintCount(initialOrder.id, initialOrder.revision);
-        setLocalPrintCount(existingPrints);
-      }
-
-      if (!effectiveShopId || !tableNumber) {
-        if (!initialOrder) setError('Stol tanlanmagan.');
-        return;
-      }
-
-      let active = true;
-      if (!initialOrder) setLoading(true);
-
-      base44.functions.invoke('restaurant-tables', {
-        action: 'get_table_order',
-        shop_id: effectiveShopId,
-        table_number: tableNumber,
-      }).then((res) => {
-        if (!active) return;
-        const data = res?.data || res;
-        if (data?.ok && data?.order) {
-          setTicketOrder(data.order);
-          const existingPrints = getTicketPrintCount(data.order.id, data.order.revision);
-          setLocalPrintCount(existingPrints);
-          setError('');
-        } else if (!initialOrder) {
-          setError(data?.error || 'Stol buyurtmasi topilmadi.');
+    setLoading(true);
+    const loadTicket = async () => {
+      if (mode === 'table' || mode === 'takeaway') {
+        if (mode === 'table' && (!effectiveShopId || !tableNumber)) {
+          if (initialOrder) return initialOrder;
+          throw new Error('Stol tanlanmagan.');
         }
-      }).catch((err) => {
-        if (!active) return;
-        if (!initialOrder) {
-          setError(err?.response?.data?.error || err?.message || 'Buyurtmani yuklab bo‘lmadi.');
+        if (mode === 'takeaway' && (!initialOrder?.id || !effectiveShopId)) {
+          throw new Error('Buyurtma yoki do‘kon topilmadi.');
         }
-      }).finally(() => {
-        if (active) setLoading(false);
-      });
-
-      return () => { active = false; };
-    } else if (mode === 'takeaway') {
-      setTicketOrder(initialOrder);
-      setLocalPrintCount(getTicketPrintCount(initialOrder?.id, initialOrder?.revision));
-      if (!initialOrder?.id || !effectiveShopId) {
-        setError('Buyurtma yoki do‘kon topilmadi.');
-        return;
-      }
-      let active = true;
-      setLoading(true);
-      setError('');
-      base44.functions.invoke('restaurant-tables', {
-        action: 'get_takeaway_order', shop_id: effectiveShopId, order_id: initialOrder.id,
-      }).then((response) => {
-        if (!active) return;
+        const response = await base44.functions.invoke('restaurant-tables', {
+          action: mode === 'table' ? 'get_table_order' : 'get_takeaway_order',
+          shop_id: effectiveShopId,
+          ...(mode === 'table' ? { table_number: tableNumber } : { order_id: initialOrder.id }),
+        });
         const result = response?.data || response;
-        if (!result?.ok || !result.order) throw new Error('Buyurtma yopilgan. Ochiq buyurtmalarni yangilang.');
-        setTicketOrder(result.order);
-        setLocalPrintCount(getTicketPrintCount(result.order.id, result.order.revision));
-      }).catch((err) => {
-        if (active) setError(err?.response?.data?.error || err?.message || 'Buyurtma yuklanmadi.');
-      }).finally(() => { if (active) setLoading(false); });
-      return () => { active = false; };
-    } else if (mode === 'customer') {
-      if (!initialOrder?.id) {
-        setError('Buyurtma saqlanmagan.');
-      } else if (orderItems?.length) {
-        setTicketOrder(staffTicketFromCustomerOrder(initialOrder, orderItems));
-      } else {
-        setLoading(true);
-        base44.entities.CustomerOrderItem.filter({ order_id: initialOrder.id })
-          .then((items) => {
-            if (!items?.length) throw new Error('Buyurtma mahsulotlari topilmadi.');
-            setTicketOrder(staffTicketFromCustomerOrder(initialOrder, items));
-          }).catch((err) => {
-            setError(err?.message || 'Mahsulotlarni yuklab bo‘lmadi.');
-          }).finally(() => {
-            setLoading(false);
-          });
+        if (!result?.ok || !result.order) {
+          throw new Error(result?.error || 'Buyurtma yopilgan yoki topilmadi. Buyurtmalarni yangilang.');
+        }
+        return result.order;
       }
-    } else if (mode === 'sale') {
-      setTicketOrder(staffTicketFromSale(initialOrder));
-    }
+      if (mode === 'customer') {
+        if (!initialOrder?.id) throw new Error('Buyurtma saqlanmagan.');
+        const savedItems = orderItems?.length ? orderItems
+          : await base44.entities.CustomerOrderItem.filter({ order_id: initialOrder.id });
+        if (!savedItems?.length) throw new Error('Buyurtma mahsulotlari topilmadi.');
+        return staffTicketFromCustomerOrder(initialOrder, savedItems);
+      }
+      return staffTicketFromSale(initialOrder);
+    };
+    loadTicket().then((order) => {
+      if (!active) return;
+      setTicketOrder(order);
+      setLocalPrintCount(getTicketPrintCount(order?.id, order?.revision));
+      setLoadedRequest({ initialOrder, mode, effectiveShopId, tableNumber, orderItems });
+    }).catch((err) => {
+      if (active) setError(err?.response?.data?.error || err?.message || 'Buyurtmani yuklab bo‘lmadi.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [open, mode, effectiveShopId, tableNumber, initialOrder, orderItems]);
+
+  const ticketReady = Boolean(loadedRequest
+    && loadedRequest.initialOrder === initialOrder
+    && loadedRequest.mode === mode
+    && loadedRequest.effectiveShopId === effectiveShopId
+    && loadedRequest.tableNumber === tableNumber
+    && loadedRequest.orderItems === orderItems);
 
   const items = ticketOrder?.items || [];
   const displayTableNumber = tableNumber || ticketOrder?.table_number;
@@ -158,28 +131,23 @@ export default function StaffOrderTicketModal({
     (orderId && getTicketPrintCount(orderId, revision) > 0)
   );
 
-  const handlePrint = useCallback(() => {
-    if (loading || error || !items.length) return;
-    if (orderId) {
-      const updated = incrementTicketPrintCount(orderId, revision);
-      setLocalPrintCount(updated);
-    }
-    window.print();
-  }, [loading, error, items.length, orderId, revision]);
+  const handlePrint = () => {
+    if (ticketReady && !loading && !error && items.length) setPrintRequested(true);
+  };
 
   useEffect(() => {
-    if (!open) {
-      autoPrintedRef.current = false;
-      return;
-    }
-    if (!autoPrint || loading || error || !items.length || !ticketOrder || autoPrintedRef.current) return;
-    const frame = window.requestAnimationFrame(() => {
-      if (autoPrintedRef.current) return;
-      autoPrintedRef.current = true;
-      handlePrint();
+    if (!open || !ticketReady || (!autoPrint && !printRequested)
+      || loading || error || !items.length) return undefined;
+    return startReceiptPrint({
+      printClass: 'odina-staff-printing',
+      warningMessage: 'Xizmat cheki chiqmagan bo‘lsa, “Xizmat cheki” tugmasidan qayta chop eting.',
+      onWarning: (description) => toast({ title: 'Chekni tekshiring', description, variant: 'destructive' }),
+      onDone: () => {
+        if (orderId) incrementTicketPrintCount(orderId, revision);
+        onCloseRef.current?.();
+      },
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [open, autoPrint, loading, error, items.length, ticketOrder, handlePrint]);
+  }, [open, ticketReady, autoPrint, printRequested, loading, error, ticketOrder, items.length, orderId, revision]);
 
   // One shared, plain black-on-white layout for the screen preview and 80mm print.
   // Identifiers and table labels come from the actual order, never sample text.
@@ -352,7 +320,7 @@ export default function StaffOrderTicketModal({
           <Button
             type="button"
             onClick={handlePrint}
-            disabled={loading || Boolean(error) || items.length === 0}
+            disabled={!ticketReady || loading || Boolean(error) || items.length === 0 || printRequested}
             className="min-h-11 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary-strong shadow-sm px-5"
           >
             <Printer className="w-4 h-4 mr-1.5" />
