@@ -37,7 +37,7 @@ test('declining cancellation keeps the order and cart with no server call', asyn
 test('confirmed cancellation removes only its row and clears only its selected cart after acknowledgment', async () => {
   let acknowledge;
   const f = fixture({ invoke: () => new Promise(resolve => { acknowledge = resolve; }) });
-  const running = f.run(); await Promise.resolve();
+  const running = f.run(); await new Promise(resolve => setImmediate(resolve));
   assert.equal(f.state().rows.length, 2); assert.equal(f.state().resets, 0);
   acknowledge({ data: { ok: true, cancelled: true } }); await running;
   assert.equal(f.state().rows.length, 1); assert.equal(f.state().rows[0].id, 'other');
