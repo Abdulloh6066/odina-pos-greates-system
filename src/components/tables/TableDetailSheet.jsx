@@ -10,6 +10,7 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import StaffOrderTicketModal from './StaffOrderTicketModal';
+import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 import TableGroupDialog from './TableGroupDialog';
 import odinaMark from '@/components/brand/odina-mark';
 import { receiptWishForSale } from '@/lib/receipt-wishes';
@@ -314,7 +315,7 @@ export default function TableDetailSheet({
                 </Button>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Button
+                {isStaffTicketEnabled(shop?.id) && <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowStaffTicket(true)}
@@ -322,7 +323,7 @@ export default function TableDetailSheet({
                 >
                   <UtensilsCrossed className="h-4 w-4" />
                   Xizmat cheki
-                </Button>
+                </Button>}
                 <Button
                   type="button"
                   variant="outline"
