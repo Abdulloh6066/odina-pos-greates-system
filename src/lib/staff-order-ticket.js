@@ -1,3 +1,9 @@
+// Temporary owner request: remove Central from this set to restore service tickets.
+const SERVICE_TICKET_PAUSED_SHOPS = new Set(['6a96f0a4ecc85c2fc57f3173']);
+export function isStaffTicketEnabled(shopId) {
+  return !SERVICE_TICKET_PAUSED_SHOPS.has(shopId);
+}
+
 // Display-only adapters for the existing kitchen/service ticket. Never calculate
 // prices or mutate the order or its saved item snapshots here.
 export function staffTicketFromSale(sale) {
