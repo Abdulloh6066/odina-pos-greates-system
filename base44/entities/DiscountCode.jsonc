@@ -20,6 +20,10 @@
       "type": "boolean",
       "default": true
     },
+    "valid_until": {
+      "type": "string",
+      "description": "YYYY-MM-DD: shu kun oxirigacha Asia/Tashkent bo\u2018yicha amal qiladi; bo\u2018sh yoki yo\u2018q bo\u2018lsa muddatsiz"
+    },
     "used_at": {
       "type": "string",
       "format": "date-time"
