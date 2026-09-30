@@ -158,7 +158,7 @@ function fixture(percentage = 5) {
   return { db, entities, client, code };
 }
 
-function loadHandler(client) {
+function loadHandler(client, now) {
   const userHelpers = readFileSync('base44/shared/user-helpers.ts', 'utf8').replace(/export /g, '');
   const managerScope = readFileSync('base44/shared/manager-request-scope.ts', 'utf8')
     .replace(/^import .*;$/gm, '').replace(/export /g, '');
@@ -196,6 +196,7 @@ function loadHandler(client) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
   const context = vm.createContext({
+    Date: now ? class extends Date { static now() { return Date.parse(now); } } : Date,
     client,
     Response,
     crypto: webcrypto,
@@ -610,7 +611,8 @@ test('discount management hides used codes and creates one-time codes', () => {
   const source = readFileSync('src/pages/DiscountCodes.jsx', 'utf8');
   assert.match(source, /item\.active !== false/);
   assert.match(source, /Number\(item\.usage_count \|\| 0\) < 1/);
-  assert.match(source, /single_use: true/);
+  assert.match(source, /single_use: usage === 'once'/);
+  assert.match(source, /valid_until: validity === 'date' \? validUntil : ''/);
 });
 
 test('86,000 cake rounds to 85,000 with immutable original price and matching accounting', async () => {
