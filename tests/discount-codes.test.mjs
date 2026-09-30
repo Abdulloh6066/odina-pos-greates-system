@@ -905,3 +905,47 @@ test('two cashiers cannot pay one takeaway twice under different payment keys', 
   assert.equal(f.db.ProductStock[0].quantity, 9);
 });
 
+
+test('unlimited promo remains active across two purchases with independent usage count', async () => {
+  const f = fixture(15);
+  f.db.DiscountCode[0].single_use = false;
+  f.db.DiscountCode[0].valid_until = '';
+  const call = loadHandler(f.client);
+  for (let i = 0; i < 2; i++) {
+    const result = await call(saleBody(f.code, 15));
+    assert.equal(result.status, 200, JSON.stringify(result));
+    assert.equal(result.data.sale.total, 85000);
+  }
+  assert.equal(f.db.DiscountCode[0].active, true);
+  assert.equal(f.db.DiscountCode[0].usage_count, 2);
+  assert.equal(f.db.Sale.length, 2);
+});
+
+test('dated promo is valid through Uzbekistan midnight and rejected immediately after', async () => {
+  const f = fixture(10);
+  f.db.DiscountCode[0].single_use = false;
+  f.db.DiscountCode[0].valid_until = '2026-10-05';
+  const before = loadHandler(f.client, '2026-10-05T18:59:59.999Z');
+  assert.equal((await before({ action:'validate_discount', code:f.code })).status, 200);
+  const after = loadHandler(f.client, '2026-10-05T19:00:00.000Z');
+  assert.equal((await after({ action:'validate_discount', code:f.code })).status, 409);
+  const sale = await after(saleBody(f.code,10));
+  assert.equal(sale.status,409,JSON.stringify(sale));
+  assert.equal(f.db.Sale.length,0);
+  assert.equal(f.db.DiscountCode[0].usage_count,0);
+});
+
+test('future-dated reusable promo can pay twice; invalid dates cannot pay', async () => {
+  const f = fixture(10);
+  f.db.DiscountCode[0].single_use = false;
+  f.db.DiscountCode[0].valid_until = '2099-10-05';
+  const call = loadHandler(f.client);
+  assert.equal((await call(saleBody(f.code,10))).status,200);
+  assert.equal((await call(saleBody(f.code,10))).status,200);
+  for (const invalid of ['2099-02-30', 'invalid', '2099-13-01']) {
+    f.db.DiscountCode[0].valid_until = invalid;
+    assert.equal((await call({action:'validate_discount',code:f.code})).status,409);
+    assert.equal((await call(saleBody(f.code,10))).status,409);
+  }
+  assert.equal(f.db.Sale.length,2);
+});
