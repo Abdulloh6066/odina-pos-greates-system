@@ -1,6 +1,17 @@
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 
+// Expiry uses the server clock, through the selected day's end in Uzbekistan.
+function isDiscountExpired(discount: any, now = Date.now()) {
+  const date = discount?.valid_until;
+  if (date === undefined || date === null || date === "") return false;
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return true;
+  const end = Date.parse(date + "T23:59:59.999+05:00");
+  if (!Number.isFinite(end) || new Date(end + 5 * 60 * 60 * 1000).toISOString().slice(0, 10) !== date) return true;
+  return now > end;
+}
+
+
 const COMPLETE_SALE_RUNTIME_VERSION = "offline-sales-v1-2026-09-12";
 
 const PAYMENT_METHODS = new Set([
@@ -625,6 +636,9 @@ export default async function(req) {
       const discount = matches?.[0];
       if (!discount || (discount.single_use !== false && Number(discount.usage_count || 0) >= 1)) {
         return Response.json({ error: "Kod noto‘g‘ri, nofaol yoki avval ishlatilgan." }, { status: 404 });
+      }
+      if (isDiscountExpired(discount)) {
+        return Response.json({ error: "Chegirma kodining muddati tugagan." }, { status: 409 });
       }
       const percentage = Number(discount.percentage);
       if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
@@ -1267,6 +1281,9 @@ export default async function(req) {
       }
       if (discount.single_use !== false && Number(discount.usage_count || 0) >= 1) {
         return Response.json({ error: "This discount code has already been used." }, { status: 409 });
+      }
+      if (isDiscountExpired(discount)) {
+        return Response.json({ error: "Chegirma kodining muddati tugagan." }, { status: 409 });
       }
       discountPercentage = Number(discount.percentage);
       if (!Number.isFinite(discountPercentage) || discountPercentage <= 0 || discountPercentage > 100) {
