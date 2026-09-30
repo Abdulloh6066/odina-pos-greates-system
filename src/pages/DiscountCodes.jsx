@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import OdinaSelect from '@/components/ui/odina-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 export default function DiscountCodes() {
@@ -64,7 +65,11 @@ export default function DiscountCodes() {
               <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center"><Ticket className="w-5 h-5" /></div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold font-mono truncate">{c.code}</div>
-                <div className="text-xs text-muted-foreground">{c.percentage}% chegirma · Bir martalik · Faol</div>
+                <div className="text-xs text-muted-foreground">{c.percentage}% chegirma · {c.single_use === false ? 'Cheksiz foydalanish' : 'Bir martalik'}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {c.valid_until ? c.valid_until.split('-').reverse().join('.') + ' gacha' : 'Muddatsiz'}
+                  {' · '}{c.valid_until && Date.now() > Date.parse(c.valid_until + 'T23:59:59.999+05:00') ? 'Muddati tugagan' : 'Faol'}
+                </div>
               </div>
               {canManage && (
                 <div className="flex gap-1">
@@ -85,6 +90,9 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
   const [codeVal, setCodeVal] = useState('');
   const [pct, setPct] = useState('');
   const [active, setActive] = useState(true);
+  const [usage, setUsage] = useState('once');
+  const [validity, setValidity] = useState('forever');
+  const [validUntil, setValidUntil] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -93,6 +101,9 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
       setCodeVal(code?.code || '');
       setPct(code?.percentage ?? '');
       setActive(code?.active !== false);
+      setUsage(code?.single_use === false ? 'unlimited' : 'once');
+      setValidity(code?.valid_until ? 'date' : 'forever');
+      setValidUntil(code?.valid_until || '');
       setNote(code?.note || '');
     }
   }, [open, code]);
@@ -103,13 +114,23 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
       void odinaAlert('Kod va 1–100 oralig‘idagi chegirma foizini kiriting.');
       return;
     }
+    if (validity === 'date') {
+      const end = Date.parse(validUntil + 'T23:59:59.999+05:00');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(validUntil) || !Number.isFinite(end)
+        || new Date(end + 5 * 60 * 60 * 1000).toISOString().slice(0, 10) !== validUntil
+        || end < Date.now()) {
+        void odinaAlert('Bugungi yoki kelajakdagi tugash sanasini tanlang.');
+        return;
+      }
+    }
     setSaving(true);
     try {
       const payload = {
         code: codeVal.trim().toUpperCase(),
         percentage,
         active,
-        single_use: true,
+        single_use: usage === 'once',
+        valid_until: validity === 'date' ? validUntil : '',
         note: note || undefined,
       };
       if (code) { await base44.entities.DiscountCode.update(code.id, payload); await logAction(user, 'discount_updated', payload.code); }
@@ -121,7 +142,7 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-display text-xl">{code ? 'Kodni tahrirlash' : 'Yangi chegirma kodi'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
@@ -132,6 +153,27 @@ function CodeDialog({ open, code, onClose, onSaved, user }) {
             <Label className="text-xs mb-1.5 block">Chegirma foizi (%)</Label>
             <Input type="number" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="10" />
           </div>
+          <div>
+            <Label htmlFor="promo-usage" className="text-xs mb-1.5 block">Foydalanish</Label>
+            <OdinaSelect id="promo-usage" value={usage} onChange={(e) => setUsage(e.target.value)} className="w-full">
+              <option value="once">Bir martalik</option>
+              <option value="unlimited">Cheksiz foydalanish</option>
+            </OdinaSelect>
+          </div>
+          <div>
+            <Label htmlFor="promo-validity" className="text-xs mb-1.5 block">Amal qilish muddati</Label>
+            <OdinaSelect id="promo-validity" value={validity} onChange={(e) => setValidity(e.target.value)} className="w-full">
+              <option value="forever">Muddatsiz</option>
+              <option value="date">Belgilangan sanagacha</option>
+            </OdinaSelect>
+          </div>
+          {validity === 'date' && (
+            <div>
+              <Label htmlFor="promo-end" className="text-xs mb-1.5 block">Oxirgi amal qilish kuni</Label>
+              <Input id="promo-end" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1.5">Tanlangan kun oxirigacha amal qiladi.</p>
+            </div>
+          )}
           <div>
             <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Masalan: Yozgi aksiya" />
