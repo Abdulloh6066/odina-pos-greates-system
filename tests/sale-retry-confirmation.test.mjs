@@ -25,7 +25,9 @@ test('retry during item saving cannot acknowledge or discard an unfinished sale'
   f.entities.SaleItem.bulkCreate = async items => { entered(); await gate; return original(items); };
   const first = f.invoke(file, body);
   await reached;
-  assert.equal(f.db.Sale.length, 1); assert.equal(f.db.Payment.length, 0);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Shift[0].expected_cash, 0);
+  assert.equal(f.db.Shift[0].sale_request_keys.includes('sale-completed:' + body.idempotency_key), false);
   const retry = await f.invoke(file, body);
   assert.equal(retry.status, 503); assert.equal(retry.data.sale, undefined);
   release();
