@@ -135,7 +135,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
 
-        {checking && <p role="status" className="rounded-xl bg-primary/10 px-3 py-2 text-sm text-brand-ink">Qoldiq tekshirilmoqda… To‘lov usulini tanlashingiz mumkin.</p>}
+        {/* Announce the check without adding/removing space above the touch targets. */}
+        <span role="status" className="sr-only">{checking ? 'Qoldiq tekshirilmoqda.' : ''}</span>
 
         {discountControls && <div className="border-b border-border pb-4 mb-1">{discountControls}</div>}
 
