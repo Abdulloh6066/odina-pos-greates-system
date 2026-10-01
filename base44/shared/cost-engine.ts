@@ -210,14 +210,16 @@ export async function computeProductCost(
   productId: string,
   ingredientCosts: Map<string, any>,
   productAtSale?: any,
+  recipeAtSale?: any,
 ): Promise<{
   costPerPiece: number;
   hasPrice: boolean;
   missing: string[];
   outputUnit: string;
 }> {
-  const recipes = await service.entities.Recipe.filter({ product_id: productId, active: true });
-  const recipe = (recipes || [])[0];
+  const recipe = recipeAtSale === undefined
+    ? (await service.entities.Recipe.filter({ product_id: productId, active: true }))?.[0]
+    : recipeAtSale;
   if (!recipe) return { costPerPiece: 0, hasPrice: false, missing: [], outputUnit: "piece" };
   const [items, product] = await Promise.all([
     service.entities.RecipeItem.filter({ recipe_id: recipe.id }),
