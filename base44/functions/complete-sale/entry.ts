@@ -1496,38 +1496,38 @@ export default async function(req) {
     for (let start = 0; start < stockPlans.length; start += 4) {
       const batch = stockPlans.slice(start, start + 4);
       await settleCheckoutWrites(batch.map((plan) => async () => {
-      let stockRecord = plan.stock;
-      if (stockRecord) {
-        const update = await service.entities.ProductStock.updateMany(
-          { id: stockRecord.id, quantity: plan.before },
-          { $set: {
-            quantity: plan.after,
+        let stockRecord = plan.stock;
+        if (stockRecord) {
+          const update = await service.entities.ProductStock.updateMany(
+            { id: stockRecord.id, quantity: plan.before },
+            { $set: {
+              quantity: plan.after,
+              location_name: shift.shop_name,
+              product_name: plan.item.product_name,
+              unit: "piece",
+              updated_at: receivedAt,
+              updated_by: user.id,
+              updated_by_name: user.full_name || user.email,
+            } },
+          );
+          if (!update?.success || Number(update.updated || 0) !== 1) {
+            throw httpError(`${plan.item.product_name} qoldig‘i boshqa qurilmada o‘zgardi. Yangilang va qayta urinib ko‘ring.`, 409);
+          }
+        } else {
+          stockRecord = await service.entities.ProductStock.create({
+            location_id: shift.shop_id,
             location_name: shift.shop_name,
+            product_id: plan.item.product_id,
             product_name: plan.item.product_name,
             unit: "piece",
+            quantity: plan.after,
+            low_stock_level: 0,
             updated_at: receivedAt,
             updated_by: user.id,
             updated_by_name: user.full_name || user.email,
-          } },
-        );
-        if (!update?.success || Number(update.updated || 0) !== 1) {
-          throw httpError(`${plan.item.product_name} qoldig‘i boshqa qurilmada o‘zgardi. Yangilang va qayta urinib ko‘ring.`, 409);
+          });
         }
-      } else {
-        stockRecord = await service.entities.ProductStock.create({
-          location_id: shift.shop_id,
-          location_name: shift.shop_name,
-          product_id: plan.item.product_id,
-          product_name: plan.item.product_name,
-          unit: "piece",
-          quantity: plan.after,
-          low_stock_level: 0,
-          updated_at: receivedAt,
-          updated_by: user.id,
-          updated_by_name: user.full_name || user.email,
-        });
-      }
-      stockChanges.push({ ...plan, stockRecord });
+        stockChanges.push({ ...plan, stockRecord });
       }));
     }
     // Keep response and movement order consistent with the original basket.
@@ -1607,46 +1607,46 @@ export default async function(req) {
     await settleCheckoutWrites([
       async () => { saleItems = await service.entities.SaleItem.bulkCreate(itemPayloads); },
       async () => {
-    paymentRecords = normalizedPayments.length
-      ? await service.entities.Payment.bulkCreate(
-        normalizedPayments.map((payment) => ({
-          sale_id: sale.id,
-          sale_number: saleNumber,
-          shop_id: shift.shop_id,
-          shift_id: shift.id,
-          cashier_id: user.id,
-          method: payment.method,
-          amount: payment.amount,
-          reference: payment.reference || undefined,
-          created_at: soldAt,
-        })),
-      )
-      : [];
+        paymentRecords = normalizedPayments.length
+          ? await service.entities.Payment.bulkCreate(
+            normalizedPayments.map((payment) => ({
+              sale_id: sale.id,
+              sale_number: saleNumber,
+              shop_id: shift.shop_id,
+              shift_id: shift.id,
+              cashier_id: user.id,
+              method: payment.method,
+              amount: payment.amount,
+              reference: payment.reference || undefined,
+              created_at: soldAt,
+            })),
+          )
+          : [];
       },
       async () => {
         for (let start = 0; start < stockChanges.length; start += 4) {
           const batch = stockChanges.slice(start, start + 4);
           await settleCheckoutWrites(batch.map((change) => async () => {
-      const movement = await service.entities.StockMovement.create({
-        movement_number: `ST-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-        location_id: shift.shop_id,
-        location_name: shift.shop_name,
-        item_kind: "product",
-        item_id: change.item.product_id,
-        item_name: change.item.product_name,
-        unit: "piece",
-        movement_type: "sale",
-        quantity_change: -change.item.quantity,
-        balance_before: change.before,
-        balance_after: change.after,
-        reason: `Kassa savdosi ${saleNumber}`,
-        reference_id: sale.id,
-        reference_type: "sale",
-        user_id: user.id,
-        user_name: user.full_name || user.email,
-        created_at: soldAt,
-      });
-      stockMovementRecords.push(movement);
+            const movement = await service.entities.StockMovement.create({
+              movement_number: `ST-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+              location_id: shift.shop_id,
+              location_name: shift.shop_name,
+              item_kind: "product",
+              item_id: change.item.product_id,
+              item_name: change.item.product_name,
+              unit: "piece",
+              movement_type: "sale",
+              quantity_change: -change.item.quantity,
+              balance_before: change.before,
+              balance_after: change.after,
+              reason: `Kassa savdosi ${saleNumber}`,
+              reference_id: sale.id,
+              reference_type: "sale",
+              user_id: user.id,
+              user_name: user.full_name || user.email,
+              created_at: soldAt,
+            });
+            stockMovementRecords.push(movement);
           }));
         }
       },
