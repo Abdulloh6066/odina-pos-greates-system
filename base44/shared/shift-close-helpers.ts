@@ -10,12 +10,15 @@ const serviceTicketVersionQuery = (version: number) => version === 0
   ? { $or: [{ service_ticket_version: 0 }, { service_ticket_version: { $exists: false } }] }
   : { service_ticket_version: version };
 
-export async function allocateServiceTicketNumber(service: any, shopId: string): Promise<number> {
+export async function allocateServiceTicketNumber(service: any, shopId: string, initialShop: any = null): Promise<number> {
   if (!shopId || !service?.entities?.Shop?.get || !service?.entities?.Shop?.updateMany) {
     throw httpError("Xizmat cheki uchun do‘kon aniqlanmadi.", 409);
   }
   for (let attempt = 0; attempt < 128; attempt += 1) {
-    const shop = await service.entities.Shop.get(shopId);
+    // Reuse this request’s verified shop only for the first attempt. A failed
+    // version claim always rereads the counter, retaining concurrency safety.
+    const shop = attempt === 0 && initialShop?.id === shopId
+      ? initialShop : await service.entities.Shop.get(shopId);
     if (!shop || shop.active === false || shop.allows_pos === false || shop.location_type === "production") {
       throw httpError("Xizmat cheki do‘koni faol emas.", 409);
     }
