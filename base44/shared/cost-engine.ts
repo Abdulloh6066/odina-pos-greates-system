@@ -181,13 +181,15 @@ export function aggregateReport(
 export async function loadIngredientCosts(
   service: any,
 ): Promise<Map<string, { cost: number; hasPrice: boolean }>> {
-  const receipts = await service.entities.SupplierReceipt.list("-received_at", 500);
+  const [receipts, items] = await Promise.all([
+    service.entities.SupplierReceipt.list("-received_at", 500),
+    service.entities.SupplierReceiptItem.list("-created_date", 1000),
+  ]);
   const validIds = new Set(
     (receipts || [])
       .filter((r: any) => r.status !== "cancelled" && r.status !== "cancelling")
       .map((r: any) => r.id),
   );
-  const items = await service.entities.SupplierReceiptItem.list("-created_date", 1000);
   const byIngredient = new Map<string, any[]>();
   for (const it of items || []) {
     if (!validIds.has(it.receipt_id)) continue;
@@ -216,9 +218,11 @@ export async function computeProductCost(
   const recipes = await service.entities.Recipe.filter({ product_id: productId, active: true });
   const recipe = (recipes || [])[0];
   if (!recipe) return { costPerPiece: 0, hasPrice: false, missing: [], outputUnit: "piece" };
-  const items = await service.entities.RecipeItem.filter({ recipe_id: recipe.id });
+  const [items, product] = await Promise.all([
+    service.entities.RecipeItem.filter({ recipe_id: recipe.id }),
+    service.entities.Product.get(productId).catch(() => null),
+  ]);
   const { batchCost, missing, hasAllPrices } = recipeCostFromMap(items || [], ingredientCosts);
-  const product = await service.entities.Product.get(productId).catch(() => null);
   const outputUnit = String(recipe.output_unit || product?.production_unit || "piece");
   const perPiece = costPerPiece(
     batchCost,
