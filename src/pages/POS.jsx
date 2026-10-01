@@ -6,6 +6,7 @@ import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, Clou
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
+import { fetchCurrentPosShift } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
@@ -71,6 +72,7 @@ export default function POS() {
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
+  const [shiftReadState, setShiftReadState] = useState('loading');
   const [settings, setSettings] = useState(null);
   const [cashRecipients, setCashRecipients] = useState([]);
   const [supplierDebts, setSupplierDebts] = useState({});
@@ -465,14 +467,29 @@ export default function POS() {
     }
   };
 
+  const loadCurrentShift = async () => {
+    setShiftReadState('loading');
+    try {
+      const currentShift = await fetchCurrentPosShift(base44);
+      setShift(currentShift);
+      setShiftReadState('ready');
+      return currentShift;
+    } catch (error) {
+      // Preserve an already loaded shift for offline sales; never present an
+      // unsuccessful initial check as permission to open a second shift.
+      setShiftReadState('error');
+      throw error;
+    }
+  };
+
   const loadAll = async () => {
     setLoadingData(true);
-    const [cats, prods, shopList, settingsList, shifts, recipientList, supplierReceipts, stockList, wasteAlertResult] = await Promise.all([
+    const [cats, prods, shopList, settingsList, , recipientList, supplierReceipts, stockList, wasteAlertResult] = await Promise.all([
       base44.entities.Category.list(),
       base44.entities.Product.list(),
       base44.entities.Shop.list(),
       base44.entities.Settings.list(),
-      base44.entities.Shift.list(),
+      loadCurrentShift().catch(() => null),
       base44.entities.CashRecipient.list('name', 500),
       base44.functions.invoke('supplier-ledger', { action: 'get_debts' }).catch(() => ({ data: { debts: {} } })),
       base44.entities.ProductStock.list('-updated_at', 500),
@@ -523,8 +540,6 @@ export default function POS() {
     setSupplierDebts(debtPayload?.debts || {});
     const wastePayload = wasteAlertResult?.data || wasteAlertResult;
     setWasteAlerts(wastePayload?.expired_items || []);
-    const myOpen = (shifts || []).find((s) => s.user_id === user?.id && s.status === 'open');
-    setShift(myOpen || null);
     setLoadingData(false);
   };
 
@@ -1037,6 +1052,10 @@ export default function POS() {
       return;
     }
     if (!shift) {
+      if (shiftReadState !== 'ready') {
+        void loadCurrentShift().catch((error) => odinaAlert(syncErrorMessage(error)));
+        return;
+      }
       if (!isOnline) {
         void odinaAlert('Smenani ochish uchun internet kerak.');
       } else {
@@ -1322,7 +1341,18 @@ export default function POS() {
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani ochib bo‘lmadi.');
       setShift(payload.shift);
       setOpenShiftOpen(false);
-    } catch (e) { void odinaAlert('Smenani ochib bo‘lmadi: ' + (e?.message || e)); }
+    } catch (e) {
+      // Another tab may already have opened it. Restore that shift instead of
+      // leaving the cashier trapped behind the duplicate-open error.
+      if ((e?.response?.status || e?.status) === 409) {
+        const currentShift = await loadCurrentShift().catch(() => null);
+        if (currentShift) {
+          setOpenShiftOpen(false);
+          return;
+        }
+      }
+      void odinaAlert('Smenani ochib bo‘lmadi: ' + syncErrorMessage(e));
+    }
     finally { setShiftLoading(false); }
   };
 
@@ -1351,8 +1381,8 @@ export default function POS() {
       return;
     }
     try {
-      const currentShift = await base44.entities.Shift.get(shift.id);
-      if (!currentShift || currentShift.status !== 'open') {
+      const currentShift = await loadCurrentShift();
+      if (!currentShift || currentShift.id !== shift.id) {
         await loadAll().catch(() => {});
         void odinaAlert('Bu smena allaqachon yopilgan yoki boshqa joyda o‘zgargan. Kassani yangilang.');
         return;
@@ -1478,9 +1508,9 @@ export default function POS() {
             <Building2 className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{shift?.shop_name || 'Faol smena yo‘q'}</div>
+            <div className="text-sm font-semibold truncate">{shift?.shop_name || (shiftReadState === 'loading' ? 'Smena tekshirilmoqda…' : shiftReadState === 'error' ? 'Smenani yuklab bo‘lmadi' : 'Faol smena yo‘q')}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {shift ? `${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : 'Savdoni boshlash uchun smenani oching'}
+              {shift ? `${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : shiftReadState === 'error' ? 'Qayta tekshirish tugmasini bosing' : shiftReadState === 'loading' ? 'Iltimos, kuting' : 'Savdoni boshlash uchun smenani oching'}
             </div>
           </div>
         </div>
@@ -1523,9 +1553,16 @@ export default function POS() {
               <Clock className="w-4 h-4" />
             </Button>
           </>
-        ) : (
+        ) : shiftReadState === 'ready' ? (
           <Button size="sm" onClick={() => setOpenShiftOpen(true)} className="h-10 bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             Smenani ochish
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" disabled={shiftReadState === 'loading'}
+            onClick={() => void loadCurrentShift().catch((error) => odinaAlert(syncErrorMessage(error)))}
+            className="h-10 shrink-0 touch-manipulation">
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${shiftReadState === 'loading' ? 'animate-spin' : ''}`} />
+            {shiftReadState === 'loading' ? 'Tekshirilmoqda…' : 'Qayta tekshirish'}
           </Button>
         )}
       </div>
