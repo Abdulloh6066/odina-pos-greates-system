@@ -1240,8 +1240,10 @@ export default async function(req) {
         return Response.json({ error: "Stol savati saqlangan buyurtmadan farq qiladi. Avval saqlang." }, { status: 409 });
       }
     }
-    const normalizedItems = await normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null);
-    const allowNegativeStock = await stockPolicy(service);
+    const [normalizedItems, allowNegativeStock] = await Promise.all([
+      normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null),
+      stockPolicy(service),
+    ]);
     const { plans: stockPlans, shortages: stockWarnings } =
       await planSaleStock(service, shift.shop_id, normalizedItems);
     if (stockWarnings.length && !allowNegativeStock) {
@@ -1256,11 +1258,19 @@ export default async function(req) {
     const unitCostByProduct: Map<string, any> = new Map();
     try {
       const ingredientCosts = await loadIngredientCosts(service);
-      for (const item of normalizedItems) {
-        unitCostByProduct.set(
-          item.product_id,
-          await computeProductCost(service, item.product_id, ingredientCosts),
-        );
+      // Cost reads are independent. Limit concurrency to four products and
+      // settle every read before saving the immutable financial snapshots.
+      for (let start = 0; start < normalizedItems.length; start += 4) {
+        const batch = normalizedItems.slice(start, start + 4);
+        const costs = await Promise.allSettled(batch.map((item) =>
+          computeProductCost(service, item.product_id, ingredientCosts)));
+        for (const [index, result] of costs.entries()) {
+          if (result.status === "fulfilled") {
+            unitCostByProduct.set(batch[index].product_id, result.value);
+          } else {
+            console.warn("Cost snapshot skipped:", result.reason);
+          }
+        }
       }
     } catch (costError) {
       console.warn("Cost snapshot skipped:", costError);
