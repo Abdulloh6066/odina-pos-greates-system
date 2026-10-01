@@ -209,6 +209,7 @@ export async function computeProductCost(
   service: any,
   productId: string,
   ingredientCosts: Map<string, any>,
+  productAtSale?: any,
 ): Promise<{
   costPerPiece: number;
   hasPrice: boolean;
@@ -220,7 +221,9 @@ export async function computeProductCost(
   if (!recipe) return { costPerPiece: 0, hasPrice: false, missing: [], outputUnit: "piece" };
   const [items, product] = await Promise.all([
     service.entities.RecipeItem.filter({ recipe_id: recipe.id }),
-    service.entities.Product.get(productId).catch(() => null),
+    productAtSale?.id === productId
+      ? Promise.resolve(productAtSale)
+      : service.entities.Product.get(productId).catch(() => null),
   ]);
   const { batchCost, missing, hasAllPrices } = recipeCostFromMap(items || [], ingredientCosts);
   const outputUnit = String(recipe.output_unit || product?.production_unit || "piece");
