@@ -366,6 +366,22 @@ export default async function(req) {
       return Response.json({ ok: true, runtime_version: COMPLETE_SALE_RUNTIME_VERSION });
     }
 
+    if (action === "get_current_shift") {
+      // Use the same stored identity as open/close, rather than a browser's
+      // paginated entity list or session user ID. This action never writes.
+      const shifts = await service.entities.Shift.filter(
+        { user_id: user.id, status: "open" }, "-opened_at", 2,
+      );
+      if (shifts.length > 1) {
+        return Response.json({ error: "Bir nechta ochiq smena topildi. Egasi bilan bog‘laning." }, { status: 409 });
+      }
+      const currentShift = shifts[0] || null;
+      if (currentShift && user.role === "manager" && currentShift.shop_id !== user.shop_id) {
+        return Response.json({ error: "Ochiq smena biriktirilgan ish joyiga mos emas. Egasi bilan bog‘laning." }, { status: 403 });
+      }
+      return Response.json({ ok: true, shift: currentShift });
+    }
+
     if (action === "open_shift") {
       const startingCash = money(body?.starting_cash);
       if (startingCash < 0) return Response.json({ error: "Starting cash must be zero or more." }, { status: 400 });
