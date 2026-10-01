@@ -38,7 +38,40 @@ import { priceForShop } from "../../shared/shop-pricing.ts";
 
 // Table orders are server-stored before payment. The snapshot is trusted only
 // after the table is authenticated, version-checked and locked below.
-async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string, trustedTableItems: any[] | null = null) {
+// Await every independent write before a failure enters compensation.
+async function settleCheckoutWrites(tasks: Array<() => Promise<unknown>>) {
+  const results = await Promise.allSettled(tasks.map(async (task) => task()));
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason;
+}
+
+// Preserve the existing immutable cost snapshots while stock checks run.
+async function loadSaleCostSnapshots(service: any, normalizedItems: any[], productsAtSale: Map<string, any>) {
+    const unitCostByProduct: Map<string, any> = new Map();
+    try {
+      const ingredientCosts = await loadIngredientCosts(service);
+      // Cost reads are independent. Limit concurrency to four products and
+      // settle every read before saving the immutable financial snapshots.
+      for (let start = 0; start < normalizedItems.length; start += 4) {
+        const batch = normalizedItems.slice(start, start + 4);
+        const costs = await Promise.allSettled(batch.map((item) =>
+          computeProductCost(service, item.product_id, ingredientCosts, productsAtSale.get(item.product_id))));
+        for (const [index, result] of costs.entries()) {
+          if (result.status === "fulfilled") {
+            unitCostByProduct.set(batch[index].product_id, result.value);
+          } else {
+            console.warn("Cost snapshot skipped:", result.reason);
+          }
+        }
+      }
+    } catch (costError) {
+      console.warn("Cost snapshot skipped:", costError);
+    }
+
+    return unitCostByProduct;
+}
+
+async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string, trustedTableItems: any[] | null = null, productsAtSale: Map<string, any> | null = null) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
     const quantity = Number(requested?.quantity);
@@ -65,6 +98,7 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     if (!savedItem && product.available_shop_ids?.length && !product.available_shop_ids.includes(shopId)) {
       throw httpError("Bu mahsulot ushbu do‘konda sotilmaydi.", 403);
     }
+    if (!savedItem) productsAtSale?.set(productId, product);
     const unitPrice = savedItem ? savedItem.price : money(priceForShop(product, shopId));
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
@@ -1256,40 +1290,21 @@ export default async function(req) {
         return Response.json({ error: "Stol savati saqlangan buyurtmadan farq qiladi. Avval saqlang." }, { status: 409 });
       }
     }
+    const productsAtSale = new Map<string, any>();
     const [normalizedItems, allowNegativeStock] = await Promise.all([
-      normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null),
+      normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null, productsAtSale),
       stockPolicy(service),
     ]);
-    const { plans: stockPlans, shortages: stockWarnings } =
-      await planSaleStock(service, shift.shop_id, normalizedItems);
+    const [{ plans: stockPlans, shortages: stockWarnings }, unitCostByProduct] = await Promise.all([
+      planSaleStock(service, shift.shop_id, normalizedItems),
+      loadSaleCostSnapshots(service, normalizedItems, productsAtSale),
+    ]);
     if (stockWarnings.length && !allowNegativeStock) {
       return Response.json({
         error: "Omborda mahsulot yetarli emas. Qoldiqsiz sotuv bloklangan.",
         shortages: stockWarnings,
         allow_negative_stock: false,
       }, { status: 409 });
-    }
-
-    // Best-effort immutable cost snapshot per sale item. Never blocks a sale.
-    const unitCostByProduct: Map<string, any> = new Map();
-    try {
-      const ingredientCosts = await loadIngredientCosts(service);
-      // Cost reads are independent. Limit concurrency to four products and
-      // settle every read before saving the immutable financial snapshots.
-      for (let start = 0; start < normalizedItems.length; start += 4) {
-        const batch = normalizedItems.slice(start, start + 4);
-        const costs = await Promise.allSettled(batch.map((item) =>
-          computeProductCost(service, item.product_id, ingredientCosts)));
-        for (const [index, result] of costs.entries()) {
-          if (result.status === "fulfilled") {
-            unitCostByProduct.set(batch[index].product_id, result.value);
-          } else {
-            console.warn("Cost snapshot skipped:", result.reason);
-          }
-        }
-      }
-    } catch (costError) {
-      console.warn("Cost snapshot skipped:", costError);
     }
 
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -1461,7 +1476,11 @@ export default async function(req) {
       discountChanged = true;
     }
 
-    for (const plan of stockPlans) {
+    // Distinct products use independent compare-and-set stock updates.
+    // Settle the whole batch before rollback so late writes cannot escape it.
+    for (let start = 0; start < stockPlans.length; start += 4) {
+      const batch = stockPlans.slice(start, start + 4);
+      await settleCheckoutWrites(batch.map((plan) => async () => {
       let stockRecord = plan.stock;
       if (stockRecord) {
         const update = await service.entities.ProductStock.updateMany(
@@ -1494,13 +1513,16 @@ export default async function(req) {
         });
       }
       stockChanges.push({ ...plan, stockRecord });
+      }));
     }
+    // Keep response and movement order consistent with the original basket.
+    stockChanges.sort((left, right) => stockPlans.findIndex((plan) => plan.item.product_id === left.item.product_id) - stockPlans.findIndex((plan) => plan.item.product_id === right.item.product_id));
 
     // A table keeps its FIRST saved service number through all edits and
     // payment. An ordinary takeout sale claims one number from the same shop
     // counter. Sale.sale_number remains the original immutable finance ID.
     const serviceTicketNumber = Number.isSafeInteger(tableOrder?.ticket_number) && tableOrder.ticket_number > 0
-      ? tableOrder.ticket_number : await allocateServiceTicketNumber(service, shift.shop_id);
+      ? tableOrder.ticket_number : await allocateServiceTicketNumber(service, shift.shop_id, receiptShop);
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
       service_ticket_number: serviceTicketNumber,
@@ -1565,7 +1587,11 @@ export default async function(req) {
       };
     });
 
-    saleItems = await service.entities.SaleItem.bulkCreate(itemPayloads);
+    // All rows refer to the already-created sale; the final shift confirmation
+    // waits for every task. Successful records remain tracked for rollback.
+    await settleCheckoutWrites([
+      async () => { saleItems = await service.entities.SaleItem.bulkCreate(itemPayloads); },
+      async () => {
     paymentRecords = normalizedPayments.length
       ? await service.entities.Payment.bulkCreate(
         normalizedPayments.map((payment) => ({
@@ -1581,8 +1607,11 @@ export default async function(req) {
         })),
       )
       : [];
-
-    for (const change of stockChanges) {
+      },
+      async () => {
+        for (let start = 0; start < stockChanges.length; start += 4) {
+          const batch = stockChanges.slice(start, start + 4);
+          await settleCheckoutWrites(batch.map((change) => async () => {
       const movement = await service.entities.StockMovement.create({
         movement_number: `ST-${day}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
         location_id: shift.shop_id,
@@ -1603,7 +1632,10 @@ export default async function(req) {
         created_at: soldAt,
       });
       stockMovementRecords.push(movement);
-    }
+          }));
+        }
+      },
+    ]);
 
     if (claimedDiscount) {
       if (claimedDiscount.single_use !== false) {
