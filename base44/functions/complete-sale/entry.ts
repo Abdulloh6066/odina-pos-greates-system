@@ -36,8 +36,6 @@ import {
 import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
 
-// Table orders are server-stored before payment. The snapshot is trusted only
-// after the table is authenticated, version-checked and locked below.
 // Await every independent write before a failure enters compensation.
 async function settleCheckoutWrites(tasks: Array<() => Promise<unknown>>) {
   const results = await Promise.allSettled(tasks.map(async (task) => task()));
@@ -47,30 +45,47 @@ async function settleCheckoutWrites(tasks: Array<() => Promise<unknown>>) {
 
 // Preserve the existing immutable cost snapshots while stock checks run.
 async function loadSaleCostSnapshots(service: any, normalizedItems: any[], productsAtSale: Map<string, any>) {
-    const unitCostByProduct: Map<string, any> = new Map();
-    try {
-      const ingredientCosts = await loadIngredientCosts(service);
-      // Cost reads are independent. Limit concurrency to four products and
-      // settle every read before saving the immutable financial snapshots.
-      for (let start = 0; start < normalizedItems.length; start += 4) {
-        const batch = normalizedItems.slice(start, start + 4);
-        const costs = await Promise.allSettled(batch.map((item) =>
-          computeProductCost(service, item.product_id, ingredientCosts, productsAtSale.get(item.product_id))));
-        for (const [index, result] of costs.entries()) {
-          if (result.status === "fulfilled") {
-            unitCostByProduct.set(batch[index].product_id, result.value);
-          } else {
-            console.warn("Cost snapshot skipped:", result.reason);
-          }
+  const unitCostByProduct: Map<string, any> = new Map();
+  const recipesByProduct: Map<string, any> = new Map();
+  // Products without recipes retain the estimate fallback without loading
+  // supplier history. Reuse verified recipes and product data below.
+  for (let start = 0; start < normalizedItems.length; start += 4) {
+    const batch = normalizedItems.slice(start, start + 4);
+    const recipes = await Promise.allSettled(batch.map((item) =>
+      service.entities.Recipe.filter({ product_id: item.product_id, active: true })));
+    for (const [index, result] of recipes.entries()) {
+      if (result.status === "fulfilled") {
+        if (result.value?.[0]) recipesByProduct.set(batch[index].product_id, result.value[0]);
+      } else {
+        console.warn("Cost snapshot skipped:", result.reason);
+      }
+    }
+  }
+  if (!recipesByProduct.size) return unitCostByProduct;
+  try {
+    const ingredientCosts = await loadIngredientCosts(service);
+    const recipeItems = normalizedItems.filter((item) => recipesByProduct.has(item.product_id));
+    for (let start = 0; start < recipeItems.length; start += 4) {
+      const batch = recipeItems.slice(start, start + 4);
+      const costs = await Promise.allSettled(batch.map((item) =>
+        computeProductCost(service, item.product_id, ingredientCosts,
+          productsAtSale.get(item.product_id), recipesByProduct.get(item.product_id))));
+      for (const [index, result] of costs.entries()) {
+        if (result.status === "fulfilled") {
+          unitCostByProduct.set(batch[index].product_id, result.value);
+        } else {
+          console.warn("Cost snapshot skipped:", result.reason);
         }
       }
-    } catch (costError) {
-      console.warn("Cost snapshot skipped:", costError);
     }
-
-    return unitCostByProduct;
+  } catch (costError) {
+    console.warn("Cost snapshot skipped:", costError);
+  }
+  return unitCostByProduct;
 }
 
+// Table orders are server-stored before payment. The snapshot is trusted only
+// after the table is authenticated, version-checked and locked below.
 async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string, trustedTableItems: any[] | null = null, productsAtSale: Map<string, any> | null = null) {
   const quantities = new Map<string, number>();
   for (const requested of requestedItems) {
