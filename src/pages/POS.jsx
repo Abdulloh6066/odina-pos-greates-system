@@ -1229,6 +1229,8 @@ export default function POS() {
   const completeSale = async (payments, printReceipt = true) => {
     if (saleSubmittingRef.current || !cart.length || stockChecking || discountLoading || !checkoutReadyRef.current) return;
     saleSubmittingRef.current = true;
+    const checkoutTimingStarted = performance.now();
+    let checkoutServerMs = null;
     let saleCommitted = false;
     setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
@@ -1291,7 +1293,9 @@ export default function POS() {
       };
 
       try {
+        const serverTimingStarted = performance.now();
         const result = await base44.functions.invoke('complete-sale', request);
+        checkoutServerMs = Math.round(performance.now() - serverTimingStarted);
         const payload = result?.data || result;
         if (!payload?.sale) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
         saleCommitted = true;
@@ -1318,6 +1322,12 @@ export default function POS() {
     } finally {
       saleSubmittingRef.current = false;
       setPaying(false);
+      console.info('[Odina checkout timing]', JSON.stringify({
+        server_ms: checkoutServerMs,
+        total_ms: Math.round(performance.now() - checkoutTimingStarted),
+        completed: saleCommitted,
+        print_receipt: printReceipt,
+      }));
     }
   };
 
