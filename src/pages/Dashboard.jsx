@@ -14,12 +14,21 @@ export default function Dashboard() {
   const [products, setProducts] = useState([]);
   const [expiredItems, setExpiredItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dailyTotals, setDailyTotals] = useState(null);
+  const [dailyReports, setDailyReports] = useState(null);
+  const [selectedShopId, setSelectedShopId] = useState('all');
   const [reportError, setReportError] = useState('');
+  const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
 
   useEffect(() => {
     if (role === 'cashier') { navigate('/pos', { replace: true }); return; }
     let active = true;
+    setLoading(true);
+    setDailyReports(null);
+    setReportError('');
+    setSales([]);
+    setProducts([]);
+    setExpiredItems([]);
+    setSelectedShopId('all');
     (async () => {
       try {
         const [s, p, wasteResult, dailyResult] = await Promise.all([
@@ -36,22 +45,41 @@ export default function Dashboard() {
         else {
           setReportError('');
           const rows = (dailyResult?.data || dailyResult)?.reports || [];
-          setDailyTotals(rows.reduce((totals, row) => ({
-            revenue: totals.revenue + Number(row.total_revenue || 0),
-            collections: totals.collections + Number(row.collections_total ?? row.total_revenue ?? 0),
-            orderPayments: totals.orderPayments + Number(row.order_payment_total || 0),
-            sales: totals.sales + Number(row.sale_count || 0),
-          }), { revenue: 0, collections: 0, orderPayments: 0, sales: 0 }));
+          setDailyReports(rows);
         }
         setSales(s || []);
         setProducts(p || []);
         setExpiredItems((wasteResult?.data || wasteResult)?.expired_items || []);
-      } catch (e) {} finally { if (active) setLoading(false); }
+      } catch (error) {
+        if (active) setReportError(error?.response?.data?.error || error?.message || 'Bosh sahifa ma’lumotlari yuklanmadi.');
+      } finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [role]);
+  }, [role, user?.id, assignedShopId, navigate]);
 
-  const today = useMemo(() => sales.filter((s) => s.status !== 'refunded' && saleBusinessDate(s) === tashkentDateKey()), [sales]);
+  // The selector uses authorized report rows; managers retain their assigned store.
+  const shops = useMemo(() => (dailyReports || []).filter((row) =>
+    role !== 'manager' || row.shop_id === assignedShopId
+  ), [dailyReports, role, assignedShopId]);
+  const shopId = role === 'manager' ? assignedShopId
+    : shops.some((shop) => shop.shop_id === selectedShopId) ? selectedShopId : 'all';
+  const shopName = shops.find((shop) => shop.shop_id === shopId)?.shop_name
+    || (role === 'manager' ? user?.shop_name || 'Biriktirilgan do‘kon' : 'Barcha do‘konlar');
+  const dailyTotals = useMemo(() => dailyReports === null ? null
+    : dailyReports.filter((row) => shopId === 'all' || Boolean(shopId && row.shop_id === shopId)).reduce((totals, row) => ({
+      revenue: totals.revenue + Number(row.total_revenue || 0),
+      collections: totals.collections + Number(row.collections_total ?? row.total_revenue ?? 0),
+      orderPayments: totals.orderPayments + Number(row.order_payment_total || 0),
+      sales: totals.sales + Number(row.sale_count || 0),
+    }), { revenue: 0, collections: 0, orderPayments: 0, sales: 0 }), [dailyReports, shopId]);
+  const today = useMemo(() => sales.filter((s) => s.status !== 'refunded'
+    && saleBusinessDate(s) === tashkentDateKey()
+    && (shopId === 'all' || Boolean(shopId && s.shop_id === shopId))), [sales, shopId]);
+  const visibleExpiredItems = expiredItems.filter((item) => shopId === 'all'
+    || Boolean(shopId && item.location_id === shopId));
+  const productCount = products.filter((product) => product.archived !== true
+    && (shopId === 'all' || Boolean(shopId && (!product.available_shop_ids?.length
+      || product.available_shop_ids.includes(shopId))))).length;
   const todayTotal = dailyTotals?.revenue || 0;
   const todayOrders = dailyTotals?.sales || 0;
   const avgOrder = todayOrders ? todayTotal / todayOrders : 0;
@@ -76,7 +104,29 @@ export default function Dashboard() {
     <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader title="Bosh sahifa" subtitle={formatUzbekistan(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
 
-      {expiredItems.length > 0 && (
+      <div className="odina-panel mb-5 rounded-2xl border border-border bg-card p-4 premium-shadow">
+        <h2 className="text-sm font-semibold mb-3">Do‘konni tanlang</h2>
+        <div role="group" aria-label="Do‘kon bo‘yicha ko‘rish" className="flex flex-wrap gap-2">
+          {[
+            ...(role === 'manager' ? [] : [{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }]),
+            ...shops,
+          ].map((shop) => (
+            <button
+              key={shop.shop_id}
+              type="button"
+              aria-pressed={shopId === shop.shop_id}
+              disabled={loading}
+              onClick={() => setSelectedShopId(shop.shop_id)}
+              className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-olive focus-visible:ring-offset-2 disabled:opacity-60 ${shopId === shop.shop_id ? 'bg-primary text-primary-foreground border-transparent' : 'bg-background text-foreground border-border hover:bg-secondary'}`}
+            >
+              {shop.shop_name}
+            </button>
+          ))}
+        </div>
+        <p aria-live="polite" className="mt-3 text-xs text-muted-foreground">{shopName} · Bugungi ko‘rsatkichlar</p>
+      </div>
+
+      {visibleExpiredItems.length > 0 && (
         <button
           type="button"
           onClick={() => navigate('/waste')}
@@ -86,8 +136,8 @@ export default function Dashboard() {
             <AlertTriangle className="w-5 h-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-semibold">{expiredItems.length} tur mahsulot 3 kundan oshgan</span>
-            <span className="block text-sm text-red-700/80 mt-0.5">Do‘konlar bo‘yicha ko‘rish va chiqitga chiqarish uchun bosing.</span>
+            <span className="block font-semibold">{visibleExpiredItems.length} tur mahsulot 3 kundan oshgan</span>
+            <span className="block text-sm text-red-700/80 mt-0.5">{shopName} · Ko‘rish va chiqitga chiqarish uchun bosing.</span>
           </span>
           <ArrowRight className="w-5 h-5 shrink-0" />
         </button>
@@ -103,7 +153,7 @@ export default function Dashboard() {
             <StatCard icon={TrendingUp} label="Bugungi olingan pul" value={dailyTotals ? formatUZS(dailyTotals.collections) : '—'} accent />
             <StatCard icon={Receipt} label="Kassa savdolari" value={dailyTotals ? formatNum(todayOrders) : '—'} />
             <StatCard icon={ShoppingBag} label="Kassa o‘rtacha sof savdosi" value={dailyTotals ? formatUZS(avgOrder) : '—'} />
-            <StatCard icon={Star} label="Mahsulotlar" value={formatNum(products.filter((product) => product.archived !== true).length)} />
+            <StatCard icon={Star} label="Mahsulotlar" value={formatNum(productCount)} />
           </div>
 
           {reportError ? <p role="alert" className="mt-3 text-sm text-destructive">Kunlik jami yuklanmadi: {reportError}</p>
