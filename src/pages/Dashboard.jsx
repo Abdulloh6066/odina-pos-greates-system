@@ -86,12 +86,24 @@ export default function Dashboard() {
   const avgOrder = todayOrders ? todayTotal / todayOrders : 0;
 
   const bestSellers = useMemo(() => {
-    const map = {};
+    const productUnits = new Map(products.map((product) => [product.id, product.sale_unit]));
+    const totals = new Map();
     today.forEach((s) => s.items?.forEach((it) => {
-      map[it.product_name] = (map[it.product_name] || 0) + it.quantity;
+      const quantity = Number(it.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) return;
+      // Sale-time units take priority; use the catalog only for legacy items.
+      const saleUnit = it.sale_unit || productUnits.get(it.product_id) || 'piece';
+      const unit = saleUnit === 'gram' ? 'kg' : 'ta';
+      const key = JSON.stringify([it.product_id || it.product_name, unit]);
+      const entry = totals.get(key) || { key, name: it.product_name, unit, rawQuantity: 0 };
+      entry.rawQuantity += quantity;
+      totals.set(key, entry);
     }));
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [today]);
+    return Array.from(totals.values(), (entry) => ({
+      ...entry,
+      quantity: entry.unit === 'kg' ? entry.rawQuantity / 1000 : entry.rawQuantity,
+    })).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+  }, [today, products]);
 
   const topEmployees = useMemo(() => {
     const map = {};
@@ -163,11 +175,11 @@ export default function Dashboard() {
             <Panel title="Bugungi Kassa mahsulotlari" icon={Star}>
               {bestSellers.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
                 <div className="space-y-2.5">
-                  {bestSellers.map(([name, qty], i) => (
-                    <div key={name} className="flex items-center gap-3">
+                  {bestSellers.map(({ key, name, quantity, unit }, i) => (
+                    <div key={key} className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-lg bg-primary/15 text-brand-ink flex items-center justify-center text-xs font-bold">{i + 1}</div>
                       <span className="flex-1 text-sm font-medium truncate">{name}</span>
-                      <span className="text-sm font-semibold text-muted-foreground">{qty} ta sotildi</span>
+                      <span className="text-sm font-semibold text-muted-foreground">{Number(quantity.toFixed(3))} {unit} sotildi</span>
                     </div>
                   ))}
                 </div>
