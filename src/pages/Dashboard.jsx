@@ -5,6 +5,7 @@ import { AlertTriangle, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star,
 import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey, canAccess } from '@/lib/pos';
 import { formatUzbekistan } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
+import OdinaSelect from '@/components/ui/odina-select';
 
 export default function Dashboard() {
   const { user } = useOutletContext();
@@ -105,24 +106,24 @@ export default function Dashboard() {
       <PageHeader title="Bosh sahifa" subtitle={formatUzbekistan(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
 
       <div className="odina-panel mb-5 rounded-2xl border border-border bg-card p-4 premium-shadow">
-        <h2 className="text-sm font-semibold mb-3">Do‘konni tanlang</h2>
-        <div role="group" aria-label="Do‘kon bo‘yicha ko‘rish" className="flex flex-wrap gap-2">
+        <label htmlFor="dashboard-shop" className="block text-sm font-semibold mb-3">Do‘konni tanlang</label>
+        <OdinaSelect
+          id="dashboard-shop"
+          aria-label="Do‘kon bo‘yicha ko‘rish"
+          value={shopId}
+          disabled={loading || shops.length === 0}
+          onChange={(event) => setSelectedShopId(event.target.value)}
+          placeholder={shopName}
+          className="w-full sm:max-w-sm min-h-12 bg-primary text-primary-foreground border-transparent font-semibold touch-manipulation"
+        >
           {[
             ...(role === 'manager' ? [] : [{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }]),
             ...shops,
+            ...(role === 'manager' && shops.length === 0 ? [{ shop_id: assignedShopId, shop_name: shopName }] : []),
           ].map((shop) => (
-            <button
-              key={shop.shop_id}
-              type="button"
-              aria-pressed={shopId === shop.shop_id}
-              disabled={loading}
-              onClick={() => setSelectedShopId(shop.shop_id)}
-              className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-olive focus-visible:ring-offset-2 disabled:opacity-60 ${shopId === shop.shop_id ? 'bg-primary text-primary-foreground border-transparent' : 'bg-background text-foreground border-border hover:bg-secondary'}`}
-            >
-              {shop.shop_name}
-            </button>
+            <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name}</option>
           ))}
-        </div>
+        </OdinaSelect>
         <p aria-live="polite" className="mt-3 text-xs text-muted-foreground">{shopName} · Bugungi ko‘rsatkichlar</p>
       </div>
 
