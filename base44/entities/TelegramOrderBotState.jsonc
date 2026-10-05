@@ -1,0 +1,72 @@
+{
+  "name": "TelegramOrderBotState",
+  "type": "object",
+  "properties": {
+    "sender_id": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "staff_id": {
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "scope_policy": {
+      "type": "string",
+      "enum": [
+        "assigned_shop",
+        "owner_choose_shop"
+      ]
+    },
+    "owner_shop_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 2,
+      "default": []
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "draft",
+        "submitting",
+        "uncertain",
+        "complete",
+        "cancelled"
+      ],
+      "default": "idle"
+    },
+    "payload_json": {
+      "type": "string",
+      "maxLength": 240000
+    },
+    "test_run_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sender_id",
+    "staff_id",
+    "enabled",
+    "scope_policy",
+    "owner_shop_ids",
+    "version",
+    "phase",
+    "payload_json"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
