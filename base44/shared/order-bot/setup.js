@@ -19,10 +19,55 @@ async function changeControl(entity, row, config, data) {
     if (result?.success !== true || result.updated !== 1 || result.has_more === true) throw Error('control');
     return controlRow(entity, config);
 }
+
+export class ProbeFailure extends Error {
+    constructor(code, diagnostic = {}) {
+        super(code);
+        this.name = 'ProbeFailure';
+        this.diagnostic = { code, ...diagnostic };
+    }
+}
+const failProbe = (code, diagnostic) => { throw new ProbeFailure(code, diagnostic); };
+const failureStatus = error => {
+    const status = error?.response?.status ?? error?.status;
+    return Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
+};
+const failureClass = error => ['Error', 'Base44Error', 'AxiosError', 'TypeError', 'AbortError', 'TimeoutError'].includes(error?.name) ? error.name : 'Error';
+async function probeCall(step, round, operation) {
+    try { return await operation(); }
+    catch (error) { failProbe('PROBE_REQUEST_FAILED', { step, round, httpStatus: failureStatus(error), errorClass: failureClass(error) }); }
+}
+export async function recoverTechnicalProbe(entity, config = INTAKE_CONFIG, now = Date.now()) {
+    const row = await probeCall('recovery_read', null, () => controlRow(entity, config));
+    const state = JSON.parse(row.payload_json);
+    const date = String(row.updated_date || '');
+    const lastWrite = Date.parse(/Z$|[+-]\d\d:\d\d$/.test(date) ? date : date + 'Z');
+    if (row.sender_id !== '1' || row.staff_id !== 'TECHNICAL_ONLY_NO_POS_USER' || row.scope_policy !== 'assigned_shop' ||
+        row.phase !== 'submitting' || !equal(row.owner_shop_ids, []) ||
+        state?.draft !== null || !Array.isArray(state.receipts) || state.receipts.length !== 0 || state.floor !== 0 ||
+        !/^[0-9]:(?:[0-9]|1[0-5])$/.test(state.probeMarker || '') ||
+        Object.keys(state).some(key => !['draft', 'receipts', 'floor', 'probeMarker'].includes(key)) ||
+        !Number.isFinite(lastWrite) || now - lastWrite < 60000) {
+        failProbe('PROBE_RECOVERY_BLOCKED', { step: 'recovery_guard' });
+    }
+    const nextPayload = JSON.stringify(initial());
+    const result = await probeCall('recovery_write', null, () => entity.updateMany({
+        id: row.id, enabled: false, test_run_id: config.runId, version: row.version, phase: 'submitting',
+        sender_id: '1', staff_id: 'TECHNICAL_ONLY_NO_POS_USER', scope_policy: 'assigned_shop',
+        owner_shop_ids: { $eq: [] }, payload_json: row.payload_json,
+    }, { $set: { phase: 'idle', version: row.version + 1, payload_json: nextPayload } }));
+    if (result?.success !== true || result.updated !== 1 || result.has_more === true)
+        failProbe('PROBE_RECOVERY_UNCONFIRMED', { step: 'recovery_write' });
+    const next = await probeCall('recovery_verify', null, () => controlRow(entity, config));
+    if (next.phase !== 'idle' || next.version !== row.version + 1 || next.payload_json !== nextPayload)
+        failProbe('PROBE_RECOVERY_UNCONFIRMED', { step: 'recovery_verify' });
+    return next;
+}
+
 export async function runStateProbe(entity, config = INTAKE_CONFIG) {
-    let row = await controlRow(entity, config);
-    if (row.phase !== 'idle') throw Error('probe busy');
-    row = await changeControl(entity, row, config, { phase: 'submitting' });
+    let row = await probeCall('initial_read', null, () => controlRow(entity, config));
+    if (row.phase !== 'idle') failProbe('PROBE_BUSY', { step: 'initial_guard' });
+    row = await probeCall('initial_claim', null, () => changeControl(entity, row, config, { phase: 'submitting' }));
     const rounds = [];
     for (let round = 0; round < 10; round++) {
         const version = row.version;
@@ -30,24 +75,34 @@ export async function runStateProbe(entity, config = INTAKE_CONFIG) {
             id: config.controlId, enabled: false, test_run_id: config.runId, version, phase: 'submitting', owner_shop_ids: { $eq: [] },
         }, { $set: { version: version + 1, payload_json: JSON.stringify({ ...initial(), probeMarker: `${round}:${i}` }) } })));
         const winners = results.flatMap((r, i) => r.status === 'fulfilled' && r.value?.success === true && r.value.updated === 1 && r.value.has_more !== true ? [i] : []);
-        if (winners.length !== 1 || results.some(r => r.status !== 'fulfilled' || r.value?.success !== true || ![0, 1].includes(r.value.updated) || r.value.has_more === true)) throw Error('probe');
-        row = await controlRow(entity, config);
-        if (row.version !== version + 1 || JSON.parse(row.payload_json).probeMarker !== `${round}:${winners[0]}`) throw Error('probe');
-        const stale = await entity.updateMany({ id: row.id, version, enabled: false, test_run_id: config.runId }, { $set: { version: version + 1000 } });
-        if (stale?.success !== true || stale.updated !== 0) throw Error('stale');
+        const valid = r => r.status === 'fulfilled' && r.value?.success === true && [0, 1].includes(r.value.updated) && r.value.has_more !== true;
+        if (winners.length !== 1 || results.some(r => !valid(r))) failProbe('PROBE_CONTENDERS_FAILED', {
+            step: 'contenders', round, winners: winners.length,
+            fulfilled: results.filter(r => r.status === 'fulfilled').length,
+            rejected: results.filter(r => r.status === 'rejected').length,
+            invalid: results.filter(r => r.status === 'fulfilled' && !valid(r)).length,
+            updated0: results.filter(r => valid(r) && r.value.updated === 0).length,
+            updated1: results.filter(r => valid(r) && r.value.updated === 1).length,
+            httpStatuses: [...new Set(results.filter(r => r.status === 'rejected').map(r => failureStatus(r.reason)).filter(s => s !== null))],
+            errorClasses: [...new Set(results.filter(r => r.status === 'rejected').map(r => failureClass(r.reason)))],
+        });
+        row = await probeCall('readback', round, () => controlRow(entity, config));
+        if (row.version !== version + 1 || JSON.parse(row.payload_json).probeMarker !== `${round}:${winners[0]}`)
+            failProbe('PROBE_READBACK_MISMATCH', { step: 'readback', round, expectedVersion: version + 1, observedVersion: row.version });
+        const stale = await probeCall('stale', round, () => entity.updateMany({ id: row.id, version, enabled: false, test_run_id: config.runId }, { $set: { version: version + 1000 } }));
+        if (stale?.success !== true || stale.updated !== 0) failProbe('PROBE_STALE_CHECK_FAILED', { step: 'stale', round });
         rounds.push({ winners: 1, staleRejected: true });
     }
-    // Exact-array and disabled-binding predicates must reject mismatches.
-    for (const mismatch of [{ owner_shop_ids: { $eq: ['wrong-shop'] } }, { enabled: true }]) {
-        const result = await entity.updateMany({ id: row.id, version: row.version, test_run_id: config.runId, ...mismatch }, { $set: { version: row.version + 1000 } });
-        if (result?.success !== true || result.updated !== 0) throw Error('predicate');
+    for (const [predicate, mismatch] of [{ owner_shop_ids: { $eq: ['wrong-shop'] } }, { enabled: true }].entries()) {
+        const result = await probeCall('predicate', null, () => entity.updateMany({ id: row.id, version: row.version, test_run_id: config.runId, ...mismatch }, { $set: { version: row.version + 1000 } }));
+        if (result?.success !== true || result.updated !== 0) failProbe('PROBE_PREDICATE_FAILED', { step: 'predicate', predicate });
     }
     const evidence = { passed: true, rounds: rounds.length, contendersPerRound: 16, staleRejected: rounds.length, checkedAt: new Date().toISOString() };
-    return changeControl(entity, row, config, { phase: 'complete', payload_json: JSON.stringify({ ...initial(), probe: evidence, activation: 'off' }) });
+    return probeCall('complete', null, () => changeControl(entity, row, config, { phase: 'complete', payload_json: JSON.stringify({ ...initial(), probe: evidence, activation: 'off' }) }));
 }
 export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, config = INTAKE_CONFIG }) {
     return async req => {
-        const answer = (body, status = 200) => Response.json({ revision: 'order-setup-v1', ...body }, { status, headers: { 'cache-control': 'no-store' } });
+        const answer = (body, status = 200) => Response.json({ revision: 'order-setup-v2', ...body }, { status, headers: { 'cache-control': 'no-store' } });
         let stage = 'auth', ownerVerified = false;
         if (req.method !== 'POST') return answer({ error: 'Amal noto‘g‘ri.' }, 405);
         try {
@@ -58,7 +113,7 @@ export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, 
             ownerVerified = true;
             const input = await req.text(); if (input.length > 256) return answer({ code: 'BAD_INPUT' }, 400);
             const action = JSON.parse(input || '{}').action || 'status';
-            if (!['status', 'prepare', 'activate'].includes(action)) return answer({ code: 'BAD_ACTION' }, 400);
+            if (!['status', 'prepare', 'activate', 'recover_probe'].includes(action)) return answer({ code: 'BAD_ACTION' }, 400);
             stage = 'config';
             const token = readSecret('ODINA_ORDER_BOT_TOKEN'), sender = readSecret('ODINA_ORDER_BOT_OWNER_TELEGRAM_ID'), secret = readSecret('ODINA_ORDER_BOT_WEBHOOK_SECRET');
             if (!/^\d+:[A-Za-z0-9_-]+$/.test(token || '') || !/^[1-9]\d*$/.test(sender || '') || !Number.isSafeInteger(Number(sender)) || !/^[A-Za-z0-9_-]{32,256}$/.test(secret || '')) throw Error();
@@ -78,6 +133,13 @@ export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, 
             const entity = client.asServiceRole.entities.TelegramOrderBotState;
             let control = await controlRow(entity, config), state = JSON.parse(control.payload_json);
             if (action === 'status') return answer({ bot: me.username, webhook: webhook.url ? 'expected' : 'absent', pendingUpdates: webhook.pending_update_count, probe: state.probe || null, bindingPrepared: Boolean(state.ownerStateId), activation: state.activation || 'off' });
+            if (action === 'recover_probe') {
+                stage = 'probe_recovery';
+                const bindings = await entity.filter({ sender_id: sender }, '-created_date', 2);
+                if (webhook.url || bindings.length !== 0) return answer({ code: 'PROBE_RECOVERY_BLOCKED' }, 409);
+                const recovered = await recoverTechnicalProbe(entity, config);
+                return answer({ bot: me.username, recovered: true, phase: recovered.phase, version: recovered.version, activation: 'off', webhook: 'absent' });
+            }
             // Recheck current real POS permissions and shop metadata before provisioning/activation.
             for (const id of config.ownerShopIds) {
                 const shop = await client.asServiceRole.entities.Shop.get(id);
@@ -121,8 +183,10 @@ export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, 
             stage = 'state';
             if (state.activation !== 'active') await changeControl(entity, control, config, { payload_json: JSON.stringify({ ...state, activation: 'active', activatedAt: new Date().toISOString() }) });
             return answer({ bot: me.username, activated: true, webhook: 'expected', maxConnections: webhook.max_connections, pendingUpdates: webhook.pending_update_count, bindingRecordId: binding.id, probe: state.probe });
-        } catch {
-            return answer({ code: ownerVerified ? 'SETUP_INCOMPLETE' : 'AUTH_REQUIRED', ...(ownerVerified ? { stage } : {}) }, ownerVerified ? 503 : 401);
+        } catch (error) {
+            const diagnostic = ownerVerified && error instanceof ProbeFailure ? error.diagnostic : null;
+            if (diagnostic) console.error('ORDER_BOT_SETUP', JSON.stringify({ stage, diagnostic }));
+            return answer({ code: ownerVerified ? 'SETUP_INCOMPLETE' : 'AUTH_REQUIRED', ...(ownerVerified ? { stage, ...(diagnostic ? { diagnostic } : {}) } : {}) }, ownerVerified ? 503 : 401);
         }
     };
 }
