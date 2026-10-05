@@ -2,7 +2,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { secrets } from "base44:runtime";
 import config from "../../shared/order-bot/readiness-config.json" with { type: "json" };
 import { prepareOrderBotReadiness } from "../../shared/order-bot/readiness.js";
-// readiness-v3: distinguish timeout/setup/fetch failures without raw errors.
+// readiness-v5: only fixed runtime cause labels; no raw error text.
 export default async function (req: Request): Promise<Response> {
     return prepareOrderBotReadiness({
         clientForRequest: createClientFromRequest,
