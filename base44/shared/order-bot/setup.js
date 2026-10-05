@@ -14,10 +14,10 @@ export async function controlRow(entity, config = INTAKE_CONFIG) {
     if (row?.id !== config.controlId || row.enabled !== false || row.test_run_id !== config.runId || !Number.isSafeInteger(row.version)) throw Error('control');
     return row;
 }
-async function changeControl(entity, row, config, data) {
-    const result = await entity.updateMany({ id: config.controlId, enabled: false, test_run_id: config.runId, version: row.version, phase: row.phase }, { $set: { ...data, version: row.version + 1 } });
+async function changeControl(entity, row, config, data, { verify = true } = {}) {
+    const result = await entity.updateMany({ id: config.controlId, enabled: false, test_run_id: config.runId, version: row.version, phase: row.phase, payload_json: row.payload_json }, { $set: { ...data, version: row.version + 1 } });
     if (result?.success !== true || result.updated !== 1 || result.has_more === true) throw Error('control');
-    return controlRow(entity, config);
+    return verify ? controlRow(entity, config) : { ...row, ...data, version: row.version + 1 };
 }
 
 export class ProbeFailure extends Error {
@@ -37,16 +37,32 @@ async function probeCall(step, round, operation) {
     try { return await operation(); }
     catch (error) { failProbe('PROBE_REQUEST_FAILED', { step, round, httpStatus: failureStatus(error), errorClass: failureClass(error) }); }
 }
+
+const freshProgress = config => ({ schema: 1, runId: config.runId, completedRounds: 0, contendersPerRound: 16, staleRejected: 0, notBefore: 0 });
+function readProgress(state, config, allowMarker = false) {
+    const keys = ['draft', 'receipts', 'floor', 'probeProgress', ...(allowMarker ? ['probeMarker'] : [])];
+    if (state?.draft !== null || !Array.isArray(state.receipts) || state.receipts.length || state.floor !== 0 ||
+        Object.keys(state).some(key => !keys.includes(key))) failProbe('PROBE_PROGRESS_INVALID', { step: 'progress_guard' });
+    const p = Object.hasOwn(state, 'probeProgress') ? state.probeProgress : freshProgress(config);
+    if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).length !== 6 || p.schema !== 1 || p.runId !== config.runId ||
+        !Number.isSafeInteger(p.completedRounds) || p.completedRounds < 0 || p.completedRounds > 10 ||
+        p.contendersPerRound !== 16 || p.staleRejected !== p.completedRounds ||
+        !Number.isSafeInteger(p.notBefore) || p.notBefore < 0) failProbe('PROBE_PROGRESS_INVALID', { step: 'progress_guard' });
+    return { ...p };
+}
+
 export async function recoverTechnicalProbe(entity, config = INTAKE_CONFIG, now = Date.now()) {
     const row = await probeCall('recovery_read', null, () => controlRow(entity, config));
     const state = JSON.parse(row.payload_json);
+    const progress = readProgress(state, config, true);
+    const markerValid = /^[0-9]:(?:[0-9]|1[0-5])$/.test(state.probeMarker || '') && (!state.probeProgress || Number(state.probeMarker.split(':')[0]) === progress.completedRounds);
+    const checkpointOnly = state.probeProgress && !Object.hasOwn(state, 'probeMarker');
     const date = String(row.updated_date || '');
     const lastWrite = Date.parse(/Z$|[+-]\d\d:\d\d$/.test(date) ? date : date + 'Z');
     if (row.sender_id !== '1' || row.staff_id !== 'TECHNICAL_ONLY_NO_POS_USER' || row.scope_policy !== 'assigned_shop' ||
         row.phase !== 'submitting' || !equal(row.owner_shop_ids, []) ||
         state?.draft !== null || !Array.isArray(state.receipts) || state.receipts.length !== 0 || state.floor !== 0 ||
-        !/^[0-9]:(?:[0-9]|1[0-5])$/.test(state.probeMarker || '') ||
-        Object.keys(state).some(key => !['draft', 'receipts', 'floor', 'probeMarker'].includes(key)) ||
+        (!markerValid && !checkpointOnly) ||
         !Number.isFinite(lastWrite) || now - lastWrite < 60000) {
         failProbe('PROBE_RECOVERY_BLOCKED', { step: 'recovery_guard' });
     }
@@ -64,16 +80,20 @@ export async function recoverTechnicalProbe(entity, config = INTAKE_CONFIG, now 
     return next;
 }
 
-export async function runStateProbe(entity, config = INTAKE_CONFIG) {
+export async function runStateProbe(entity, config = INTAKE_CONFIG, { maxRounds = 10, now = Date.now } = {}) {
     let row = await probeCall('initial_read', null, () => controlRow(entity, config));
     if (row.phase !== 'idle') failProbe('PROBE_BUSY', { step: 'initial_guard' });
-    row = await probeCall('initial_claim', null, () => changeControl(entity, row, config, { phase: 'submitting' }));
-    const rounds = [];
-    for (let round = 0; round < 10; round++) {
+    let progress = readProgress(JSON.parse(row.payload_json), config);
+    if (progress.notBefore > now()) return row;
+    if (!Number.isInteger(maxRounds) || maxRounds < 1 || maxRounds > 10) failProbe('PROBE_BATCH_INVALID', { step: 'config' });
+    const startingRound = progress.completedRounds;
+    row = await probeCall('initial_claim', null, () => changeControl(entity, row, config, { phase: 'submitting' }, { verify: false }));
+    const rounds = Array.from({ length: startingRound }, () => ({ winners: 1, staleRejected: true }));
+    for (let round = startingRound; round < Math.min(10, startingRound + maxRounds); round++) {
         const version = row.version;
         const results = await Promise.allSettled(Array.from({ length: 16 }, (_, i) => entity.updateMany({
             id: config.controlId, enabled: false, test_run_id: config.runId, version, phase: 'submitting', owner_shop_ids: { $eq: [] },
-        }, { $set: { version: version + 1, payload_json: JSON.stringify({ ...initial(), probeMarker: `${round}:${i}` }) } })));
+        }, { $set: { version: version + 1, payload_json: JSON.stringify({ ...initial(), probeProgress: progress, probeMarker: `${round}:${i}` }) } })));
         const winners = results.flatMap((r, i) => r.status === 'fulfilled' && r.value?.success === true && r.value.updated === 1 && r.value.has_more !== true ? [i] : []);
         const valid = r => r.status === 'fulfilled' && r.value?.success === true && [0, 1].includes(r.value.updated) && r.value.has_more !== true;
         if (winners.length !== 1 || results.some(r => !valid(r))) failProbe('PROBE_CONTENDERS_FAILED', {
@@ -92,6 +112,14 @@ export async function runStateProbe(entity, config = INTAKE_CONFIG) {
         const stale = await probeCall('stale', round, () => entity.updateMany({ id: row.id, version, enabled: false, test_run_id: config.runId }, { $set: { version: version + 1000 } }));
         if (stale?.success !== true || stale.updated !== 0) failProbe('PROBE_STALE_CHECK_FAILED', { step: 'stale', round });
         rounds.push({ winners: 1, staleRejected: true });
+        progress = { ...progress, completedRounds: round + 1, staleRejected: round + 1, notBefore: 0 };
+        row = await probeCall('round_checkpoint', round, () => changeControl(entity, row, config, { payload_json: JSON.stringify({ ...initial(), probeProgress: progress }) }, { verify: false }));
+    }
+    // Runtime preparation advances two rounds per call. Final predicates and binding
+    // provisioning get their own cooled-down call, rather than another burst.
+    if (rounds.length < 10 || (maxRounds < 10 && startingRound < 10)) {
+        progress = { ...progress, notBefore: now() + 60000 };
+        return probeCall('batch_checkpoint', null, () => changeControl(entity, row, config, { phase: 'idle', payload_json: JSON.stringify({ ...initial(), probeProgress: progress }) }, { verify: false }));
     }
     for (const [predicate, mismatch] of [{ owner_shop_ids: { $eq: ['wrong-shop'] } }, { enabled: true }].entries()) {
         const result = await probeCall('predicate', null, () => entity.updateMany({ id: row.id, version: row.version, test_run_id: config.runId, ...mismatch }, { $set: { version: row.version + 1000 } }));
@@ -100,9 +128,9 @@ export async function runStateProbe(entity, config = INTAKE_CONFIG) {
     const evidence = { passed: true, rounds: rounds.length, contendersPerRound: 16, staleRejected: rounds.length, checkedAt: new Date().toISOString() };
     return probeCall('complete', null, () => changeControl(entity, row, config, { phase: 'complete', payload_json: JSON.stringify({ ...initial(), probe: evidence, activation: 'off' }) }));
 }
-export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, config = INTAKE_CONFIG }) {
+export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, config = INTAKE_CONFIG, probeBatchRounds = 2, now = Date.now }) {
     return async req => {
-        const answer = (body, status = 200) => Response.json({ revision: 'order-setup-v2', ...body }, { status, headers: { 'cache-control': 'no-store' } });
+        const answer = (body, status = 200) => Response.json({ revision: 'order-setup-v3', ...body }, { status, headers: { 'cache-control': 'no-store' } });
         let stage = 'auth', ownerVerified = false;
         if (req.method !== 'POST') return answer({ error: 'Amal noto‘g‘ri.' }, 405);
         try {
@@ -146,7 +174,8 @@ export function prepareOrderBotSetup({ clientForRequest, readSecret, fetchImpl, 
                 if (!shop || shop.active === false || shop.allows_pos === false || shop.location_type === 'production') throw Error();
             }
             if (action === 'prepare') {
-                if (!state.probe?.passed) { stage = 'atomic_probe'; control = await runStateProbe(entity, config); state = JSON.parse(control.payload_json); }
+                if (!state.probe?.passed) { stage = 'atomic_probe'; control = await runStateProbe(entity, config, { maxRounds: probeBatchRounds, now }); state = JSON.parse(control.payload_json); }
+                if (!state.probe?.passed) return answer({ bot: me.username, prepared: false, probe: { passed: false, completedRounds: state.probeProgress.completedRounds, rounds: 10, contendersPerRound: 16, staleRejected: state.probeProgress.staleRejected }, retryAfterSeconds: Math.max(0, Math.ceil((state.probeProgress.notBefore - now()) / 1000)), webhook: webhook.url ? 'expected' : 'absent', activation: 'off' });
                 if (state.activation !== 'off') return answer({ code: 'ALREADY_ACTIVATING' }, 409);
                 stage = 'binding';
                 let rows = await entity.filter({ sender_id: sender }, '-created_date', 2);
