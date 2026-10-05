@@ -7,7 +7,7 @@ export const ORDER_BOT_SECRET_NAMES = Object.freeze([
 // The injected secrets reader is called only inside an approved, owner-authenticated request.
 export function prepareOrderBotReadiness({ clientForRequest, readSecret, fetchImpl, verificationApproved = false, ownerStaffId = '', expectedWebhookUrl = '' }) {
     return async req => {
-        const answer = (body, status = 200) => Response.json({ revision: 'readiness-v4', ...body }, { status, headers: { 'cache-control': 'no-store' } });
+        const answer = (body, status = 200) => Response.json({ revision: 'readiness-v5', ...body }, { status, headers: { 'cache-control': 'no-store' } });
         if (req.method !== 'POST') return answer({ error: 'Amal noto‘g‘ri.' }, 405);
         let ownerVerified = false, stage = 'auth', code = 'AUTH_UNVERIFIED';
         let present, diagnostic;
@@ -48,13 +48,20 @@ export function prepareOrderBotReadiness({ clientForRequest, readSecret, fetchIm
                 } catch (error) {
                     // Only fixed labels are returned; never copy message, stack, URL or cause.
                     const name = ['TypeError', 'TimeoutError', 'AbortError', 'PermissionDenied', 'NetworkError'].includes(error?.name) ? error.name : 'Other';
+                    const message = typeof error?.message === 'string' ? error.message : '';
+                    const causeKind = /Illegal invocation|incompatible receiver/i.test(message) ? 'FETCH_RECEIVER'
+                        : /(?:signal.*not.*AbortSignal|AbortSignal.*(?:expected|required)|signal.*not supported)/i.test(message) ? 'FETCH_SIGNAL'
+                        : /(?:redirect.*(?:not supported|not allowed)|redirect mode.*error|unexpected redirect)/i.test(message) ? 'FETCH_REDIRECT'
+                        : /(?:Invalid URL|Failed to parse URL)/i.test(message) ? 'FETCH_URL'
+                        : /(?:not implemented|not supported|not available)/i.test(message) ? 'RUNTIME_UNSUPPORTED'
+                        : 'UNCLASSIFIED';
                     const cause = error?.cause?.code;
                     code = signal.aborted ? 'TELEGRAM_TIMEOUT'
                         : name === 'PermissionDenied' ? 'TELEGRAM_NETWORK_PERMISSION_DENIED'
                         : ['ENOTFOUND', 'EAI_AGAIN'].includes(cause) ? 'TELEGRAM_DNS_FAILED'
                         : ['CERT_HAS_EXPIRED', 'ERR_TLS_CERT_ALTNAME_INVALID', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'].includes(cause) ? 'TELEGRAM_TLS_FAILED'
                         : 'TELEGRAM_FETCH_REJECTED';
-                    diagnostic = { elapsedMs: Date.now() - startedAt, errorKind: name };
+                    diagnostic = { elapsedMs: Date.now() - startedAt, errorKind: name, causeKind };
                     throw Error();
                 }
                 if (!response.ok) {
