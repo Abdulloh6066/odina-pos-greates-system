@@ -7,7 +7,7 @@ export const ORDER_BOT_SECRET_NAMES = Object.freeze([
 // The injected secrets reader is called only inside an approved, owner-authenticated request.
 export function prepareOrderBotReadiness({ clientForRequest, readSecret, fetchImpl, verificationApproved = false, ownerStaffId = '', expectedWebhookUrl = '' }) {
     return async req => {
-        const answer = (body, status = 200) => Response.json({ revision: 'readiness-v3', ...body }, { status, headers: { 'cache-control': 'no-store' } });
+        const answer = (body, status = 200) => Response.json({ revision: 'readiness-v4', ...body }, { status, headers: { 'cache-control': 'no-store' } });
         if (req.method !== 'POST') return answer({ error: 'Amal noto‘g‘ri.' }, 405);
         let ownerVerified = false, stage = 'auth', code = 'AUTH_UNVERIFIED';
         let present, diagnostic;
