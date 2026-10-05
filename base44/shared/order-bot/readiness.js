@@ -7,10 +7,10 @@ export const ORDER_BOT_SECRET_NAMES = Object.freeze([
 // The injected secrets reader is called only inside an approved, owner-authenticated request.
 export function prepareOrderBotReadiness({ clientForRequest, readSecret, fetchImpl, verificationApproved = false, ownerStaffId = '', expectedWebhookUrl = '' }) {
     return async req => {
-        const answer = (body, status = 200) => Response.json({ revision: 'readiness-v2', ...body }, { status, headers: { 'cache-control': 'no-store' } });
+        const answer = (body, status = 200) => Response.json({ revision: 'readiness-v3', ...body }, { status, headers: { 'cache-control': 'no-store' } });
         if (req.method !== 'POST') return answer({ error: 'Amal noto‘g‘ri.' }, 405);
         let ownerVerified = false, stage = 'auth', code = 'AUTH_UNVERIFIED';
-        let present;
+        let present, diagnostic;
         try {
             const client = await clientForRequest(req);
             const auth = await client.auth.me();
@@ -30,11 +30,33 @@ export function prepareOrderBotReadiness({ clientForRequest, readSecret, fetchIm
             if (!configured) return answer({ stage, code: 'CONFIG_INVALID_OR_MISSING', present, configured: false, identityVerified: false, activationReady: false });
             const call = async method => {
                 stage = method;
-                code = 'TELEGRAM_TRANSPORT_FAILED';
-                const response = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
-                    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
-                    redirect: 'error', signal: AbortSignal.timeout(10000),
-                });
+                code = 'TELEGRAM_REQUEST_SETUP_FAILED';
+                const startedAt = Date.now();
+                let signal, response;
+                try {
+                    signal = AbortSignal.timeout(10000);
+                    if (typeof fetchImpl !== 'function') throw Error();
+                } catch {
+                    diagnostic = { elapsedMs: Date.now() - startedAt };
+                    throw Error();
+                }
+                try {
+                    response = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
+                        method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+                        redirect: 'error', signal,
+                    });
+                } catch (error) {
+                    // Only fixed labels are returned; never copy message, stack, URL or cause.
+                    const name = ['TypeError', 'TimeoutError', 'AbortError', 'PermissionDenied', 'NetworkError'].includes(error?.name) ? error.name : 'Other';
+                    const cause = error?.cause?.code;
+                    code = signal.aborted ? 'TELEGRAM_TIMEOUT'
+                        : name === 'PermissionDenied' ? 'TELEGRAM_NETWORK_PERMISSION_DENIED'
+                        : ['ENOTFOUND', 'EAI_AGAIN'].includes(cause) ? 'TELEGRAM_DNS_FAILED'
+                        : ['CERT_HAS_EXPIRED', 'ERR_TLS_CERT_ALTNAME_INVALID', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'].includes(cause) ? 'TELEGRAM_TLS_FAILED'
+                        : 'TELEGRAM_FETCH_REJECTED';
+                    diagnostic = { elapsedMs: Date.now() - startedAt, errorKind: name };
+                    throw Error();
+                }
                 if (!response.ok) {
                     code = response.status === 401 ? 'TELEGRAM_AUTH_REJECTED' : response.status === 429 ? 'TELEGRAM_RATE_LIMITED' : 'TELEGRAM_HTTP_ERROR';
                     throw Error();
@@ -56,7 +78,7 @@ export function prepareOrderBotReadiness({ clientForRequest, readSecret, fetchIm
         } catch {
             // Before owner verification disclose no configuration or internal auth details.
             if (!ownerVerified) return answer({ error: 'Egasi sifatida tizimga kiring.', stage: 'auth', code: 'AUTH_UNVERIFIED', activationReady: false }, 401);
-            return answer({ error: 'Ulanishni tekshirish yakunlanmadi.', stage, code, ...(present ? { present } : {}), activationReady: false }, 503);
+            return answer({ error: 'Ulanishni tekshirish yakunlanmadi.', stage, code, ...(present ? { present } : {}), ...(diagnostic || {}), activationReady: false }, 503);
         }
     };
 }
