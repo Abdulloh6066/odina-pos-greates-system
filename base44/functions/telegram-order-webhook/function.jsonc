@@ -1,0 +1,5 @@
+{
+  "name": "telegram-order-webhook",
+  "entry": "entry.ts",
+  "is_public": true
+}
