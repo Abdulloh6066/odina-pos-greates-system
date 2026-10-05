@@ -1,0 +1,5 @@
+{
+  "name": "telegram-order-readiness",
+  "entry": "entry.ts",
+  "is_public": false
+}
