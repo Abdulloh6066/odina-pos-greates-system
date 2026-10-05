@@ -39,8 +39,8 @@ export class OrderBot {
             return { text: 'Buyurtma qaysi do‘konda saqlansin?', buttons: d.owner_shop_choices.map(s => [s.name, `shop:${d.id}:${d.version}:${s.id}`]) };
         const fields = missing(d, this.now());
         if (fields.length || d.errors?.length)
-            return reply(`Aniqlashtiring: ${fields.join(', ')}${d.errors?.length ? ' Noto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : ''}`);
-        return { text: `Buyurtma: ${d.name}, ${d.phone}\n${d.date} ${d.time} (Toshkent)\n${d.tier} UZS · 1 dona · ${d.type}\nDo‘kon: ${d.shop_name || d.shop}\nOlib ketish. To‘lanmagan, qoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
+            return reply(`Aniqlashtiring:\n${fields.join('\n')}${d.errors?.length ? '\nNoto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : ''}`);
+        return { text: `Buyurtma:\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nTur: ${d.type}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
     }
     async process(s, staff, m, cb) {
         let d = await this.store.get(s);
@@ -83,7 +83,27 @@ export class OrderBot {
         const text = String(m.text ?? m.caption ?? '');
         if (/\b\d{6,}:[A-Za-z0-9_-]{30,}\b/.test(text))
             return reply('Maxfiy kalitni chatga yubormang. Mas’ul xodimga murojaat qiling.');
-        if (['/start', '/yordam'].includes(text)) return reply('Assalomu alaykum! Tort rasmi va buyurtma matnini yuboring.\nMasalan: 2026-10-10 10:00, 200 lik, +998901234567, ism: Ali, tur: tugilgan_kun_va_boshqa, olish: olib ketish.\n200 lik — 200 000 so‘m. Avans qabul qilinmaydi. Yakuniy ma’lumotlarni ko‘rib, Tasdiqlash tugmasini bosing.\n/holat — holat, /tahrir — tahrirlash, /bekor — bekor qilish.');
+        if (['/start', '/yordam'].includes(text)) return reply([
+            'Assalomu alaykum! Tort rasmi va buyurtma matnini yuboring.',
+            '',
+            'Masalan:',
+            'Ism: Ali',
+            'Telefon: +998901234567',
+            'Sana: 2026-10-10',
+            'Vaqt: 10:00',
+            'Narx: 200 lik',
+            'Tur: tugilgan_kun_va_boshqa',
+            'Olish: olib ketish',
+            '',
+            '200 lik — 200 000 so‘m.',
+            'Avans qabul qilinmaydi.',
+            '',
+            'Yakuniy ma’lumotlarni ko‘rib, Tasdiqlash tugmasini bosing.',
+            '',
+            '/holat — holat',
+            '/tahrir — tahrirlash',
+            '/bekor — bekor qilish',
+        ].join('\n'));
         if (text === '/holat') {
             if (!d)
                 return reply('Rasm va buyurtma matnini yuboring.');
@@ -190,6 +210,6 @@ export class OrderBot {
                 tx.put(s, c);
             }
         });
-        return reply(valid ? `Buyurtma saqlandi: ${r.order_number}. To‘lanmagan, qoldiq: ${r.remaining_balance} UZS.` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
+        return reply(valid ? `Buyurtma saqlandi.\nBuyurtma raqami: ${r.order_number}\nTo‘lov: to‘lanmagan\nQoldiq: ${r.remaining_balance} UZS` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
     }
 }
