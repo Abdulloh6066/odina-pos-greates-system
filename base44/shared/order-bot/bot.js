@@ -43,7 +43,7 @@ export class OrderBot {
                 d.tier && !fields.some(f => f.startsWith('Narx')) ? `Narx: ${d.tier} UZS` : '',
                 d.phone ? `Telefon: ${d.phone}` : '',
                 d.name ? `Mijoz ismi: ${d.name}` : '',
-                `Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}`,
+                d.type === null ? '' : `Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}`,
                 d.fulfilment ? 'Olish: olib ketish' : '',
                 d.photo ? 'Tort rasmi: qabul qilindi' : '',
             ].filter(Boolean);
