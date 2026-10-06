@@ -35,12 +35,29 @@ export class OrderBot {
         return this.store.transaction(s, tx => tx.reply(uid, r));
     }
     summary(d) {
+        const fields = missing(d, this.now());
+        if (fields.length || d.errors?.length) {
+            const received = [
+                d.date && !fields.some(f => f.startsWith('Sana')) ? `Sana: ${d.date}` : '',
+                d.time && !fields.some(f => f.startsWith('Vaqt')) ? `Vaqt: ${d.time} (Toshkent)` : '',
+                d.tier && !fields.some(f => f.startsWith('Narx')) ? `Narx: ${d.tier} UZS` : '',
+                d.phone ? `Telefon: ${d.phone}` : '',
+                d.name ? `Mijoz ismi: ${d.name}` : '',
+                `Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}`,
+                d.fulfilment ? 'Olish: olib ketish' : '',
+                d.photo ? 'Tort rasmi: qabul qilindi' : '',
+            ].filter(Boolean);
+            return reply([
+                ...(received.length ? ['Qabul qilingan ma’lumotlar:', ...received, ''] : []),
+                fields.length ? 'Buyurtmani saqlash uchun ma’lumotlar yetarli emas. Quyidagilarni yuboring:' : 'Buyurtma ma’lumotlarini aniqlashtirish kerak.',
+                ...fields,
+                '',
+                d.errors?.length ? 'Noto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : 'Faqat yetishmayotgan ma’lumotlarni keyingi xabarda yuboring. Oldingi ma’lumotlar saqlanadi.',
+            ].join('\n'));
+        }
         if (!d.shop && d.owner_shop_choices?.length)
             return { text: 'Buyurtma qaysi do‘konda saqlansin?', buttons: d.owner_shop_choices.map(s => [s.name, `shop:${d.id}:${d.version}:${s.id}`]) };
-        const fields = missing(d, this.now());
-        if (fields.length || d.errors?.length)
-            return reply(`Aniqlashtiring:\n${fields.join('\n')}${d.errors?.length ? '\nNoto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : ''}`);
-        return { text: `Buyurtma:\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nTur: ${d.type}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
+        return { text: `Buyurtma:\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nBuyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
     }
     async process(s, staff, m, cb) {
         let d = await this.store.get(s);
@@ -100,7 +117,7 @@ export class OrderBot {
             'Sana: 2026-10-10',
             'Vaqt: 10:00',
             'Narx: 200 lik',
-            'Tur: tugilgan_kun_va_boshqa',
+            'To‘y buyurtmasi bo‘lsa, matnda «to‘y uchun» deb yozing.',
             'Olish: olib ketish',
             '',
             '200 lik — 200 000 so‘m.',
@@ -126,7 +143,7 @@ export class OrderBot {
             if (d && ['submitting', 'uncertain'].includes(d.status))
                 return reply('Buyurtma tekshirilmoqda. /holat yuboring.');
             if (!d || ['cancelled', 'complete'].includes(d.status))
-                d = { id: randomUUID().slice(0, 16), version: 0, sender: s, staff: staff.id, shop: staff.owner_shop_choices ? '' : staff.shop_id, shop_name: staff.shop_name, owner_shop_choices: staff.owner_shop_choices, status: 'draft', notes: '', errors: [] };
+                d = { id: randomUUID().slice(0, 16), version: 0, sender: s, staff: staff.id, shop: staff.owner_shop_choices ? '' : staff.shop_id, shop_name: staff.shop_name, owner_shop_choices: staff.owner_shop_choices, status: 'draft', type: 'tugilgan_kun_va_boshqa', notes: '', errors: [] };
             if (text === '/bekor') {
                 d.status = 'cancelled';
                 d.version++;
@@ -150,6 +167,7 @@ export class OrderBot {
             }
             const p = parse(text, this.now());
             Object.assign(d, p.patch);
+            if (d.type === undefined) d.type = 'tugilgan_kun_va_boshqa';
             d.errors.push(...p.errors);
             if (text)
                 d.notes = (d.notes + '\n' + text).trim();
@@ -174,6 +192,7 @@ export class OrderBot {
             const c = tx.get(s);
             if (c.status !== 'draft' || c.version !== snapshot.version)
                 return null;
+            if (c.type === undefined) c.type = 'tugilgan_kun_va_boshqa';
             c.status = 'submitting';
             c.key = `odina-order-bot:${c.id}:${c.version}`;
             tx.put(s, c);
