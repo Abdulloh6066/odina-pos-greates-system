@@ -21,14 +21,20 @@ export function parse(text, now) {
     take(/(?<!\d)(\+?998[\s-]*\d{2}[\s-]*\d{3}[\s-]*\d{2}[\s-]*\d{2})(?!\d)/g, 'phone', m => '+' + m[1].replace(/\D/g, ''));
     take(/(?:^|[,;\n])\s*ism\s*:\s*([^,;\n]+)/gi, 'name', m => m[1].trim());
     take(/(?:^|[,;\n])\s*tur\s*:\s*(tugilgan_kun_va_boshqa|toy_va_bazmlar)\b/gi, 'type');
+    if (/\bto['‘’ʻʼ]?y\s+uchun\b/i.test(text)) {
+        if (Object.hasOwn(patch, 'type') && patch.type !== 'toy_va_bazmlar') {
+            patch.type = null;
+            if (!errors.includes('type')) errors.push('type');
+        } else patch.type = 'toy_va_bazmlar';
+    }
     take(/(?:^|[,;\n])\s*olish\s*:\s*(olib ketish)\b/gi, 'fulfilment', () => 'pickup');
     if (/avans|oldindan|to['‘’]?landi/i.test(text))
         errors.push('payment');
     return { patch, errors };
 }
 export function missing(d, now) {
-    const labels = { date: 'sana (2026-10-06)', time: 'vaqt (10:00)', tier: 'narx (200 lik)', phone: 'telefon (+998901234567)', name: 'mijoz ismi (ism: Ali)', type: 'tur (tur: tugilgan_kun_va_boshqa yoki toy_va_bazmlar)', fulfilment: 'olish usuli (olish: olib ketish)', photo: 'tort rasmi' };
-    const needed = Object.keys(labels).filter(k => !d[k]);
+    const labels = { date: 'Sana:', time: 'Vaqt:', tier: 'Narx:', phone: 'Telefon raqami:', name: 'Mijoz ismi:', type: 'Buyurtma turi:', fulfilment: 'Olish usuli:', photo: 'Tort rasmi:' };
+    const needed = Object.keys(labels).filter(k => !d[k] && !(k === 'type' && d.type === undefined));
     if (d.date && d.time) {
         const t = new Date(`${d.date}T${d.time}:00+05:00`);
         if (!Number.isFinite(+t) || new Date(+t + 18000000).toISOString().slice(0, 16) !== `${d.date}T${d.time}` || t < now)
