@@ -3,6 +3,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { secrets } from "base44:runtime";
 import { INTAKE_CONFIG, controlRow } from "../../shared/order-bot/setup.js";
 import { prepareHostedOrderBot } from "../../shared/order-bot/hosted.js";
+// Bot bundle revision: start-greeting-v1 (includes server-binding /start refusal).
 export default async function (req: Request): Promise<Response> {
     try {
         const secret = secrets.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
