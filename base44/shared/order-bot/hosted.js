@@ -16,9 +16,21 @@ export function prepareHostedOrderBot({ service, canonicalIds = {}, approvedPhot
     const boundary = localWebhook({ handle: async (update) => {
             const message = update?.callback_query?.message ?? update?.message;
             const from = update?.callback_query?.from ?? update?.message?.from;
-            if (!Number.isSafeInteger(update?.update_id) || !Number.isSafeInteger(from?.id) || from?.is_bot || message?.chat?.type !== 'private' || String(message.chat.id) !== String(from.id) || !await bot.auth(String(from.id))) return { ok: true };
+            if (!Number.isSafeInteger(update?.update_id) || !Number.isSafeInteger(from?.id) || from.id <= 0 || from?.is_bot || message?.chat?.type !== 'private' || String(message.chat.id) !== String(from.id)) return { ok: true };
+            const sender = String(from.id);
+            if (!await bot.auth(sender)) {
+                // A fixed /start refusal grants no access and creates no binding or draft.
+                // Only Telegram-authenticated private messages may receive this response.
+                if (deliveryEnabled && !update.callback_query && message.text === '/start' &&
+                    !message.forward_origin && !message.forward_from && !message.forward_date) {
+                    try {
+                        await telegram.sendReply(sender, { text: 'Siz ro‘yxatda yo‘qsiz. Mas’ul xodimga murojaat qiling.' });
+                    }
+                    catch { /* Unknown send outcome: acknowledge, never blindly retry. */ }
+                }
+                return { ok: true };
+            }
             const response = await bot.handle(update);
-            const sender = String((update.callback_query?.from ?? update.message?.from)?.id ?? '');
             if (deliveryEnabled && await bot.auth(sender)) {
                 // Durable send claim. Sending/unknown is not automatically retried: Telegram
                 // sendMessage has no idempotency key. A new /holat can request a fresh reply.
