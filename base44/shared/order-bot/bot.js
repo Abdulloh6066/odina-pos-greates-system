@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { parse, missing } from './parser.js';
+import { parse, missing, recoverContactDetails } from './parser.js';
 const reply = text => ({ text });
 export class OrderBot {
     constructor({ store, allowlist = {}, pos, photos, now = () => new Date(), bindingProvider = null, submissionEnabled = true }) { Object.assign(this, { store, allowlist, pos, photos, now, bindingProvider, submissionEnabled }); }
@@ -57,7 +57,7 @@ export class OrderBot {
         }
         if (!d.shop && d.owner_shop_choices?.length)
             return { text: 'Buyurtma qaysi do‘konda saqlansin?', buttons: d.owner_shop_choices.map(s => [s.name, `shop:${d.id}:${d.version}:${s.id}`]) };
-        return { text: `Buyurtma:\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nBuyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
+        return { text: `Shu buyurtma to‘g‘rimi?\n\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nBuyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
     }
     async process(s, staff, m, cb) {
         let d = await this.store.get(s);
@@ -136,7 +136,16 @@ export class OrderBot {
                 return this.reconcile(s, d);
             if (d.status === 'cancelled')
                 return reply('Buyurtma bekor qilingan.');
-            return this.summary(d);
+            return this.store.transaction(s, tx => {
+                const current = tx.get(s);
+                if (!current || current.status !== 'draft')
+                    return reply('Buyurtma holati o‘zgargan. /holat yuboring.');
+                if (recoverContactDetails(current, this.now())) {
+                    current.version++;
+                    tx.put(s, current);
+                }
+                return this.summary(current);
+            });
         }
         return this.store.transaction(s, tx => {
             d = tx.get(s);
@@ -165,12 +174,13 @@ export class OrderBot {
                 d.errors = [];
                 d.editing = false;
             }
-            const p = parse(text, this.now());
+            const p = parse(text, this.now(), d);
             Object.assign(d, p.patch);
             if (d.type === undefined) d.type = 'tugilgan_kun_va_boshqa';
             d.errors.push(...p.errors);
             if (text)
                 d.notes = (d.notes + '\n' + text).trim();
+            recoverContactDetails(d, this.now());
             const photo = m.photo?.at(-1);
             if (photo?.file_id && photo.file_size <= 10485760)
                 d.photo = { file_id: photo.file_id };
