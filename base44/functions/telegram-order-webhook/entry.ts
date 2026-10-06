@@ -9,7 +9,7 @@ export default async function (req: Request): Promise<Response> {
         const secret = secrets.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
         const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
         const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-        if (!a.length || a.length !== b.length || !timingSafeEqual(a, b)) return new Response("Ruxsat yo‘q.", { status: 403, headers: { "x-odina-order-revision": "start-greeting-v1" } });
+        if (!a.length || a.length !== b.length || !timingSafeEqual(a, b)) return new Response("Ruxsat yo‘q. (start-greeting-v1)", { status: 403, headers: { "x-odina-order-revision": "start-greeting-v1" } });
         if (req.method !== "POST") return new Response("Amal noto‘g‘ri.", { status: 405 });
         const ownerId = secrets.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") || "";
         const token = secrets.get("ODINA_ORDER_BOT_TOKEN") || "";
