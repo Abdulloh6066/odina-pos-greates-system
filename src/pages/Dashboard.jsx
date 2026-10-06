@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dailyReports, setDailyReports] = useState(null);
   const [selectedShopId, setSelectedShopId] = useState('all');
+  const [businessDate, setBusinessDate] = useState(tashkentDateKey);
   const [reportError, setReportError] = useState('');
   const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
 
@@ -24,30 +25,20 @@ export default function Dashboard() {
     if (role === 'cashier') { navigate('/pos', { replace: true }); return; }
     let active = true;
     setLoading(true);
-    setDailyReports(null);
-    setReportError('');
     setSales([]);
     setProducts([]);
     setExpiredItems([]);
     setSelectedShopId('all');
     (async () => {
       try {
-        const [s, p, wasteResult, dailyResult] = await Promise.all([
+        const [s, p, wasteResult] = await Promise.all([
           base44.entities.Sale.list('-created_date', 500),
           base44.entities.Product.list(),
           (role === 'admin' || role === 'manager')
             ? base44.functions.invoke('waste-ledger', { action: 'get_alerts' }).catch(() => ({ data: { expired_items: [] } }))
             : Promise.resolve({ data: { expired_items: [] } }),
-          base44.functions.invoke('daily-sales-export', { action: 'preview', business_date: tashkentDateKey() })
-            .catch(error => ({ reportError: error?.response?.data?.error || error?.message || 'Kunlik hisobot yuklanmadi.' })),
         ]);
         if (!active) return;
-        if (dailyResult.reportError) setReportError(dailyResult.reportError);
-        else {
-          setReportError('');
-          const rows = (dailyResult?.data || dailyResult)?.reports || [];
-          setDailyReports(rows);
-        }
         setSales(s || []);
         setProducts(p || []);
         setExpiredItems((wasteResult?.data || wasteResult)?.expired_items || []);
@@ -57,6 +48,89 @@ export default function Dashboard() {
     })();
     return () => { active = false; };
   }, [role, user?.id, assignedShopId, navigate]);
+
+  // One preview supplies count and money together; catalog/alerts are not polled.
+  useEffect(() => {
+    if (role === 'cashier') return;
+    let active = true;
+    let inFlight = false;
+    let timer;
+    let lastAttempt = -Infinity;
+    let retryAt = 0;
+    let failures = 0;
+    let day = tashkentDateKey();
+    setBusinessDate(day);
+    setDailyReports(null);
+    setReportError('');
+
+    const checkDay = () => {
+      const nextDay = tashkentDateKey();
+      if (day !== nextDay) {
+        day = nextDay;
+        setBusinessDate(day);
+        setDailyReports(null); // Never label yesterday's totals as today's.
+      }
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      if (!active) return;
+      const midnight = Date.parse(day + 'T00:00:00+05:00') + 86400000;
+      timer = setTimeout(refresh, Math.min(60000, Math.max(1, midnight - Date.now())));
+    };
+    const refresh = async () => {
+      if (!active) return;
+      checkDay();
+      if (inFlight) return;
+      if (document.visibilityState === 'hidden' || navigator.onLine === false
+        || Date.now() < retryAt || Date.now() - lastAttempt < 15000) {
+        schedule();
+        return;
+      }
+      inFlight = true;
+      lastAttempt = Date.now();
+      const requestDay = day;
+      try {
+        const result = await base44.functions.invoke('daily-sales-export', {
+          action: 'preview', business_date: requestDay,
+        });
+        if (!active) return;
+        checkDay();
+        if (requestDay !== day) return;
+        const data = result?.data || result;
+        if (!Array.isArray(data?.reports)) throw new Error(data?.error || 'Kunlik hisobot yuklanmadi.');
+        setDailyReports(data.reports);
+        setReportError('');
+        failures = 0;
+        retryAt = 0;
+      } catch (error) {
+        if (!active) return;
+        checkDay();
+        failures += 1;
+        // Back off on failures, including 429, and honor Retry-After.
+        const headers = error?.response?.headers;
+        const retryAfter = headers?.get?.('retry-after') ?? headers?.['retry-after'];
+        const seconds = Number(retryAfter);
+        const serverDelay = retryAfter == null ? 0 : Number.isFinite(seconds)
+          ? seconds * 1000 : Date.parse(retryAfter) - Date.now();
+        retryAt = Date.now() + Math.max(Math.min(60000 * 2 ** (failures - 1), 300000), serverDelay || 0);
+        if (requestDay === day) setReportError(error?.response?.data?.error || error?.message || 'Kunlik hisobot yuklanmadi.');
+      } finally {
+        inFlight = false;
+        if (active) schedule();
+      }
+    };
+    void refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [role, user?.id, assignedShopId]);
 
   // The selector uses authorized report rows; managers retain their assigned store.
   const shops = useMemo(() => (dailyReports || []).filter((row) =>
@@ -74,8 +148,8 @@ export default function Dashboard() {
       sales: totals.sales + Number(row.sale_count || 0),
     }), { revenue: 0, collections: 0, orderPayments: 0, sales: 0 }), [dailyReports, shopId]);
   const today = useMemo(() => sales.filter((s) => s.status !== 'refunded'
-    && saleBusinessDate(s) === tashkentDateKey()
-    && (shopId === 'all' || Boolean(shopId && s.shop_id === shopId))), [sales, shopId]);
+    && saleBusinessDate(s) === businessDate
+    && (shopId === 'all' || Boolean(shopId && s.shop_id === shopId))), [sales, shopId, businessDate]);
   const visibleExpiredItems = expiredItems.filter((item) => shopId === 'all'
     || Boolean(shopId && item.location_id === shopId));
   const productCount = products.filter((product) => product.archived !== true
