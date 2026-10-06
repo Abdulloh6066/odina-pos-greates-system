@@ -83,7 +83,15 @@ export class OrderBot {
         const text = String(m.text ?? m.caption ?? '');
         if (/\b\d{6,}:[A-Za-z0-9_-]{30,}\b/.test(text))
             return reply('Maxfiy kalitni chatga yubormang. Mas’ul xodimga murojaat qiling.');
-        if (['/start', '/yordam'].includes(text)) return reply([
+        if (text === '/start') return reply([
+            'Assalomu alaykum!',
+            staff.is_owner === true ? 'Siz boss sifatida tanildingiz.' : 'Siz xodim sifatida tanildingiz.',
+            'Sizdan buyurtma olishga tayyormiz.',
+            '',
+            'Tort rasmi va buyurtma matnini yuboring.',
+            'Namuna uchun /yordam tugmasini bosing.',
+        ].join('\n'));
+        if (text === '/yordam') return reply([
             'Assalomu alaykum! Tort rasmi va buyurtma matnini yuboring.',
             '',
             'Masalan:',
