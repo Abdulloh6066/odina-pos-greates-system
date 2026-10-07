@@ -56,6 +56,6 @@ export class InternalOrderBridge {
         const catalogued = items.length === 1 && items[0].item_type !== 'custom' && Boolean(items[0].product_id) && items[0].product_name_snapshot === `TORT ${d.tier}`;
         if ((!unlisted && !catalogued) || items[0].shop_id !== d.shop || items[0].quantity !== 1 || items[0].unit_price_snapshot !== d.tier || items[0].line_total !== d.tier || items[0].unit_snapshot !== 'piece' || items[0].customization_note !== orderNotes(d) || payments.length || !audit.some(a => a.details.startsWith(o.order_number + ' · ')))
             return null;
-        return { complete: true, key: d.key, staff: d.staff, shop: d.shop, total: o.total, paid_amount: o.paid_amount, remaining_balance: o.remaining_balance, payment_status: o.payment_status, order_number: o.order_number, catalog_missing: unlisted };
+        return { complete: true, key: d.key, staff: d.staff, shop: d.shop, total: o.total, paid_amount: o.paid_amount, remaining_balance: o.remaining_balance, payment_status: o.payment_status, order_number: o.order_number, order_sequence: o.order_sequence, catalog_missing: unlisted };
     }
 }
