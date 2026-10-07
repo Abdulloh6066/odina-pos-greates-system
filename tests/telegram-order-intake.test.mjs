@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parse, missing, recoverContactDetails } from '../base44/shared/order-bot/parser.js';
+import { parse, missing, recoverContactDetails, updateCustomization, orderNotes } from '../base44/shared/order-bot/parser.js';
 import { OrderBot } from '../base44/shared/order-bot/bot.js';
 import { Base44StateStore } from '../base44/shared/order-bot/base44-store.js';
 
@@ -14,7 +14,7 @@ const previous = () => ({
     owner_shop_choices: [{ id: 'central', name: 'Odina Central' }, { id: 'branch', name: 'Odina Branch' }],
     date: '2026-10-08', time: '16:00', type: 'tugilgan_kun_va_boshqa',
     photo: { file_id: 'reference-cake-photo' }, errors: [],
-    notes: '8-okt 16:00\nЯ тебя люблю муж\nYoziladi',
+    notes: '8-okt 16:00',
 });
 
 // The production state adapter talks only to this in-memory entity in these
@@ -245,5 +245,107 @@ test('full currency prices still require owner shop selection', async () => {
     const confirmation = await f.callback(response.buttons[1][1]);
     assert.match(confirmation.text, /^Shu buyurtma to‘g‘rimi\?/);
     assert.equal(f.creates(), 0);
+});
+
+
+const ready = (notes = '') => ({ ...previous(), phone, name: 'Abdulloh',
+    fulfilment: 'pickup', tier: 200000, notes });
+const writing = 'Я тебя люблю муж';
+
+test('explicit inscription and notes stay separate; order fields do not repeat in notes', () => {
+    const draft = ready('8-okt 16:00\n200 lik razmerda\n' + details +
+        '\nTortdagi yozuv: ' + writing + '\nIzoh: oq rangda bezatilsin');
+    updateCustomization(draft);
+    assert.equal(draft.inscription, writing);
+    assert.equal(draft.additional_notes, 'oq rangda bezatilsin');
+    assert.equal(orderNotes(draft), 'Tortdagi yozuv: ' + writing + '\nIzoh: oq rangda bezatilsin');
+    assert.equal(draft.inscription_pending, false);
+});
+
+test('inscriptions and explicit notes cannot overwrite dates, prices or names', () => {
+    const result = parse('Tortdagi yozuv: Ali 20 yosh 9-okt 10:00 250 lik\nIzoh: 200000 som yozilmasin', now, previous());
+    assert.deepEqual(result, { patch: {}, errors: [] });
+    assert.deepEqual(parse('Ali\nYozilad', now, previous()), { patch: {}, errors: [] });
+});
+
+test('the screenshot writing marker requires a decision before order confirmation', async () => {
+    for (const marker of ['Yozilad', 'Yoziladi']) {
+        const f = fixture(ready('8-okt 16:00\n' + writing + '\n' + marker +
+            '\n200000 som\n' + details));
+        const question = await f.message('/holat');
+        assert.equal(question.text, 'Tortga «' + writing + '» deb yozilsinmi?');
+        assert.deepEqual(question.buttons.map(b => b[0]), ['Ha, yozilsin', 'Yo‘q, izoh sifatida']);
+        const draft = await f.store.get(sender);
+        const forgedConfirm = await f.callback('ok:' + draft.id + ':' + draft.version);
+        assert.equal(forgedConfirm.text, question.text);
+        assert.equal(f.creates(), 0);
+        const confirmation = await f.callback(question.buttons[0][1]);
+        assert.match(confirmation.text, /^Shu buyurtma to‘g‘rimi\?/);
+        assert.match(confirmation.text, /Tortdagi yozuv: Я тебя люблю муж/);
+        assert.doesNotMatch(confirmation.text, /Yozilad/);
+        assert.equal(orderNotes(await f.store.get(sender)), 'Tortdagi yozuv: ' + writing);
+        assert.equal(f.creates(), 0);
+        await f.callback(confirmation.buttons[0][1]);
+        assert.equal(f.creates(), 1);
+    }
+});
+
+test('declining inscription keeps the text as an additional note', async () => {
+    const f = fixture(ready(writing + '\nYozilad\nIzoh: oq rangda'));
+    const question = await f.message('/holat');
+    const confirmation = await f.callback(question.buttons[1][1]);
+    assert.match(confirmation.text, /^Shu buyurtma to‘g‘rimi\?/);
+    assert.doesNotMatch(confirmation.text, /Tortdagi yozuv:/);
+    const notes = orderNotes(await f.store.get(sender));
+    assert.ok(notes.includes(writing));
+    assert.ok(notes.includes('oq rangda'));
+    assert.equal(f.creates(), 0);
+    assert.match((await f.callback(question.buttons[0][1])).text, /eskirgan/);
+});
+
+test('unknown design text is preserved, repeated notes are deduplicated', () => {
+    const draft = ready('Oq gullar\nOq gullar\n200000 som\nOlganda beradi pulini');
+    updateCustomization(draft);
+    assert.equal(orderNotes(draft), 'Izoh: Oq gullar\nOlganda beradi pulini');
+    assert.equal(draft.inscription_pending, false);
+});
+
+test('multiple proposed writings ask for an explicit inscription, retaining all text', async () => {
+    const f = fixture(ready('Birinchi matn\nYoziladi\nIkkinchi matn\nYoziladi'));
+    const response = await f.message('/holat');
+    assert.match(response.text, /Tortdagi yozuvni aniqlashtiring/);
+    assert.equal(response.buttons, undefined);
+    assert.ok(response.text.includes('Birinchi matn'));
+    assert.ok(response.text.includes('Ikkinchi matn'));
+    const clarified = await f.message('Tortdagi yozuv: Yakuniy matn');
+    assert.match(clarified.text, /^Shu buyurtma to‘g‘rimi\?/);
+    assert.equal((await f.store.get(sender)).inscription, 'Yakuniy matn');
+});
+
+test('editing resets inscription decisions, retains the photo and asks again for new writing', async () => {
+    const f = fixture(ready(writing + '\nYoziladi'));
+    const first = await f.message('/holat');
+    await f.callback(first.buttons[0][1]);
+    await f.message('/tahrir');
+    const response = await f.message('8-okt 16:00\n200000 som\n' + details + '\nBoshqa matn\nYozilad');
+    assert.equal(response.text, 'Tortga «Boshqa matn» deb yozilsinmi?');
+    assert.equal((await f.store.get(sender)).photo.file_id, previous().photo.file_id);
+    assert.equal(f.creates(), 0);
+});
+
+test('old order confirmation buttons cannot bypass a newly required inscription decision', async () => {
+    const old = ready(writing + '\nYoziladi');
+    const f = fixture(old);
+    const response = await f.callback('ok:' + old.id + ':' + old.version);
+    assert.match(response.text, /Tortga «Я тебя люблю муж»/);
+    assert.equal(f.creates(), 0);
+});
+
+test('historical notes keep their original value until an unsubmitted draft is migrated', () => {
+    const old = ready('8-okt 16:00\n' + writing + '\nYoziladi');
+    assert.equal(orderNotes(old), old.notes);
+    updateCustomization(old);
+    assert.equal(old.inscription_pending, true);
+    assert.equal(old.notes, '8-okt 16:00\n' + writing + '\nYoziladi');
 });
 
