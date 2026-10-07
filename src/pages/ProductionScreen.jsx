@@ -620,10 +620,10 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
             <span>{displayDate(order.required_date)} · {order.required_time || '—'}</span>
             <span className="rounded-full bg-secondary px-2 py-0.5">{typeLabel(order.order_type)}</span>
           </div>
-          <div className={hasImage ? 'grid lg:grid-cols-[minmax(240px,34%)_minmax(0,1fr)]' : ''}>
+          <div className={hasImage ? 'grid md:grid-cols-[minmax(240px,34%)_minmax(0,1fr)]' : ''}>
             {/* Reference image */}
             {hasImage && (
-              <div className="px-4 sm:px-5 pb-4 lg:pr-2">
+              <div className="px-4 sm:px-5 pb-4 md:pr-2">
                 <button
                   type="button"
                   onClick={onPreview}
