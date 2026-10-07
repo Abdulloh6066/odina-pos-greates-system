@@ -2,6 +2,11 @@
   "name": "CustomerOrder",
   "type": "object",
   "properties": {
+    "order_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Mijozga ko\u2018rsatiladigan o\u2018zgarmas tartib raqami: 1, 2, 3... barcha kunlar va do\u2018konlar bo\u2018yicha."
+    },
     "order_number": {
       "type": "string"
     },
