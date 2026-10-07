@@ -82,6 +82,7 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{it.product_name_snapshot}</div>
+                      {it.item_type === 'custom' && <div className="text-xs text-muted-foreground">Katalogdagi mos mahsulot topilmadi · oddiy buyurtma</div>}
                       <div className="text-xs text-muted-foreground">
                         {it.category_name_snapshot} · {it.quantity} {it.unit_snapshot === 'sheet' ? 'varaq' : 'dona'}
                         {it.unit_snapshot === 'sheet' && it.event_pieces_per_sheet_snapshot ? ` (~${it.event_pieces_per_sheet_snapshot} dona)` : ''}
