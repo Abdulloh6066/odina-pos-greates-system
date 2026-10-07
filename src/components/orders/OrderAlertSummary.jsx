@@ -1,3 +1,4 @@
+import { displayOrderNumber } from '@/lib/orders';
 import React from 'react';
 import { formatUZS } from '@/lib/pos';
 
@@ -8,7 +9,7 @@ function Chip({ label, value }) {
 function AlertRow({ alert, onOpen }) {
   const { order, deadline, unpaid } = alert;
   return <button type="button" onClick={() => onOpen(order)} className="opl-alert-row">
-    <div className="opl-alert-info"><strong>{order.order_number} · {order.customer_name}</strong><span>{order.required_date} · {order.required_time}</span></div>
+    <div className="opl-alert-info"><strong>{displayOrderNumber(order)} · {order.customer_name}</strong><span>{order.required_date} · {order.required_time}</span></div>
     <div className="opl-alert-tags">
       {deadline.kind === 'overdue' && <span className="opl-tag">Kechikdi</span>}
       {deadline.kind === 'due_soon' && <span className="opl-tag">1 soatdan kam qoldi</span>}
