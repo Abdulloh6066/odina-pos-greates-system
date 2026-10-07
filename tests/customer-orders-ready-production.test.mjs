@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
@@ -296,55 +297,37 @@ function harness(db, options = {}) {
   };
 }
 
-function transpileScript(source) {
-  return ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-}
-
-function loadHandler(client) {
-  const helperCode = transpileScript(
-    readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, ''),
-  );
-  const costCode = transpileScript(
-    readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, ''),
-  );
-  const readyCode = transpileScript(
-    readFileSync('base44/shared/order-ready-production.ts', 'utf8')
-      .replace(/import \{[\s\S]*?\} from "\.\/cost-engine\.ts";/, '')
-      .replace(/export /g, ''),
-  );
-  const customerCode = transpileScript(
-    readFileSync('base44/shared/customer-helpers.ts', 'utf8').replace(/export /g, ''),
-  );
-  let source = readFileSync('base44/functions/customer-orders/entry.ts', 'utf8')
-    .replace(
-      /import \{ createClientFromRequest \} from "npm:@base44\/sdk";/,
-      'const createClientFromRequest = () => client;',
-    )
-    .replace(
-      /import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/,
-      '',
-    )
-    .replace(
-      /import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/order-ready-production\.ts";/,
-      '',
-    )
-    .replace(/import \{ ensureCustomer \} from "\.\.\/\.\.\/shared\/customer-helpers\.ts";/, '')
-    .replace(/export default async function\(req[^{]*\{/, 'async function handler(req) {');
-  source = [helperCode, costCode, readyCode, customerCode, source, 'globalThis.testHandler = handler;'].join('\n');
+function loadHandler(client, { enableRecipeAccounting = true } = {}) {
+  const cache = new Map();
   const context = vm.createContext({
-    client,
-    Response,
-    crypto: webcrypto,
-    console,
-    structuredClone,
-    exports: {},
-    Date: makeClock(),
+    Response, crypto: webcrypto, console, structuredClone, Date: makeClock(),
   });
-  vm.runInContext(transpileScript(source), context);
+  function loadModule(path) {
+    if (cache.has(path)) return cache.get(path).exports;
+    const module = { exports: {} };
+    cache.set(path, module);
+    let source = readFileSync(path, 'utf8');
+    if (path.endsWith('/customer-orders/entry.ts') && enableRecipeAccounting) {
+      // Exercise the preserved recipe path separately from the production policy.
+      source = source.replace('const ORDER_RECIPE_ACCOUNTING_ENABLED = false;',
+        'const ORDER_RECIPE_ACCOUNTING_ENABLED = true;');
+    }
+    const code = ts.transpileModule(source, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+    }).outputText;
+    const require = (specifier) => {
+      if (specifier === 'npm:@base44/sdk') return { createClientFromRequest: () => client };
+      if (!specifier.startsWith('.')) throw new Error('Unexpected offline dependency: ' + specifier);
+      return loadModule(resolve(dirname(path), specifier));
+    };
+    vm.runInContext('(function(require, module, exports) {\n' + code + '\n})', context)(
+      require, module, module.exports,
+    );
+    return module.exports;
+  }
+  const handler = loadModule(resolve('base44/functions/customer-orders/entry.ts')).default;
   return async (body) => {
-    const response = await context.testHandler({ json: async () => body });
+    const response = await handler({ json: async () => body });
     return { status: response.status, data: await response.json() };
   };
 }
@@ -573,6 +556,88 @@ test('disabled production worker is rejected before any order status change', as
   const result = await loadHandler(harness(f.db))(readyRequest);
   assert.equal(result.status, 403);
   assert.equal(f.db.CustomerOrder[0].order_status, 'qabul_qilindi');
+});
+
+
+test('paused recipes allow Ready with no recipe or ingredient stock and keep all stock unchanged', async () => {
+  const f = fixture();
+  f.db.Recipe = []; f.db.RecipeItem = []; f.db.IngredientStock = [];
+  const before = structuredClone(f.db.ProductStock);
+  const call = loadHandler(harness(f.db), { enableRecipeAccounting: false });
+  const runtime = await call({ action: 'runtime_status' });
+  assert.equal(runtime.data.order_recipe_accounting_enabled, false);
+  // A caller cannot opt back into recipe accounting.
+  const result = await call({ ...readyRequest, applyIngredients: true });
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(result.data.order.order_status, 'tayyor');
+  assert.equal(result.data.production_applied, false);
+  assert.equal(f.db.CustomerOrder[0].ready_inventory_state, 'pending');
+  assert.match(f.db.CustomerOrder[0].ready_at, /\+05:00$/);
+  assert.deepEqual(f.db.ProductStock, before);
+  assert.equal(f.db.ProductionBatch.length, 0);
+  assert.equal(f.db.ProductionBatchItem.length, 0);
+  assert.equal(f.db.StockMovement.length, 0);
+  const stamp = f.db.CustomerOrder[0].ready_at;
+  assert.equal((await call(readyRequest)).data.already_ready, true);
+  assert.equal(f.db.CustomerOrder[0].ready_at, stamp);
+  assert.equal(f.db.ActionHistory.length, 1);
+  assert.equal((await call({ ...readyRequest, step: 'shipped' })).status, 200);
+});
+
+test('paused recipes do not consume ingredients even when a recipe exists', async () => {
+  const f = fixture(); const before = structuredClone(f.db.IngredientStock);
+  const result = await loadHandler(harness(f.db), { enableRecipeAccounting: false })(readyRequest);
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.deepEqual(f.db.IngredientStock, before);
+  assert.equal(result.data.production_applied, false);
+  assert.equal(f.db.StockMovement.length, 0);
+});
+
+test('paused recipe mode supports legacy drafts and prevents simultaneous status writes', async () => {
+  const f = fixture(); delete f.db.CustomerOrder[0].ready_inventory_state;
+  const call = loadHandler(harness(f.db), { enableRecipeAccounting: false });
+  const results = await Promise.all([call(readyRequest), call(readyRequest)]);
+  assert.equal(results.filter(r => r.status === 200).length, 1);
+  assert.equal(results.filter(r => r.status === 409).length, 1);
+  assert.equal(f.db.CustomerOrder[0].order_status, 'tayyor');
+  assert.equal(f.db.ActionHistory.length, 1);
+  assert.equal(f.db.StockMovement.length, 0);
+});
+
+test('paused recipes preserve production permissions and reject cancelled or processing orders', async () => {
+  for (const [role, shop, expected] of [
+    ['production', 'prod-main', 200], ['production', 'shop-a', 403], ['cashier', 'shop-a', 403],
+  ]) {
+    const f = fixture(role, shop); f.db.Recipe = [];
+    const call = loadHandler(harness(f.db), { enableRecipeAccounting: false });
+    assert.equal((await call(readyRequest)).status, expected);
+    if (role === 'production') {
+      assert.equal((await call({ action: 'record_payment', order_id: 'order-1', amount: 1 })).status, 403);
+    }
+  }
+  for (const blocked of [
+    { order_status: 'bekor_qilindi' }, { ready_inventory_state: 'processing' },
+    { ready_inventory_state: 'completed' },
+  ]) {
+    const f = fixture(); Object.assign(f.db.CustomerOrder[0], blocked);
+    const before = structuredClone(f.db);
+    const result = await loadHandler(harness(f.db), { enableRecipeAccounting: false })(readyRequest);
+    assert.equal(result.status, 409);
+    assert.deepEqual(f.db, before);
+  }
+});
+
+test('normal completion still deducts finished goods while paused recipes leave ingredients alone', async () => {
+  const f = fixture(); const before = structuredClone(f.db.IngredientStock);
+  const call = loadHandler(harness(f.db), { enableRecipeAccounting: false });
+  assert.equal((await call(readyRequest)).status, 200);
+  const result = await call({ action: 'complete_order', order_id: 'order-1', idempotency_key: 'paused-complete' });
+  assert.equal(result.status, 200, JSON.stringify(result));
+  assert.equal(result.data.order.order_status, 'yakunlandi');
+  assert.deepEqual(f.db.IngredientStock, before);
+  assert.equal(f.db.ProductStock.find(r => r.product_id === 'cake-sheet').quantity, 20);
+  assert.equal(f.db.ProductStock.find(r => r.product_id === 'cake-piece').quantity, 40);
+  assert.equal(f.db.StockMovement.filter(r => r.movement_type === 'sale').length, 2);
 });
 
 console.log('Customer order ready-production offline regression tests ready.');
