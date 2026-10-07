@@ -94,6 +94,7 @@ const inlineWriting = /^(.+?)\s+(?:deb\s+)?(?:yoziladi|yozilad|yozilsin)[.!]?$/i
 function decorationLines(text) {
     const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
     const protectedLines = new Set(), explicit = [], candidates = [], additional = [];
+    let orphanMarker = false;
     for (let i = 0; i < lines.length; i++) {
         const label = lines[i].match(inscriptionLabel), note = lines[i].match(noteLabel);
         if (label) { explicit.push(label[1].trim()); protectedLines.add(i); }
@@ -104,13 +105,13 @@ function decorationLines(text) {
             const before = lines[i - 1];
             if (before && !protectedLines.has(i - 1) && !/[:\d]/u.test(before) && !/^(?:olib\s+ketish|to['‘’ʻʼ]?y\s+uchun)$/iu.test(before)) {
                 candidates.push(before); protectedLines.add(i - 1);
-            } else additional.push(lines[i]);
+            } else if (!before || (!inscriptionLabel.test(before) && !inlineWriting.test(before))) orphanMarker = true;
         } else {
             const inline = lines[i].match(inlineWriting);
             if (inline) { candidates.push(inline[1].replace(/^[«“"]|[»”"]$/g, '').trim()); protectedLines.add(i); }
         }
     }
-    return { lines, protectedLines, explicit, candidates: [...new Set(candidates)], additional };
+    return { lines, protectedLines, explicit, candidates: [...new Set(candidates)], additional, orphanMarker };
 }
 // Dates/numbers inside explicit notes or proposed inscriptions are not order fields.
 export function orderInput(text) {
@@ -118,6 +119,8 @@ export function orderInput(text) {
     return lines.filter((_, i) => !protectedLines.has(i)).join('\n');
 }
 function removeOrderFields(line, draft) {
+    if (/[,;]/.test(line) && /(?:^|[,;])\s*(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line))
+        return line.split(/[,;](?!\d)/).map(part => removeOrderFields(part.trim(), draft)).filter(Boolean).join('; ');
     if (line === draft.name) return '';
     if (/^(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line)) {
         const value = line.replace(/^[^:]+:\s*/, '');
@@ -157,7 +160,7 @@ export function updateCustomization(draft) {
     const values = {
         notes_format_version: 1, inscription, inscription_candidate: candidate,
         inscription_pending: pending,
-        inscription_unclear: !inscription && parts.candidates.length > 1,
+        inscription_unclear: !inscription && (parts.candidates.length > 1 || parts.orphanMarker),
         additional_notes: [...new Set(additional)].join('\n'),
     };
     const changed = Object.entries(values).some(([k, v]) => draft[k] !== v);
