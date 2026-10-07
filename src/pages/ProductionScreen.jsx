@@ -638,6 +638,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium leading-snug">{it.product_name_snapshot}</div>
+                      {it.item_type === 'custom' && <div className="text-xs text-muted-foreground">Katalogdagi mos mahsulot topilmadi · oddiy buyurtma</div>}
                       <div className="text-xs text-muted-foreground">
                         {it.quantity} {unitLabel(it.unit_snapshot)}
                         {it.category_name_snapshot ? ` · ${it.category_name_snapshot}` : ''}
