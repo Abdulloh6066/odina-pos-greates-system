@@ -1,3 +1,7 @@
+// Keep historical technical numbers intact; display the permanent sequence.
+export const displayOrderNumber = (order) => Number.isSafeInteger(order?.order_sequence) && order.order_sequence > 0
+  ? String(order.order_sequence) : (order?.order_number || '—');
+
 export const ORDER_STATUSES = [
   { key: "qabul_qilindi", label: "Qabul qilindi", tone: "bg-blue-100 text-blue-700 border-blue-200" },
   { key: "tayyorlanmoqda", label: "Tayyorlanmoqda", tone: "bg-amber-100 text-amber-700 border-amber-200" },
