@@ -47,7 +47,7 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
     ],
     StockMovement: [],
     ProductionBatch: [],
-    Settings: [{ id: 's1', shop_name: 'Odina', allow_negative_stock: true }],
+    Settings: [{ id: 's1', shop_name: 'Odina', customer_order_last_number: 0, allow_negative_stock: true }],
     Customer: [],
     CustomerOrder: [],
     CustomerOrderItem: [],
