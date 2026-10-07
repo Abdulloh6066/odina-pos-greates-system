@@ -1,3 +1,4 @@
+import { displayOrderNumber } from '@/lib/orders';
 import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -99,7 +100,7 @@ export default function Orders() {
       if (view === 'history' && isActive(o)) return false;
       if (view === 'date' && o.required_date !== dateFilter) return false;
       if (q) {
-        const hay = `${o.order_number || ''} ${o.customer_name || ''} ${o.customer_phone || ''}`.toLowerCase();
+        const hay = `${displayOrderNumber(o)} ${o.order_number || ''} ${o.customer_name || ''} ${o.customer_phone || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       if (shopFilter && o.shop_id !== shopFilter) return false;
