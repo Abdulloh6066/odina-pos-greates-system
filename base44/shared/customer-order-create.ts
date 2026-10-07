@@ -74,11 +74,32 @@ export async function reversePaymentOnShift(
   ).catch(() => {});
 }
 
-async function normalizeOrderItems(service: any, requestedItems: any[], orderType: string, shopId: string) {
+async function normalizeOrderItems(service: any, requestedItems: any[], orderType: string, shopId: string, botGuard: any = null) {
   const normalized: any[] = [];
   for (const requested of requestedItems) {
     const productId = String(requested?.product_id || "");
     const quantity = Number(requested?.quantity);
+    // Only the authenticated internal Telegram bridge may create an unlisted cake.
+    // The price comes from its validated draft, never from a browser item price.
+    if (!productId && botGuard?.allowUnlistedCake === true) {
+      const price = botGuard.expectedTotal;
+      if (requestedItems.length !== 1 || quantity !== 1 || !Number.isSafeInteger(price) || price <= 0 || price > 1000000000) {
+        throw httpError("Oddiy buyurtma narxi yoki miqdori noto‘g‘ri.", 400);
+      }
+      const products = await service.entities.Product.filter({ active: true, name: `TORT ${price}` });
+      const matching = products.filter((p: any) => p.archived !== true && p.production_unit !== "sheet"
+        && String(p.name).trim().toUpperCase() === `TORT ${price}`
+        && Number(p.shop_prices?.[shopId] ?? p.price) === price);
+      if (matching.length) throw httpError("Katalog o‘zgardi. Buyurtmani qayta tekshirish kerak.", 409);
+      normalized.push({
+        product_id: "", item_type: "custom", product_name_snapshot: "Oddiy buyurtma (tort)",
+        product_image_snapshot: "", category_name_snapshot: "Buyurtmalar",
+        unit_snapshot: "piece", quantity: 1, event_pieces_per_sheet_snapshot: 0,
+        unit_price_snapshot: price, line_total: price,
+        customization_note: String(requested?.customization_note || ""),
+      });
+      continue;
+    }
     if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
       throw httpError("Har bir mahsulotda to‘g‘ri miqdor bo‘lishi kerak.", 400);
     }
@@ -115,7 +136,7 @@ async function normalizeOrderItems(service: any, requestedItems: any[], orderTyp
 }
 
 // Internal only. Callers authenticate and authorize before invoking; never expose directly.
-export async function createCustomerOrder(service: any, user: any, body: any, botGuard: null | { staffId: string; shopId: string; expectedTotal: number; authorize: () => Promise<any> } = null): Promise<Response> {
+export async function createCustomerOrder(service: any, user: any, body: any, botGuard: null | { staffId: string; shopId: string; expectedTotal: number; allowUnlistedCake?: boolean; authorize: () => Promise<any> } = null): Promise<Response> {
   let createdOrder: any = null;
   let createdItems: any[] = [];
   let createdPayment: any = null;
@@ -198,7 +219,7 @@ export async function createCustomerOrder(service: any, user: any, body: any, bo
       if (!requestedItems.length) {
         return Response.json({ error: "Kamida bitta mahsulot qo‘shing." }, { status: 400 });
       }
-      const normalizedItems = await normalizeOrderItems(service, requestedItems, orderType, shop.id);
+      const normalizedItems = await normalizeOrderItems(service, requestedItems, orderType, shop.id, botGuard);
       const subtotal = normalizedItems.reduce((sum, item) => sum + item.line_total, 0);
 
       let deliveryFee = 0;
