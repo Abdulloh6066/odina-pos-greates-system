@@ -13,7 +13,7 @@ import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import DemandSection from '@/components/production/DemandSection';
 import TomorrowIngredientForecast from '@/components/production/TomorrowIngredientForecast';
 import {
-  ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays, ChevronDown, CakeSlice,
+  ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays, ChevronDown, CakeSlice, RefreshCw,
 } from 'lucide-react';
 
 const ACTIVE_STATUSES = ['qabul_qilindi', 'tayyorlanmoqda', 'tayyor'];
@@ -140,18 +140,26 @@ function ProductionScreenInner() {
   const [forecastLoading, setForecastLoading] = useState(true);
   const [forecastError, setForecastError] = useState('');
   const loadedOnce = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const refreshInFlight = useRef(null);
+  const refreshQueued = useRef(false);
+  const forecastQueued = useRef(false);
 
   const loadOrders = async () => {
     try {
       const all = await base44.entities.CustomerOrder.list('-created_date', 200);
-      const list = all || [];
+      if (!Array.isArray(all)) throw new Error('Buyurtmalar javobi noto‘g‘ri.');
+      const list = all;
       setActive(list.filter((o) => ACTIVE_STATUSES.includes(o.order_status)));
       const today = todayStr();
       setShippedToday(
         list.filter((o) => o.order_status === 'yuborildi_olib_ketildi' && uzbekistanDateKey(o.shipped_at) === today),
       );
+      setRefreshError('');
       return true;
     } catch (e) {
+      if (loadedOnce.current) setRefreshError('Buyurtmalar yangilanmadi. Oxirgi yuklangan ro‘yxat ko‘rsatilmoqda.');
       if (!loadedOnce.current) setError(e?.message || 'Buyurtmalarni yuklab bo‘lmadi.');
       return false;
     }
@@ -168,7 +176,7 @@ function ProductionScreenInner() {
       setItemsByOrder(map);
       return true;
     } catch (e) {
-      setItemsByOrder({});
+      // Keep the last successful product details during a temporary connection failure.
       return false;
     }
   };
@@ -191,11 +199,36 @@ function ProductionScreenInner() {
     }
   };
 
-  const load = async () => {
+  const load = async (includeForecast = true) => {
+    // A realtime event arriving during a fetch needs a fresh follow-up read.
+    // Never let an older concurrent response hide a newer order.
+    if (refreshInFlight.current) {
+      refreshQueued.current = true;
+      forecastQueued.current ||= includeForecast;
+      return refreshInFlight.current;
+    }
+    setRefreshing(true);
     setError('');
-    await Promise.allSettled([loadOrders(), loadItems(), loadForecast()]);
-    loadedOnce.current = true;
-    setLoading(false);
+    const request = (async () => {
+      let withForecast = includeForecast;
+      do {
+        refreshQueued.current = false;
+        forecastQueued.current = false;
+        await Promise.allSettled([
+          loadOrders(), loadItems(), ...(withForecast ? [loadForecast()] : []),
+        ]);
+        loadedOnce.current = true;
+        setLoading(false);
+        withForecast = forecastQueued.current;
+      } while (refreshQueued.current);
+    })();
+    refreshInFlight.current = request;
+    try {
+      await request;
+    } finally {
+      refreshInFlight.current = null;
+      setRefreshing(false);
+    }
   };
 
   const safeSubscribe = (entityName, handler) => {
@@ -211,10 +244,21 @@ function ProductionScreenInner() {
     let cancelled = false;
     let t;
     const tick = () => { if (!cancelled) setClock(clockStr()); };
-    const schedule = () => { clearTimeout(t); t = setTimeout(load, 250); };
+    const schedule = () => { clearTimeout(t); t = setTimeout(() => !cancelled && load(), 250); };
+    const refreshVisible = () => {
+      if (!cancelled && document.visibilityState !== 'hidden' && navigator.onLine !== false) {
+        load(false);
+      }
+    };
 
     load();
     const interval = setInterval(tick, 30000);
+    // Subscription messages can be missed after sleep or a reconnect.
+    // Refresh reads independently of the ready/shipped action buttons.
+    const orderInterval = setInterval(refreshVisible, 15000);
+    window.addEventListener('focus', refreshVisible);
+    window.addEventListener('online', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
     const u1 = safeSubscribe('CustomerOrder', schedule);
     const u2 = safeSubscribe('CustomerOrderItem', schedule);
     const u3 = safeSubscribe('IngredientStock', schedule);
@@ -224,7 +268,12 @@ function ProductionScreenInner() {
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearInterval(orderInterval);
       clearTimeout(t);
+      refreshQueued.current = false;
+      window.removeEventListener('focus', refreshVisible);
+      window.removeEventListener('online', refreshVisible);
+      document.removeEventListener('visibilitychange', refreshVisible);
       try { u1(); } catch (e) {}
       try { u2(); } catch (e) {}
       try { u3(); } catch (e) {}
@@ -302,6 +351,10 @@ function ProductionScreenInner() {
             <div className="hidden md:flex items-center gap-2 text-sm font-medium text-muted-foreground bg-secondary/60 rounded-xl px-3 h-10">
               <Clock className="w-4 h-4 text-brand-olive" /> {clock}
             </div>
+            <Button variant="outline" size="sm" onClick={() => load(false)} disabled={refreshing} aria-label="Buyurtmalarni yangilash">
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Yangilash</span>
+            </Button>
             <Link to={homePath} className="hidden sm:flex">
               <Button variant="outline" size="sm"><Home className="w-4 h-4" /> Menyu</Button>
             </Link>
@@ -331,6 +384,12 @@ function ProductionScreenInner() {
           </div>
         ) : (
           <div className="space-y-8">
+            {refreshError && (
+              <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-brand-ink flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {refreshError}
+              </div>
+            )}
             {visibleDays.map((day) => (
               <OrderDaySection
                 key={day.key}
