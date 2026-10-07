@@ -40,7 +40,7 @@ function fixture(tier = 85000, products = []) {
     Product: products, Customer:[], CustomerOrder:[], CustomerOrderItem:[], ActionHistory:[],
     OrderPayment:[], Shift:[], ProductionBatch:[], ProductionBatchItem:[], StockMovement:[],
     ProductStock:[{id:'stock', location_id:'central', product_id:'cake', quantity:10, unit:'piece'}],
-    IngredientStock:[{id:'ingredient', quantity:123}], Settings:[{allow_negative_stock:false}],
+    IngredientStock:[{id:'ingredient', quantity:123}], Settings:[{id:'settings',customer_order_last_number:0,allow_negative_stock:false}],
   };
   let sequence = 0;
   const clone = v => v == null ? v : structuredClone(v);
