@@ -533,7 +533,6 @@ function OrderDaySection({
         </div>
       ) : (
         <>
-
           <div className="space-y-2">
             {orders.map((order) => (
               <OrderCard
@@ -574,54 +573,54 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
       u === 'overdue' ? 'border-rose-300' : u === 'urgent' ? 'border-amber-300' : 'border-border'
     }`}>
       <div className="flex flex-col xl:flex-row xl:items-stretch">
-      <button
-        type="button"
-        id={summaryId}
-        aria-expanded={expanded}
-        aria-controls={detailsId}
-        onClick={() => setExpanded((open) => !open)}
-        className="w-full min-w-0 flex-1 min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
-      >
-        <span className="hidden sm:flex w-10 h-10 rounded-full bg-secondary items-center justify-center shrink-0 font-display text-lg font-semibold">
-          {displayOrderNumber(order)}
-        </span>
-        <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 md:grid-cols-[minmax(135px,0.8fr)_minmax(145px,0.9fr)_minmax(0,1.4fr)] md:items-center">
-          <span className="flex items-center gap-3 min-w-0">
-            <span className="font-display text-base sm:text-lg font-semibold truncate">Buyurtma {displayOrderNumber(order)}</span>
-            <span className="inline-flex items-center gap-1 text-sm font-semibold shrink-0 md:hidden bg-secondary rounded-md px-1.5 py-0.5">
-              <Clock className="w-3.5 h-3.5 text-brand-olive" /> {order.required_time || '—'}
+        <button
+          type="button"
+          id={summaryId}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded((open) => !open)}
+          className="w-full min-w-0 flex-1 min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
+        >
+          <span className="hidden sm:flex w-10 h-10 rounded-full bg-secondary items-center justify-center shrink-0 font-display text-lg font-semibold">
+            {displayOrderNumber(order)}
+          </span>
+          <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 md:grid-cols-[minmax(135px,0.8fr)_minmax(145px,0.9fr)_minmax(0,1.4fr)] md:items-center">
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="font-display text-base sm:text-lg font-semibold truncate">Buyurtma {displayOrderNumber(order)}</span>
+              <span className="inline-flex items-center gap-1 text-sm font-semibold shrink-0 md:hidden bg-secondary rounded-md px-1.5 py-0.5">
+                <Clock className="w-3.5 h-3.5 text-brand-olive" /> {order.required_time || '—'}
+              </span>
+            </span>
+            <span className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+              <span className="hidden md:inline-flex items-center gap-1.5 font-semibold text-foreground shrink-0 bg-secondary rounded-md px-2 py-1">
+                <Clock className="w-4 h-4 text-brand-olive" /> {order.required_time || '—'}
+              </span>
+              <ChefHat className="w-4 h-4 text-brand-olive shrink-0" />
+              <span className="truncate">{order.shop_name_snapshot || '—'}</span>
+            </span>
+            <span className="flex items-center gap-2 min-w-0 text-xs sm:text-sm text-muted-foreground">
+              <CakeSlice className="w-4 h-4 text-brand-olive shrink-0" />
+              <span className="truncate">{productSummary}</span>
             </span>
           </span>
-          <span className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-            <span className="hidden md:inline-flex items-center gap-1.5 font-semibold text-foreground shrink-0 bg-secondary rounded-md px-2 py-1">
-              <Clock className="w-4 h-4 text-brand-olive" /> {order.required_time || '—'}
+          <span className="shrink-0 flex flex-col lg:flex-row items-end lg:items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium rounded-full px-2.5 py-1 ${isReady ? 'text-brand-ink bg-brand-olive/20' : 'text-muted-foreground bg-secondary'}`}>
+              {isReady && <CheckCircle2 className="w-3.5 h-3.5" />}
+              {statusLabel}
             </span>
-            <ChefHat className="w-4 h-4 text-brand-olive shrink-0" />
-            <span className="truncate">{order.shop_name_snapshot || '—'}</span>
+            {u === 'overdue' && (
+              <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-rose-700 bg-rose-100 border border-rose-200 rounded-full px-2 py-1">
+                <AlertTriangle className="w-3.5 h-3.5" /> Muddati o‘tgan
+              </span>
+            )}
+            {u === 'urgent' && (
+              <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-1">
+                <AlertTriangle className="w-3.5 h-3.5" /> Shoshilinch
+              </span>
+            )}
           </span>
-          <span className="flex items-center gap-2 min-w-0 text-xs sm:text-sm text-muted-foreground">
-            <CakeSlice className="w-4 h-4 text-brand-olive shrink-0" />
-            <span className="truncate">{productSummary}</span>
-          </span>
-        </span>
-        <span className="shrink-0 flex flex-col lg:flex-row items-end lg:items-center gap-1.5">
-          <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium rounded-full px-2.5 py-1 ${isReady ? 'text-brand-ink bg-brand-olive/20' : 'text-muted-foreground bg-secondary'}`}>
-            {isReady && <CheckCircle2 className="w-3.5 h-3.5" />}
-            {statusLabel}
-          </span>
-          {u === 'overdue' && (
-            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-rose-700 bg-rose-100 border border-rose-200 rounded-full px-2 py-1">
-              <AlertTriangle className="w-3.5 h-3.5" /> Muddati o‘tgan
-            </span>
-          )}
-          {u === 'urgent' && (
-            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-1">
-              <AlertTriangle className="w-3.5 h-3.5" /> Shoshilinch
-            </span>
-          )}
-        </span>
-        <ChevronDown aria-hidden="true" className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
+          <ChevronDown aria-hidden="true" className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
         <div className="grid grid-cols-2 gap-2 px-3 py-2.5 border-t xl:border-t-0 xl:border-l border-border bg-secondary/20 xl:shrink-0">
           <Button
             variant="outline"
@@ -713,8 +712,6 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
                   </div>
                 )}
               </div>
-
-
             </div>
           </div>
         </div>
