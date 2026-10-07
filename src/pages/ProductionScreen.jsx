@@ -397,7 +397,7 @@ function ProductionScreenInner() {
               </DialogTitle>
               <DialogDescription>
                 {confirm.step === 'ready'
-                  ? `${displayOrderNumber(confirm.order)} tayyor deb belgilanadi va tex-karta bo‘yicha masalliqlar markaziy ombordan avtomatik kamayadi.`
+                  ? `${displayOrderNumber(confirm.order)} buyurtmasini tayyor deb belgilaysiz.`
                   : `${displayOrderNumber(confirm.order)} buyurtmasini yuborilgan deb belgilaysiz.`}
               </DialogDescription>
             </DialogHeader>
@@ -469,15 +469,24 @@ function buildPlanGroups(orders, itemsByOrder) {
 
 function ProductionPlanSummary({ orders, itemsByOrder }) {
   const groups = useMemo(() => buildPlanGroups(orders, itemsByOrder), [orders, itemsByOrder]);
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = React.useId();
   if (!groups.length) return null;
   return (
-    <div className="mb-4 rounded-2xl border border-border bg-card premium-shadow overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-border bg-secondary/40 flex items-center gap-2">
-        <ChefHat className="w-4 h-4 text-brand-olive" />
-        <h3 className="text-sm font-semibold">Ishlab chiqarish rejasi</h3>
-        <span className="ml-auto text-xs text-muted-foreground">{groups.length} ta mahsulot</span>
-      </div>
-      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+    <div className="mt-3 rounded-xl border border-border bg-card/70 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((open) => !open)}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        className="w-full min-h-11 px-3 py-2.5 flex items-center gap-2 text-left hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
+      >
+        <ChefHat className="w-4 h-4 text-brand-olive shrink-0" />
+        <span className="text-xs sm:text-sm font-medium flex-1">Ishlab chiqarish rejasi</span>
+        <span className="text-xs text-muted-foreground">{groups.length} ta mahsulot</span>
+        <ChevronDown aria-hidden="true" className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      <div id={detailsId} hidden={!expanded} className={`p-3 border-t border-border gap-2.5 ${expanded ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'hidden'}`}>
         {groups.map((g) => (
           <div key={g.name} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
@@ -516,8 +525,6 @@ function OrderDaySection({
         </span>
       </div>
 
-      {forecast}
-
       {orders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/60 py-8 px-4 text-center">
           <CheckCircle2 className="w-9 h-9 text-brand-olive/50 mx-auto mb-2" />
@@ -526,8 +533,7 @@ function OrderDaySection({
         </div>
       ) : (
         <>
-          <ProductionPlanSummary orders={orders} itemsByOrder={itemsByOrder} />
-          <p className="text-xs text-muted-foreground mb-2">Buyurtma ustiga bosing — barcha tafsilotlar ochiladi.</p>
+
           <div className="space-y-2">
             {orders.map((order) => (
               <OrderCard
@@ -541,8 +547,10 @@ function OrderDaySection({
               />
             ))}
           </div>
+          <ProductionPlanSummary orders={orders} itemsByOrder={itemsByOrder} />
         </>
       )}
+      {forecast && <div className="mt-3">{forecast}</div>}
     </section>
   );
 }
@@ -565,13 +573,14 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
     <div className={`rounded-2xl border bg-card premium-shadow overflow-hidden ${
       u === 'overdue' ? 'border-rose-300' : u === 'urgent' ? 'border-amber-300' : 'border-border'
     }`}>
+      <div className="flex flex-col xl:flex-row xl:items-stretch">
       <button
         type="button"
         id={summaryId}
         aria-expanded={expanded}
         aria-controls={detailsId}
         onClick={() => setExpanded((open) => !open)}
-        className="w-full min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
+        className="w-full min-w-0 flex-1 min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
       >
         <span className="hidden sm:flex w-10 h-10 rounded-full bg-secondary items-center justify-center shrink-0 font-display text-lg font-semibold">
           {displayOrderNumber(order)}
@@ -579,12 +588,12 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
         <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 md:grid-cols-[minmax(135px,0.8fr)_minmax(145px,0.9fr)_minmax(0,1.4fr)] md:items-center">
           <span className="flex items-center gap-3 min-w-0">
             <span className="font-display text-base sm:text-lg font-semibold truncate">Buyurtma {displayOrderNumber(order)}</span>
-            <span className="inline-flex items-center gap-1 text-sm font-medium shrink-0 md:hidden">
+            <span className="inline-flex items-center gap-1 text-sm font-semibold shrink-0 md:hidden bg-secondary rounded-md px-1.5 py-0.5">
               <Clock className="w-3.5 h-3.5 text-brand-olive" /> {order.required_time || '—'}
             </span>
           </span>
           <span className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-            <span className="hidden md:inline-flex items-center gap-1.5 font-medium text-foreground shrink-0">
+            <span className="hidden md:inline-flex items-center gap-1.5 font-semibold text-foreground shrink-0 bg-secondary rounded-md px-2 py-1">
               <Clock className="w-4 h-4 text-brand-olive" /> {order.required_time || '—'}
             </span>
             <ChefHat className="w-4 h-4 text-brand-olive shrink-0" />
@@ -596,7 +605,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
           </span>
         </span>
         <span className="shrink-0 flex flex-col lg:flex-row items-end lg:items-center gap-1.5">
-          <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium rounded-full px-2.5 py-1 ${isReady ? 'text-brand-olive bg-brand-olive/15' : 'text-muted-foreground bg-secondary'}`}>
+          <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium rounded-full px-2.5 py-1 ${isReady ? 'text-brand-ink bg-brand-olive/20' : 'text-muted-foreground bg-secondary'}`}>
             {isReady && <CheckCircle2 className="w-3.5 h-3.5" />}
             {statusLabel}
           </span>
@@ -613,6 +622,29 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
         </span>
         <ChevronDown aria-hidden="true" className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
+        <div className="grid grid-cols-2 gap-2 px-3 py-2.5 border-t xl:border-t-0 xl:border-l border-border bg-secondary/20 xl:shrink-0">
+          <Button
+            variant="outline"
+            onClick={() => setExpanded((open) => !open)}
+            aria-expanded={expanded}
+            aria-controls={detailsId}
+            aria-label={`Buyurtma ${displayOrderNumber(order)}: ${expanded ? 'Yopish' : 'Ko‘rish'}`}
+            className="h-11 min-w-24 bg-card font-semibold"
+          >
+            <ChevronDown aria-hidden="true" className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            {expanded ? 'Yopish' : 'Ko‘rish'}
+          </Button>
+          <Button
+            onClick={isReady ? onShip : onReady}
+            disabled={busy}
+            aria-label={`Buyurtma ${displayOrderNumber(order)}: ${isReady ? 'Yuborildi' : 'Tayyor bo‘ldi'}`}
+            className="h-11 min-w-32 font-semibold text-brand-ink"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : isReady ? <Truck className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            {isReady ? 'Yuborildi' : 'Tayyor bo‘ldi'}
+          </Button>
+        </div>
+      </div>
 
       {expanded && (
         <div id={detailsId} role="region" aria-labelledby={summaryId} className="border-t border-border pt-3">
@@ -682,28 +714,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
                 )}
               </div>
 
-              {/* Actions */}
-              <div className="p-4 sm:px-5 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
-                <Button
-                  variant={isReady ? 'secondary' : 'outline'}
-                  size="lg"
-                  disabled={busy || isReady}
-                  onClick={onReady}
-                  className="h-12 text-sm sm:text-base"
-                >
-                  {isReady ? <CheckCircle2 className="w-5 h-5 text-brand-olive" /> : busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                  Tayyor bo‘ldi
-                </Button>
-                <Button
-                  size="lg"
-                  disabled={busy || !isReady}
-                  onClick={onShip}
-                  className="h-12 text-sm sm:text-base"
-                >
-                  {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
-                  Yuborildi
-                </Button>
-              </div>
+
             </div>
           </div>
         </div>
