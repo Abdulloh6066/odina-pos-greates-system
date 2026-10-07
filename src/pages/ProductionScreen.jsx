@@ -214,10 +214,12 @@ function ProductionScreenInner() {
       do {
         refreshQueued.current = false;
         forecastQueued.current = false;
-        await Promise.allSettled([
+        const results = await Promise.allSettled([
           loadOrders(), loadItems(), ...(withForecast ? [loadForecast()] : []),
         ]);
-        loadedOnce.current = true;
+        if (results[0].status === 'fulfilled' && results[0].value === true) {
+          loadedOnce.current = true;
+        }
         setLoading(false);
         withForecast = forecastQueued.current;
       } while (refreshQueued.current);
