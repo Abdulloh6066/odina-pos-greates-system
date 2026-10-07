@@ -12,7 +12,16 @@
       "type": "string"
     },
     "product_id": {
-      "type": "string"
+      "type": "string",
+      "description": "Katalog mahsuloti IDsi; oddiy buyurtmada bo\u2018sh."
+    },
+    "item_type": {
+      "type": "string",
+      "enum": [
+        "catalog",
+        "custom"
+      ],
+      "default": "catalog"
     },
     "product_name_snapshot": {
       "type": "string"
@@ -49,7 +58,6 @@
   },
   "required": [
     "order_id",
-    "product_id",
     "product_name_snapshot",
     "unit_snapshot",
     "quantity",
