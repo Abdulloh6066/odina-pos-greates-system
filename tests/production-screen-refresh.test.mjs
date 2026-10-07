@@ -135,6 +135,16 @@ test('malformed responses do not silently empty the successful list', async () =
   assert.match(h.state.refreshError,/yangilanmadi/);
 });
 
+test('initial failures stay explicit until the first successful order read', async () => {
+  const h = harness(); await h.reject(0);
+  assert.match(h.state.error,/connection/);
+  h.poll(); await h.reject(1);
+  assert.match(h.state.error,/connection/);
+  h.poll(); await h.resolve(2,[order('1'),order('2')]);
+  assert.equal(h.state.error,'');
+  assert.equal(h.state.active.length,2);
+});
+
 test('cleanup removes polling, subscriptions and reconnect listeners', async () => {
   const h = harness(); await h.resolve(0,[order('1')]); h.close();
   assert.equal(h.intervals.size,0); assert.equal(h.timeouts.size,0);
