@@ -584,17 +584,14 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
           <span className="hidden sm:flex w-10 h-10 rounded-full bg-secondary items-center justify-center shrink-0 font-display text-lg font-semibold">
             {displayOrderNumber(order)}
           </span>
-          <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 md:grid-cols-[minmax(135px,0.8fr)_minmax(145px,0.9fr)_minmax(0,1.4fr)] md:items-center">
-            <span className="flex items-center gap-3 min-w-0">
+          <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 lg:grid-cols-[minmax(200px,0.9fr)_minmax(110px,0.7fr)_minmax(0,1.4fr)] lg:items-center">
+            <span className="flex flex-wrap items-center gap-2 min-w-0">
               <span className="font-display text-base sm:text-lg font-semibold truncate">Buyurtma {displayOrderNumber(order)}</span>
-              <span className="inline-flex items-center gap-1 text-sm font-semibold shrink-0 md:hidden bg-secondary rounded-md px-1.5 py-0.5">
+              <span className="inline-flex items-center gap-1 text-sm font-semibold shrink-0 bg-secondary rounded-md px-1.5 py-0.5">
                 <Clock className="w-3.5 h-3.5 text-brand-olive" /> {order.required_time || '—'}
               </span>
             </span>
             <span className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
-              <span className="hidden md:inline-flex items-center gap-1.5 font-semibold text-foreground shrink-0 bg-secondary rounded-md px-2 py-1">
-                <Clock className="w-4 h-4 text-brand-olive" /> {order.required_time || '—'}
-              </span>
               <ChefHat className="w-4 h-4 text-brand-olive shrink-0" />
               <span className="truncate">{order.shop_name_snapshot || '—'}</span>
             </span>
