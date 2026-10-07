@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { parse, missing, recoverContactDetails, recoverMissingPrice } from './parser.js';
+import { parse, missing, recoverContactDetails, recoverMissingPrice, updateCustomization, orderNotes } from './parser.js';
 const reply = text => ({ text });
 export class OrderBot {
     constructor({ store, allowlist = {}, pos, photos, now = () => new Date(), bindingProvider = null, submissionEnabled = true }) { Object.assign(this, { store, allowlist, pos, photos, now, bindingProvider, submissionEnabled }); }
@@ -55,9 +55,14 @@ export class OrderBot {
                 d.errors?.length ? 'Noto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : 'Faqat yetishmayotgan ma’lumotlarni keyingi xabarda yuboring. Oldingi ma’lumotlar saqlanadi.',
             ].join('\n'));
         }
+        if (d.inscription_pending)
+            return { text: 'Tortga «' + d.inscription_candidate + '» deb yozilsinmi?',
+                buttons: [['Ha, yozilsin', `inscribe:${d.id}:${d.version}`], ['Yo‘q, izoh sifatida', `note:${d.id}:${d.version}`]] };
+        if (d.inscription_unclear)
+            return reply('Tortdagi yozuvni aniqlashtiring. «Tortdagi yozuv: ...» shaklida yuboring. Oldingi matn saqlanadi.\n\nIzoh: ' + d.additional_notes);
         if (!d.shop && d.owner_shop_choices?.length)
             return { text: 'Buyurtma qaysi do‘konda saqlansin?', buttons: d.owner_shop_choices.map(s => [s.name, `shop:${d.id}:${d.version}:${s.id}`]) };
-        return { text: `Shu buyurtma to‘g‘rimi?\n\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nBuyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\nIzoh: ${d.notes}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
+        return { text: `Shu buyurtma to‘g‘rimi?\n\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nBuyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\n${orderNotes(d) || 'Izoh: yo‘q'}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
     }
     async process(s, staff, m, cb) {
         let d = await this.store.get(s);
@@ -79,6 +84,18 @@ export class OrderBot {
                     c.version++;
                     tx.put(s, c);
                     return this.summary(c);
+                });
+            }
+            if (['inscribe', 'note'].includes(action)) {
+                return this.store.transaction(s, tx => {
+                    const current = tx.get(s);
+                    if (current.status !== 'draft' || current.version !== d.version || !current.inscription_pending)
+                        return reply('Bu javob eskirgan. /holat yuboring.');
+                    current.inscription_decision = { text: current.inscription_candidate, accepted: action === 'inscribe' };
+                    updateCustomization(current);
+                    current.version++;
+                    tx.put(s, current);
+                    return this.summary(current);
                 });
             }
             if (action === 'ok')
@@ -119,6 +136,8 @@ export class OrderBot {
             'Narx: 200 lik',
             'To‘y buyurtmasi bo‘lsa, matnda «to‘y uchun» deb yozing.',
             'Olish: olib ketish',
+            'Tortdagi yozuv: Tug‘ilgan kuning bilan!',
+            'Izoh: oq rangda bezatilsin',
             '',
             '200 lik — 200 000 so‘m.',
             'Avans qabul qilinmaydi.',
@@ -142,7 +161,8 @@ export class OrderBot {
                     return reply('Buyurtma holati o‘zgargan. /holat yuboring.');
                 const contactRecovered = recoverContactDetails(current, this.now());
                 const priceRecovered = recoverMissingPrice(current, this.now());
-                if (contactRecovered || priceRecovered) {
+                const notesUpdated = updateCustomization(current);
+                if (contactRecovered || priceRecovered || notesUpdated) {
                     current.version++;
                     tx.put(s, current);
                 }
@@ -173,6 +193,7 @@ export class OrderBot {
                 for (const k of ['date', 'time', 'tier', 'phone', 'name', 'type', 'fulfilment'])
                     delete d[k];
                 d.notes = '';
+                delete d.inscription_decision;
                 d.errors = [];
                 d.editing = false;
             }
@@ -184,6 +205,7 @@ export class OrderBot {
                 d.notes = (d.notes + '\n' + text).trim();
             recoverContactDetails(d, this.now());
             recoverMissingPrice(d, this.now());
+            updateCustomization(d);
             const photo = m.photo?.at(-1);
             if (photo?.file_id && photo.file_size <= 10485760)
                 d.photo = { file_id: photo.file_id };
@@ -195,6 +217,19 @@ export class OrderBot {
     async confirm(s, snapshot) {
         if (!this.submissionEnabled)
             return reply('Buyurtma yuborish hozircha yoqilmagan. Mas’ul xodimga murojaat qiling.');
+        if (snapshot.status === 'draft' && updateCustomization(snapshot)) {
+            return this.store.transaction(s, tx => {
+                const current = tx.get(s);
+                if (current.status !== 'draft' || current.version !== snapshot.version)
+                    return reply('Bu tasdiq eskirgan. /holat yuboring.');
+                updateCustomization(current);
+                current.version++;
+                tx.put(s, current);
+                return this.summary(current);
+            });
+        }
+        if (snapshot.inscription_pending || snapshot.inscription_unclear)
+            return this.summary(snapshot);
         if (!snapshot.shop)
             return this.summary(snapshot);
         if (snapshot.editing)
