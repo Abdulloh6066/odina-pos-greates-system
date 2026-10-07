@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parse, missing, recoverContactDetails, updateCustomization, orderNotes } from '../base44/shared/order-bot/parser.js';
+import { parse, missing, recoverContactDetails, updateCustomization, orderNotes, dateProblem } from '../base44/shared/order-bot/parser.js';
 import { OrderBot } from '../base44/shared/order-bot/bot.js';
 import { Base44StateStore } from '../base44/shared/order-bot/base44-store.js';
 
@@ -178,7 +178,7 @@ test('conflicting prices and past dates never expose confirmation buttons', asyn
 });
 
 test('full UZS amounts recognize the screenshot and common money formats', () => {
-    for (const text of ['200000 som', '200 000 so‘m', "200000 so'm", '200000 so’m', '200.000 sum', '200,000 UZS', '200\u00a0000 soʻm', 'Narx: 200000', '200 lik', '200000']) {
+    for (const text of ['200000 som', '200 000 so‘m', "200000 so'm", '200000 so’m', '200.000 sum', '200,000 UZS', '200\u00a0000 soʻm', 'Narx: 200000', '200 lik']) {
         const result = parse(text, now, previous());
         assert.equal(result.patch.tier, 200000, text);
         assert.deepEqual(result.errors, [], text);
@@ -368,5 +368,100 @@ test('historical notes keep their original value until an unsubmitted draft is m
     updateCustomization(old);
     assert.equal(old.inscription_pending, true);
     assert.equal(old.notes, '8-okt 16:00\n' + writing + '\nYoziladi');
+});
+
+
+test('all twelve months accept their first four letters and remaining spelling variants', () => {
+    const names = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+    for (const [index, month] of names.entries()) {
+        for (const word of [month, month.slice(0, 4), month.length >= 4 ? month.slice(0, 4) + 'xyz' : month]) {
+            const result = parse('7- ' + word + ' 17:00', now);
+            assert.equal(result.patch.date, '2026-' + String(index + 1).padStart(2, '0') + '-07', word);
+        }
+    }
+    for (const text of ['7 oktabr', '7-oqtiyabr', '7- oqtiyabr', '7 OKTYABR', '7.oktabr', '7-okt'])
+        assert.equal(parse(text, now).patch.date, '2026-10-07', text);
+    assert.equal(parse('7 iyu', now).patch.date, undefined);
+    assert.equal(parse('7 Unknownmonth', now).patch.date, undefined);
+});
+
+test('explicit som, UZS and USZ prices are exact, without guessing or multiplying', () => {
+    for (const text of ['8500 som', '8500 UZS', '8500 usz', '8500som', "8500 so'm", 'Narx: 8500 UZS'])
+        assert.equal(parse(text, now, previous()).patch.tier, 8500, text);
+    assert.equal(parse('85 som', now).patch.tier, 85);
+    assert.equal(parse('8500', now, previous()).patch.tier, undefined);
+    assert.equal(parse('8500\n' + details, now, previous()).patch.tier, undefined);
+    assert.equal(parse('85 lik', now).patch.tier, 85000);
+});
+
+test('lowercase customer names are recognized with contact context or a missing-name reply', () => {
+    for (const name of ['abdurahim', 'ali', 'vali', 'Олег'])
+        assert.equal(parse(phone + '\n' + name, now, previous()).patch.name, name);
+    assert.equal(parse('abdurahim', now, previous()).patch.name, 'abdurahim');
+    assert.equal(parse('abdurahim', now).patch.name, undefined);
+    assert.equal(parse(phone + '\nAbdurahim\nAli', now, previous()).patch.name, null);
+    assert.equal(parse(phone + '\nIzoh: Oq gullar', now, previous()).patch.name, undefined);
+});
+
+test('the latest screenshot wording accepts corrected date, lowercase name and pickup variant', async () => {
+    const f = fixture({ ...previous(), date: '2026-10-06' });
+    const response = await f.message('85000 som\n' + phone + '\nabdurahim\nolib ketadi\n7- oqtiyabr 17:00');
+    assert.match(response.text, /^Shu buyurtma to‘g‘rimi\?/);
+    const d = await f.store.get(sender);
+    assert.equal(d.date, '2026-10-07');
+    assert.equal(d.time, '17:00');
+    assert.equal(d.tier, 85000);
+    assert.equal(d.name, 'abdurahim');
+    assert.equal(d.fulfilment, 'pickup');
+    assert.equal(orderNotes(d), '');
+    assert.equal(f.creates(), 0);
+});
+
+test('pickup defaults when omitted, and all pickup variants are recognized', async () => {
+    for (const wording of ['', '\nolib ketish', '\nolib ketadi', '\nolib ketaman', '\nolib ketamiz', '\nDastafka kerak emas']) {
+        const f = fixture(previous());
+        const response = await f.message('85000 UZS\n' + phone + '\nabdurahim' + wording);
+        assert.match(response.text, /^Shu buyurtma to‘g‘rimi\?/, wording);
+        assert.equal((await f.store.get(sender)).fulfilment, 'pickup');
+        assert.equal(f.creates(), 0);
+    }
+});
+
+test('delivery requests and conflicting methods cannot silently become pickup orders', async () => {
+    for (const wording of ['dastafka', 'dostavka', 'yetkazib berish', 'delivery']) {
+        const f = fixture(ready());
+        const response = await f.message(wording);
+        assert.equal((await f.store.get(sender)).fulfilment, 'delivery');
+        assert.equal(response.buttons, undefined);
+        assert.match(response.text, /Yetkazib berish bu botda hali yoqilmagan/);
+        assert.equal(f.creates(), 0);
+        const correction = await f.message('olib ketish');
+        assert.match(correction.text, /^Shu buyurtma to‘g‘rimi\?/);
+    }
+    const f = fixture(ready());
+    const response = await f.message('dastafka\nolib ketish');
+    assert.equal(response.buttons, undefined);
+    assert.equal(f.creates(), 0);
+});
+
+test('past dates explain the reason, and impossible dates remain blocked', async () => {
+    const past = ready();
+    past.date = '2026-10-06';
+    past.time = '17:00';
+    const f = fixture(past);
+    assert.match((await f.message('/holat')).text, /2026-10-06 17:00 \(Toshkent\) o‘tib ketgan/);
+    const future = await f.message('7- oqtiyabr 17:00');
+    assert.match(future.text, /^Shu buyurtma to‘g‘rimi\?/);
+    assert.equal(f.creates(), 0);
+    assert.match(dateProblem({ date: '2026-02-30', time: '17:00' }, now), /noto‘g‘ri/);
+    assert.match(dateProblem({ date: '2026-10-07', time: '25:00' }, now), /noto‘g‘ri/);
+});
+
+test('month and currency aliases do not leak into cleaned notes or parse inscriptions', () => {
+    const draft = ready('7- oqtiyabr 17:00\n85000 USZ\n' + phone + '\nAbdulloh\nolib ketadi\nIzoh: oq rangda');
+    updateCustomization(draft);
+    assert.equal(orderNotes(draft), 'Izoh: oq rangda');
+    const result = parse('Tortdagi yozuv: 7- oqtiyabr 8500 USZ\nIzoh: dastafka', now, previous());
+    assert.deepEqual(result.patch, {});
 });
 
