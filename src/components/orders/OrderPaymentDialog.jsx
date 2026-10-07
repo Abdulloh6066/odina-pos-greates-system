@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
-import { buildIdempotencyKey } from '@/lib/orders';
+import { displayOrderNumber, buildIdempotencyKey } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,7 +52,7 @@ export default function OrderPaymentDialog({ open, onClose, order, onDone }) {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>To‘lov qo‘shish</DialogTitle>
-          <DialogDescription>{order?.order_number} · Qoldi: {formatUZS(order?.remaining_balance || 0)}</DialogDescription>
+          <DialogDescription>{displayOrderNumber(order)} · Qoldi: {formatUZS(order?.remaining_balance || 0)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 mt-2">
           <div>
