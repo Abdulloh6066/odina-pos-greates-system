@@ -1,3 +1,4 @@
+import { displayOrderNumber } from '@/lib/orders';
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -118,7 +119,7 @@ export default function CustomerProfile({ open, onClose, customer, onEdit, canEd
                 ) : orders.map((o) => (
                   <div key={o.id} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{o.order_number}</div>
+                      <div className="text-sm font-medium truncate">{displayOrderNumber(o)}</div>
                       <div className="text-xs text-muted-foreground">{uzbekistanDateKey(o.created_date || o.created_at)} · {ORDER_STATUS_LABELS[o.order_status] || o.order_status}</div>
                     </div>
                     <div className="text-sm font-semibold shrink-0">{formatUZS(o.total)}</div>
