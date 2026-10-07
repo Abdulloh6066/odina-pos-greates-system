@@ -176,3 +176,74 @@ test('conflicting prices and past dates never expose confirmation buttons', asyn
     assert.equal(price.creates(), 0);
     assert.equal(past.creates(), 0);
 });
+
+test('full UZS amounts recognize the screenshot and common money formats', () => {
+    for (const text of ['200000 som', '200 000 so‘m', "200000 so'm", '200000 so’m', '200.000 sum', '200,000 UZS', '200\u00a0000 soʻm', 'Narx: 200000', '200 lik', '200000']) {
+        const result = parse(text, now, previous());
+        assert.equal(result.patch.tier, 200000, text);
+        assert.deepEqual(result.errors, [], text);
+    }
+    assert.equal(parse('200000', now).patch.tier, undefined);
+    assert.equal(parse('200 som', now).patch.tier, 200);
+});
+
+test('dates, phone numbers, malformed decimals and invalid prices never become a price', () => {
+    for (const text of ['8-okt 16:00', '+998919175070', '200000.50 som', '-200000 som', 'abc200000 som', '200000 something'])
+        assert.equal(parse(text, now, previous()).patch.tier, undefined, text);
+    for (const text of ['0 som', '9999999999999999999 som'])
+        assert.ok(parse(text, now, previous()).errors.includes('tier'), text);
+});
+
+test('conflicting currency and lik prices stay ambiguous; equivalent prices agree', () => {
+    for (const text of ['200000 som yoki 250000 som', '200 lik yoki 250000 som']) {
+        const result = parse(text, now, previous());
+        assert.equal(result.patch.tier, null);
+        assert.ok(result.errors.includes('tier'));
+    }
+    assert.equal(parse('200 lik — 200000 som', now, previous()).patch.tier, 200000);
+});
+
+test('the exact screenshot price reply reaches confirmation and creates only on confirmation', async () => {
+    const f = fixture({ ...previous(), phone, name: 'Abdulloh', fulfilment: 'pickup',
+        notes: previous().notes + '\n' + details });
+    const response = await f.message('200000 som');
+    assert.match(response.text, /^Shu buyurtma to‘g‘rimi\?/);
+    assert.match(response.text, /Narx: 200000 UZS/);
+    assert.deepEqual(response.buttons.map(b => b[0]), ['Tasdiqlash', 'Tahrirlash', 'Bekor qilish']);
+    assert.equal(f.creates(), 0);
+    const draft = await f.store.get(sender);
+    assert.equal(draft.date, '2026-10-08');
+    assert.equal(draft.photo.file_id, previous().photo.file_id);
+    assert.equal(draft.name, 'Abdulloh');
+    await f.callback(response.buttons[0][1]);
+    assert.equal(f.creates(), 1);
+});
+
+test('/holat recovers an already ignored 200000 som reply without resending it', async () => {
+    const f = fixture({ ...previous(), phone, name: 'Abdulloh', fulfilment: 'pickup',
+        notes: previous().notes + '\n' + details + '\n200000 som' });
+    const response = await f.message('/holat');
+    assert.match(response.text, /^Shu buyurtma to‘g‘rimi\?/);
+    assert.equal((await f.store.get(sender)).tier, 200000);
+    assert.equal(f.creates(), 0);
+});
+
+test('price recovery preserves existing prices and refuses conflicting old notes', async () => {
+    const current = fixture({ ...previous(), phone, name: 'Abdulloh', fulfilment: 'pickup', tier: 250000, notes: '200000 som' });
+    assert.match((await current.message('/holat')).text, /Narx: 250000 UZS/);
+    const conflict = fixture({ ...previous(), phone, name: 'Abdulloh', fulfilment: 'pickup', notes: '200000 som\n250000 som' });
+    assert.equal((await conflict.message('/holat')).buttons, undefined);
+    assert.equal((await conflict.store.get(sender)).tier, undefined);
+});
+
+test('full currency prices still require owner shop selection', async () => {
+    const f = fixture();
+    const response = await f.message('8-okt 16:00\n200000 som\n' + details, {
+        photo: [{ file_id: 'cake-photo', file_size: 1024 }],
+    });
+    assert.match(response.text, /qaysi do‘konda/);
+    const confirmation = await f.callback(response.buttons[1][1]);
+    assert.match(confirmation.text, /^Shu buyurtma to‘g‘rimi\?/);
+    assert.equal(f.creates(), 0);
+});
+
