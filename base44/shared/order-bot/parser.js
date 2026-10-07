@@ -1,5 +1,6 @@
 const months = { yan: 1, fev: 2, mar: 3, apr: 4, may: 5, iyn: 6, iyl: 7, avg: 8, sen: 9, okt: 10, noy: 11, dek: 12 };
 export function parse(text, now, draft = {}) {
+    text = orderInput(text);
     const patch = {}, errors = [];
     function take(regex, key, convert = m => m[1]) {
         const a = [...text.matchAll(regex)];
@@ -85,6 +86,94 @@ export function recoverMissingPrice(draft, now) {
     draft.tier = parsed.patch.tier;
     return true;
 }
+
+const inscriptionLabel = /^(?:tort(?:dagi|ga)?\s+yozuv|yozuv)\s*:\s*(.+)$/iu;
+const noteLabel = /^(?:izoh|qo['‘’ʻʼ]?shimcha\s+izoh)\s*:\s*(.+)$/iu;
+const writingMarker = /^(?:yoziladi|yozilad|yozilsin)[.!]?$/iu;
+const inlineWriting = /^(.+?)\s+(?:deb\s+)?(?:yoziladi|yozilad|yozilsin)[.!]?$/iu;
+function decorationLines(text) {
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    const protectedLines = new Set(), explicit = [], candidates = [], additional = [];
+    for (let i = 0; i < lines.length; i++) {
+        const label = lines[i].match(inscriptionLabel), note = lines[i].match(noteLabel);
+        if (label) { explicit.push(label[1].trim()); protectedLines.add(i); }
+        else if (note) { additional.push(note[1].trim()); protectedLines.add(i); }
+        else if (writingMarker.test(lines[i])) {
+            protectedLines.add(i);
+            // A marker applies to the preceding unlabelled text, not a data field.
+            const before = lines[i - 1];
+            if (before && !protectedLines.has(i - 1) && !/[:\d]/u.test(before) && !/^(?:olib\s+ketish|to['‘’ʻʼ]?y\s+uchun)$/iu.test(before)) {
+                candidates.push(before); protectedLines.add(i - 1);
+            } else additional.push(lines[i]);
+        } else {
+            const inline = lines[i].match(inlineWriting);
+            if (inline) { candidates.push(inline[1].replace(/^[«“"]|[»”"]$/g, '').trim()); protectedLines.add(i); }
+        }
+    }
+    return { lines, protectedLines, explicit, candidates: [...new Set(candidates)], additional };
+}
+// Dates/numbers inside explicit notes or proposed inscriptions are not order fields.
+export function orderInput(text) {
+    const { lines, protectedLines } = decorationLines(text);
+    return lines.filter((_, i) => !protectedLines.has(i)).join('\n');
+}
+function removeOrderFields(line, draft) {
+    if (line === draft.name) return '';
+    if (/^(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line)) {
+        const value = line.replace(/^[^:]+:\s*/, '');
+        const parsed = parse(line, new Date(), draft);
+        if (Object.keys(parsed.patch).length && !parsed.errors.length) return '';
+        line = value; // Preserve an unrecognized value for review.
+    }
+    return line
+        .replace(/(?<!\d)(\+?998[\s-]*\d{2}[\s-]*\d{3}[\s-]*\d{2}[\s-]*\d{2})(?!\d)/g, '')
+        .replace(/\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}-(?:yan|fev|mar|apr|may|iyn|iyl|avg|sen|okt|noy|dek))\b/gi, '')
+        .replace(/\b\d{1,2}:\d{2}\b/g, '')
+        .replace(/(?<![\d.,+-])\b\d+\s*lik\b/gi, '')
+        .replace(/(?<![\d.,+-])\b(?:\d{1,3}(?:[ \u00a0\u202f.,]\d{3})+|\d+)[ \t]*(?:so['‘’ʻʼ]?m|sum|uzs|сум)(?![\p{L}\p{N}_])/giu, '')
+        .replace(/^(?:olib\s+ketish|to['‘’ʻʼ]?y\s+uchun|tugilgan_kun_va_boshqa|toy_va_bazmlar)$/iu, '')
+        .replace(new RegExp('^' + String(draft.tier || 'NO_PRICE') + '$'), '')
+        .replace(/^[\s,;—-]*(?:razmerda)?[\s,;—-]*$/iu, '')
+        .trim();
+}
+export function updateCustomization(draft) {
+    const parts = decorationLines(draft.notes || '');
+    const additional = [...parts.additional];
+    for (let i = 0; i < parts.lines.length; i++) {
+        if (!parts.protectedLines.has(i)) {
+            const rest = removeOrderFields(parts.lines[i], draft);
+            if (rest) additional.push(rest);
+        }
+    }
+    const candidate = parts.candidates.length === 1 ? parts.candidates[0] : '';
+    const decision = draft.inscription_decision?.text === candidate ? draft.inscription_decision : null;
+    let inscription = parts.explicit.at(-1) || '';
+    let pending = false;
+    if (!inscription && candidate) {
+        if (decision?.accepted === true) inscription = candidate;
+        else if (decision?.accepted === false) additional.push(candidate);
+        else pending = true;
+    }
+    if (parts.candidates.length > 1) additional.push(...parts.candidates);
+    const values = {
+        notes_format_version: 1, inscription, inscription_candidate: candidate,
+        inscription_pending: pending,
+        additional_notes: [...new Set(additional)].join('\n'),
+    };
+    const changed = Object.entries(values).some(([k, v]) => draft[k] !== v);
+    Object.assign(draft, values);
+    return changed;
+}
+// New drafts use reviewed customization; old saved drafts retain their original
+// text so reconciliation never rewrites or reinterprets historical orders.
+export function orderNotes(draft) {
+    if (draft.notes_format_version !== 1) return draft.notes;
+    return [
+        draft.inscription ? 'Tortdagi yozuv: ' + draft.inscription : '',
+        draft.additional_notes ? 'Izoh: ' + draft.additional_notes : '',
+    ].filter(Boolean).join('\n');
+}
+
 export function missing(d, now) {
     const labels = { date: 'Sana:', time: 'Vaqt:', tier: 'Narx:', phone: 'Telefon raqami:', name: 'Mijoz ismi:', type: 'Buyurtma turi:', fulfilment: 'Olish usuli:', photo: 'Tort rasmi:' };
     const needed = Object.keys(labels).filter(k => !d[k] && !(k === 'type' && d.type === undefined));
