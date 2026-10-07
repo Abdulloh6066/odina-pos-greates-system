@@ -288,6 +288,6 @@ export class OrderBot {
                 tx.put(s, c);
             }
         });
-        return reply(valid ? `Buyurtma saqlandi.\nBuyurtma raqami: ${r.order_number}\nTo‘lov: to‘lanmagan\nQoldiq: ${r.remaining_balance} UZS${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
+        return reply(valid ? `Buyurtma saqlandi.\nBuyurtma raqami: ${Number.isSafeInteger(r.order_sequence) && r.order_sequence > 0 ? r.order_sequence : r.order_number}\nTo‘lov: to‘lanmagan\nQoldiq: ${r.remaining_balance} UZS${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
     }
 }
