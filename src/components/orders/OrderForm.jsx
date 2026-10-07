@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
-import { buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES, MONTHS_UZ, tashkentNowParts, tashkentNowStamp, composeRequiredDate, isFutureDateTime } from '@/lib/orders';
+import { displayOrderNumber, buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES, MONTHS_UZ, tashkentNowParts, tashkentNowStamp, composeRequiredDate, isFutureDateTime } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -228,7 +228,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
       const res = await base44.functions.invoke('customer-orders', payload);
       const data = res?.data || res;
       if (data?.order) {
-        toast({ title: 'Buyurtma yaratildi', description: data.order.order_number });
+        toast({ title: 'Buyurtma yaratildi', description: displayOrderNumber(data.order) });
         onCreated(data.order, data.items || []);
         reset();
       } else {
@@ -258,7 +258,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
         <DialogHeader>
           <DialogTitle>{prefill ? 'Qayta buyurtma' : 'Yangi buyurtma'}</DialogTitle>
           <DialogDescription>
-            {prefill ? `${prefill.order.order_number} asosida yangi buyurtma — sanani va vaqtni qaytadan tanlang.` : 'Mijoz va mahsulot ma’lumotlarini to‘ldiring.'}
+            {prefill ? `${displayOrderNumber(prefill.order)} asosida yangi buyurtma — sanani va vaqtni qaytadan tanlang.` : 'Mijoz va mahsulot ma’lumotlarini to‘ldiring.'}
           </DialogDescription>
         </DialogHeader>
 
