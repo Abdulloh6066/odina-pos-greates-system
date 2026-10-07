@@ -260,7 +260,7 @@ function ProductionScreenInner() {
         throw new Error(data?.error || 'Amal bajarilmadi');
       }
     } catch (e) {
-      toast({ title: 'Xatolik', description: e?.message || 'Amal bajarilmadi', variant: 'destructive' });
+      toast({ title: 'Xatolik', description: e?.response?.data?.error || e?.message || 'Amal bajarilmadi', variant: 'destructive' });
     } finally {
       setBusyId('');
       setConfirm(null);
