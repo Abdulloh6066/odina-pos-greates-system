@@ -581,7 +581,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
           onClick={() => setExpanded((open) => !open)}
           className="w-full min-w-0 flex-1 min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
         >
-          <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 lg:grid-cols-[minmax(220px,0.9fr)_minmax(110px,0.7fr)_minmax(0,1.4fr)] lg:items-center">
+          <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 lg:grid-cols-[minmax(250px,0.9fr)_minmax(110px,0.7fr)_minmax(0,1.4fr)] lg:items-center">
             <span className="flex flex-wrap items-center gap-2 min-w-0">
               <span className="inline-flex items-center rounded-lg border border-border bg-secondary/70 px-2.5 py-1 font-sans text-sm sm:text-base font-semibold tabular-nums whitespace-nowrap">Buyurtma №{displayOrderNumber(order)}</span>
               <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-semibold tabular-nums shrink-0 bg-secondary/70 border border-border rounded-lg px-2.5 py-1">
