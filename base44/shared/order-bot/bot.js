@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { parse, missing, recoverContactDetails } from './parser.js';
+import { parse, missing, recoverContactDetails, recoverMissingPrice } from './parser.js';
 const reply = text => ({ text });
 export class OrderBot {
     constructor({ store, allowlist = {}, pos, photos, now = () => new Date(), bindingProvider = null, submissionEnabled = true }) { Object.assign(this, { store, allowlist, pos, photos, now, bindingProvider, submissionEnabled }); }
@@ -140,7 +140,9 @@ export class OrderBot {
                 const current = tx.get(s);
                 if (!current || current.status !== 'draft')
                     return reply('Buyurtma holati o‘zgargan. /holat yuboring.');
-                if (recoverContactDetails(current, this.now())) {
+                const contactRecovered = recoverContactDetails(current, this.now());
+                const priceRecovered = recoverMissingPrice(current, this.now());
+                if (contactRecovered || priceRecovered) {
                     current.version++;
                     tx.put(s, current);
                 }
@@ -181,6 +183,7 @@ export class OrderBot {
             if (text)
                 d.notes = (d.notes + '\n' + text).trim();
             recoverContactDetails(d, this.now());
+            recoverMissingPrice(d, this.now());
             const photo = m.photo?.at(-1);
             if (photo?.file_id && photo.file_size <= 10485760)
                 d.photo = { file_id: photo.file_id };
