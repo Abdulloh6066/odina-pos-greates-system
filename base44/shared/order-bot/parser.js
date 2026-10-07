@@ -121,8 +121,7 @@ function removeOrderFields(line, draft) {
     if (line === draft.name) return '';
     if (/^(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line)) {
         const value = line.replace(/^[^:]+:\s*/, '');
-        const parsed = parse(line, new Date(), draft);
-        if (Object.keys(parsed.patch).length && !parsed.errors.length) return '';
+        if (/^ism\s*:/iu.test(line) && value === draft.name) return '';
         line = value; // Preserve an unrecognized value for review.
     }
     return line
@@ -158,6 +157,7 @@ export function updateCustomization(draft) {
     const values = {
         notes_format_version: 1, inscription, inscription_candidate: candidate,
         inscription_pending: pending,
+        inscription_unclear: !inscription && parts.candidates.length > 1,
         additional_notes: [...new Set(additional)].join('\n'),
     };
     const changed = Object.entries(values).some(([k, v]) => draft[k] !== v);
