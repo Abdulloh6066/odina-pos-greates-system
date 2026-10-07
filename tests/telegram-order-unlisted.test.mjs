@@ -11,7 +11,7 @@ const now = new Date('2026-10-07T07:00:00Z');
 class Clock extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return +now; } }
 function modules(client) {
   const cache = new Map();
-  const context = vm.createContext({ Response, crypto: webcrypto, console, Date: Clock, structuredClone });
+  const context = vm.createContext({ URL, Response, crypto: webcrypto, console, Date: Clock, structuredClone });
   function load(path) {
     path = resolve(path);
     if (cache.has(path)) return cache.get(path).exports;
@@ -80,6 +80,7 @@ function fixture(tier = 85000, products = []) {
     type:'tugilgan_kun_va_boshqa',fulfilment:'pickup',
     photo:{file_id:'offline-photo'},reference_image:'https://base44.app/offline-cake.png',
     notes:'Tortdagi yozuv: Nazzi san uchun',errors:[] };
+  load('base44/shared/order-bot/parser.js').updateCustomization(draft);
   const create = () => bridge.createConfirmed({draft,image:draft.reference_image,staffId:'owner'});
   const handler=load('base44/functions/customer-orders/entry.ts').default;
   const call=async body=>{ const r=await handler({json:async()=>body}); return {status:r.status,data:await r.json()}; };
