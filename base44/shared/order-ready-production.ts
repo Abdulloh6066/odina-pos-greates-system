@@ -274,11 +274,13 @@ export async function completeOrderReadyProduction({
   user,
   order,
   readyStamp,
+  applyIngredients = true,
 }: {
   service: any;
   user: any;
   order: any;
   readyStamp: string;
+  applyIngredients?: boolean;
 }) {
   const previousStatus = String(order.order_status || "qabul_qilindi");
   if (["tayyor", "yuborildi_olib_ketildi", "yakunlandi"].includes(previousStatus)) {
@@ -307,6 +309,35 @@ export async function completeOrderReadyProduction({
   });
   if ((existingBatches || []).some((batch: any) => batch.status !== "cancelled")) {
     throw fail("Bu buyurtma uchun oldingi ishlab chiqarish yozuvi topildi. Egasi tekshirishi kerak.", 409);
+  }
+
+  // Customer order recipe accounting is temporarily paused by server policy.
+  // Keep inventory pending: marking an order ready is not proof of production.
+  if (!applyIngredients) {
+    const claim = await service.entities.CustomerOrder.updateMany(
+      {
+        id: order.id,
+        order_status: previousStatus,
+        ready_inventory_state: order.ready_inventory_state || { $exists: false },
+      },
+      { $set: { order_status: "tayyor", ready_at: readyStamp, updated_at: new Date().toISOString() } },
+    );
+    if (!claim?.success || Number(claim.updated || 0) !== 1) {
+      throw fail("Buyurtma holati o‘zgardi. Yangilang va qayta urinib ko‘ring.", 409);
+    }
+    await service.entities.ActionHistory.create({
+      user_id: user.id,
+      user_name: userLabel(user),
+      action: "production_status_change",
+      details: `${order.order_number} · ${previousStatus} → tayyor · tex-karta hisobi vaqtincha o‘chirilgan · ${readyStamp}`,
+    }).catch(() => {});
+    return {
+      order: { ...order, order_status: "tayyor", ready_at: readyStamp },
+      previous_status: previousStatus,
+      production_applied: false,
+      production_batches: [],
+      ingredient_updates: [],
+    };
   }
 
   const location = await resolveProductionLocation(service, user);
