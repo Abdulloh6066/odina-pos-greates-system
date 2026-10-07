@@ -1,3 +1,4 @@
+import { orderNotes } from './parser.js';
 import { resolveOrderBotStaff } from '../order-bot-authorization.ts';
 import { createCustomerOrder } from '../customer-order-create.ts';
 // This adapter receives a trusted internal service, never a token or user supplied role.
@@ -25,7 +26,7 @@ export class InternalOrderBridge {
         const url = new URL(image);
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.hostname === 'api.telegram.org' || !this.service.approvedPhotoHosts?.includes(url.hostname))
             throw Error('photo');
-        const body = { action: 'create_order', idempotency_key: d.key, shop_id: u.shop_id, order_type: d.type, customer_name: d.name, customer_phone: d.phone, required_date: d.date, required_time: d.time, fulfilment_type: 'pickup', reference_image: image, notes: d.notes, items: [{ product_id: candidates[0].id, quantity: 1, customization_note: d.notes }], advance_payment: null, delivery_fee: 0, adjustment_amount: 0 };
+        const body = { action: 'create_order', idempotency_key: d.key, shop_id: u.shop_id, order_type: d.type, customer_name: d.name, customer_phone: d.phone, required_date: d.date, required_time: d.time, fulfilment_type: 'pickup', reference_image: image, notes: orderNotes(d), items: [{ product_id: candidates[0].id, quantity: 1, customization_note: orderNotes(d) }], advance_payment: null, delivery_fee: 0, adjustment_amount: 0 };
         // Existing keys are reconciled, not passed through the legacy early replay return.
         if ((await this.service.entities.CustomerOrder.filter({ idempotency_key: d.key })).length)
             throw Error('reconcile');
@@ -43,7 +44,7 @@ export class InternalOrderBridge {
         if (rows.length !== 1)
             return null;
         const o = rows[0];
-        if (o.creator_id !== d.staff || o.shop_id !== d.shop || o.customer_name !== d.name || o.customer_phone !== d.phone || o.required_date !== d.date || o.required_time !== d.time || o.order_type !== d.type || o.fulfilment_type !== 'pickup' || o.notes !== d.notes || o.reference_image !== d.reference_image || o.total !== d.tier || o.paid_amount !== 0 || o.remaining_balance !== d.tier || o.payment_status !== 'unpaid')
+        if (o.creator_id !== d.staff || o.shop_id !== d.shop || o.customer_name !== d.name || o.customer_phone !== d.phone || o.required_date !== d.date || o.required_time !== d.time || o.order_type !== d.type || o.fulfilment_type !== 'pickup' || o.notes !== orderNotes(d) || o.reference_image !== d.reference_image || o.total !== d.tier || o.paid_amount !== 0 || o.remaining_balance !== d.tier || o.payment_status !== 'unpaid')
             return null;
         if (!o.customer_id || !await this.service.entities.Customer.get(o.customer_id))
             return null;
