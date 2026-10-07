@@ -22,11 +22,12 @@ export function parse(text, now, draft = {}) {
     const amount = '(?:\\d{1,3}(?:[ \\u00a0\\u202f.,]\\d{3})+|\\d+)';
     const currency = "(?:so['‘’ʻʼ]?m|sum|uzs|сум)";
     for (const m of text.matchAll(new RegExp('(?<![\\d.,+-])\\b(' + amount + ')[ \\t]*' + currency + '(?![\\p{L}\\p{N}_])', 'giu')))
-        prices.push(Number(m[1].replace(/\D/g, '')));
+        if (!/[-+\d][\d \t\u00a0\u202f.,]*$/.test(text.slice(0, m.index)))
+            prices.push(Number(m[1].replace(/\D/g, '')));
     // A labelled full amount, or a number-only reply while awaiting a price.
     const labelled = new RegExp('(?:^|[;\\n])[ \\t]*narx[ \\t]*:[ \\t]*(' + amount + ')[ \\t]*(?=$|[;\\n])', 'gi');
     for (const m of text.matchAll(labelled)) prices.push(Number(m[1].replace(/\D/g, '')));
-    if (!draft.tier && (draft.date || draft.time || draft.photo) && new RegExp('^[ \\t]*(' + amount + ')[ \\t]*$').test(text))
+    if (!draft.tier && !/^998\d{9}$/.test(text.trim()) && (draft.date || draft.time || draft.photo) && new RegExp('^[ \\t]*(' + amount + ')[ \\t]*$').test(text))
         prices.push(Number(text.replace(/\D/g, '')));
     const distinctPrices = [...new Set(prices)];
     if (distinctPrices.length === 1 && Number.isSafeInteger(distinctPrices[0]) && distinctPrices[0] > 0)
