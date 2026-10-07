@@ -1,3 +1,4 @@
+import { displayOrderNumber } from './orders.js';
 // Temporary owner request: remove Central from this set to restore service tickets.
 const SERVICE_TICKET_PAUSED_SHOPS = new Set(['6a96f0a4ecc85c2fc57f3173']);
 export function isStaffTicketEnabled(shopId) {
@@ -30,7 +31,7 @@ export function staffTicketFromCustomerOrder(order, savedItems) {
   if (!order) return null;
   return {
     id: order.id,
-    number: order.order_number,
+    number: displayOrderNumber(order),
     started_at: order.created_at || order.created_date,
     shop_name: order.shop_name_snapshot,
     customer_name: order.customer_name,
