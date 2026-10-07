@@ -401,6 +401,7 @@ test('lowercase customer names are recognized with contact context or a missing-
     assert.equal(parse('abdurahim', now).patch.name, undefined);
     assert.equal(parse(phone + '\nAbdurahim\nAli', now, previous()).patch.name, null);
     assert.equal(parse(phone + '\nIzoh: Oq gullar', now, previous()).patch.name, undefined);
+    assert.equal(parse(phone + '\ndelivery', now, previous()).patch.name, undefined);
 });
 
 test('the latest screenshot wording accepts corrected date, lowercase name and pickup variant', async () => {
@@ -428,7 +429,7 @@ test('pickup defaults when omitted, and all pickup variants are recognized', asy
 });
 
 test('delivery requests and conflicting methods cannot silently become pickup orders', async () => {
-    for (const wording of ['dastafka', 'dostavka', 'yetkazib berish', 'delivery']) {
+    for (const wording of ['dastafka', 'dostavka', 'yetkazib berish', 'delivery', 'доставка']) {
         const f = fixture(ready());
         const response = await f.message(wording);
         assert.equal((await f.store.get(sender)).fulfilment, 'delivery');
