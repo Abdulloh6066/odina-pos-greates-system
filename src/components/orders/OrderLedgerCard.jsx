@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowUpRight, Repeat2 } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
-import { statusLabel, typeLabel, payStatusLabel, fulfilmentLabel } from '@/lib/orders';
+import { displayOrderNumber, statusLabel, typeLabel, payStatusLabel, fulfilmentLabel } from '@/lib/orders';
 
 function displayDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
@@ -12,14 +12,14 @@ export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat }) {
   const remaining = Number(order.remaining_balance || 0);
   return <article className="opl-order">
     <button type="button" className="opl-order-open" onClick={() => onOpen(order)}
-      aria-label={`${order.order_number}, ${order.customer_name}, batafsil ko‘rish`}>
+      aria-label={`${displayOrderNumber(order)}, ${order.customer_name}, batafsil ko‘rish`}>
       <div className="opl-order-top">
         <span className="opl-order-time">{displayDate(order.required_date)} <strong>{order.required_time || '—'}</strong></span>
         <span className="opl-status" data-status={order.order_status}>{statusLabel(order.order_status)}</span>
       </div>
       <div className="opl-order-content">
         <div className="opl-order-person">
-          <span className="opl-order-id">{order.order_number}</span>
+          <span className="opl-order-id">{displayOrderNumber(order)}</span>
           <strong className="opl-customer">{order.customer_name}</strong>
           <span className="opl-phone">{order.customer_phone || 'Telefon ko‘rsatilmagan'}</span>
         </div>
