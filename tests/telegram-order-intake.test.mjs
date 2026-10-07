@@ -188,7 +188,7 @@ test('full UZS amounts recognize the screenshot and common money formats', () =>
 });
 
 test('dates, phone numbers, malformed decimals and invalid prices never become a price', () => {
-    for (const text of ['8-okt 16:00', '+998919175070', '200000.50 som', '-200000 som', 'abc200000 som', '200000 something'])
+    for (const text of ['8-okt 16:00', '+998919175070', '998919175070', '200000.50 som', '-200000 som', '-200 100 som', '200 5000 som', 'abc200000 som', '200000 something'])
         assert.equal(parse(text, now, previous()).patch.tier, undefined, text);
     for (const text of ['0 som', '9999999999999999999 som'])
         assert.ok(parse(text, now, previous()).errors.includes('tier'), text);
