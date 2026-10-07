@@ -10,9 +10,6 @@ import OdinaBrand from '@/components/brand/OdinaBrand';
 import { typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
 import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
-import { useOrderAlerts } from '@/hooks/useOrderAlerts';
-import OrderAlertSummary from '@/components/orders/OrderAlertSummary';
-import OrderDetail from '@/components/orders/OrderDetail';
 import DemandSection from '@/components/production/DemandSection';
 import TomorrowIngredientForecast from '@/components/production/TomorrowIngredientForecast';
 import {
@@ -138,13 +135,11 @@ function ProductionScreenInner() {
   const [busyId, setBusyId] = useState('');
   const [confirm, setConfirm] = useState(null);
   const [preview, setPreview] = useState('');
-  const [detailOrder, setDetailOrder] = useState(null);
   const [clock, setClock] = useState(clockStr());
   const [forecast, setForecast] = useState(null);
   const [forecastLoading, setForecastLoading] = useState(true);
   const [forecastError, setForecastError] = useState('');
   const loadedOnce = useRef(false);
-  const { alerts, counts } = useOrderAlerts(active);
 
   const loadOrders = async () => {
     try {
@@ -336,7 +331,6 @@ function ProductionScreenInner() {
           </div>
         ) : (
           <div className="space-y-8">
-            <OrderAlertSummary alerts={alerts} counts={counts} onOpen={(o) => setDetailOrder(o)} />
             {visibleDays.map((day) => (
               <OrderDaySection
                 key={day.key}
@@ -438,12 +432,6 @@ function ProductionScreenInner() {
         </DialogContent>
       </Dialog>
 
-      <OrderDetail
-        order={detailOrder}
-        onClose={() => setDetailOrder(null)}
-        onPaid={() => load()}
-        onRepeat={() => setDetailOrder(null)}
-      />
     </div>
   );
 }
