@@ -7,7 +7,10 @@ import {
 } from "../../shared/order-ready-production.ts";
 import { createCustomerOrder, PAYMENT_METHODS, tashkentStamp, findOpenShift, applyPaymentToShift, reversePaymentOnShift } from "../../shared/customer-order-create.ts";
 
-const ORDER_RUNTIME_VERSION = "customer-orders-v3-2026-09-13";
+const ORDER_RUNTIME_VERSION = "customer-orders-v4-2026-10-07";
+// Owner requested status-only readiness until customer order recipes are set up.
+// This server policy cannot be overridden by a browser request.
+const ORDER_RECIPE_ACCOUNTING_ENABLED = false;
 
 const PAYMENT_KINDS = new Set(["advance", "balance", "additional"]);
 
@@ -60,7 +63,7 @@ export default async function(req: Request): Promise<Response> {
   try {
     const authenticatedUser = await base44.auth.me();
     if (!authenticatedUser) {
-      return Response.json({ error: "Tizimga kirish talab qilinadi." }, { status: 401 });
+      return Response.json({ error: "Tizimga kirish talab qilinadi." }, { status: 401, headers: { "x-odina-order-revision": ORDER_RUNTIME_VERSION } });
     }
     const user = await resolveAppUser(service, authenticatedUser);
     if (user.active === false) {
@@ -78,7 +81,7 @@ export default async function(req: Request): Promise<Response> {
     }
 
     if (action === "runtime_status") {
-      return Response.json({ ok: true, runtime_version: ORDER_RUNTIME_VERSION });
+      return Response.json({ ok: true, runtime_version: ORDER_RUNTIME_VERSION, order_recipe_accounting_enabled: ORDER_RECIPE_ACCOUNTING_ENABLED });
     }
 
     if (action === "create_order") {
@@ -252,6 +255,7 @@ export default async function(req: Request): Promise<Response> {
           user,
           order,
           readyStamp: tashkentStamp(),
+          applyIngredients: ORDER_RECIPE_ACCOUNTING_ENABLED,
         });
         return Response.json({
           ...result,
