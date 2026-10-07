@@ -3,13 +3,13 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { secrets } from "base44:runtime";
 import { INTAKE_CONFIG, controlRow } from "../../shared/order-bot/setup.js";
 import { prepareHostedOrderBot } from "../../shared/order-bot/hosted.js";
-// Bot bundle revision: order-intake-v5 (reviewed cake inscriptions and clean order notes).
+// Bot bundle revision: order-intake-v6 (flexible months, currency prices, names and default pickup).
 export default async function (req: Request): Promise<Response> {
     try {
         const secret = secrets.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
         const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
         const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-        if (!a.length || a.length !== b.length || !timingSafeEqual(a, b)) return new Response("Ruxsat yo‘q. (order-intake-v5)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v5" } });
+        if (!a.length || a.length !== b.length || !timingSafeEqual(a, b)) return new Response("Ruxsat yo‘q. (order-intake-v6)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v6" } });
         if (req.method !== "POST") return new Response("Amal noto‘g‘ri.", { status: 405 });
         const ownerId = secrets.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") || "";
         const token = secrets.get("ODINA_ORDER_BOT_TOKEN") || "";
