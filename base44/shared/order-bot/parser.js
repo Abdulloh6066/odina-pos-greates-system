@@ -6,7 +6,7 @@ const months = {
 };
 const monthWords = '(?:(?:yanv|fevr|mart|apre|iyun|iyul|avgu|sent|okta|okty|oqti|okti|noya|deka)[a-z]*|(?:yan|fev|mar|apr|may|iyn|iyl|avg|sen|okt|noy|dek)(?![a-z]))';
 const datePattern = '\\b(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[ \\t]*[-.]?[ \\t]*' + monthWords + ')\\b';
-const deliveryPattern = /\b(?:dastafka|dastavka|dostavka|delivery|yetkazib\s+berish)\b/iu;
+const deliveryPattern = /\b(?:dastafka|dastavka|dostavka|delivery|доставка|даставка|дастафка|yetkazib\s+berish)\b/iu;
 const pickupPattern = /^(?:olish\s*:\s*)?olib\s+(?:ketish|ketadi|ketaman|ketamiz)[.!]?$/iu;
 export function parse(text, now, draft = {}) {
     text = orderInput(text);
@@ -61,6 +61,7 @@ export function parse(text, now, draft = {}) {
     if (!draft.name && !Object.hasOwn(patch, 'name')) {
         const lines = text.split(/[,;\n]/).map(line => line.trim().replace(/\s+/g, ' ')).filter(Boolean);
         const names = lines.filter(line => line.length <= 80
+            && !deliveryPattern.test(line) && !pickupPattern.test(line)
             && /^(?:[\p{L}‘’ʻʼ'-]+|\p{Lu}[\p{L}‘’ʻʼ'-]*(?: \p{Lu}[\p{L}‘’ʻʼ'-]*){1,2})$/u.test(line)
             && !/(?:^| )(?:buyurtma|tort|rasm|yoziladi|yozilad|olib|ketish|yetkazib|avans|to‘lov|narx|sana|vaqt|telefon|rahmat|salom|aniq|deb|uchun|oq|qora|pushti|qizil|rang|gullar|bezak|bento|dastafka|dastavka|dostavka)(?:$| )/iu.test(line));
         const contactReply = Boolean(patch.phone || draft.phone);
