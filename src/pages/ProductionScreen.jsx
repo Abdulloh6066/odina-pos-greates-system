@@ -13,7 +13,7 @@ import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import DemandSection from '@/components/production/DemandSection';
 import TomorrowIngredientForecast from '@/components/production/TomorrowIngredientForecast';
 import {
-  ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays,
+  ChefHat, Clock, AlertTriangle, CheckCircle2, Truck, Loader2, Home, LogOut, ImageOff, Monitor, CalendarDays, ChevronDown, CakeSlice,
 } from 'lucide-react';
 
 const ACTIVE_STATUSES = ['qabul_qilindi', 'tayyorlanmoqda', 'tayyor'];
@@ -527,7 +527,8 @@ function OrderDaySection({
       ) : (
         <>
           <ProductionPlanSummary orders={orders} itemsByOrder={itemsByOrder} />
-          <div className="space-y-4">
+          <p className="text-xs text-muted-foreground mb-2">Buyurtma ustiga bosing — barcha tafsilotlar ochiladi.</p>
+          <div className="space-y-2">
             {orders.map((order) => (
               <OrderCard
                 key={order.id}
@@ -547,6 +548,15 @@ function OrderDaySection({
 }
 
 function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
+  const [expanded, setExpanded] = useState(false);
+  const summaryId = `order-summary-${order.id}`;
+  const detailsId = `order-details-${order.id}`;
+  const productSummary = items.length
+    ? items.map((it) => `${it.product_name_snapshot || 'Mahsulot'} · ${it.quantity} ${unitLabel(it.unit_snapshot)}`).join(' / ')
+    : 'Mahsulotlar yuklanmoqda…';
+  const statusLabel = order.order_status === 'tayyor'
+    ? 'Tayyor'
+    : order.order_status === 'tayyorlanmoqda' ? 'Tayyorlanmoqda' : 'Qabul qilindi';
   const u = urgency(order);
   const isReady = order.order_status === 'tayyor';
   const hasImage = !!order.reference_image;
@@ -555,44 +565,69 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
     <div className={`rounded-2xl border bg-card premium-shadow overflow-hidden ${
       u === 'overdue' ? 'border-rose-300' : u === 'urgent' ? 'border-amber-300' : 'border-border'
     }`}>
-      {/* Card head */}
-      <div className="p-4 sm:p-5 pb-3 sm:pb-3 flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-display text-base sm:text-lg font-semibold">{displayOrderNumber(order)}</span>
-            <span className="text-[11px] font-medium bg-secondary text-muted-foreground rounded-full px-2 py-0.5">
-              {typeLabel(order.order_type)}
+      <button
+        type="button"
+        id={summaryId}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        onClick={() => setExpanded((open) => !open)}
+        className="w-full min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
+      >
+        <span className="hidden sm:flex w-10 h-10 rounded-full bg-secondary items-center justify-center shrink-0 font-display text-lg font-semibold">
+          {displayOrderNumber(order)}
+        </span>
+        <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 md:grid-cols-[minmax(135px,0.8fr)_minmax(145px,0.9fr)_minmax(0,1.4fr)] md:items-center">
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="font-display text-base sm:text-lg font-semibold truncate">Buyurtma {displayOrderNumber(order)}</span>
+            <span className="inline-flex items-center gap-1 text-sm font-medium shrink-0 md:hidden">
+              <Clock className="w-3.5 h-3.5 text-brand-olive" /> {order.required_time || '—'}
             </span>
-          </div>
-          <div className="mt-1.5 flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="w-4 h-4 text-brand-olive shrink-0" />
-            <span className="font-medium text-foreground">{order.required_date} · {order.required_time}</span>
-          </div>
-          <div className="mt-1 text-sm text-muted-foreground truncate flex items-center gap-1.5">
+          </span>
+          <span className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+            <span className="hidden md:inline-flex items-center gap-1.5 font-medium text-foreground shrink-0">
+              <Clock className="w-4 h-4 text-brand-olive" /> {order.required_time || '—'}
+            </span>
             <ChefHat className="w-4 h-4 text-brand-olive shrink-0" />
-            {order.shop_name_snapshot || '—'}
-          </div>
-        </div>
-        {u === 'overdue' && (
-          <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-rose-700 bg-rose-100 border border-rose-200 rounded-full px-2.5 py-1">
-            <AlertTriangle className="w-3.5 h-3.5" /> Muddati o‘tgan
+            <span className="truncate">{order.shop_name_snapshot || '—'}</span>
           </span>
-        )}
-        {u === 'urgent' && (
-          <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2.5 py-1">
-            <AlertTriangle className="w-3.5 h-3.5" /> Shoshilinch
+          <span className="flex items-center gap-2 min-w-0 text-xs sm:text-sm text-muted-foreground">
+            <CakeSlice className="w-4 h-4 text-brand-olive shrink-0" />
+            <span className="truncate">{productSummary}</span>
           </span>
-        )}
-      </div>
+        </span>
+        <span className="shrink-0 flex flex-col lg:flex-row items-end lg:items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium rounded-full px-2.5 py-1 ${isReady ? 'text-brand-olive bg-brand-olive/15' : 'text-muted-foreground bg-secondary'}`}>
+            {isReady && <CheckCircle2 className="w-3.5 h-3.5" />}
+            {statusLabel}
+          </span>
+          {u === 'overdue' && (
+            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-rose-700 bg-rose-100 border border-rose-200 rounded-full px-2 py-1">
+              <AlertTriangle className="w-3.5 h-3.5" /> Muddati o‘tgan
+            </span>
+          )}
+          {u === 'urgent' && (
+            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-semibold text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-1">
+              <AlertTriangle className="w-3.5 h-3.5" /> Shoshilinch
+            </span>
+          )}
+        </span>
+        <ChevronDown aria-hidden="true" className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
 
-      <div className={hasImage ? 'grid lg:grid-cols-[minmax(280px,38%)_minmax(0,1fr)]' : ''}>
+      {expanded && (
+        <div id={detailsId} role="region" aria-labelledby={summaryId} className="border-t border-border pt-3">
+          <div className="px-4 sm:px-5 pb-3 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+            <span>{displayDate(order.required_date)} · {order.required_time || '—'}</span>
+            <span className="rounded-full bg-secondary px-2 py-0.5">{typeLabel(order.order_type)}</span>
+          </div>
+      <div className={hasImage ? 'grid lg:grid-cols-[minmax(240px,34%)_minmax(0,1fr)]' : ''}>
         {/* Reference image */}
         {hasImage && (
           <div className="px-4 sm:px-5 pb-4 lg:pr-2">
             <button
               type="button"
               onClick={onPreview}
-              className="relative w-full h-52 sm:h-60 lg:h-64 xl:h-72 rounded-xl overflow-hidden bg-secondary/70 border border-border block"
+              className="relative w-full h-52 sm:h-60 rounded-xl overflow-hidden bg-secondary/70 border border-border block"
               aria-label="Rasmini kattalashtirish"
             >
               <Image
@@ -671,6 +706,8 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
           </div>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }
