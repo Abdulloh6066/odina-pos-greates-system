@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { parse, missing, recoverContactDetails, recoverMissingPrice, updateCustomization, orderNotes } from './parser.js';
+import { parse, missing, recoverContactDetails, recoverMissingPrice, updateCustomization, orderNotes, dateProblem } from './parser.js';
 const reply = text => ({ text });
 export class OrderBot {
     constructor({ store, allowlist = {}, pos, photos, now = () => new Date(), bindingProvider = null, submissionEnabled = true }) { Object.assign(this, { store, allowlist, pos, photos, now, bindingProvider, submissionEnabled }); }
@@ -44,13 +44,16 @@ export class OrderBot {
                 d.phone ? `Telefon: ${d.phone}` : '',
                 d.name ? `Mijoz ismi: ${d.name}` : '',
                 d.type === null ? '' : `Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}`,
-                d.fulfilment ? 'Olish: olib ketish' : '',
+                d.fulfilment === 'pickup' ? 'Olish: olib ketish' : '',
                 d.photo ? 'Tort rasmi: qabul qilindi' : '',
             ].filter(Boolean);
             return reply([
                 ...(received.length ? ['Qabul qilingan ma’lumotlar:', ...received, ''] : []),
+                ...(dateProblem(d, this.now()) ? [dateProblem(d, this.now()), ''] : []),
+                ...(d.fulfilment === 'delivery' ? ['Yetkazib berish bu botda hali yoqilmagan. Olib ketish bo‘lsa, «olib ketish» deb yuboring.', ''] : []),
                 fields.length ? 'Buyurtmani saqlash uchun ma’lumotlar yetarli emas. Quyidagilarni yuboring:' : 'Buyurtma ma’lumotlarini aniqlashtirish kerak.',
                 ...fields,
+                ...(fields.includes('Narx:') ? ['Narxni «85000 som» yoki «85000 UZS» shaklida yuboring.'] : []),
                 '',
                 d.errors?.length ? 'Noto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : 'Faqat yetishmayotgan ma’lumotlarni keyingi xabarda yuboring. Oldingi ma’lumotlar saqlanadi.',
             ].join('\n'));
