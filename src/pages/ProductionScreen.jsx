@@ -620,92 +620,92 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
             <span>{displayDate(order.required_date)} · {order.required_time || '—'}</span>
             <span className="rounded-full bg-secondary px-2 py-0.5">{typeLabel(order.order_type)}</span>
           </div>
-      <div className={hasImage ? 'grid lg:grid-cols-[minmax(240px,34%)_minmax(0,1fr)]' : ''}>
-        {/* Reference image */}
-        {hasImage && (
-          <div className="px-4 sm:px-5 pb-4 lg:pr-2">
-            <button
-              type="button"
-              onClick={onPreview}
-              className="relative w-full h-52 sm:h-60 rounded-xl overflow-hidden bg-secondary/70 border border-border block"
-              aria-label="Rasmini kattalashtirish"
-            >
-              <Image
-                src={order.reference_image}
-                alt={`${displayOrderNumber(order)} namuna rasmi`}
-                fittingType="fit"
-                className="w-full h-full object-contain"
-              />
-            </button>
-          </div>
-        )}
-
-        <div className="min-w-0 flex flex-col">
-          {/* Products */}
-          <div className="p-4 pt-0 sm:px-5 flex-1 min-h-0">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Mahsulotlar</div>
-            {items.length === 0 ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ImageOff className="w-4 h-4" /> Mahsulotlar yuklanmoqda…
-              </div>
-            ) : (
-              <ul className="grid grid-cols-1 xl:grid-cols-2 gap-x-5 gap-y-2">
-                {items.map((it) => (
-                  <li key={it.id} className="flex items-start gap-2.5">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
-                      {it.product_image_snapshot ? (
-                        <Image src={it.product_image_snapshot} alt={it.product_name_snapshot || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" />
-                      ) : (
-                        <span className="text-sm font-medium text-muted-foreground">{(it.product_name_snapshot || '?')[0]}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium leading-snug">{it.product_name_snapshot}</div>
-                      {it.item_type === 'custom' && <div className="text-xs text-muted-foreground">Katalogdagi mos mahsulot topilmadi · oddiy buyurtma</div>}
-                      <div className="text-xs text-muted-foreground">
-                        {it.quantity} {unitLabel(it.unit_snapshot)}
-                        {it.category_name_snapshot ? ` · ${it.category_name_snapshot}` : ''}
-                      </div>
-                      {it.customization_note && (
-                        <div className="text-xs text-brand-ink mt-0.5">✎ {it.customization_note}</div>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {order.notes && (
-              <div className="mt-3 rounded-xl bg-secondary/50 border border-border p-2.5">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Umumiy izoh</div>
-                <div className="text-sm leading-snug whitespace-pre-wrap">{order.notes}</div>
+          <div className={hasImage ? 'grid lg:grid-cols-[minmax(240px,34%)_minmax(0,1fr)]' : ''}>
+            {/* Reference image */}
+            {hasImage && (
+              <div className="px-4 sm:px-5 pb-4 lg:pr-2">
+                <button
+                  type="button"
+                  onClick={onPreview}
+                  className="relative w-full h-52 sm:h-60 rounded-xl overflow-hidden bg-secondary/70 border border-border block"
+                  aria-label="Rasmini kattalashtirish"
+                >
+                  <Image
+                    src={order.reference_image}
+                    alt={`${displayOrderNumber(order)} namuna rasmi`}
+                    fittingType="fit"
+                    className="w-full h-full object-contain"
+                  />
+                </button>
               </div>
             )}
-          </div>
 
-          {/* Actions */}
-          <div className="p-4 sm:px-5 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
-            <Button
-              variant={isReady ? 'secondary' : 'outline'}
-              size="lg"
-              disabled={busy || isReady}
-              onClick={onReady}
-              className="h-12 text-sm sm:text-base"
-            >
-              {isReady ? <CheckCircle2 className="w-5 h-5 text-brand-olive" /> : busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-              Tayyor bo‘ldi
-            </Button>
-            <Button
-              size="lg"
-              disabled={busy || !isReady}
-              onClick={onShip}
-              className="h-12 text-sm sm:text-base"
-            >
-              {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
-              Yuborildi
-            </Button>
+            <div className="min-w-0 flex flex-col">
+              {/* Products */}
+              <div className="p-4 pt-0 sm:px-5 flex-1 min-h-0">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Mahsulotlar</div>
+                {items.length === 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ImageOff className="w-4 h-4" /> Mahsulotlar yuklanmoqda…
+                  </div>
+                ) : (
+                  <ul className="grid grid-cols-1 xl:grid-cols-2 gap-x-5 gap-y-2">
+                    {items.map((it) => (
+                      <li key={it.id} className="flex items-start gap-2.5">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary shrink-0 flex items-center justify-center">
+                          {it.product_image_snapshot ? (
+                            <Image src={it.product_image_snapshot} alt={it.product_name_snapshot || 'Mahsulot rasmi'} fittingType="fill" className="w-full h-full" />
+                          ) : (
+                            <span className="text-sm font-medium text-muted-foreground">{(it.product_name_snapshot || '?')[0]}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium leading-snug">{it.product_name_snapshot}</div>
+                          {it.item_type === 'custom' && <div className="text-xs text-muted-foreground">Katalogdagi mos mahsulot topilmadi · oddiy buyurtma</div>}
+                          <div className="text-xs text-muted-foreground">
+                            {it.quantity} {unitLabel(it.unit_snapshot)}
+                            {it.category_name_snapshot ? ` · ${it.category_name_snapshot}` : ''}
+                          </div>
+                          {it.customization_note && (
+                            <div className="text-xs text-brand-ink mt-0.5">✎ {it.customization_note}</div>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {order.notes && (
+                  <div className="mt-3 rounded-xl bg-secondary/50 border border-border p-2.5">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Umumiy izoh</div>
+                    <div className="text-sm leading-snug whitespace-pre-wrap">{order.notes}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="p-4 sm:px-5 border-t border-border bg-secondary/20 grid grid-cols-2 gap-2">
+                <Button
+                  variant={isReady ? 'secondary' : 'outline'}
+                  size="lg"
+                  disabled={busy || isReady}
+                  onClick={onReady}
+                  className="h-12 text-sm sm:text-base"
+                >
+                  {isReady ? <CheckCircle2 className="w-5 h-5 text-brand-olive" /> : busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                  Tayyor bo‘ldi
+                </Button>
+                <Button
+                  size="lg"
+                  disabled={busy || !isReady}
+                  onClick={onShip}
+                  className="h-12 text-sm sm:text-base"
+                >
+                  {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
+                  Yuborildi
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
         </div>
       )}
     </div>
