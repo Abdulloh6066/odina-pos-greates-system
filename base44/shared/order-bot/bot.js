@@ -245,7 +245,7 @@ export class OrderBot {
                 return null;
             if (c.type === undefined) c.type = 'tugilgan_kun_va_boshqa';
             c.status = 'submitting';
-            c.key = `odina-order-bot:${c.id}:${c.version}`;
+            c.key = c.key || `odina-order-bot:${c.id}:${c.version}`;
             tx.put(s, c);
             return c;
         });
@@ -288,6 +288,6 @@ export class OrderBot {
                 tx.put(s, c);
             }
         });
-        return reply(valid ? `Buyurtma saqlandi.\nBuyurtma raqami: ${r.order_number}\nTo‘lov: to‘lanmagan\nQoldiq: ${r.remaining_balance} UZS` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
+        return reply(valid ? `Buyurtma saqlandi.\nBuyurtma raqami: ${r.order_number}\nTo‘lov: to‘lanmagan\nQoldiq: ${r.remaining_balance} UZS${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
     }
 }
