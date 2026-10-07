@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import OdinaBrand from '@/components/brand/OdinaBrand';
-import { typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
+import { displayOrderNumber, typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
 import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import DemandSection from '@/components/production/DemandSection';
@@ -247,8 +247,8 @@ function ProductionScreenInner() {
         toast({
           title: step === 'ready' ? 'Tayyor bo‘ldi' : 'Yuborildi',
           description: step === 'ready' && data.production_applied
-            ? `${data.order.order_number} · Masalliqlar ombordan kamaydi`
-            : data.order.order_number,
+            ? `${displayOrderNumber(data.order)} · Masalliqlar ombordan kamaydi`
+            : displayOrderNumber(data.order),
         });
         await load();
       } else {
@@ -267,7 +267,7 @@ function ProductionScreenInner() {
     const tomorrow = dateOffsetStr(1);
     const sortByTime = (a, b) => {
       const timeCompare = (a.required_time || '').localeCompare(b.required_time || '');
-      return timeCompare || (a.order_number || '').localeCompare(b.order_number || '');
+      return timeCompare || (a.order_sequence || 0) - (b.order_sequence || 0);
     };
     const ordersFor = (date) => active.filter((o) => o.required_date === date).sort(sortByTime);
 
@@ -371,7 +371,7 @@ function ProductionScreenInner() {
                     <Truck className="w-4 h-4 text-brand-olive" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold truncate">{o.order_number}</div>
+                    <div className="text-sm font-semibold truncate">{displayOrderNumber(o)}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {o.shop_name_snapshot} · {typeLabel(o.order_type)}
                     </div>
@@ -397,8 +397,8 @@ function ProductionScreenInner() {
               </DialogTitle>
               <DialogDescription>
                 {confirm.step === 'ready'
-                  ? `${confirm.order.order_number} tayyor deb belgilanadi va tex-karta bo‘yicha masalliqlar markaziy ombordan avtomatik kamayadi.`
-                  : `${confirm.order.order_number} buyurtmasini yuborilgan deb belgilaysiz.`}
+                  ? `${displayOrderNumber(confirm.order)} tayyor deb belgilanadi va tex-karta bo‘yicha masalliqlar markaziy ombordan avtomatik kamayadi.`
+                  : `${displayOrderNumber(confirm.order)} buyurtmasini yuborilgan deb belgilaysiz.`}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="gap-2">
@@ -559,7 +559,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
       <div className="p-4 sm:p-5 pb-3 sm:pb-3 flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-display text-base sm:text-lg font-semibold">{order.order_number}</span>
+            <span className="font-display text-base sm:text-lg font-semibold">{displayOrderNumber(order)}</span>
             <span className="text-[11px] font-medium bg-secondary text-muted-foreground rounded-full px-2 py-0.5">
               {typeLabel(order.order_type)}
             </span>
@@ -597,7 +597,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
             >
               <Image
                 src={order.reference_image}
-                alt={`${order.order_number || 'Buyurtma'} namuna rasmi`}
+                alt={`${displayOrderNumber(order)} namuna rasmi`}
                 fittingType="fit"
                 className="w-full h-full object-contain"
               />
