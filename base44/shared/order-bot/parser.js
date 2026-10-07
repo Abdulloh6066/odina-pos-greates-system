@@ -119,7 +119,7 @@ export function orderInput(text) {
     return lines.filter((_, i) => !protectedLines.has(i)).join('\n');
 }
 function removeOrderFields(line, draft) {
-    if (/[,;]/.test(line) && /(?:^|[,;])\s*(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line))
+    if (/[,;](?!\d)/.test(line) && /(?:^|[,;])\s*(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line))
         return line.split(/[,;](?!\d)/).map(part => removeOrderFields(part.trim(), draft)).filter(Boolean).join('; ');
     if (line === draft.name) return '';
     if (/^(?:ism|telefon|sana|vaqt|narx|tur|olish)\s*:/iu.test(line)) {
