@@ -6,7 +6,7 @@ const months = {
 };
 const monthWords = '(?:(?:yanv|fevr|mart|apre|iyun|iyul|avgu|sent|okta|okty|oqti|okti|noya|deka)[a-z]*|(?:yan|fev|mar|apr|may|iyn|iyl|avg|sen|okt|noy|dek)(?![a-z]))';
 const datePattern = '\\b(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[ \\t]*[-.]?[ \\t]*' + monthWords + ')\\b';
-const deliveryPattern = /\b(?:dastafka|dastavka|dostavka|delivery|доставка|даставка|дастафка|yetkazib\s+berish)\b/iu;
+const deliveryPattern = /(?<![\p{L}\p{N}_])(?:dastafka|dastavka|dostavka|delivery|доставка|даставка|дастафка|yetkazib\s+berish)(?![\p{L}\p{N}_])/iu;
 const pickupPattern = /^(?:olish\s*:\s*)?olib\s+(?:ketish|ketadi|ketaman|ketamiz)[.!]?$/iu;
 export function parse(text, now, draft = {}) {
     text = orderInput(text);
