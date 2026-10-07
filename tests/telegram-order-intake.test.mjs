@@ -252,6 +252,27 @@ const ready = (notes = '') => ({ ...previous(), phone, name: 'Abdulloh',
     fulfilment: 'pickup', tier: 200000, notes });
 const writing = 'Я тебя люблю муж';
 
+test('redundant writing marker after an explicit inscription does not become a note', () => {
+    const draft = ready('Tortdagi yozuv: ' + writing + '\nYozilad');
+    updateCustomization(draft);
+    assert.equal(orderNotes(draft), 'Tortdagi yozuv: ' + writing);
+    assert.equal(draft.inscription_unclear, false);
+});
+
+test('an orphan writing instruction asks for clarification; text with numbers stays intact', async () => {
+    const f = fixture(ready('Ali 20 yosh\nYoziladi'));
+    const response = await f.message('/holat');
+    assert.match(response.text, /Tortdagi yozuvni aniqlashtiring/);
+    assert.ok(response.text.includes('Ali 20 yosh'));
+    assert.equal(response.buttons, undefined);
+});
+
+test('comma-separated labelled fields stay out of additional notes', () => {
+    const draft = ready('Ism: Abdulloh, Telefon: ' + phone + ', Sana: 2026-10-08, Vaqt: 16:00, Narx: 200,000 UZS, Olish: olib ketish\nIzoh: Oq, pushti gullar');
+    updateCustomization(draft);
+    assert.equal(orderNotes(draft), 'Izoh: Oq, pushti gullar');
+});
+
 test('explicit inscription and notes stay separate; order fields do not repeat in notes', () => {
     const draft = ready('8-okt 16:00\n200 lik razmerda\n' + details +
         '\nTortdagi yozuv: ' + writing + '\nIzoh: oq rangda bezatilsin');
