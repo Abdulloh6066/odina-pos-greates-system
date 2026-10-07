@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
-import { statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
+import { displayOrderNumber, statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Image } from '@/components/ui/image';
@@ -51,7 +51,7 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto scrollbar-thin">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
-            <span>{order.order_number}</span>
+            <span>{displayOrderNumber(order)}</span>
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${statusTone(order.order_status)}`}>{statusLabel(order.order_status)}</span>
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${payStatusTone(order.payment_status)}`}>{payStatusLabel(order.payment_status)}</span>
           </DialogTitle>
