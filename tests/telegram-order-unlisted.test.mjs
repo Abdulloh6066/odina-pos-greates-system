@@ -111,7 +111,8 @@ test('order numbers persist across retry, next-day dates and both shops',async()
   const first=await f.create();
   assert.equal(first.order_sequence,1);
   const historical=structuredClone(f.db.CustomerOrder[0]);
-  assert.equal((await f.create()).order_sequence,1);
+  await assert.rejects(f.create(),/reconcile/);
+  assert.equal((await f.bridge.reconcile(f.draft)).order_sequence,1);
   assert.equal(f.db.Settings[0].customer_order_last_number,1);
   f.draft.key='odina-order-bot:next-day:4'; f.draft.date='2026-10-08';
   assert.equal((await f.create()).order_sequence,2);
