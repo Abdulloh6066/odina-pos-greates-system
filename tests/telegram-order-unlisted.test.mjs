@@ -106,6 +106,30 @@ function fixture(tier = 85000, products = []) {
 const catalog = (price=200000)=>({id:'cake',name:'TORT '+price,price,active:true,archived:false,
   production_unit:'piece',category_name:'Tortlar',track_stock:true,source_type:'central_produced'});
 
+test('order numbers persist across retry, next-day dates and both shops',async()=>{
+  const f=fixture();
+  const first=await f.create();
+  assert.equal(first.order_sequence,1);
+  const historical=structuredClone(f.db.CustomerOrder[0]);
+  assert.equal((await f.create()).order_sequence,1);
+  assert.equal(f.db.Settings[0].customer_order_last_number,1);
+  f.draft.key='odina-order-bot:next-day:4'; f.draft.date='2026-10-08';
+  assert.equal((await f.create()).order_sequence,2);
+  f.draft.key='odina-order-bot:other-shop:4'; f.draft.shop='branch';
+  assert.equal((await f.create()).order_sequence,3);
+  assert.deepEqual(f.db.CustomerOrder[0],historical);
+});
+
+test('bot success displays the saved sequence instead of its technical order number',async()=>{
+  const f=fixture();
+  const response=await f.callback();
+  assert.match(response.text,/Buyurtma raqami: 1\n/);
+  assert.doesNotMatch(response.text,/BO-20/);
+  await f.status();
+  assert.equal(f.db.Settings[0].customer_order_last_number,1);
+  assert.equal(f.db.CustomerOrder.length,1);
+});
+
 test('85000 missing from catalog saves an ordinary unpaid order, line, customer, photo and audit',async()=>{
   const f=fixture(); const result=await f.create();
   assert.equal(result.complete,true); assert.equal(result.catalog_missing,true);
