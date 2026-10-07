@@ -2,6 +2,11 @@
   "name": "Settings",
   "type": "object",
   "properties": {
+    "customer_order_last_number": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Buyurtmalarning doimiy umumiy raqami uchun server hisoblagichi; kun almashganda nolga tushmaydi."
+    },
     "shop_name": {
       "type": "string",
       "default": "Odina Shop"
