@@ -7,7 +7,7 @@ import {
 } from "../../shared/order-ready-production.ts";
 import { createCustomerOrder, PAYMENT_METHODS, tashkentStamp, findOpenShift, applyPaymentToShift, reversePaymentOnShift } from "../../shared/customer-order-create.ts";
 
-const ORDER_RUNTIME_VERSION = "customer-orders-v4-2026-10-07";
+const ORDER_RUNTIME_VERSION = "customer-orders-v5-2026-10-07";
 // Owner requested status-only readiness until customer order recipes are set up.
 // This server policy cannot be overridden by a browser request.
 const ORDER_RECIPE_ACCOUNTING_ENABLED = false;
