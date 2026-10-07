@@ -17,7 +17,21 @@ export function parse(text, now, draft = {}) {
         return `${new Date(+now + 18000000).getUTCFullYear()}-${String(months[month]).padStart(2, '0')}-${d.padStart(2, '0')}`;
     });
     take(/\b(\d{1,2}:\d{2})\b/g, 'time', m => m[1].padStart(5, '0'));
-    take(/(?<![\d.,])\b(\d+)\s*lik\b/gi, 'tier', m => Number(m[1]) * 1000);
+    // "lik" is thousands; explicit currency amounts are already full UZS.
+    const prices = [...text.matchAll(/(?<![\d.,+-])\b(\d+)\s*lik\b/gi)].map(m => Number(m[1]) * 1000);
+    const amount = '(?:\\d{1,3}(?:[ \\u00a0\\u202f.,]\\d{3})+|\\d+)';
+    const currency = "(?:so['‘’ʻʼ]?m|sum|uzs|сум)";
+    for (const m of text.matchAll(new RegExp('(?<![\\d.,+-])\\b(' + amount + ')[ \\t]*' + currency + '(?![\\p{L}\\p{N}_])', 'giu')))
+        prices.push(Number(m[1].replace(/\D/g, '')));
+    // A labelled full amount, or a number-only reply while awaiting a price.
+    const labelled = new RegExp('(?:^|[;\\n])[ \\t]*narx[ \\t]*:[ \\t]*(' + amount + ')[ \\t]*(?=$|[;\\n])', 'gi');
+    for (const m of text.matchAll(labelled)) prices.push(Number(m[1].replace(/\D/g, '')));
+    if (!draft.tier && (draft.date || draft.time || draft.photo) && new RegExp('^[ \\t]*(' + amount + ')[ \\t]*$').test(text))
+        prices.push(Number(text.replace(/\D/g, '')));
+    const distinctPrices = [...new Set(prices)];
+    if (distinctPrices.length === 1 && Number.isSafeInteger(distinctPrices[0]) && distinctPrices[0] > 0)
+        patch.tier = distinctPrices[0];
+    else if (distinctPrices.length) { patch.tier = null; errors.push('tier'); }
     take(/(?<!\d)(\+?998[\s-]*\d{2}[\s-]*\d{3}[\s-]*\d{2}[\s-]*\d{2})(?!\d)/g, 'phone', m => '+' + m[1].replace(/\D/g, ''));
     take(/(?:^|[,;\n])\s*ism\s*:\s*([^,;\n]+)/gi, 'name', m => m[1].trim());
     take(/(?:^|[,;\n])\s*tur\s*:\s*(tugilgan_kun_va_boshqa|toy_va_bazmlar)\b/gi, 'type');
@@ -60,6 +74,15 @@ export function recoverContactDetails(draft, now) {
         }
     }
     return changed;
+}
+// Recover an explicit, unambiguous price that the older parser ignored.
+// Existing prices and drafts with a price conflict are never overwritten.
+export function recoverMissingPrice(draft, now) {
+    if (draft.tier || draft.errors?.includes('tier')) return false;
+    const parsed = parse(draft.notes || '', now, draft);
+    if (!parsed.patch.tier || parsed.errors.includes('tier')) return false;
+    draft.tier = parsed.patch.tier;
+    return true;
 }
 export function missing(d, now) {
     const labels = { date: 'Sana:', time: 'Vaqt:', tier: 'Narx:', phone: 'Telefon raqami:', name: 'Mijoz ismi:', type: 'Buyurtma turi:', fulfilment: 'Olish usuli:', photo: 'Tort rasmi:' };
