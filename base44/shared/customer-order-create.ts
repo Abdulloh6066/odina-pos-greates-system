@@ -1,5 +1,6 @@
 import { money, httpError } from "./shift-close-helpers.ts";
 import { ensureCustomer } from "./customer-helpers.ts";
+import { allocateCustomerOrderSequence } from "./customer-order-sequence.js";
 
 const ORDER_RUNTIME_VERSION = "customer-orders-v3-2026-09-13";
 export const PAYMENT_METHODS = new Set([
@@ -287,8 +288,10 @@ export async function createCustomerOrder(service: any, user: any, body: any, bo
         }
       }
 
+      const orderSequence = await allocateCustomerOrderSequence(service);
       try {
         createdOrder = await service.entities.CustomerOrder.create({
+          order_sequence: orderSequence,
           order_number: orderNumber,
           order_type: orderType,
           shop_id: shop.id,
