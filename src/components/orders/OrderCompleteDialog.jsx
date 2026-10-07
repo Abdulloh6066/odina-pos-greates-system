@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
-import { buildIdempotencyKey } from '@/lib/orders';
+import { displayOrderNumber, buildIdempotencyKey } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -38,7 +38,7 @@ export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
       const res = await base44.functions.invoke('customer-orders', payload);
       const data = res?.data || res;
       if (data?.order) {
-        toast({ title: data.already_completed ? 'Allaqachon yakunlangan' : handoffLabel, description: data.order.order_number });
+        toast({ title: data.already_completed ? 'Allaqachon yakunlangan' : handoffLabel, description: displayOrderNumber(data.order) });
         onDone(data);
       } else {
         throw new Error(data?.error || 'Amal bajarilmadi');
@@ -61,7 +61,7 @@ export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
             {handoffLabel}
           </DialogTitle>
           <DialogDescription>
-            {order?.order_number} · {needsPayment
+            {displayOrderNumber(order)} · {needsPayment
               ? `Qoldiq: ${formatUZS(remaining)} — qoldiq to‘lovni qabul qiling`
               : 'To‘liq to‘langan — buyurtmani yakunlang'}
           </DialogDescription>
