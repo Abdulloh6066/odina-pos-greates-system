@@ -52,7 +52,7 @@ export class InternalOrderBridge {
         const items = await this.service.entities.CustomerOrderItem.filter({ order_id: o.id });
         const payments = await this.service.entities.OrderPayment.filter({ order_id: o.id });
         const audit = await this.service.entities.ActionHistory.filter({ user_id: d.staff, action: 'order_created' });
-        const unlisted = items.length === 1 && items[0].item_type === 'custom' && items[0].product_id === '' && items[0].product_name_snapshot === 'Oddiy buyurtma (tort)';
+        const unlisted = items.length === 1 && items[0].item_type === 'custom' && !items[0].product_id && items[0].product_name_snapshot === 'Oddiy buyurtma (tort)';
         const catalogued = items.length === 1 && items[0].item_type !== 'custom' && Boolean(items[0].product_id) && items[0].product_name_snapshot === `TORT ${d.tier}`;
         if ((!unlisted && !catalogued) || items[0].shop_id !== d.shop || items[0].quantity !== 1 || items[0].unit_price_snapshot !== d.tier || items[0].line_total !== d.tier || items[0].unit_snapshot !== 'piece' || items[0].customization_note !== orderNotes(d) || payments.length || !audit.some(a => a.details.startsWith(o.order_number + ' · ')))
             return null;
