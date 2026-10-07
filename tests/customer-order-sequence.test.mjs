@@ -43,8 +43,10 @@ test('an uncertain counter write consumes its number without reusing it', async 
 });
 
 test('missing, duplicate, invalid or exhausted settings never guess a number', async () => {
-  for (const last of [undefined, null, -1, 0.5, '3', Number.MAX_SAFE_INTEGER])
-    await assert.rejects(allocateCustomerOrderSequence(fixture(last).service));
+  for (const last of [undefined, null, -1, 0.5, '3', Number.MAX_SAFE_INTEGER]) {
+    const f = fixture(); f.row.customer_order_last_number = last;
+    await assert.rejects(allocateCustomerOrderSequence(f.service));
+  }
   for (const rows of [[], [{id:'a',customer_order_last_number:0},{id:'b',customer_order_last_number:0}]])
     await assert.rejects(allocateCustomerOrderSequence({entities:{Settings:{list:async()=>rows}}}));
 });
