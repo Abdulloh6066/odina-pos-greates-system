@@ -199,7 +199,7 @@ export function dateProblem(d, now) {
     if (!Number.isFinite(+t) || new Date(+t + 18000000).toISOString().slice(0, 16) !== d.date + 'T' + d.time)
         return 'Sana yoki vaqt noto‘g‘ri. To‘g‘ri sana va vaqt yuboring.';
     if (t < now)
-        return d.date + ' ' + d.time + ' (Toshkent) o‘tib ketgan. Yangi sana va vaqt yuboring.';
+        return d.date + ' ' + d.time + ' o‘tib ketgan. Yangi sana va vaqt yuboring.';
     return '';
 }
 export function missing(d, now) {
