@@ -169,7 +169,7 @@ test('duplicate eligible catalog products block instead of silently choosing one
 test('uncatalogued orders show the warning only after complete reconciliation and repeated callbacks do not duplicate',async()=>{
   const f=fixture();const r=await f.callback();
   assert.match(r.text,/Buyurtma saqlandi/);assert.match(r.text,/mos mahsulot topilmadi/);
-  assert.match(r.text,/Oddiy buyurtma sifatida saqlandi/);assert.match(r.text,/Qoldiq: 85000/);
+  assert.match(r.text,/Oddiy buyurtma sifatida saqlandi/);assert.match(r.text,/Qoldiq: 85 000 so‘m/);
   const before=f.db.CustomerOrder.length;
   await f.callback();const status=await f.status();
   assert.match(status.text,/mos mahsulot topilmadi/);
