@@ -109,15 +109,18 @@ test('screenshot draft asks only for price, then displays confirmation without c
     const incomplete = await f.message(details);
     assert.match(incomplete.text, /Mijoz ismi: Abdulloh/);
     assert.match(incomplete.text, /Olish: olib ketish/);
-    const requested = incomplete.text.split('Quyidagilarni yuboring:')[1];
-    assert.match(requested, /Narx:/);
+    const requested = incomplete.text.split('\n\n')[1];
+    assert.match(requested, /⚠️ Buyurtma narxi yetishmayapti\./);
+    assert.match(requested, /Narxdan keyin som, UZS yoki lik yozing\./);
+    assert.ok(incomplete.text.endsWith('Yetishmayotgan ma’lumotlarni yuboring.'));
+    assert.doesNotMatch(incomplete.text, /\(Toshkent\)|85000|Oldingi ma’lumotlar saqlanadi/);
     assert.doesNotMatch(requested, /Mijoz ismi:|Olish usuli:|Telefon raqami:/);
     assert.equal(incomplete.buttons, undefined);
     const complete = await f.message('200 lik');
     assert.match(complete.text, /^Shu buyurtma to‘g‘rimi\?/);
     assert.match(complete.text, /Ism: Abdulloh/);
-    assert.match(complete.text, /Narx: 200000 UZS/);
-    assert.deepEqual(complete.buttons.map(b => b[0]), ['Tasdiqlash', 'Tahrirlash', 'Bekor qilish']);
+    assert.match(complete.text, /Narx: 200 000 so‘m/);
+    assert.deepEqual(complete.buttons.map(b => b[0]), ['✅ Tasdiqlash', '✏️ Tahrirlash', '❌ Bekor qilish']);
     assert.equal(f.creates(), 0);
     const draft = await f.store.get(sender);
     assert.equal(draft.photo.file_id, previous().photo.file_id);
@@ -208,8 +211,8 @@ test('the exact screenshot price reply reaches confirmation and creates only on 
         notes: previous().notes + '\n' + details });
     const response = await f.message('200000 som');
     assert.match(response.text, /^Shu buyurtma to‘g‘rimi\?/);
-    assert.match(response.text, /Narx: 200000 UZS/);
-    assert.deepEqual(response.buttons.map(b => b[0]), ['Tasdiqlash', 'Tahrirlash', 'Bekor qilish']);
+    assert.match(response.text, /Narx: 200 000 so‘m/);
+    assert.deepEqual(response.buttons.map(b => b[0]), ['✅ Tasdiqlash', '✏️ Tahrirlash', '❌ Bekor qilish']);
     assert.equal(f.creates(), 0);
     const draft = await f.store.get(sender);
     assert.equal(draft.date, '2026-10-08');
@@ -230,7 +233,7 @@ test('/holat recovers an already ignored 200000 som reply without resending it',
 
 test('price recovery preserves existing prices and refuses conflicting old notes', async () => {
     const current = fixture({ ...previous(), phone, name: 'Abdulloh', fulfilment: 'pickup', tier: 250000, notes: '200000 som' });
-    assert.match((await current.message('/holat')).text, /Narx: 250000 UZS/);
+    assert.match((await current.message('/holat')).text, /Narx: 250 000 so‘m/);
     const conflict = fixture({ ...previous(), phone, name: 'Abdulloh', fulfilment: 'pickup', notes: '200000 som\n250000 som' });
     assert.equal((await conflict.message('/holat')).buttons, undefined);
     assert.equal((await conflict.store.get(sender)).tier, undefined);
@@ -450,7 +453,7 @@ test('past dates explain the reason, and impossible dates remain blocked', async
     past.date = '2026-10-06';
     past.time = '17:00';
     const f = fixture(past);
-    assert.match((await f.message('/holat')).text, /2026-10-06 17:00 \(Toshkent\) o‘tib ketgan/);
+    assert.match((await f.message('/holat')).text, /2026-10-06 17:00 o‘tib ketgan/);
     const future = await f.message('7- oqtiyabr 17:00');
     assert.match(future.text, /^Shu buyurtma to‘g‘rimi\?/);
     assert.equal(f.creates(), 0);
