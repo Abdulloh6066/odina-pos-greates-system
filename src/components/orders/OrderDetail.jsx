@@ -4,7 +4,7 @@ import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { displayOrderNumber, statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Image } from '@/components/ui/image';
 import OrderPaymentDialog from '@/components/orders/OrderPaymentDialog';
 import OrderCompleteDialog from '@/components/orders/OrderCompleteDialog';
@@ -71,6 +71,34 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
               {order.fulfilment_type === 'delivery' && <Info icon={MapPin} label="Manzil" value={order.delivery_address || '—'} />}
               <Info icon={User} label="Yaratdi" value={`${order.creator_name} (${order.creator_role})`} />
             </div>
+
+            {order.reference_image && (
+              <section aria-label="Tort namuna rasmi">
+                <h4 className="text-sm font-semibold mb-2">Tort namuna rasmi</h4>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button type="button" aria-label="Tort namuna rasmini kattalashtirish"
+                      className="block w-full overflow-hidden rounded-xl border border-border bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <div className="h-60 sm:h-72 w-full">
+                        <Image src={order.reference_image} alt={`${displayOrderNumber(order)} tort namuna rasmi`}
+                          fittingType="fit" className="h-full w-full object-contain" />
+                      </div>
+                      <span className="block px-3 py-2 text-xs text-muted-foreground">Kattalashtirish uchun rasmni bosing</span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>{displayOrderNumber(order)} · Tort namuna rasmi</DialogTitle>
+                      <DialogDescription>Buyurtmaga biriktirilgan tort namunasi.</DialogDescription>
+                    </DialogHeader>
+                    <div className="h-[65vh] w-full overflow-hidden rounded-xl bg-secondary/40">
+                      <Image src={order.reference_image} alt={`${displayOrderNumber(order)} tort namuna rasmi`}
+                        fittingType="fit" className="h-full w-full object-contain" />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </section>
+            )}
 
             <div>
               <h4 className="text-sm font-semibold mb-2">Mahsulotlar</h4>
