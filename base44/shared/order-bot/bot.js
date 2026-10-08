@@ -66,7 +66,7 @@ export class OrderBot {
             return reply('Tortdagi yozuvni aniqlashtiring. «Tortdagi yozuv: ...» shaklida yuboring. Oldingi matn saqlanadi.\n\nIzoh: ' + d.additional_notes);
         if (!d.shop && d.owner_shop_choices?.length)
             return { text: 'Buyurtma qaysi do‘konda saqlansin?', buttons: d.owner_shop_choices.map(s => [s.name, `shop:${d.id}:${d.version}:${s.id}`]) };
-        return { text: `Shu buyurtma to‘g‘rimi? 🧾\n\n👤 Ism: ${d.name}\n📞 Telefon: ${d.phone}\n📅 Sana: ${d.date}\n🕐 Vaqt: ${d.time}\n\n🏪 Do‘kon: ${d.shop_name || d.shop}\n📋 Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\n🛍 Olish: olib ketish\n📦 Soni: 1 dona\n\n💰 Narx: ${money(d.tier)}\n🔴 To‘lov: to‘lanmagan\n💳 Qoldiq: ${money(d.tier)}\n\n📝 ${orderNotes(d) || 'Izoh: yo‘q'}`, buttons: [['✅ Tasdiqlash', `ok:${d.id}:${d.version}`], ['✏️ Tahrirlash', `edit:${d.id}:${d.version}`], ['❌ Bekor qilish', `cancel:${d.id}:${d.version}`]] };
+        return { text: `Shu buyurtma to‘g‘rimi? 🧾\n\n👤 Ism: ${d.name}\n📞 Telefon: ${d.phone}\n📅 Sana: ${d.date}\n🕐 Vaqt: ${d.time}\n\n🏪 Do‘kon: ${d.shop_name || d.shop}\n📋 Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\n🛍 Olish: olib ketish\n📦 Soni: 1 dona\n\n💰 Narx: ${money(d.tier)}\n💰 To‘lov: to‘lanmagan\n💰 Qoldiq: ${money(d.tier)}\n\n📝 ${orderNotes(d) || 'Izoh: yo‘q'}`, buttons: [['✅ Tasdiqlash', `ok:${d.id}:${d.version}`], ['✏️ Tahrirlash', `edit:${d.id}:${d.version}`], ['❌ Bekor qilish', `cancel:${d.id}:${d.version}`]] };
     }
     async process(s, staff, m, cb) {
         let d = await this.store.get(s);
@@ -289,6 +289,6 @@ export class OrderBot {
                 tx.put(s, c);
             }
         });
-        return reply(valid ? `✅ Buyurtma saqlandi.\n🧾 Buyurtma raqami: ${Number.isSafeInteger(r.order_sequence) && r.order_sequence > 0 ? r.order_sequence : r.order_number}\n🔴 To‘lov: to‘lanmagan\n💳 Qoldiq: ${money(r.remaining_balance)}${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
+        return reply(valid ? `✅ Buyurtma saqlandi.\n🧾 Buyurtma raqami: ${Number.isSafeInteger(r.order_sequence) && r.order_sequence > 0 ? r.order_sequence : r.order_number}\n💰 To‘lov: to‘lanmagan\n💰 Qoldiq: ${money(r.remaining_balance)}${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
     }
 }
