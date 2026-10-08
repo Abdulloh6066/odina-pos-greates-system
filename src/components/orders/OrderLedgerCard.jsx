@@ -1,4 +1,5 @@
 import React from 'react';
+import { Image } from '@/components/ui/image';
 import { ArrowUpRight, Repeat2 } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { displayOrderNumber, statusLabel, typeLabel, payStatusLabel, fulfilmentLabel } from '@/lib/orders';
@@ -18,6 +19,12 @@ export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat }) {
         <span className="opl-status" data-status={order.order_status}>{statusLabel(order.order_status)}</span>
       </div>
       <div className="opl-order-content">
+        {order.reference_image && (
+          <div className="mb-3 h-40 sm:h-48 w-full overflow-hidden rounded-xl border border-border bg-secondary/40">
+            <Image src={order.reference_image} alt={`${displayOrderNumber(order)} tort namuna rasmi`}
+              fittingType="fit" className="h-full w-full object-contain" />
+          </div>
+        )}
         <div className="opl-order-person">
           <span className="opl-order-id">{displayOrderNumber(order)}</span>
           <strong className="opl-customer">{order.customer_name}</strong>
