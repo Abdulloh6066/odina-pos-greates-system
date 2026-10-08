@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { parse, missing, recoverContactDetails, recoverMissingPrice, updateCustomization, orderNotes, dateProblem } from './parser.js';
 const reply = text => ({ text });
+const money = value => String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' so‘m';
 export class OrderBot {
     constructor({ store, allowlist = {}, pos, photos, now = () => new Date(), bindingProvider = null, submissionEnabled = true }) { Object.assign(this, { store, allowlist, pos, photos, now, bindingProvider, submissionEnabled }); }
     async auth(s) {
@@ -38,24 +39,24 @@ export class OrderBot {
         const fields = missing(d, this.now());
         if (fields.length || d.errors?.length) {
             const received = [
-                d.date && !fields.some(f => f.startsWith('Sana')) ? `Sana: ${d.date}` : '',
-                d.time && !fields.some(f => f.startsWith('Vaqt')) ? `Vaqt: ${d.time} (Toshkent)` : '',
-                d.tier && !fields.some(f => f.startsWith('Narx')) ? `Narx: ${d.tier} UZS` : '',
-                d.phone ? `Telefon: ${d.phone}` : '',
-                d.name ? `Mijoz ismi: ${d.name}` : '',
-                d.type === null ? '' : `Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}`,
-                d.fulfilment === 'pickup' ? 'Olish: olib ketish' : '',
-                d.photo ? 'Tort rasmi: qabul qilindi' : '',
+                d.date && !fields.some(f => f.startsWith('Sana')) ? `📅 Sana: ${d.date}` : '',
+                d.time && !fields.some(f => f.startsWith('Vaqt')) ? `🕐 Vaqt: ${d.time}` : '',
+                d.tier && !fields.some(f => f.startsWith('Narx')) ? `💰 Narx: ${money(d.tier)}` : '',
+                d.phone ? `📞 Telefon: ${d.phone}` : '',
+                d.name ? `👤 Mijoz ismi: ${d.name}` : '',
+                d.type === null ? '' : `📋 Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}`,
+                d.fulfilment === 'pickup' ? '🛍 Olish: olib ketish' : '',
+                d.photo ? '📷 Tort rasmi: qabul qilindi' : '',
             ].filter(Boolean);
             return reply([
-                ...(received.length ? ['Qabul qilingan ma’lumotlar:', ...received, ''] : []),
+                ...(received.length ? ['✅ Qabul qilingan ma’lumotlar:', ...received, ''] : []),
                 ...(dateProblem(d, this.now()) ? [dateProblem(d, this.now()), ''] : []),
                 ...(d.fulfilment === 'delivery' ? ['Yetkazib berish bu botda hali yoqilmagan. Olib ketish bo‘lsa, «olib ketish» deb yuboring.', ''] : []),
-                fields.length ? 'Buyurtmani saqlash uchun ma’lumotlar yetarli emas. Quyidagilarni yuboring:' : 'Buyurtma ma’lumotlarini aniqlashtirish kerak.',
-                ...fields,
-                ...(fields.includes('Narx:') ? ['Narxni «85000 som» yoki «85000 UZS» shaklida yuboring.'] : []),
+                fields.length === 1 && fields[0] === 'Narx:' ? '⚠️ Buyurtma narxi yetishmayapti.' : fields.length ? '⚠️ Quyidagi ma’lumotlar yetishmayapti:' : '⚠️ Buyurtma ma’lumotlarini aniqlashtiring.',
+                ...(fields.length === 1 && fields[0] === 'Narx:' ? [] : fields.map(field => '• ' + field.replace(/:$/, ''))),
+                ...(fields.includes('Narx:') ? ['Narxdan keyin som, UZS yoki lik yozing.'] : []),
                 '',
-                d.errors?.length ? 'Noto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : 'Faqat yetishmayotgan ma’lumotlarni keyingi xabarda yuboring. Oldingi ma’lumotlar saqlanadi.',
+                d.errors?.length ? 'Noto‘g‘ri yoki bir nechta qiymat bor; /tahrir bilan to‘liq matnni qayta yuboring.' : 'Yetishmayotgan ma’lumotlarni yuboring.',
             ].join('\n'));
         }
         if (d.inscription_pending)
@@ -65,7 +66,7 @@ export class OrderBot {
             return reply('Tortdagi yozuvni aniqlashtiring. «Tortdagi yozuv: ...» shaklida yuboring. Oldingi matn saqlanadi.\n\nIzoh: ' + d.additional_notes);
         if (!d.shop && d.owner_shop_choices?.length)
             return { text: 'Buyurtma qaysi do‘konda saqlansin?', buttons: d.owner_shop_choices.map(s => [s.name, `shop:${d.id}:${d.version}:${s.id}`]) };
-        return { text: `Shu buyurtma to‘g‘rimi?\n\nIsm: ${d.name}\nTelefon: ${d.phone}\nSana: ${d.date}\nVaqt: ${d.time} (Toshkent)\nNarx: ${d.tier} UZS\nSoni: 1 dona\nBuyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\nDo‘kon: ${d.shop_name || d.shop}\nOlish: olib ketish\nTo‘lov: to‘lanmagan\nQoldiq: ${d.tier} UZS\n${orderNotes(d) || 'Izoh: yo‘q'}`, buttons: [['Tasdiqlash', `ok:${d.id}:${d.version}`], ['Tahrirlash', `edit:${d.id}:${d.version}`], ['Bekor qilish', `cancel:${d.id}:${d.version}`]] };
+        return { text: `Shu buyurtma to‘g‘rimi? 🧾\n\n👤 Ism: ${d.name}\n📞 Telefon: ${d.phone}\n📅 Sana: ${d.date}\n🕐 Vaqt: ${d.time}\n\n🏪 Do‘kon: ${d.shop_name || d.shop}\n📋 Buyurtma turi: ${d.type === 'toy_va_bazmlar' ? 'To‘y buyurtmasi' : 'Buyurtma'}\n🛍 Olish: olib ketish\n📦 Soni: 1 dona\n\n💰 Narx: ${money(d.tier)}\n🔴 To‘lov: to‘lanmagan\n💳 Qoldiq: ${money(d.tier)}\n\n📝 ${orderNotes(d) || 'Izoh: yo‘q'}`, buttons: [['✅ Tasdiqlash', `ok:${d.id}:${d.version}`], ['✏️ Tahrirlash', `edit:${d.id}:${d.version}`], ['❌ Bekor qilish', `cancel:${d.id}:${d.version}`]] };
     }
     async process(s, staff, m, cb) {
         let d = await this.store.get(s);
@@ -288,6 +289,6 @@ export class OrderBot {
                 tx.put(s, c);
             }
         });
-        return reply(valid ? `Buyurtma saqlandi.\nBuyurtma raqami: ${Number.isSafeInteger(r.order_sequence) && r.order_sequence > 0 ? r.order_sequence : r.order_number}\nTo‘lov: to‘lanmagan\nQoldiq: ${r.remaining_balance} UZS${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
+        return reply(valid ? `✅ Buyurtma saqlandi.\n🧾 Buyurtma raqami: ${Number.isSafeInteger(r.order_sequence) && r.order_sequence > 0 ? r.order_sequence : r.order_number}\n🔴 To‘lov: to‘lanmagan\n💳 Qoldiq: ${money(r.remaining_balance)}${r.catalog_missing ? '\n\nKatalogdagi mos mahsulot topilmadi. Oddiy buyurtma sifatida saqlandi.' : ''}` : 'Natija tekshirilmoqda. /holat yuboring. Yangi buyurtma yaratmang.');
     }
 }
