@@ -35,6 +35,27 @@ import {
 } from "../../shared/shift-close-helpers.ts";
 import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
+import {
+  prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
+} from "../../shared/sale-ingredient-flow.ts";
+
+// Restore only Odina Branch's deferred tech-card connection.
+const BRANCH_TECH_CARD_SHOP_ID = "6a96f0a4ecc85c2fc57f3174";
+async function prepareBranchIngredients(service: any, shopId: string, items: any[]) {
+  const eligible = shopId === BRANCH_TECH_CARD_SHOP_ID
+    ? items.filter((item) => item.source_type === "shop_prepared" && item.sale_unit !== "gram")
+    : [];
+  const prepared = await prepareSaleIngredientDeduction(service, shopId, eligible, { allowMissing: true });
+  const linked = new Set(prepared.lines.map((line: any) => line.product_id));
+  for (const item of items) {
+    if (linked.has(item.product_id)) {
+      // These drinks consume ingredients, never an additional finished product.
+      item.stock_tracked = false;
+      item.stock_quantity_change = 0;
+    }
+  }
+  return prepared;
+}
 
 // Await every independent write before a failure enters compensation.
 async function settleCheckoutWrites(tasks: Array<() => Promise<unknown>>) {
@@ -389,6 +410,8 @@ export default async function(req) {
   let discountChanged = false;
   let stockChanges: any[] = [];
   let stockMovementRecords: any[] = [];
+  const ingredientChanges: any[] = [];
+  const ingredientMovementRecords: any[] = [];
   let idempotencyClaimed = false;
   let idempotencyShiftId = "";
   let idempotencyKey = "";
@@ -895,6 +918,14 @@ export default async function(req) {
         normalizeSaleItems(service, requestedItems, shift.shop_id, tableItems),
         stockPolicy(service),
       ]);
+      const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems);
+      if (ingredientPrep.shortages.length && !allowNegativeStock) {
+        return Response.json({
+          error: "Branch omborida tex-karta masalliqlari yetarli emas: " + ingredientPrep.shortages.map((row: any) => row.ingredient_name).join(", "),
+          ingredient_shortages: ingredientPrep.shortages,
+          allow_negative_stock: false,
+        }, { status: 409 });
+      }
       const { shortages } = await planSaleStock(service, shift.shop_id, normalizedItems);
       if (shortages.length && !allowNegativeStock) {
         return Response.json({
@@ -903,7 +934,7 @@ export default async function(req) {
           allow_negative_stock: false,
         }, { status: 409 });
       }
-      return Response.json({ shortages, allow_negative_stock: allowNegativeStock });
+      return Response.json({ shortages, ingredient_shortages: ingredientPrep.shortages, allow_negative_stock: allowNegativeStock });
     }
 
     if (action === "refund_sale") {
@@ -960,6 +991,8 @@ export default async function(req) {
       let shiftAdjusted = false;
       const restocks: any[] = [];
       const refundMovements: any[] = [];
+      const ingredientRestocks: any[] = [];
+      const refundIngredientMovements: any[] = [];
 
       try {
         refund = await service.entities.Refund.create({
@@ -1079,6 +1112,15 @@ export default async function(req) {
           refundMovements.push(movement);
         }
 
+        if (original.shop_id === BRANCH_TECH_CARD_SHOP_ID) {
+          await restoreSaleIngredientsOnRefund(service, {
+            shopId: original.shop_id, shopName: original.shop_name,
+            saleId: original.id, saleNumber: original.sale_number || original.id,
+            refundId: refund.id, userId: user.id, userName: user.full_name || user.email,
+            now, restocks: ingredientRestocks, movements: refundIngredientMovements,
+          });
+        }
+
         try {
           await service.entities.ActionHistory.create({
             user_id: user.id,
@@ -1103,6 +1145,16 @@ export default async function(req) {
           })),
         });
       } catch (error) {
+        for (const movement of refundIngredientMovements) {
+          try { await service.entities.StockMovement.delete(movement.id); } catch {}
+        }
+        for (const restock of ingredientRestocks) {
+          try {
+            await service.entities.IngredientStock.updateMany(
+              { id: restock.stockRecord.id }, { $inc: { quantity: -restock.quantity } },
+            );
+          } catch {}
+        }
         for (const movement of refundMovements) {
           try { await service.entities.StockMovement.delete(movement.id); } catch {}
         }
@@ -1310,6 +1362,11 @@ export default async function(req) {
       normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null, productsAtSale),
       stockPolicy(service),
     ]);
+    const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems);
+    if (ingredientPrep.shortages.length && !allowNegativeStock) {
+      throw httpError("Branch omborida tex-karta masalliqlari yetarli emas: "
+        + ingredientPrep.shortages.map((row: any) => row.ingredient_name).join(", "), 409);
+    }
     const [{ plans: stockPlans, shortages: stockWarnings }, unitCostByProduct] = await Promise.all([
       planSaleStock(service, shift.shop_id, normalizedItems),
       loadSaleCostSnapshots(service, normalizedItems, productsAtSale),
@@ -1652,6 +1709,13 @@ export default async function(req) {
       },
     ]);
 
+    await applySaleIngredientDeduction(service, {
+      shopId: shift.shop_id, shopName: shift.shop_name,
+      saleId: sale.id, saleNumber, userId: user.id, userName: user.full_name || user.email,
+      now: soldAt, plans: ingredientPrep.plans, lines: ingredientPrep.lines,
+      applied: ingredientChanges, movements: ingredientMovementRecords,
+    });
+
     if (claimedDiscount) {
       if (claimedDiscount.single_use !== false) {
         await service.entities.DiscountCode.update(claimedDiscount.id, {
@@ -1750,6 +1814,7 @@ export default async function(req) {
       table_released: tableReleased,
       shift: updatedShift,
       stock_warnings: stockWarnings,
+      ingredient_warnings: ingredientPrep.shortages,
       allow_negative_stock: allowNegativeStock,
       stock_updates: stockChanges.map((change) => ({
         product_id: change.item.product_id,
@@ -1758,16 +1823,16 @@ export default async function(req) {
     });
   } catch (error) {
     let rollbackSafe = true;
-    if (idempotencyClaimed && idempotencyShiftId && idempotencyKey) {
+    for (const movement of ingredientMovementRecords) {
+      try { await service.entities.StockMovement.delete(movement.id); } catch { rollbackSafe = false; }
+    }
+    for (const change of ingredientChanges) {
       try {
-        await base44.asServiceRole.entities.Shift.updateMany(
-          { id: idempotencyShiftId },
-          { $pull: { sale_request_keys: idempotencyKey } },
+        const restored = await service.entities.IngredientStock.updateMany(
+          { id: change.stockId }, { $inc: { quantity: change.quantity } },
         );
-      } catch {
-        rollbackSafe = false;
-        // Preserve the original failure. A retry can be reviewed if the claim remains.
-      }
+        if (!restored?.success || Number(restored.updated || 0) !== 1) rollbackSafe = false;
+      } catch { rollbackSafe = false; }
     }
     for (const movement of stockMovementRecords) {
       try { await base44.asServiceRole.entities.StockMovement.delete(movement.id); } catch { rollbackSafe = false; }
@@ -1801,6 +1866,18 @@ export default async function(req) {
     }
     if (sale) {
       try { await base44.asServiceRole.entities.Sale.delete(sale.id); } catch { rollbackSafe = false; }
+    }
+
+    if (rollbackSafe && idempotencyClaimed && idempotencyShiftId && idempotencyKey) {
+      try {
+        await base44.asServiceRole.entities.Shift.updateMany(
+          { id: idempotencyShiftId },
+          { $pull: { sale_request_keys: idempotencyKey } },
+        );
+      } catch {
+        rollbackSafe = false;
+        // Preserve the original failure. A retry can be reviewed if the claim remains.
+      }
     }
 
     // An uncertain payment must never reopen the table for a second charge.
