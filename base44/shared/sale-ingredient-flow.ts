@@ -78,11 +78,11 @@ export async function loadShopRecipes(
     if (!recipe) { byProduct.set(productId, null); continue; }
     byProduct.set(productId, {
       recipe_id: recipe.id,
-      output_quantity: dedNum(recipe.output_quantity) || 1,
+      output_quantity: Number(recipe.output_quantity),
       items: (itemsByRecipe.get(recipe.id) || []).map((ri: any) => ({
         ingredient_id: ri.ingredient_id,
         ingredient_name_snapshot: ri.ingredient_name_snapshot,
-        quantity: dedNum(ri.quantity),
+        quantity: Number(ri.quantity),
         unit: String(ri.unit || ""),
       })),
     });
@@ -93,11 +93,13 @@ export async function loadShopRecipes(
 
 // Validate tech-cards and plan ingredient deductions for a sale.
 // Returns { lines, requirements, plans, shortages }.
-// Throws (before any mutation) when a shop_prepared product has no active tech-card.
+// Strict by default; Branch's gradual setup may explicitly allow missing cards.
+// A present but invalid active card always blocks before any mutation.
 export async function prepareSaleIngredientDeduction(
   service: any,
   shopId: string,
   items: any[],
+  options: { allowMissing?: boolean } = {},
 ) {
   const shopPrepared = items.filter((row: any) => row.source_type === "shop_prepared");
   if (!shopPrepared.length) {
@@ -105,6 +107,11 @@ export async function prepareSaleIngredientDeduction(
   }
 
   const { byProduct } = await loadShopRecipes(service, shopPrepared);
+  for (const recipe of byProduct.values()) {
+    if (recipe && !recipe.items.length) {
+      throw httpError("Faol tex-kartada masalliqlar kiritilmagan. Egasi tekshirishi kerak.", 409);
+    }
+  }
   const { lines, missing } = shopPreparedLines(
     shopPrepared.map((row: any) => ({
       product_id: row.product_id,
@@ -114,13 +121,21 @@ export async function prepareSaleIngredientDeduction(
     })),
     byProduct,
   );
-  if (missing.length) {
+  if (missing.length && !options.allowMissing) {
     throw httpError(
       "Bu mahsulot uchun faol tex-karta topilmadi. Avval tex-kartani kiriting.",
       409,
     );
   }
 
+  for (const line of lines) {
+    if (!Number.isFinite(line.recipe.output_quantity) || line.recipe.output_quantity <= 0
+      || line.recipe.items.some((row: any) => !row.ingredient_id
+        || !Number.isFinite(row.quantity) || row.quantity <= 0
+        || !["g", "ml", "piece"].includes(row.unit))) {
+      throw httpError("Tex-karta masalliqlari yoki natija miqdori noto‘g‘ri. Egasi tekshirishi kerak.", 409);
+    }
+  }
   const requirements = aggregateIngredientRequirements(lines);
   const ingredientIds = Array.from(new Set(requirements.map((r: any) => r.ingredient_id)));
   const stockRows = ingredientIds.length
@@ -143,7 +158,7 @@ export async function prepareSaleIngredientDeduction(
   return { lines, requirements, plans, shortages };
 }
 
-// Apply the planned ingredient deductions after a sale is finalized.
+// Apply planned deductions after the sale record exists, before financial confirmation.
 // Mutates IngredientStock and writes one StockMovement per ingredient (aggregated).
 // `applied` is pushed with rollback descriptors.
 export async function applySaleIngredientDeduction(
@@ -158,16 +173,18 @@ export async function applySaleIngredientDeduction(
     now: string;
     plans: any[];
     lines: any[];
+    applied?: any[];
+    movements?: any[];
   },
 ): Promise<{ movements: any[]; applied: any[] }> {
   const { shopId, shopName, saleId, saleNumber, userId, userName, now, plans, lines } = params;
-  const movements: any[] = [];
-  const applied: any[] = [];
+  // Caller's journals retain partial writes if a later operation throws.
+  const movements: any[] = params.movements || [];
+  const applied: any[] = params.applied || [];
 
   // Build a per-ingredient product-name list for the reason text.
   const ingredientSources = new Map<string, string[]>();
   for (const line of lines || []) {
-    const output = dedNum(line.recipe.output_quantity) || 1;
     for (const ri of line.recipe.items) {
       const key = String(ri.ingredient_id);
       if (!ingredientSources.has(key)) ingredientSources.set(key, []);
@@ -254,12 +271,14 @@ export async function restoreSaleIngredientsOnRefund(
     userId: string;
     userName: string;
     now: string;
+    movements?: any[];
+    restocks?: any[];
   },
 ): Promise<{ movements: any[]; restocks: any[] }> {
   const { shopId, shopName, saleId, saleNumber, refundId, userId, userName, now } = params;
 
   const allMovements = await service.entities.StockMovement.filter(
-    { reference_id: saleId, item_kind: "ingredient", movement_type: "sale" },
+    { reference_id: saleId, location_id: shopId, item_kind: "ingredient", movement_type: "sale" },
     "created_at",
     2000,
   );
@@ -274,11 +293,15 @@ export async function restoreSaleIngredientsOnRefund(
   );
   const stockByIngredient = new Map<string, any>();
   for (const row of stockRows || []) {
-    stockByIngredient.set(String(row.ingredient_id), row);
+    const key = String(row.ingredient_id);
+    if (stockByIngredient.has(key)) {
+      throw httpError(`${row.ingredient_name || "Masalliq"} uchun takroriy ombor qoldig‘i topildi.`, 409);
+    }
+    stockByIngredient.set(key, row);
   }
 
-  const movements: any[] = [];
-  const restocks: any[] = [];
+  const movements: any[] = params.movements || [];
+  const restocks: any[] = params.restocks || [];
 
   for (const restore of toRestore) {
     const existing = stockByIngredient.get(restore.ingredient_id) || null;
