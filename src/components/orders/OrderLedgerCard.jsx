@@ -1,12 +1,12 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
-import { ArrowUpRight, Repeat2 } from 'lucide-react';
+import { ArrowUpRight, Repeat2, User, Phone, Calendar, Clock, Store, ImageIcon } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
-import { displayOrderNumber, statusLabel, typeLabel, payStatusLabel, fulfilmentLabel } from '@/lib/orders';
+import { displayOrderNumber, statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
 
 function displayDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
-  return match ? `${match[3]}.${match[2]}.${match[1]}` : value || 'Sana belgilanmagan';
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : value || '—';
 }
 
 export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat }) {
@@ -14,39 +14,54 @@ export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat }) {
   return <article className="opl-order">
     <button type="button" className="opl-order-open" onClick={() => onOpen(order)}
       aria-label={`${displayOrderNumber(order)}, ${order.customer_name}, batafsil ko‘rish`}>
-      <div className="opl-order-top">
-        <span className="opl-order-time">{displayDate(order.required_date)} <strong>{order.required_time || '—'}</strong></span>
-        <span className="opl-status" data-status={order.order_status}>{statusLabel(order.order_status)}</span>
+      <div className="opl-order-header">
+        <div className="opl-order-header-left">
+          <span className="opl-order-number">{displayOrderNumber(order)}</span>
+          <div className="opl-order-badges">
+            <span className={`opl-badge ${statusTone(order.order_status)}`}>{statusLabel(order.order_status)}</span>
+            <span className={`opl-badge ${payStatusTone(order.payment_status)}`}>{payStatusLabel(order.payment_status)}</span>
+          </div>
+        </div>
+        <ArrowUpRight className="opl-open-arrow" size={20} aria-hidden="true" />
       </div>
-      <div className="opl-order-content">
-        {order.reference_image && (
-          <div className="mb-3 h-40 sm:h-48 w-full overflow-hidden rounded-xl border border-border bg-secondary/40">
+      <p className="opl-order-type-line">{typeLabel(order.order_type)} · {fulfilmentLabel(order.fulfilment_type)}</p>
+
+      <div className="opl-order-meta">
+        <MetaRow icon={User} label="Mijoz" value={order.customer_name} />
+        <MetaRow icon={Phone} label="Telefon" value={order.customer_phone || '—'} />
+        <MetaRow icon={Calendar} label="Sana" value={displayDate(order.required_date)} />
+        <MetaRow icon={Clock} label="Vaqt" value={order.required_time || '—'} />
+        {isAdmin && order.shop_name_snapshot && <MetaRow icon={Store} label="Do‘kon" value={order.shop_name_snapshot} />}
+        {order.creator_name && <MetaRow icon={User} label="Yaratdi" value={`${order.creator_name}${order.creator_role ? ` (${order.creator_role})` : ''}`} />}
+      </div>
+
+      {order.reference_image && (
+        <div className="opl-order-image-wrap">
+          <div className="opl-order-image-thumb">
             <Image src={order.reference_image} alt={`${displayOrderNumber(order)} tort namuna rasmi`}
               fittingType="fit" className="h-full w-full object-contain" />
           </div>
-        )}
-        <div className="opl-order-person">
-          <span className="opl-order-id">{displayOrderNumber(order)}</span>
-          <strong className="opl-customer">{order.customer_name}</strong>
-          <span className="opl-phone">{order.customer_phone || 'Telefon ko‘rsatilmagan'}</span>
+          <span className="opl-order-image-hint"><ImageIcon size={12} aria-hidden="true" /> Batafsil ko‘rish uchun bosing</span>
         </div>
-        <div className="opl-order-details">
-          <span>{typeLabel(order.order_type)}</span>
-          <span>{fulfilmentLabel(order.fulfilment_type)}</span>
-          {isAdmin && order.shop_name_snapshot && <span>{order.shop_name_snapshot}</span>}
-          {order.fulfilment_type === 'delivery' && order.delivery_address && <span className="opl-address">{order.delivery_address}</span>}
-        </div>
-      </div>
-      <div className="opl-order-bottom">
-        <span>Jami <strong>{formatUZS(order.total)}</strong></span>
-        <span className={remaining > 0 ? 'opl-balance-due' : 'opl-balance-paid'}>
-          {remaining > 0 ? 'Qolgan to‘lov' : 'To‘lov'} <strong>{remaining > 0 ? formatUZS(remaining) : payStatusLabel(order.payment_status)}</strong>
-        </span>
-        <ArrowUpRight className="opl-open-arrow" size={20} aria-hidden="true" />
+      )}
+
+      <div className="opl-order-footer">
+        <div className="opl-order-price-line"><span>Mahsulotlar</span><strong>{formatUZS(order.subtotal)}</strong></div>
+        <div className="opl-order-price-line"><span>Yetkazib berish</span><strong>{formatUZS(order.delivery_fee)}</strong></div>
+        <div className="opl-order-price-line opl-order-total"><span>Jami</span><strong>{formatUZS(order.total)}</strong></div>
+        {remaining > 0 && <div className="opl-order-price-line opl-order-balance"><span>Qoldi</span><strong>{formatUZS(remaining)}</strong></div>}
       </div>
     </button>
     {onRepeat && <div className="opl-order-actions">
       <button type="button" onClick={() => onRepeat(order)}><Repeat2 size={16} aria-hidden="true" /> Qayta buyurtma</button>
     </div>}
   </article>;
+}
+
+function MetaRow({ icon: Icon, label, value }) {
+  return <div className="opl-meta-row">
+    <Icon className="opl-meta-icon" size={14} aria-hidden="true" />
+    <span className="opl-meta-label">{label}:</span>
+    <span className="opl-meta-value">{value}</span>
+  </div>;
 }

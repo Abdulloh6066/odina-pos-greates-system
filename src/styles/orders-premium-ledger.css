@@ -67,27 +67,28 @@
 .opl-order:hover { border-color: #aaa969; box-shadow: 0 8px 22px #36382114; }
 .opl-order-open { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; display: block; }
 .opl-order-open:disabled { cursor: default; }
-.opl-order-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 18px 12px; border-bottom: 1px solid #efede5; }
-.opl-order-time { display: flex; gap: 8px; align-items: baseline; font-size: 13px; font-weight: 700; color: #515442; }
-.opl-order-time strong { font-size: 20px; color: #22251e; line-height: 1; }
-.opl-status { max-width: 58%; border-radius: 8px; padding: 5px 8px; background: #f2f0e3; color: #5b5c39; font-size: 11px; font-weight: 700; text-align: center; }
-.opl-status[data-status="tayyor"] { background: #eaf3e6; color: #355f39; }
-.opl-status[data-status="tayyorlanmoqda"] { background: #f8efd9; color: #72562d; }
-.opl-status[data-status="bekor_qilindi"] { background: #fae9e6; color: #934239; }
-.opl-order-content { padding: 16px 18px 12px; }
-.opl-order-person { display: flex; flex-direction: column; gap: 4px; }
-.opl-order-id { color: #777b64; font-size: 11px; font-weight: 750; letter-spacing: .04em; }
-.opl-customer { color: #22251e; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
-.opl-phone { color: #72756a; font-size: 13px; }
-.opl-order-details { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 14px; }
-.opl-order-details span { border: 1px solid #ece9dd; background: #faf9f5; border-radius: 7px; padding: 4px 7px; color: #5f6257; font-size: 11px; }
-.opl-order-details .opl-address { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.opl-order-bottom { display: flex; gap: 14px; align-items: center; padding: 13px 18px 16px; }
-.opl-order-bottom > span { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #777b6d; }
-.opl-order-bottom strong { color: #25271f; font-size: 14px; white-space: nowrap; }
-.opl-order-bottom .opl-balance-due strong { color: #914e31; }
-.opl-order-bottom .opl-balance-paid strong { color: #426a41; }
-.opl-open-arrow { margin-left: auto; align-self: end; color: #787b57; }
+.opl-order-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 16px 18px 6px; }
+.opl-order-header-left { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.opl-order-number { font: 700 24px/1 Georgia, ui-serif, serif; color: #22251e; }
+.opl-order-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.opl-badge { display: inline-flex; align-items: center; border-radius: 8px; padding: 3px 8px; font-size: 11px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.opl-open-arrow { color: #787b57; flex-shrink: 0; }
+.opl-order-type-line { margin: 0; padding: 0 18px 12px; font-size: 12px; color: #6f7263; font-weight: 600; }
+.opl-order-meta { display: grid; grid-template-columns: 1fr; gap: 7px; padding: 12px 18px; border-top: 1px solid #efede5; border-bottom: 1px solid #efede5; background: #fcfbf6; }
+@media (min-width: 640px) { .opl-order-meta { grid-template-columns: 1fr 1fr; } }
+.opl-meta-row { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
+.opl-meta-icon { color: #888a72; flex-shrink: 0; }
+.opl-meta-label { color: #8a8c7a; white-space: nowrap; }
+.opl-meta-value { color: #343727; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opl-order-image-wrap { padding: 12px 18px; }
+.opl-order-image-thumb { width: 100%; height: 140px; overflow: hidden; border-radius: 10px; border: 1px solid #e8e5d8; background: #faf9f5; }
+.opl-order-image-hint { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 11px; color: #888a72; }
+.opl-order-footer { padding: 12px 18px 16px; display: flex; flex-direction: column; gap: 5px; }
+.opl-order-price-line { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6f7263; }
+.opl-order-price-line strong { color: #25271f; font-size: 13px; white-space: nowrap; }
+.opl-order-total { border-top: 1px solid #efede5; margin-top: 4px; padding-top: 7px; font-size: 15px; font-weight: 700; color: #22251e; }
+.opl-order-total strong { font-size: 16px; }
+.opl-order-balance strong { color: #914e31; }
 .opl-order-actions { padding: 0 18px 13px; }
 .opl-order-actions button { min-height: 35px; display: flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; background: transparent; color: #696d4a; font-size: 12px; font-weight: 650; padding: 5px 8px; }
 .opl-order-actions button:hover { background: #f2f1e7; }
@@ -124,9 +125,8 @@
   .opl-date { width: 100%; }
   .opl-filter-fields { grid-template-columns: 1fr; }
   .opl-filters { padding: 12px; }
-  .opl-order-top, .opl-order-content, .opl-order-bottom { padding-left: 14px; padding-right: 14px; }
+  .opl-order-header, .opl-order-type-line, .opl-order-meta, .opl-order-image-wrap, .opl-order-footer { padding-left: 14px; padding-right: 14px; }
   .opl-order-actions { padding-left: 14px; }
-  .opl-order-bottom { gap: 10px; }
-  .opl-order-bottom strong { font-size: 12px; }
+  .opl-order-meta { grid-template-columns: 1fr; }
   .opl-alert-row { align-items: start; flex-direction: column; }
 }
