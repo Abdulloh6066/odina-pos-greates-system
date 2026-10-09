@@ -156,6 +156,7 @@ export default function ProductionPanel({
             <p className="font-semibold">Retseptlar versiya bilan saqlanadi</p>
             <p className="text-sm text-muted-foreground mt-0.5">
               Retsept o‘zgarsa eski yozuv saqlanadi, yangi versiya ishlab chiqarishda ishlatiladi.
+              {location?.id === '6a96f0a4ecc85c2fc57f3174' && ' Branch’da tayyorlanadigan kofe va boshqa dona mahsulotlar sotilganda faol tex-karta masalliqlari shu filial omboridan avtomatik ayriladi. Tex-kartasi yo‘q mahsulotlarda masalliq hisobi hali ulanmagan.'}
             </p>
           </div>
         </div>
@@ -181,6 +182,11 @@ export default function ProductionPanel({
                     </div>
                   </div>
 
+                  {location?.id === '6a96f0a4ecc85c2fc57f3174' && product.source_type === 'shop_prepared' && product.sale_unit !== 'gram' && (
+                    <p className={`mt-3 text-xs font-medium ${recipe && lines.length ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {recipe && lines.length ? 'Kassa bilan ulangan · masalliqlar avtomatik ayriladi' : 'Ombor hisobi ulanmagan · tex-karta kiriting'}
+                    </p>
+                  )}
                   <div className="mt-3 space-y-1.5 flex-1">
                     {lines.slice(0, 4).map((line) => (
                       <div key={line.id} className="flex items-center justify-between gap-2 text-sm">
