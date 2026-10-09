@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { Tags, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Tags } from 'lucide-react';
 import { logAction } from '@/lib/pos';
-import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import CategoryIcon from '@/components/CategoryIcon';
 import { TEA_ICON_URL, APELSIN_ICON_URL, SMOOTHIE_ICON_URL, MILKSHAKE_ICON_URL } from '@/lib/category-icon';
+import '@/styles/categories-catalog.css';
 
 const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '🥤', '🍰', '🍪', '🍩', '🥧', '🍫', '🍓', '🍋', '🫐', '🍔', '➕', TEA_ICON_URL, APELSIN_ICON_URL, SMOOTHIE_ICON_URL, MILKSHAKE_ICON_URL];
 
@@ -21,6 +21,7 @@ export default function Categories() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -29,6 +30,12 @@ export default function Categories() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return categories;
+    return categories.filter((c) => (c.name || '').toLowerCase().includes(q));
+  }, [categories, query]);
 
   const remove = async (cat) => {
     const accepted = await odinaConfirm(`“${cat.name}” kategoriyasini o‘chirasizmi?`, {
@@ -44,43 +51,92 @@ export default function Categories() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-3xl mx-auto animate-fade-in">
-      <PageHeader
-        title="Kategoriyalar"
-        subtitle={`${categories.length} ta kategoriya`}
-        icon={Tags}
-        actions={canManage && (
-          <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            <Plus className="w-4 h-4 mr-1.5" /> Qo‘shish
-          </Button>
-        )}
-      />
-      {loading ? (
-        <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}</div>
-      ) : categories.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-16 text-center">Hozircha kategoriyalar yo‘q.</p>
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
-          {categories.map((c) => (
-            <div key={c.id} className="odina-panel flex items-center gap-3 rounded-2xl bg-card border border-border premium-shadow p-4">
-              <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center text-xl overflow-hidden">
-                <CategoryIcon icon={c.icon} imgClassName="w-8 h-8" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate">{c.name}</div>
-                <div className="text-xs text-muted-foreground">{c.active ? 'Faol' : 'Nofaol'}</div>
-              </div>
-              {canManage && (
-                <div className="flex gap-1">
-                  <button onClick={() => { setEditing(c); setOpen(true); }} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => remove(c)} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
-                </div>
+    <div className="cat-page">
+      <div className="cat-shell">
+        <div className="cat-header">
+          <div className="cat-header-left">
+            <span className="cat-eyebrow">KATALOG</span>
+            <h1>Kategoriyalar</h1>
+            <p>Mahsulotlar kategoriya bo‘yicha ixcham tartiblangan.</p>
+          </div>
+          {canManage && (
+            <button className="cat-add" onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus size={18} aria-hidden="true" /> Qo‘shish
+            </button>
+          )}
+        </div>
+
+        <div className="cat-workspace">
+          <div className="cat-toolbar">
+            <div className="cat-search">
+              <Search size={18} aria-hidden="true" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Kategoriya qidirish…"
+                aria-label="Kategoriya qidirish"
+              />
+            </div>
+            <span className="cat-count-pill">{filtered.length} / {categories.length}</span>
+          </div>
+
+          {loading ? (
+            <div className="cat-skeletons">
+              {Array.from({ length: 6 }).map((_, i) => <div key={i} className="cat-skeleton" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="cat-empty">
+              {query ? (
+                <>
+                  <strong>Hech narsa topilmadi</strong>
+                  <p>“{query}” bo‘yicha kategoriya yo‘q.</p>
+                  <button className="cat-empty-add" onClick={() => setQuery('')}>Filtrlarni tozalash</button>
+                </>
+              ) : (
+                <>
+                  <strong>Hozircha kategoriyalar yo‘q</strong>
+                  <p>Birinchi kategoriyani qo‘shing.</p>
+                  {canManage && <button className="cat-empty-add" onClick={() => { setEditing(null); setOpen(true); }}>
+                    <Plus size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }} />Kategoriya qo‘shish
+                  </button>}
+                </>
               )}
             </div>
-          ))}
+          ) : (
+            <div className="cat-grid">
+              {filtered.map((c) => (
+                <CategoryCard key={c.id} category={c} canManage={canManage} onEdit={() => { setEditing(c); setOpen(true); }} onRemove={() => remove(c)} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <CategoryDialog open={open} category={editing} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); load(); }} user={user} />
+      </div>
+    </div>
+  );
+}
+
+function CategoryCard({ category: c, canManage, onEdit, onRemove }) {
+  const active = c.active !== false;
+  return (
+    <div className={`cat-card${active ? '' : ' is-inactive'}`}>
+      <div className="cat-card-top">
+        <div className="cat-icon-box">
+          <CategoryIcon icon={c.icon} />
+        </div>
+        <div className="cat-card-name">{c.name}</div>
+      </div>
+      <span className={`cat-status${active ? ' is-active' : ' is-inactive'}`}>
+        <span className="cat-dot" /> {active ? 'Faol' : 'Nofaol'}
+      </span>
+      {canManage && (
+        <div className="cat-actions">
+          <button className="cat-act" onClick={onEdit}><Pencil size={15} aria-hidden="true" /> Tahrirlash</button>
+          <button className="cat-act cat-act-danger" onClick={onRemove}><Trash2 size={15} aria-hidden="true" /> O‘chirish</button>
         </div>
       )}
-      <CategoryDialog open={open} category={editing} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); load(); }} user={user} />
     </div>
   );
 }
