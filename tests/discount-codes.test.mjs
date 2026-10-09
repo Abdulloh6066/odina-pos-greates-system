@@ -1,6 +1,7 @@
 // Offline regression tests for one-time discount codes and 100% OWNER PIN approval.
 // No live Base44 records are read, created, updated, or deleted.
 import assert from 'node:assert/strict';
+import { memoryBackend } from './helpers/memory-backend.mjs';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
@@ -188,6 +189,7 @@ function loadHandler(client, now) {
       'error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",',
       'error: error instanceof Error ? (error.stack || error.message) : "Savdoni yakunlab bo‘lmadi.",',
     );
+  source = source.replace(/import \{\s*prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,\s*\} from "\.\.\/\.\.\/shared\/sale-ingredient-flow\.ts";/, '');
   const shopPricing = readFileSync('base44/shared/shop-pricing.ts', 'utf8').replace(/export /g, '');
   source = source.replace(/import \{ priceForShop \} from "\.\.\/\.\.\/shared\/shop-pricing\.ts";/, '');
   source = sharedCode + '\n' + costCode + '\n' + shopPricing + '\n' + source + '\nglobalThis.testHandler = handler;';
@@ -196,6 +198,7 @@ function loadHandler(client, now) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
   const context = vm.createContext({
+    ...memoryBackend().load('base44/shared/sale-ingredient-flow.ts'),
     Date: now ? class extends Date { static now() { return Date.parse(now); } } : Date,
     client,
     Response,
