@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
+import { canChooseBurgerFries, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductCard from '@/components/pos/ProductCard';
@@ -69,6 +70,7 @@ export default function POS() {
   const [cart, setCart] = useState([]);
   const [keyboardProductId, setKeyboardProductId] = useState(null);
   const [weightProduct, setWeightProduct] = useState(null);
+  const [burgerProduct, setBurgerProduct] = useState(null);
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
@@ -111,8 +113,8 @@ export default function POS() {
   const [cancellingTakeawayId, setCancellingTakeawayId] = useState('');
   const cancellingTakeawayRef = useRef(false);
   const [takeawayCancelError, setTakeawayCancelError] = useState(null);
-  const takeawayDirty = Boolean(takeawayOrder) && JSON.stringify(cart.map(({ product_id, quantity }) => ({ product_id, quantity })))
-    !== JSON.stringify((takeawayOrder?.items || []).map(({ product_id, quantity }) => ({ product_id, quantity })));
+  const takeawayDirty = Boolean(takeawayOrder) && JSON.stringify(cart.map((row) => ({ key: saleLineKey(row), quantity: row.quantity })))
+    !== JSON.stringify((takeawayOrder?.items || []).map((row) => ({ key: saleLineKey(row), quantity: row.quantity })));
 
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
@@ -232,7 +234,7 @@ export default function POS() {
   const tableCartDirty = Boolean(selectedTable) && (
     cart.length !== (tableOrder?.items?.length || 0)
     || cart.some((row) => {
-      const saved = tableOrder?.items?.find((item) => item.product_id === row.product_id);
+      const saved = tableOrder?.items?.find((item) => saleLineKey(item) === saleLineKey(row));
       return !saved || saved.quantity !== row.quantity || saved.price !== row.price;
     })
   );
@@ -273,6 +275,7 @@ export default function POS() {
         items: cart.map((row) => ({
           product_id: row.product_id,
           quantity: row.quantity,
+          ...friesOptionFields(row),
           variant_name: row.variant_name || row.variant || '',
           notes: row.notes || '',
         })),
@@ -309,7 +312,7 @@ export default function POS() {
       const response = await base44.functions.invoke('restaurant-tables', {
         action: 'save_takeaway_order', shop_id: shift.shop_id, shift_id: shift.id,
         order_id: orderId, expected_revision: takeawayOrder?.revision || 0,
-        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity,
+        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity, ...friesOptionFields(row),
           variant_name: row.variant_name || row.variant || '', notes: row.notes || '' })),
       });
       const result = response?.data || response;
@@ -743,6 +746,10 @@ export default function POS() {
   };
   const addToCart = (product) => {
     if (tableLocked || paying || payOpen || stockChecking) return;
+    if (canChooseBurgerFries(product.id, shift?.shop_id || user?.shop_id)) {
+      setBurgerProduct({ ...product, shopId: shift?.shop_id || user?.shop_id });
+      return;
+    }
     setKeyboardProductId(product.id);
     if (product.sale_unit === 'gram') { openWeight(product); return; }
     setCart((prev) => {
@@ -753,6 +760,25 @@ export default function POS() {
       return [...prev, { product_id: product.id, product_name: product.name, image_url: product.image_url, price: product.price, sale_unit: 'piece', quantity: 1, subtotal: product.price }];
     });
   };
+
+  const saveBurgerChoice = (option) => {
+    if (!burgerProduct || !['with', 'without'].includes(option) || tableLocked || paying || payOpen || stockChecking
+      || burgerProduct.shopId !== (shift?.shop_id || user?.shop_id)) return;
+    const product = burgerProduct;
+    const row = { product_id: product.id, product_name: burgerOptionName(product.name, option),
+      image_url: product.image_url, price: product.price + friesSurcharge({ fries_option: option }),
+      sale_unit: 'piece', quantity: 1, fries_option: option };
+    row.subtotal = row.price;
+    const key = saleLineKey(row);
+    setKeyboardProductId(key);
+    setCart((prev) => {
+      const existing = prev.find((item) => saleLineKey(item) === key);
+      return existing ? prev.map((item) => saleLineKey(item) === key
+        ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.price } : item) : [...prev, row];
+    });
+    setBurgerProduct(null);
+  };
+  useEffect(() => { setBurgerProduct(null); }, [tableKey, shift?.shop_id, user?.shop_id]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -767,7 +793,7 @@ export default function POS() {
       if ([...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
         .some((node) => node.getAttribute('data-state') !== 'closed' && !node.classList.contains('odina-cart-sheet')
           && node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden')) return;
-      const item = cart.find((row) => row.product_id === keyboardProductId) || cart[cart.length - 1];
+      const item = cart.find((row) => saleLineKey(row) === keyboardProductId) || cart[cart.length - 1];
       event.preventDefault();
       if (increase) inc(item); else dec(item);
     };
@@ -826,27 +852,27 @@ export default function POS() {
     }
   };
 
-  const inc = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (!tableLocked && !paying) setCart((p) => p.map((i) => i.product_id === item.product_id ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
+  const inc = (item) => { if (item.sale_unit === 'gram') { openWeight(item, true); return; } if (!tableLocked && !paying) setCart((p) => p.map((i) => saleLineKey(i) === saleLineKey(item) ? { ...i, quantity: i.quantity + 1, subtotal: i.subtotal + i.price } : i)); };
   const dec = (item) => {
     if (tableLocked || paying || payOpen || stockChecking || savingTableRef.current) return;
     if (item.sale_unit === 'gram') { openWeight(item, true); return; }
-    if (selectedTable && cart.length === 1 && cart[0].product_id === item.product_id && item.quantity <= 1) {
+    if (selectedTable && cart.length === 1 && saleLineKey(cart[0]) === saleLineKey(item) && item.quantity <= 1) {
       void cancelLastTableItem();
       return;
     }
     setCart((p) => p.flatMap((i) => {
-      if (i.product_id !== item.product_id) return [i];
+      if (saleLineKey(i) !== saleLineKey(item)) return [i];
       const q = i.quantity - 1;
       return q <= 0 ? [] : [{ ...i, quantity: q, subtotal: q * i.price }];
     }));
   };
   const removeItem = (item) => {
     if (tableLocked || paying || payOpen || stockChecking || savingTableRef.current) return;
-    if (selectedTable && cart.length === 1 && cart[0].product_id === item.product_id) {
+    if (selectedTable && cart.length === 1 && saleLineKey(cart[0]) === saleLineKey(item)) {
       void cancelLastTableItem();
       return;
     }
-    setCart((p) => p.filter((i) => i.product_id !== item.product_id));
+    setCart((p) => p.filter((i) => saleLineKey(i) !== saleLineKey(item)));
   };
   const resetCart = () => { takeawayRequestIdRef.current = ''; setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
   const clearCart = () => { if (!tableLocked && !paying && (!selectedTable || !tableOrder) && !takeawayOrder) resetCart(); }; 
@@ -1105,7 +1131,7 @@ export default function POS() {
         ...(selectedTable ? { table_shop_id: selectedTable.shopId,
           table_number: selectedTable.number,
           table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
-        items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+        items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...friesOptionFields(item) })),
       });
       if (checkoutCancelledRef.current) return;
       const payload = result?.data || result;
@@ -1282,6 +1308,7 @@ export default function POS() {
         items: cart.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
+          ...friesOptionFields(item),
         })),
         discount_code: discountCode || undefined,
         rounding_total: adjustmentMode === 'rounding' ? roundingTarget : undefined,
@@ -1743,7 +1770,7 @@ export default function POS() {
         <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
-            selectedProductId={cart.some((row) => row.product_id === keyboardProductId) ? keyboardProductId : cart[cart.length - 1]?.product_id}
+            selectedProductId={cart.some((row) => saleLineKey(row) === keyboardProductId) ? keyboardProductId : (cart.length ? saleLineKey(cart[cart.length - 1]) : undefined)}
             onSelectItem={(item) => setKeyboardProductId(item.product_id)}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
@@ -1773,7 +1800,7 @@ export default function POS() {
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
-            selectedProductId={cart.some((row) => row.product_id === keyboardProductId) ? keyboardProductId : cart[cart.length - 1]?.product_id}
+            selectedProductId={cart.some((row) => saleLineKey(row) === keyboardProductId) ? keyboardProductId : (cart.length ? saleLineKey(cart[cart.length - 1]) : undefined)}
             onSelectItem={(item) => setKeyboardProductId(item.product_id)}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
@@ -1831,6 +1858,24 @@ export default function POS() {
         activeShopId={shift?.shop_id || user?.shop_id}
         onSelect={(shopId, number, payDirect) => { void selectTableFromPicker(shopId, number, payDirect); }}
       />
+      <Dialog open={Boolean(burgerProduct)} onOpenChange={(open) => !open && setBurgerProduct(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{burgerProduct?.name}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Fri qo‘shilsinmi?{burgerProduct?.id === '6ab747c5c1c33517e6eea449' ? ' 1 porsiya = 3 ta mini burger.' : ''}</p>
+          <div className="grid gap-3">
+            <Button type="button" variant="outline" className="h-auto min-h-20 justify-between gap-3 rounded-xl px-4 py-4"
+              disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveBurgerChoice('without')}>
+              <span className="text-base font-semibold">Frisiz</span><span>{formatUZS(burgerProduct?.price || 0)}</span>
+            </Button>
+            <Button type="button" className="h-auto min-h-20 justify-between gap-3 rounded-xl px-4 py-4"
+              disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveBurgerChoice('with')}>
+              <span className="text-left"><span className="block text-base font-semibold">Fri bilan</span><span className="block text-xs opacity-80">150 g fri · +{formatUZS(FRIES_SURCHARGE)}</span></span>
+              <span>{formatUZS((burgerProduct?.price || 0) + FRIES_SURCHARGE)}</span>
+            </Button>
+          </div>
+          <Button type="button" variant="ghost" onClick={() => setBurgerProduct(null)}>Bekor qilish</Button>
+        </DialogContent>
+      </Dialog>
       <Dialog open={Boolean(weightProduct)} onOpenChange={(open) => !open && setWeightProduct(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>{weightProduct?.name} — gramm</DialogTitle></DialogHeader>
