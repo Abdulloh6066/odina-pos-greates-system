@@ -11,6 +11,8 @@ import {
   dedNum,
 } from "./shop-ingredient-deduction.ts";
 
+import { recipeWithBurgerFries } from "./burger-fries.js";
+
 const httpError = (message: string, status: number) => {
   const error: any = new Error(message);
   error.status = status;
@@ -118,6 +120,7 @@ export async function prepareSaleIngredientDeduction(
       product_name: row.product_name,
       quantity: row.quantity,
       source_type: row.source_type,
+      fries_option: row.fries_option,
     })),
     byProduct,
   );
@@ -128,7 +131,11 @@ export async function prepareSaleIngredientDeduction(
     );
   }
 
+  if (shopPrepared.some((row: any) => row.fries_option === "with" && !byProduct.get(row.product_id))) {
+    throw httpError("Fri bilan burger uchun faol tex-karta kerak.", 409);
+  }
   for (const line of lines) {
+    line.recipe = recipeWithBurgerFries(line, line.recipe);
     if (!Number.isFinite(line.recipe.output_quantity) || line.recipe.output_quantity <= 0
       || line.recipe.items.some((row: any) => !row.ingredient_id
         || !Number.isFinite(row.quantity) || row.quantity <= 0
