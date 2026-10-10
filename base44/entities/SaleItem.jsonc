@@ -56,7 +56,7 @@
     "unit_cost_at_sale": {
       "type": "number",
       "default": 0,
-      "description": "Sotuv vaqtidagi o‘zgartirib bo‘lmaydigan tannarx (1 dona)"
+      "description": "Sotuv vaqtidagi o\u2018zgartirib bo\u2018lmaydigan tannarx (1 dona)"
     },
     "total_cost_at_sale": {
       "type": "number",
@@ -66,7 +66,7 @@
     "cost_is_estimate": {
       "type": "boolean",
       "default": true,
-      "description": "Tannarx ishonchli hisoblanmagan (retsept/xarid narxi yetishmagan) — Taxminiy"
+      "description": "Tannarx ishonchli hisoblanmagan (retsept/xarid narxi yetishmagan) \u2014 Taxminiy"
     },
     "created_at": {
       "type": "string",
@@ -79,6 +79,14 @@
         "gram"
       ],
       "default": "piece"
+    },
+    "fries_option": {
+      "type": "string",
+      "enum": [
+        "with",
+        "without"
+      ],
+      "description": "Burger fri tanlovi; eski savdolarda bo\u2018sh qoladi"
     }
   },
   "required": [
