@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
+import { saleLineKey } from '@/lib/burger-fries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -44,7 +45,7 @@ export default function Cart({
           </div>
         ) : (
           cart.map((item) => (
-            <div key={item.product_id} onClick={() => onSelectItem?.(item)} onFocus={() => onSelectItem?.(item)} style={selectedProductId === item.product_id ? { backgroundColor: 'rgba(254, 205, 124, 0.18)' } : undefined} className="odina-cart-line grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(6.5rem,auto)_2.75rem] items-center gap-2 border-b border-dashed border-brand-sand/60 px-1 py-1.5 animate-pop-in last:border-b-0">
+            <div key={saleLineKey(item)} onClick={() => onSelectItem?.(item)} onFocus={() => onSelectItem?.(item)} style={selectedProductId === saleLineKey(item) ? { backgroundColor: 'rgba(254, 205, 124, 0.18)' } : undefined} className="odina-cart-line grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(6.5rem,auto)_2.75rem] items-center gap-2 border-b border-dashed border-brand-sand/60 px-1 py-1.5 animate-pop-in last:border-b-0">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="w-9 h-9 rounded-lg bg-card overflow-hidden shrink-0 border border-border/60">
                   {item.image_url ? (
