@@ -1,19 +1,21 @@
 // Offline-only: execute actual POS callbacks with memory stubs; no live requests.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { saleLineKey } from '../base44/shared/burger-fries.js';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync('src/pages/POS.jsx', 'utf8');
 const action = source.slice(source.indexOf('  const cancelLastTableItem = async () => {'),
   source.indexOf('  const inc = (item) =>'));
-const mutations = source.slice(source.indexOf('  const dec = (item) =>'),
+const mutations = source.slice(source.indexOf('  const inc = (item) =>'),
   source.indexOf('  const resetCart ='));
 function harness({ confirmed = true, fails = false, online = true, quantity = 1, otherItem = false } = {}) {
   const cart = [{ product_id: 'coffee', quantity, price: 20000, subtotal: quantity * 20000 }];
   if (otherItem) cart.push({ product_id: 'tea', quantity: 1, price: 10000, subtotal: 10000 });
   const events = [];
   const context = {
+    saleLineKey,
     selectedTable: { shopId: 'shop', number: 2 }, tableKey: 'shop:2',
     priorTableKey: { current: 'shop:2' }, tableLocked: false, paying: false, payOpen: false,
     stockChecking: false, savingTableRef: { current: false },
@@ -36,7 +38,7 @@ function harness({ confirmed = true, fails = false, online = true, quantity = 1,
     navigate: (path) => events.push(['navigate', path]), posHomePath: '/pos?screen=1',
     openWeight: () => events.push(['weight']),
   };
-  vm.runInNewContext(action + mutations + '\nglobalThis.api = { cancelLastTableItem, dec, removeItem };', context);
+  vm.runInNewContext(action + mutations + '\nglobalThis.api = { cancelLastTableItem, inc, dec, removeItem };', context);
   return { context, events, api: context.api, flush: () => new Promise((resolve) => setImmediate(resolve)) };
 }
 test('No keeps the final table item with no server write', async () => {
@@ -73,6 +75,26 @@ test('trash and repeated minus taps trigger only one confirmation for the final 
   assert.equal(f.events.filter(([type]) => type === 'confirm').length, 1);
   assert.equal(f.context.cart.length, 1);
 });
+test('mixed options of the same burger change quantity and remove independently', () => {
+  const f = harness();
+  f.context.cart = [
+    { product_id: 'burger', fries_option: 'without', quantity: 2, price: 37000, subtotal: 74000 },
+    { product_id: 'burger', fries_option: 'with', quantity: 1, price: 42000, subtotal: 42000 },
+  ];
+  f.api.inc(f.context.cart[1]);
+  assert.equal(f.context.cart[0].quantity, 2);
+  assert.equal(f.context.cart[1].quantity, 2);
+  assert.equal(f.context.cart[1].subtotal, 84000);
+  f.api.dec(f.context.cart[0]);
+  assert.equal(f.context.cart[0].quantity, 1);
+  assert.equal(f.context.cart[1].quantity, 2);
+  f.api.removeItem(f.context.cart[0]);
+  assert.equal(f.context.cart.length, 1);
+  assert.equal(f.context.cart[0].fries_option, 'with');
+  assert.equal(f.context.cart[0].quantity, 2);
+  assert.equal(f.events.length, 0);
+});
+
 test('ordinary decrement and replacing a product leave the remaining order editable', async () => {
   const f = harness({ quantity: 2 });
   f.api.dec(f.context.cart[0]); assert.equal(f.context.cart[0].quantity, 1);
