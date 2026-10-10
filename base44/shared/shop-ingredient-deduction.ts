@@ -23,6 +23,7 @@ export type SaleLine = {
   product_name: string;
   quantity: number;
   source_type: string;
+  fries_option?: string;
 };
 
 // Collect the active tech-card for every shop-prepared product in the sale.
