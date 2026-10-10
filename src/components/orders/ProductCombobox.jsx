@@ -101,7 +101,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
       </button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="grid h-[100dvh] w-screen max-h-none max-w-none grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-[min(88dvh,820px)] sm:w-[calc(100%_-_2rem)] sm:max-w-5xl sm:rounded-2xl sm:border">
+        <DialogContent className="grid h-[100dvh] w-screen min-w-0 max-h-none max-w-none grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-[min(88dvh,820px)] sm:w-[calc(100%_-_2rem)] sm:max-w-5xl sm:rounded-2xl sm:border">
           <DialogHeader className="border-b border-border bg-card px-4 py-4 pr-14 sm:px-6">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-olive/15 text-brand-ink">
@@ -114,7 +114,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 border-b border-border bg-secondary/20 px-4 py-3 sm:px-6">
+          <div className="min-w-0 space-y-3 border-b border-border bg-secondary/20 px-4 py-3 sm:px-6">
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -135,7 +135,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
               )}
             </div>
 
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin">
+            <div className="-mx-1 flex min-w-0 max-w-full gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin">
               <button
                 type="button"
                 onClick={() => setCategoryId('')}
@@ -166,7 +166,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
           </div>
 
           <div
-            className="min-h-0 overflow-y-auto overscroll-contain bg-[#faf9f6] p-3 pb-6 touch-pan-y sm:p-5"
+            className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-[#faf9f6] p-3 pb-6 touch-pan-y sm:p-5"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
             {loading && (
@@ -184,7 +184,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
             )}
 
             {!loading && filtered.length > 0 && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
                 {filtered.map((product) => {
                   const isSheet = product.production_unit === 'sheet';
                   const unit = isSheet ? 'list' : 'dona';
@@ -261,8 +261,8 @@ export default function ProductCombobox({ products, onAdd, loading }) {
             )}
           </div>
 
-          <div className="border-t border-border bg-card px-4 py-3 shadow-[0_-8px_24px_rgba(28,31,20,0.06)] sm:px-6">
-            <div className="flex items-center gap-3">
+          <div className="min-w-0 border-t border-border bg-card px-4 py-3 shadow-[0_-8px_24px_rgba(28,31,20,0.06)] sm:px-6">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <div className="hidden min-w-0 flex-1 sm:block">
                 <div className="text-sm font-semibold">
                   {selectedProducts.length > 0 ? `${selectedProducts.length} xil mahsulot tanlandi` : 'Hali mahsulot tanlanmadi'}
@@ -271,14 +271,14 @@ export default function ProductCombobox({ products, onAdd, loading }) {
                   {selectedProducts.length > 0 ? `Jami miqdor: ${selectedQuantity}` : 'Mahsulot yonidagi + tugmasini bosing'}
                 </div>
               </div>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)} className="flex-1 sm:flex-none">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto sm:flex-none">
                 Bekor
               </Button>
               <Button
                 type="button"
                 onClick={applySelection}
                 disabled={selectedProducts.length === 0}
-                className="flex-[1.6] sm:min-w-64 sm:flex-none"
+                className="h-auto min-h-11 w-full min-w-0 whitespace-normal py-2 text-center sm:w-auto sm:min-w-64 sm:flex-none"
               >
                 <Check className="h-4 w-4" />
                 {selectedProducts.length > 0
