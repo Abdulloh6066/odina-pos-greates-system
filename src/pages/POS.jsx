@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
-import { canChooseBurgerFries, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
+import { canPreviewBurgerFries, repriceBurgerCartForShop, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductCard from '@/components/pos/ProductCard';
@@ -746,7 +746,7 @@ export default function POS() {
   };
   const addToCart = (product) => {
     if (tableLocked || paying || payOpen || stockChecking) return;
-    if (canChooseBurgerFries(product.id, shift?.shop_id || user?.shop_id)) {
+    if (canPreviewBurgerFries(product.id, shift?.shop_id || user?.shop_id)) {
       setBurgerProduct({ ...product, shopId: shift?.shop_id || user?.shop_id });
       return;
     }
@@ -779,6 +779,12 @@ export default function POS() {
     setBurgerProduct(null);
   };
   useEffect(() => { setBurgerProduct(null); }, [tableKey, shift?.shop_id, user?.shop_id]);
+  // Pre-shift preview uses catalogue prices; apply Branch prices when its shift opens.
+  // Server-saved unpaid orders keep their original immutable price snapshots.
+  useEffect(() => {
+    if (!shift?.shop_id || selectedTable || takeawayOrder) return;
+    setCart((rows) => repriceBurgerCartForShop(rows, products, shift.shop_id));
+  }, [shift?.shop_id, products, tableKey, takeawayOrder]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -1862,6 +1868,7 @@ export default function POS() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>{burgerProduct?.name}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Fri qo‘shilsinmi?{burgerProduct?.id === '6ab747c5c1c33517e6eea449' ? ' 1 porsiya = 3 ta mini burger.' : ''}</p>
+          {!burgerProduct?.shopId && <p className="text-xs text-muted-foreground">Branch smenasi ochilgach shu do‘kon narxlari qo‘llanadi.</p>}
           <div className="grid gap-3">
             <Button type="button" variant="outline" className="h-auto min-h-20 justify-between gap-3 rounded-xl px-4 py-4"
               disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveBurgerChoice('without')}>
