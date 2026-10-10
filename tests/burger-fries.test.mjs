@@ -1,5 +1,6 @@
 // Integration regressions with an in-memory SDK. No real sales, stock or network.
 import test from 'node:test';
+import { webcrypto } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { memoryBackend } from './helpers/memory-backend.mjs';
 import { buildPendingSale } from '../src/lib/offline-sales.js';
@@ -263,6 +264,31 @@ test('saving and reloading a mixed table order preserves both choices and create
   assert.equal(paid.status, 200, JSON.stringify(paid));
   assert.equal(stock(f, fries.FRIES_INGREDIENT_ID), 9850);
   assert.equal(f.db.Shop[0].restaurant_table_orders.length, 0);
+});
+
+
+test('refund restores burger ingredients and optional fries once, preserving the sale-time line snapshot', async () => {
+  const f = fixture();
+  const pin = '0101'; const salt = 'mock-only-salt';
+  const key = await webcrypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await webcrypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256',
+    salt: new TextEncoder().encode(salt), iterations: 100000 }, key, 256);
+  await f.entities.SecuritySettings.create({ key: 'owner_approval_pin', pin_salt: salt,
+    pin_hash: Buffer.from(bits).toString('hex'), pin_algorithm: 'PBKDF2-SHA256', pin_iterations: 100000 });
+  const completed = await f.invoke(saleFile, saleRequest([{ product_id: miniId, quantity: 1, fries_option: 'with' }], 50000));
+  assert.equal(completed.status, 200, JSON.stringify(completed));
+  const lineBefore = structuredClone(f.db.SaleItem[0]);
+  const refund = { action: 'refund_sale', sale_id: f.db.Sale[0].id, owner_pin: pin, reason: 'Mock refund' };
+  const returned = await f.invoke(saleFile, refund);
+  assert.equal(returned.status, 200, JSON.stringify(returned));
+  assert.equal(stock(f, fries.FRIES_INGREDIENT_ID), 10000);
+  assert.equal(stock(f, ingredient('Mini bulochka')), 10000);
+  assert.equal(stock(f, ingredient('Sir — Chedler')), 10000);
+  assert.equal(stock(f, ingredient('Farsh')), 10000);
+  assert.deepEqual(f.db.SaleItem[0], lineBefore);
+  assert.equal((await f.invoke(saleFile, refund)).status, 409);
+  assert.equal(stock(f, fries.FRIES_INGREDIENT_ID), 10000);
+  assert.equal(f.db.StockMovement.filter(r => r.item_id === fries.FRIES_INGREDIENT_ID && r.movement_type === 'refund').length, 1);
 });
 
 test('a failed fries movement rolls back ingredient deductions and financial records', async () => {
