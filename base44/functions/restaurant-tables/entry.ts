@@ -1,6 +1,7 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
 import { allocateServiceTicketNumber } from "../../shared/shift-close-helpers.ts";
+import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName } from "../../shared/burger-fries.js";
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
 // Completed sales, payments and stock movements occur only in complete-sale.
@@ -418,9 +419,9 @@ Deno.serve(async (req) => {
       if (takeaway && existing && body?.expected_revision === 0 && existing.revision === 1
         && existing.opened_by === actor.id && existing.state === "occupied"
         && Array.isArray(body?.items) && body.items.length === existing.items.length
-        && new Set(body.items.map((row: any) => row.product_id)).size === body.items.length
+        && new Set(body.items.map((row: any) => saleLineKey(row))).size === body.items.length
         && body.items.every((row: any) => existing.items.some((item: any) =>
-          item.product_id === row.product_id && item.quantity === row.quantity
+          saleLineKey(item) === saleLineKey(row) && item.quantity === row.quantity
           && item.notes === String(row.notes || "").trim()
           && item.variant_name === String(row.variant_name || "").trim()))) {
         return Response.json({ ok: true, order: existing, unchanged: true });
@@ -444,17 +445,19 @@ Deno.serve(async (req) => {
       if (!Array.isArray(requested) || requested.length < 1 || requested.length > MAX_ORDER_ITEMS) {
         return Response.json({ error: "Buyurtmada 1–100 turdagi mahsulot bo‘lishi kerak." }, { status: 400 });
       }
-      const previousItems = new Map((existing?.items || []).map((item: any) => [item.product_id, item]));
+      const previousItems = new Map((existing?.items || []).map((item: any) => [saleLineKey(item), item]));
       const seen = new Set<string>();
       const items: any[] = [];
       for (const row of requested) {
         const productId = String(row?.product_id || "");
         const quantity = row?.quantity;
-        if (!productId || seen.has(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000000) {
+        const option = validateFriesOption(row, shop.id);
+        const key = saleLineKey(row);
+        if (!productId || seen.has(key) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000000) {
           return Response.json({ error: "Takroriy mahsulot yoki dona soni noto‘g‘ri." }, { status: 400 });
         }
-        seen.add(productId);
-        const previous: any = previousItems.get(productId);
+        seen.add(key);
+        const previous: any = previousItems.get(key);
         const product = await service.entities.Product.get(productId).catch(() => null);
         if (!previous && (!product || product.active === false || product.archived === true)) {
           return Response.json({ error: "Yangi qo‘shilgan mahsulot sotuvda mavjud emas." }, { status: 409 });
@@ -462,14 +465,15 @@ Deno.serve(async (req) => {
         if (!previous && product?.available_shop_ids?.length && !product.available_shop_ids.includes(shop.id)) {
           return Response.json({ error: "Bu mahsulot ushbu do‘konda sotilmaydi." }, { status: 403 });
         }
-        const price = previous ? previous.price : Number(product?.shop_prices?.[shop.id] ?? product.price);
+        const price = previous ? previous.price : Number(product?.shop_prices?.[shop.id] ?? product.price) + friesSurcharge(row);
         if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(price * quantity)) {
           return Response.json({ error: "Mahsulot narxi yoki miqdori noto‘g‘ri." }, { status: 400 });
         }
         const saleUnit = (previous || product).sale_unit === "gram" ? "gram" : "piece";
         if (saleUnit !== "gram" && quantity > 1000) return Response.json({ error: "Dona soni chegaradan oshdi." }, { status: 400 });
         items.push({ product_id: productId,
-          product_name: previous?.product_name || String(product.name || "Mahsulot"),
+          product_name: previous?.product_name || burgerOptionName(String(product.name || "Mahsulot"), option),
+          ...friesOptionFields(previous || row),
           image_url: previous?.image_url || String(product.image_url || ""),
           price, quantity, sale_unit: saleUnit, subtotal: Math.round(price * quantity / (saleUnit === "gram" ? 1000 : 1)),
           stock_tracked: saleUnit !== "gram" && (previous ? previous.stock_tracked !== false : product.track_stock !== false),
