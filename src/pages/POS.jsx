@@ -1771,7 +1771,7 @@ export default function POS() {
           <Cart
             cart={cart}
             selectedProductId={cart.some((row) => saleLineKey(row) === keyboardProductId) ? keyboardProductId : (cart.length ? saleLineKey(cart[cart.length - 1]) : undefined)}
-            onSelectItem={(item) => setKeyboardProductId(item.product_id)}
+            onSelectItem={(item) => setKeyboardProductId(saleLineKey(item))}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
@@ -1801,7 +1801,7 @@ export default function POS() {
           <Cart
             cart={cart}
             selectedProductId={cart.some((row) => saleLineKey(row) === keyboardProductId) ? keyboardProductId : (cart.length ? saleLineKey(cart[cart.length - 1]) : undefined)}
-            onSelectItem={(item) => setKeyboardProductId(item.product_id)}
+            onSelectItem={(item) => setKeyboardProductId(saleLineKey(item))}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
             subtotal={subtotal} discount={discount} couponDiscount={couponDiscount} discountCode={discountCode}
             onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError}
