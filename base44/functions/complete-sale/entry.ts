@@ -35,6 +35,7 @@ import {
 } from "../../shared/shift-close-helpers.ts";
 import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
+import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries } from "../../shared/burger-fries.js";
 import {
   prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
 } from "../../shared/sale-ingredient-flow.ts";
@@ -93,7 +94,7 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
           productsAtSale.get(item.product_id), recipesByProduct.get(item.product_id))));
       for (const [index, result] of costs.entries()) {
         if (result.status === "fulfilled") {
-          unitCostByProduct.set(batch[index].product_id, result.value);
+          unitCostByProduct.set(saleLineKey(batch[index]), costWithBurgerFries(batch[index], result.value, ingredientCosts));
         } else {
           console.warn("Cost snapshot skipped:", result.reason);
         }
@@ -108,25 +109,30 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
 // Table orders are server-stored before payment. The snapshot is trusted only
 // after the table is authenticated, version-checked and locked below.
 async function normalizeSaleItems(service: any, requestedItems: any[], shopId: string, trustedTableItems: any[] | null = null, productsAtSale: Map<string, any> | null = null) {
-  const quantities = new Map<string, number>();
+  const requestedLines = new Map<string, any>();
   for (const requested of requestedItems) {
     const quantity = Number(requested?.quantity);
     const productId = String(requested?.product_id || "");
+    const option = validateFriesOption(requested, shopId);
     if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) {
       throw httpError("Har bir mahsulotda to‘g‘ri dona soni bo‘lishi kerak.", 400);
     }
-    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+    const key = saleLineKey(requested);
+    const combined = (requestedLines.get(key)?.quantity || 0) + quantity;
+    if (!Number.isSafeInteger(combined) || combined > 1000000) throw httpError("Mahsulot miqdori chegaradan oshdi.", 400);
+    requestedLines.set(key, { product_id: productId, quantity: combined, ...friesOptionFields({ fries_option: option }) });
   }
-
-  const entries = [...quantities.entries()];
-  const savedItems = entries.map(([productId]) =>
-    trustedTableItems?.find((item: any) => item.product_id === productId));
-  const products = await Promise.all(entries.map(([productId], index) =>
-    savedItems[index] || service.entities.Product.get(productId)));
+  const entries = [...requestedLines.values()];
+  const savedItems = entries.map((row) =>
+    trustedTableItems?.find((item: any) => saleLineKey(item) === saleLineKey(row)));
+  const products = await Promise.all(entries.map((row, index) =>
+    savedItems[index] || service.entities.Product.get(row.product_id)));
 
   const normalizedItems = [];
-  for (const [index, [productId, quantity]] of entries.entries()) {
+  for (const [index, row] of entries.entries()) {
+    const { product_id: productId, quantity } = row;
     const savedItem = savedItems[index];
+    if (trustedTableItems && !savedItem) throw httpError("Stol savati saqlangan buyurtmadan farq qiladi.", 409);
     const product = products[index];
     if (!product || (!savedItem && (product.active === false || product.archived === true))) {
       throw httpError("Tanlangan mahsulotlardan biri hozir sotuvda mavjud emas.", 409);
@@ -135,7 +141,7 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
       throw httpError("Bu mahsulot ushbu do‘konda sotilmaydi.", 403);
     }
     if (!savedItem) productsAtSale?.set(productId, product);
-    const unitPrice = savedItem ? savedItem.price : money(priceForShop(product, shopId));
+    const unitPrice = savedItem ? savedItem.price : money(priceForShop(product, shopId)) + friesSurcharge(row);
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
     }
@@ -143,7 +149,8 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     const tracked = saleUnit !== "gram" && (product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false);
     normalizedItems.push({
       product_id: product.id || product.product_id,
-      product_name: savedItem ? savedItem.product_name : product.name,
+      product_name: savedItem ? savedItem.product_name : burgerOptionName(product.name, row.fries_option),
+      ...friesOptionFields(savedItem || row),
       image_url: product.image_url || "",
       price: unitPrice,
       sale_unit: saleUnit,
@@ -903,13 +910,13 @@ export default async function(req) {
         const requested = new Map<string, number>();
         for (const row of requestedItems) {
           if (!row?.product_id || !Number.isInteger(row.quantity) || row.quantity < 1
-            || requested.has(row.product_id)) {
+            || requested.has(saleLineKey(row))) {
             return Response.json({ error: "Stol mahsulotlarini yangilang." }, { status: 409 });
           }
-          requested.set(row.product_id, row.quantity);
+          requested.set(saleLineKey(row), row.quantity);
         }
         if (requested.size !== order.items?.length
-          || order.items.some((row: any) => requested.get(row.product_id) !== row.quantity)) {
+          || order.items.some((row: any) => requested.get(saleLineKey(row)) !== row.quantity)) {
           return Response.json({ error: "Saqlanmagan stol o‘zgarishlari bor. Avval saqlang." }, { status: 409 });
         }
         tableItems = order.items;
@@ -1346,14 +1353,14 @@ export default async function(req) {
       }
       const requested = new Map<string, number>();
       for (const row of requestedItems) {
-        const id = String(row?.product_id || "");
-        if (!id || !Number.isInteger(row?.quantity) || row.quantity < 1 || requested.has(id)) {
+        const id = saleLineKey(row);
+        if (!row?.product_id || !Number.isInteger(row?.quantity) || row.quantity < 1 || requested.has(id)) {
           return Response.json({ error: "Stol mahsulotlari noto‘g‘ri. Buyurtmani yangilang." }, { status: 409 });
         }
         requested.set(id, row.quantity);
       }
       if (requested.size !== tableOrder.items?.length
-        || tableOrder.items.some((item: any) => requested.get(item.product_id) !== item.quantity)) {
+        || tableOrder.items.some((item: any) => requested.get(saleLineKey(item)) !== item.quantity)) {
         return Response.json({ error: "Stol savati saqlangan buyurtmadan farq qiladi. Avval saqlang." }, { status: 409 });
       }
     }
@@ -1631,7 +1638,7 @@ export default async function(req) {
         ? discountAmount - allocatedDiscount
         : money(discountAmount * item.subtotal / subtotal);
       allocatedDiscount += itemDiscount;
-      const costInfo = unitCostByProduct.get(item.product_id) || { costPerPiece: 0, hasPrice: false };
+      const costInfo = unitCostByProduct.get(saleLineKey(item)) || { costPerPiece: 0, hasPrice: false };
       const snapUnitCost = item.sale_unit !== "gram" && costInfo.hasPrice ? money(costInfo.costPerPiece) : 0;
       const snapTotalCost = snapUnitCost * item.quantity;
       return {
@@ -1646,6 +1653,7 @@ export default async function(req) {
         stock_location_id: item.stock_location_id || undefined,
         stock_quantity_change: item.stock_quantity_change,
         product_name_snapshot: item.product_name,
+        ...friesOptionFields(item),
         image_url_snapshot: item.image_url,
         quantity: item.quantity,
         unit_price: item.price,
