@@ -304,15 +304,17 @@ function saleNumberFor(idempotencyKey: string, soldAt: string) {
 }
 
 function canonicalSaleRequest(body: any) {
-  const quantities = new Map<string, number>();
+  const quantities = new Map<string, any>();
   for (const item of Array.isArray(body?.items) ? body.items : []) {
     const productId = String(item?.product_id || "");
+    const key = saleLineKey(item);
     const quantity = Math.floor(Number(item?.quantity));
-    quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+    quantities.set(key, { product_id: productId,
+      quantity: (quantities.get(key)?.quantity || 0) + quantity,
+      ...(item?.fries_option === "with" ? { fries_option: "with" } : {}) });
   }
-  const items = Array.from(quantities.entries())
-    .map(([product_id, quantity]) => ({ product_id, quantity }))
-    .sort((left, right) => left.product_id.localeCompare(right.product_id));
+  const items = Array.from(quantities.values())
+    .sort((left, right) => saleLineKey(left).localeCompare(saleLineKey(right)));
   const payments = (Array.isArray(body?.payments) ? body.payments : [])
     .map((payment: any) => ({
       method: String(payment?.method || ""),
