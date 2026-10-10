@@ -610,6 +610,7 @@ Deno.serve(async (req) => {
     });
     return Response.json({ ok: true, shop: safeShop(updated) });
   } catch (error) {
+    if ((error as any)?.status === 400) return Response.json({ error: (error as any).message }, { status: 400 });
     console.error("restaurant-tables failed", error);
     return Response.json({ error: "Stollar ma’lumotini xavfsiz yuklash yoki saqlash amalga oshmadi." }, { status: 500 });
   }
