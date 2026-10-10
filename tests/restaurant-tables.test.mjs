@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { transformSync } from 'esbuild';
 import * as lucideIcons from 'lucide-react';
 import * as floorGeometry from '../src/lib/table-floorplan.js';
+import * as burgerFries from '../base44/shared/burger-fries.js';
 import { buildTableLayout, entranceFromPoint, normalizeEntrance, normalizeOutdoorPolygon, nudgeEntrance, pointInOutdoorPolygon, tablesOverlap, validOutdoorPolygon, validateTableLayout } from '../src/lib/table-floorplan.js';
 
 const read = (path) => readFileSync(path, 'utf8');
@@ -111,6 +112,7 @@ function fixture() {
     userRole: (user) => user?.role || '',
     userShopId: (user) => user?.shop_id || '',
     userLabel: (user) => user?.email || 'Xodim',
+    ...burgerFries,
     Response, console, Date, Set, Number, String, crypto: webcrypto,
     httpError: (message, status) => Object.assign(new Error(message), { status }),
   });
