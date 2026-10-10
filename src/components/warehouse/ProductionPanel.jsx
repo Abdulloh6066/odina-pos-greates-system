@@ -426,7 +426,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
                       className="h-10 rounded-lg border border-input bg-card px-3 text-sm min-w-0"
                     >
                       <option value="">Masalliqni tanlang</option>
-                      {ingredients.map((ingredient) => (
+                      {ingredients.filter((ingredient) => ingredient.category !== 'household').map((ingredient) => (
                         <option key={ingredient.id} value={ingredient.id}>{ingredient.name} · {UNIT_LABELS[ingredient.base_unit] || ingredient.base_unit}</option>
                       ))}
                     </OdinaSelect>
