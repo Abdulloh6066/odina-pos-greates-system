@@ -40,6 +40,7 @@ const SOURCE_LABELS = {
 const INGREDIENT_CATEGORY_LABELS = {
   food: 'Oziq-ovqat masallig‘i',
   packaging: 'Qadoqlash',
+  household: 'Xo‘jalik va tozalash',
 };
 const MOVEMENT_LABELS = {
   opening: 'Boshlang‘ich qoldiq',
@@ -83,6 +84,7 @@ export default function Warehouse() {
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
   const tab = resolveWarehouseTab(requestedTab, user?.role);
   const [search, setSearch] = useState('');
+  const [ingredientCategory, setIngredientCategory] = useState('all');
   const [loading, setLoading] = useState(true);
   const [loadWarning, setLoadWarning] = useState('');
   const [ingredientOpen, setIngredientOpen] = useState(false);
@@ -286,7 +288,7 @@ export default function Warehouse() {
   }, [tab, ingredientStock, productStock, selectedLocation]);
 
   const items = useMemo(() => {
-    const source = tab === 'products' ? products : ingredients;
+    const source = tab === 'products' ? products : ingredients.filter((item) => ingredientCategory === 'all' || item.category === ingredientCategory);
     const query = search.toLowerCase().trim();
     if (!query) return source;
     return source.filter((item) => [
@@ -294,7 +296,7 @@ export default function Warehouse() {
       item.category,
       item.source_type,
     ].filter(Boolean).join(' ').toLowerCase().includes(query));
-  }, [tab, products, ingredients, search]);
+  }, [tab, products, ingredients, search, ingredientCategory]);
 
   const visibleMovements = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -366,6 +368,15 @@ export default function Warehouse() {
             </div>
           </label>
         </div>
+        {tab === 'ingredients' && (
+          <label className="block mt-3 sm:max-w-xs space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Mahsulot turi</span>
+            <OdinaSelect value={ingredientCategory} onChange={(event) => setIngredientCategory(event.target.value)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
+              <option value="all">Barcha turlar</option>
+              {Object.entries(INGREDIENT_CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </OdinaSelect>
+          </label>
+        )}
       </div>
 
       {!selectedLocation ? (
@@ -605,7 +616,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq yoki qadoq</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq, qadoq yoki xo‘jalik buyumi</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">Nomi</Label>
@@ -616,6 +627,7 @@ function IngredientDialog({ open, onClose, onSaved }) {
             <OdinaSelect value={category} onChange={(event) => setCategory(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
               <option value="food">Oziq-ovqat masallig‘i</option>
               <option value="packaging">Qadoqlash</option>
+              <option value="household">Xo‘jalik va tozalash</option>
             </OdinaSelect>
           </div>
           <div className="grid grid-cols-2 gap-3">
