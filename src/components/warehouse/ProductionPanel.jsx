@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import CakeLayersPanel from '@/components/warehouse/CakeLayersPanel';
+import { isCakeLayer, ingredientUnitLabel, cakeLayerStockRows, calculateProductionCapacity } from '@/lib/cake-layer-inventory';
 
 const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 
@@ -29,8 +31,12 @@ export default function ProductionPanel({
   products,
   ingredients,
   ingredientStock,
+  productStock = [],
   search,
   onReload,
+  onCreateLayer,
+  onAdjustLayer,
+  onTransfer,
 }) {
   const [recipes, setRecipes] = useState([]);
   const [recipeItems, setRecipeItems] = useState([]);
@@ -104,6 +110,30 @@ export default function ProductionPanel({
     ),
     [ingredientStock, location?.id],
   );
+
+  const layerRows = cakeLayerStockRows(ingredients, ingredientStock, location?.id)
+    .filter((row) => !query || row.ingredient.name.toLowerCase().includes(query));
+  const capacityFor = (product) => {
+    if (activeRecipes.filter((recipe) => recipe.product_id === product.id).length !== 1) {
+      return { possible: 0, layerPossible: 0, layers: [], issue: 'Mahsulotning faol retseptini tekshiring.' };
+    }
+    const recipe = recipeByProduct[product.id];
+    return calculateProductionCapacity({
+      product, recipe, lines: recipeItemsByRecipe[recipe?.id] || [],
+      ingredients, stocks: ingredientStock, locationId: location?.id,
+    });
+  };
+  const capacityRows = productionProducts.filter((product) =>
+    (recipeItemsByRecipe[recipeByProduct[product.id]?.id] || []).some((line) =>
+      isCakeLayer(ingredients.find((ingredient) => ingredient.id === line.ingredient_id)))
+  ).map((product) => {
+    const matches = productStock.filter((stock) => stock.location_id === location?.id && stock.product_id === product.id);
+    const stock = matches[0];
+    const quantity = stock ? Number(stock.quantity) : 0;
+    const prepared = matches.length <= 1 && Number.isSafeInteger(quantity) && quantity >= 0
+      && (!stock || (stock.unit || 'piece') === (product.production_unit || 'piece')) ? quantity : null;
+    return { product, capacity: capacityFor(product), prepared };
+  });
 
   const historyRows = batches.filter((batch) => {
     if (batch.location_id !== location?.id) return false;
@@ -240,6 +270,59 @@ export default function ProductionPanel({
     );
   }
 
+  if (mode === 'cake_layers') {
+    return (
+      <>
+        <CakeLayersPanel
+          layerRows={layerRows}
+          capacityRows={capacityRows}
+          canManage={canManageRecipes}
+          canAdjust={['admin', 'manager', 'accountant', 'production'].includes(user?.role)}
+          canProduce={canProduce}
+          onCreate={onCreateLayer}
+          onAdjust={onAdjustLayer}
+          onRecipe={(product) => product ? setRecipeProduct(product) : setRecipePickerOpen(true)}
+          onProduce={setProductionProduct}
+          onTransfer={onTransfer}
+        />
+        <Dialog open={recipePickerOpen} onOpenChange={setRecipePickerOpen}>
+          <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Qavat retsepti uchun mahsulot tanlang</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground">Har bir mahsulotga nechta qavat/list, qancha krem va boshqa masalliq ketishini kiriting.</p>
+            <OdinaSelect aria-label="Qavat retsepti mahsuloti" defaultValue="" className="w-full h-11 rounded-xl border border-input bg-card px-3"
+              onChange={(event) => {
+                const selected = products.find((product) => product.id === event.target.value);
+                if (selected) { setRecipePickerOpen(false); setRecipeProduct(selected); }
+              }}>
+              <option value="" disabled>Mahsulotni tanlang</option>
+              {products.filter((product) => product.source_type === 'central_produced').map((product) =>
+                <option key={product.id} value={product.id}>{product.name}</option>)}
+            </OdinaSelect>
+          </DialogContent>
+        </Dialog>
+        <RecipeDialog
+          open={Boolean(recipeProduct)}
+          product={recipeProduct}
+          recipe={recipeByProduct[recipeProduct?.id]}
+          existingItems={recipeItemsByRecipe[recipeByProduct[recipeProduct?.id]?.id] || []}
+          ingredients={ingredients}
+          onClose={() => setRecipeProduct(null)}
+          onSaved={async () => { setRecipeProduct(null); await load(); }}
+        />
+        <ProductionDialog
+          open={Boolean(productionProduct)}
+          product={productionProduct}
+          recipe={recipeByProduct[productionProduct?.id]}
+          recipeItems={recipeItemsByRecipe[recipeByProduct[productionProduct?.id]?.id] || []}
+          balances={balances}
+          location={location}
+          onClose={() => setProductionProduct(null)}
+          onSaved={async () => { setProductionProduct(null); await Promise.all([load(), onReload()]); }}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] gap-5">
@@ -255,13 +338,8 @@ export default function ProductionPanel({
             <div className="grid sm:grid-cols-2 gap-3">
               {productionProducts.map((product) => {
                 const recipe = recipeByProduct[product.id];
-                const lines = recipeItemsByRecipe[recipe.id] || [];
-                const possible = lines.length
-                  ? Math.max(0, Math.floor(Math.min(...lines.map((line) => {
-                      const perPiece = Number(line.quantity || 0) / Number(recipe.output_quantity || 1);
-                      return perPiece > 0 ? Number(balances[line.ingredient_id] || 0) / perPiece : 0;
-                    }))))
-                  : 0;
+                const capacity = capacityFor(product);
+                const possible = capacity.possible;
                 return (
                   <div key={product.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
                     <div className="flex items-start justify-between gap-3">
@@ -271,8 +349,10 @@ export default function ProductionPanel({
                       </div>
                       <Scale className="w-5 h-5 text-brand-ink shrink-0" />
                     </div>
+                    {capacity.issue && <p className="text-xs text-destructive mt-2">{capacity.issue}</p>}
                     {canProduce && (
                       <Button
+                        disabled={Boolean(capacity.issue) || possible < 1}
                         onClick={() => setProductionProduct(product)}
                         className="w-full mt-4 min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation"
                       >
@@ -363,8 +443,17 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
 
   const save = async () => {
     const validRows = rows.filter((row) => row.ingredient_id && Number(row.quantity) > 0);
-    if (!product || Number(outputQuantity) <= 0 || validRows.length !== rows.length) {
+    if (!product || !Number.isSafeInteger(Number(outputQuantity)) || Number(outputQuantity) <= 0 || validRows.length !== rows.length) {
       void odinaAlert('Natija miqdori va barcha masalliqlarni to‘liq kiriting.');
+      return;
+    }
+    const invalidLayer = validRows.some((row) => {
+      const ingredient = ingredients.find((item) => item.id === row.ingredient_id);
+      return isCakeLayer(ingredient) && (product.source_type !== 'central_produced'
+        || !Number.isSafeInteger(Number(row.quantity) / Number(outputQuantity)));
+    });
+    if (invalidLayer) {
+      void odinaAlert('Qavatlar faqat markaziy mahsulot retseptida, har bir natijaga butun list sonida kiritiladi.');
       return;
     }
     setSaving(true);
@@ -426,22 +515,22 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
                       className="h-10 rounded-lg border border-input bg-card px-3 text-sm min-w-0"
                     >
                       <option value="">Masalliqni tanlang</option>
-                      {ingredients.filter((ingredient) => ingredient.category !== 'household').map((ingredient) => (
-                        <option key={ingredient.id} value={ingredient.id}>{ingredient.name} · {UNIT_LABELS[ingredient.base_unit] || ingredient.base_unit}</option>
+                      {ingredients.filter((ingredient) => ingredient.category !== 'household' && (!isCakeLayer(ingredient) || product?.source_type === 'central_produced')).map((ingredient) => (
+                        <option key={ingredient.id} value={ingredient.id}>{ingredient.name} · {ingredientUnitLabel(ingredient)}</option>
                       ))}
                     </OdinaSelect>
                     <div className="relative">
                       <Input
                         type="number"
-                        min="0.001"
-                        step="0.001"
+                        min={isCakeLayer(selected) ? '1' : '0.001'}
+                        step={isCakeLayer(selected) ? '1' : '0.001'}
                         value={row.quantity}
                         onChange={(event) => updateRow(index, 'quantity', event.target.value)}
                         placeholder="0"
-                        className="pr-12"
+                        className={isCakeLayer(selected) ? 'pr-20' : 'pr-12'}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                        {UNIT_LABELS[selected?.base_unit] || ''}
+                        {ingredientUnitLabel(selected)}
                       </span>
                     </div>
                     <button
