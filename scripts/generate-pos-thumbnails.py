@@ -34,17 +34,28 @@ def convert(product: dict) -> dict:
     row = {"id": product_id, "name": product.get("name", ""), "source": source}
     if not source:
         return {**row, "status": "no_image"}
-    if source.startswith("/images/") and source.lower().endswith(".svg"):
-        existing = ROOT / "public" / source.lstrip("/")
-        if not existing.is_file():
+    if not re.fullmatch(r"[a-f0-9]{16,64}", product_id):
+        raise ValueError(f"Unsupported product ID: {product_id}")
+    local_source = None
+    if source.startswith("/images/"):
+        public_root = (ROOT / "public").resolve()
+        local_source = (public_root / source.lstrip("/")).resolve()
+        if not local_source.is_relative_to(public_root):
+            raise ValueError("Local source must remain inside public assets")
+        if not local_source.is_file():
             return {**row, "status": "local_source_unavailable"}
-        return {**row, "status": "existing_svg", "bytes": existing.stat().st_size}
-    if not re.fullmatch(r"[a-f0-9]{16,64}", product_id) or not source.startswith(SOURCE_PREFIX):
+        if local_source.suffix.lower() == ".svg":
+            return {**row, "status": "existing_svg", "bytes": local_source.stat().st_size}
+    elif not source.startswith(SOURCE_PREFIX):
         raise ValueError(f"Unsupported source for {product_id}; original left unchanged")
 
     cache = Path("/tmp/odina-pos-image-originals")
     cache.mkdir(exist_ok=True)
     original_path = cache / (sha256(source.encode()).hexdigest() + ".original")
+    if local_source:
+        if local_source.stat().st_size > MAX_SOURCE_BYTES:
+            raise ValueError("Source exceeds safe size limit")
+        original_path.write_bytes(local_source.read_bytes())
     raw = None
     for attempt in range(3):
         try:
@@ -100,9 +111,12 @@ def main() -> None:
     args = parser.parse_args()
     products = json.loads(args.input.read_text())
     if isinstance(products, dict):
-        if any(not isinstance(filename, str) or "/" in filename or ".." in filename for filename in products.values()):
-            raise ValueError("Compact inputs must contain plain public filenames")
-        products = [{"id": key, "image_url": SOURCE_PREFIX + filename if filename else ""}
+        if any(not isinstance(filename, str) or ".." in filename
+               or ("/" in filename and not filename.startswith("/images/"))
+               for filename in products.values()):
+            raise ValueError("Compact inputs must contain public filenames or local /images/ paths")
+        products = [{"id": key, "image_url": (filename if filename.startswith("/images/")
+                    else SOURCE_PREFIX + filename) if filename else ""}
                     for key, filename in products.items()]
     if not isinstance(products, list) or not products:
         raise ValueError("Input must be a nonempty product array")
