@@ -2,7 +2,8 @@
 """Generate POS-only WebP files without changing Product records or original images.
 
 Usage: python3 scripts/generate-pos-thumbnails.py /tmp/product-images.json
-Input: array of {id, image_url}, from a read-only Product export.
+Input: array of {id, image_url} from a read-only Product export, or an
+ID-to-public-filename map such as scripts/pos-image-sources.json.
 Requires Pillow for this maintenance task only; not an app/runtime dependency.
 """
 from __future__ import annotations
@@ -98,6 +99,11 @@ def main() -> None:
     parser.add_argument("--report", type=Path, default=Path("/tmp/odina-pos-image-report.json"))
     args = parser.parse_args()
     products = json.loads(args.input.read_text())
+    if isinstance(products, dict):
+        if any(not isinstance(filename, str) or "/" in filename or ".." in filename for filename in products.values()):
+            raise ValueError("Compact inputs must contain plain public filenames")
+        products = [{"id": key, "image_url": SOURCE_PREFIX + filename if filename else ""}
+                    for key, filename in products.items()]
     if not isinstance(products, list) or not products:
         raise ValueError("Input must be a nonempty product array")
     ids = [p.get("id") for p in products]
