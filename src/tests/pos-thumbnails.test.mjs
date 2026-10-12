@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { POS_THUMBNAILS } from '../lib/pos-thumbnail-manifest.js';
 import { posThumbnailFor } from '../lib/pos-thumbnails.js';
 
@@ -23,6 +23,17 @@ test('POS thumbnails have valid WebP assets and match the original source snapsh
     assert.equal(bytes.toString('ascii', 8, 12), 'WEBP');
     assert.ok(bytes.length > 32);
   }
+});
+
+test('previously approved Central thumbnails remain byte-for-byte unchanged', () => {
+  let retained = 0;
+  for (const [id, entry] of entries) {
+    const oldAsset = new URL(`public/images/pos-15-v1/${id}.webp`, root);
+    if (!existsSync(oldAsset)) continue;
+    assert.deepEqual(readFileSync(new URL(`public${entry.thumbnail}`, root)), readFileSync(oldAsset));
+    retained += 1;
+  }
+  assert.equal(retained, 8);
 });
 
 test('matching image thumbnails work for Central, Branch and other POS shops', () => {
