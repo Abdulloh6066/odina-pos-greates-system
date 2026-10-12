@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, ClipboardCheck, ClipboardList, History, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
+import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, ClipboardCheck, ClipboardList, History, Layers3, PackagePlus, Plus, Search, Truck, Warehouse as WarehouseIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
@@ -18,8 +18,10 @@ import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 import ProductionPanel from '@/components/warehouse/ProductionPanel';
 import StockCountPanel from '@/components/warehouse/StockCountPanel';
 import { TEST_PRODUCT_IDS } from '@/lib/test-catalog-cleanup';
+import { isCakeLayer, ingredientUnitLabel } from '@/lib/cake-layer-inventory';
 
 const TABS = [
+  { id: 'cake_layers', label: 'Qavatlar va listlar', icon: Layers3, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
   { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck, roles: ['admin', 'manager', 'warehouse', 'accountant'] },
@@ -88,6 +90,7 @@ export default function Warehouse() {
   const [loading, setLoading] = useState(true);
   const [loadWarning, setLoadWarning] = useState('');
   const [ingredientOpen, setIngredientOpen] = useState(false);
+  const [ingredientIsLayer, setIngredientIsLayer] = useState(false);
   const [adjusting, setAdjusting] = useState(null);
 
   const loadAssignedTransfers = async () => {
@@ -277,6 +280,13 @@ export default function Warehouse() {
   const selectedLocationRecord = locations.find((location) => location.id === selectedLocation);
   const canCreateIngredients = ['admin', 'accountant'].includes(user?.role);
 
+  useEffect(() => {
+    if (requestedTab !== 'cake_layers' || user?.role !== 'admin' || !locations.length) return;
+    if (selectedLocationRecord?.location_type === 'production') return;
+    const central = locations.find((location) => location.location_type === 'production');
+    if (central) setSelectedLocation(central.id);
+  }, [requestedTab, user?.role, locations, selectedLocationRecord?.location_type]);
+
   const stockMap = useMemo(() => {
     const balances = tab === 'products' ? productStock : ingredientStock;
     const keyName = tab === 'products' ? 'product_id' : 'ingredient_id';
@@ -288,7 +298,7 @@ export default function Warehouse() {
   }, [tab, ingredientStock, productStock, selectedLocation]);
 
   const items = useMemo(() => {
-    const source = tab === 'products' ? products : ingredients.filter((item) => ingredientCategory === 'all' || item.category === ingredientCategory);
+    const source = tab === 'products' ? products : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory));
     const query = search.toLowerCase().trim();
     if (!query) return source;
     return source.filter((item) => [
@@ -319,8 +329,8 @@ export default function Warehouse() {
         subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
         actions={canCreateIngredients && (
-          <Button onClick={() => setIngredientOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong">
-            <Plus className="w-4 h-4 mr-1.5" /> Yangi masalliq
+          <Button onClick={() => { setIngredientIsLayer(tab === 'cake_layers'); setIngredientOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
+            <Plus className="w-4 h-4 mr-1.5" /> {tab === 'cake_layers' ? 'Qavat turi qo‘shish' : 'Yangi masalliq'}
           </Button>
         )}
       />
@@ -342,7 +352,11 @@ export default function Warehouse() {
               <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
               <OdinaSelect
                 value={selectedLocation}
-                onChange={(event) => setSelectedLocation(event.target.value)}
+                onChange={(event) => {
+                  const next = locations.find((location) => location.id === event.target.value);
+                  if (tab === 'cake_layers' && next?.location_type !== 'production') changeTab('ingredients');
+                  setSelectedLocation(event.target.value);
+                }}
                 className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 {locations.map((location) => (
@@ -388,14 +402,14 @@ export default function Warehouse() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
-            <Summary label="Masalliqlar" value={ingredients.length} />
+            <Summary label="Masalliqlar" value={ingredients.filter((item) => !isCakeLayer(item)).length} />
             <Summary label="Tayyor mahsulotlar" value={products.length} />
             <Summary label="Omborda mavjud turlar" value={stockedCount} />
             <Summary label="Ombor harakatlari" value={movements.filter((m) => m.location_id === selectedLocation).length} />
           </div>
 
           <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3">
-            {visibleTabs.filter((item) => item.id !== 'suppliers' || canViewSupplierLedger).map(({ id, label, icon: Icon }) => (
+            {visibleTabs.filter((item) => (item.id !== 'suppliers' || canViewSupplierLedger) && (item.id !== 'cake_layers' || selectedLocationRecord?.location_type === 'production')).map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
                 variant={tab === id ? 'default' : 'outline'}
@@ -421,7 +435,7 @@ export default function Warehouse() {
               recipients={recipients}
               search={search}
             />
-          ) : ['recipes', 'production'].includes(tab) ? (
+          ) : ['recipes', 'production', 'cake_layers'].includes(tab) ? (
             <ProductionPanel
               mode={tab}
               user={user}
@@ -429,8 +443,12 @@ export default function Warehouse() {
               products={products}
               ingredients={ingredients}
               ingredientStock={ingredientStock}
+              productStock={productStock}
               search={search}
               onReload={load}
+              onCreateLayer={() => { setIngredientIsLayer(true); setIngredientOpen(true); }}
+              onAdjustLayer={(item) => setAdjusting({ item, kind: 'ingredient' })}
+              onTransfer={() => changeTab('transfers')}
             />
           ) : tab === 'transfers' ? (
             <TransfersPanel
@@ -478,6 +496,8 @@ export default function Warehouse() {
 
       <IngredientDialog
         open={ingredientOpen}
+        asLayer={ingredientIsLayer}
+        existingIngredients={ingredients}
         onClose={() => setIngredientOpen(false)}
         onSaved={() => { setIngredientOpen(false); load(); }}
       />
@@ -570,7 +590,7 @@ function HistoryList({ movements }) {
   );
 }
 
-function IngredientDialog({ open, onClose, onSaved }) {
+function IngredientDialog({ open, asLayer = false, existingIngredients = [], onClose, onSaved }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('food');
   const [baseUnit, setBaseUnit] = useState('g');
@@ -581,13 +601,17 @@ function IngredientDialog({ open, onClose, onSaved }) {
     if (open) {
       setName('');
       setCategory('food');
-      setBaseUnit('g');
-      setPurchaseUnit('kg');
+      setBaseUnit(asLayer ? 'piece' : 'g');
+      setPurchaseUnit(asLayer ? 'piece' : 'kg');
     }
-  }, [open]);
+  }, [open, asLayer]);
 
   const save = async () => {
     if (!name.trim()) return;
+    if (asLayer && existingIngredients.some((ingredient) => ingredient.name.trim().toLowerCase() === name.trim().toLowerCase())) {
+      void odinaAlert('Bu nomdagi karta mavjud. Mavjud kartadan foydalaning yoki qavat nomini aniqlashtiring.');
+      return;
+    }
     const validPair = (baseUnit === 'g' && ['g', 'kg'].includes(purchaseUnit))
       || (baseUnit === 'ml' && ['ml', 'l'].includes(purchaseUnit))
       || (baseUnit === 'piece' && purchaseUnit === 'piece');
@@ -599,10 +623,11 @@ function IngredientDialog({ open, onClose, onSaved }) {
     try {
       await base44.entities.Ingredient.create({
         name: name.trim(),
-        category,
-        base_unit: baseUnit,
-        purchase_unit: purchaseUnit,
-        conversion_to_base: ['kg', 'l'].includes(purchaseUnit) ? 1000 : 1,
+        category: asLayer ? 'food' : category,
+        base_unit: asLayer ? 'piece' : baseUnit,
+        purchase_unit: asLayer ? 'piece' : purchaseUnit,
+        conversion_to_base: asLayer ? 1 : (['kg', 'l'].includes(purchaseUnit) ? 1000 : 1),
+        is_cake_layer: asLayer,
         active: true,
       });
       onSaved();
@@ -616,12 +641,13 @@ function IngredientDialog({ open, onClose, onSaved }) {
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="font-display text-xl">Yangi masalliq, qadoq yoki xo‘jalik buyumi</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display text-xl">{asLayer ? 'Yangi qavat / list turi' : 'Yangi masalliq, qadoq yoki xo‘jalik buyumi'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="text-xs mb-1.5 block">Nomi</Label>
-            <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Masalan: un, sut, tort qutisi" />
+            <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder={asLayer ? "Masalan: oq biskvit — katta list" : "Masalan: un, sut, tort qutisi"} />
           </div>
+          {!asLayer && <>
           <div>
             <Label className="text-xs mb-1.5 block">Turi</Label>
             <OdinaSelect value={category} onChange={(event) => setCategory(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
@@ -655,6 +681,8 @@ function IngredientDialog({ open, onClose, onSaved }) {
           <p className="text-xs text-muted-foreground rounded-xl bg-secondary/60 p-3">
             Kilogramm va litr avtomatik ravishda 1 000 gramm yoki millilitrga aylantiriladi.
           </p>
+          </>}
+          {asLayer && <p className="text-sm rounded-xl bg-secondary/60 p-3">Birlik: butun list/qavat. Turini yaratgach, haqiqiy qoldiqni “Qavat kirimi / tuzatish” orqali kiriting.</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
@@ -684,11 +712,16 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
   }, [open, current]);
 
   const unit = kind === 'ingredient' ? item?.base_unit : (location?.location_type === 'production' ? item?.production_unit || 'piece' : 'piece');
+  const unitLabel = kind === 'ingredient' ? ingredientUnitLabel(item) : (UNIT_LABELS[unit] || unit);
   const change = (mode === 'remove' ? -1 : 1) * Number(quantity || 0);
   const after = current + change;
 
   const save = async () => {
     if (!item || !location || !Number.isFinite(change) || change === 0 || !reason.trim()) return;
+    if (isCakeLayer(item) && !Number.isSafeInteger(change)) {
+      void odinaAlert('Butun list/qavat sonini kiriting.');
+      return;
+    }
     if (after < 0) {
       void odinaAlert('Ombor qoldig‘i manfiy bo‘lishi mumkin emas.');
       return;
@@ -732,8 +765,8 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
             <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>{kind === 'product' ? 'Qoldiqni kamaytirish' : 'Chiqim qilish'}</Button>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Miqdor ({UNIT_LABELS[unit] || unit})</Label>
-            <Input autoFocus type="number" min="0.001" step={kind === 'product' || unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
+            <Label className="text-xs mb-1.5 block">Miqdor ({unitLabel})</Label>
+            <Input autoFocus type="number" min={kind === 'product' || unit === 'piece' ? '1' : '0.001'} step={kind === 'product' || unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Sabab</Label>
