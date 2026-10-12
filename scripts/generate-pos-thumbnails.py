@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import time
 import urllib.request
+import urllib.error
 from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,9 +57,15 @@ def convert(product: dict) -> dict:
                     raise ValueError("Source exceeds safe size limit")
                 original_path.write_bytes(raw)
             break
-        except Exception:
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return {**row, "status": "source_unavailable", "http_status": error.code}
             if attempt == 2:
-                raise
+                raise RuntimeError(f"Image download failed for {product_id}: HTTP {error.code}") from error
+            time.sleep(attempt + 1)
+        except Exception as error:
+            if attempt == 2:
+                raise RuntimeError(f"Image conversion input failed for {product_id}") from error
             time.sleep(attempt + 1)
 
     with Image.open(io.BytesIO(raw)) as opened:
@@ -113,6 +120,7 @@ def main() -> None:
                "existing_svg": sum(row["status"] == "existing_svg" for row in results),
                "no_image": sum(row["status"] == "no_image" for row in results),
                "original_smaller": sum(row["status"] == "original_smaller" for row in results),
+               "source_unavailable": sum(row["status"] == "source_unavailable" for row in results),
                "original_bytes": original, "thumbnail_bytes": compressed,
                "saved_percent": round((1 - compressed / original) * 100, 2),
                "max_edge": MAX_EDGE, "webp_quality": QUALITY}
