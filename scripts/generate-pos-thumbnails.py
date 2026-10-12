@@ -27,6 +27,18 @@ QUALITY = 88
 MAX_SOURCE_BYTES = 25 * 1024 * 1024
 OUTPUT = ROOT / "public/images/pos-v2"
 MANIFEST = ROOT / "src/lib/pos-thumbnail-manifest.js"
+# Preserve the already-approved smaller Central trial assets when the original
+# product photo still matches. Extending coverage must not make Central heavier.
+APPROVED_TRIAL_SOURCES = {
+    "6ab546e601804895b9374e80": "8626ae888_spartak.png",
+    "6ab546e3e87e400ee14b2c6c": "291ecb623_biskvit.png",
+    "6ab546e0d3b3bba25340fb13": "b40f830d8_gozli-pirojni.png",
+    "6ab546d671c7683c19867ccf": "9ea742922_tvarojniy.png",
+    "6ab546d28badecb776d7b864": "f9d5967a0_medavik-kaymoq.png",
+    "6ab546cfded029118ff61c26": "906e9b372_prechuda.png",
+    "6ab546cc9d99abaff9b7a539": "71c2f0df1_medavik-damashniy.png",
+    "6ab54689fddbaa9a6a528495": "e7fbb35db_twix.png",
+}
 
 
 def convert(product: dict) -> dict:
@@ -91,6 +103,17 @@ def convert(product: dict) -> dict:
         image.save(buffer, "WEBP", quality=QUALITY, method=6, exact=True)
         output_bytes = buffer.getvalue()
         output_size = list(image.size)
+    reused_approved_thumbnail = False
+    approved_source = APPROVED_TRIAL_SOURCES.get(product_id)
+    approved_path = ROOT / "public/images/pos-15-v1" / f"{product_id}.webp"
+    if approved_source and source == SOURCE_PREFIX + approved_source and approved_path.is_file():
+        approved_bytes = approved_path.read_bytes()
+        with Image.open(io.BytesIO(approved_bytes)) as approved:
+            approved_size = list(approved.size)
+            approved.verify()
+        if len(approved_bytes) < len(output_bytes) and min(approved_size) >= 400:
+            output_bytes, output_size = approved_bytes, approved_size
+            reused_approved_thumbnail = True
     if len(output_bytes) >= len(raw):
         return {**row, "status": "original_smaller", "original_bytes": len(raw)}
     digest = sha256(output_bytes).hexdigest()[:12]
@@ -101,7 +124,8 @@ def convert(product: dict) -> dict:
         check.verify()
     return {**row, "status": "optimized", "thumbnail": f"/images/pos-v2/{filename}",
             "original_bytes": len(raw), "thumbnail_bytes": len(output_bytes),
-            "original_size": source_size, "thumbnail_size": output_size}
+            "original_size": source_size, "thumbnail_size": output_size,
+            "reused_approved_thumbnail": reused_approved_thumbnail}
 
 
 def main() -> None:
@@ -137,6 +161,7 @@ def main() -> None:
     original = sum(row["original_bytes"] for row in optimized)
     compressed = sum(row["thumbnail_bytes"] for row in optimized)
     summary = {"products": len(products), "optimized": len(optimized),
+               "reused_approved_thumbnails": sum(bool(row.get("reused_approved_thumbnail")) for row in optimized),
                "existing_svg": sum(row["status"] == "existing_svg" for row in results),
                "no_image": sum(row["status"] == "no_image" for row in results),
                "original_smaller": sum(row["status"] == "original_smaller" for row in results),
