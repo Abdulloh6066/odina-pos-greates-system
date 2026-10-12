@@ -37,7 +37,7 @@ def convert(product: dict) -> dict:
     if source.startswith("/images/") and source.lower().endswith(".svg"):
         existing = ROOT / "public" / source.lstrip("/")
         if not existing.is_file():
-            raise ValueError(f"Missing local SVG for {product_id}")
+            return {**row, "status": "local_source_unavailable"}
         return {**row, "status": "existing_svg", "bytes": existing.stat().st_size}
     if not re.fullmatch(r"[a-f0-9]{16,64}", product_id) or not source.startswith(SOURCE_PREFIX):
         raise ValueError(f"Unsupported source for {product_id}; original left unchanged")
@@ -127,6 +127,7 @@ def main() -> None:
                "no_image": sum(row["status"] == "no_image" for row in results),
                "original_smaller": sum(row["status"] == "original_smaller" for row in results),
                "source_unavailable": sum(row["status"] == "source_unavailable" for row in results),
+               "local_source_unavailable": sum(row["status"] == "local_source_unavailable" for row in results),
                "original_bytes": original, "thumbnail_bytes": compressed,
                "saved_percent": round((1 - compressed / original) * 100, 2),
                "max_edge": MAX_EDGE, "webp_quality": QUALITY}
