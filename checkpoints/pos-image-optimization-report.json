@@ -1,0 +1,828 @@
+{
+  "summary": {
+    "products": 100,
+    "optimized": 11,
+    "reused_approved_thumbnails": 8,
+    "existing_svg": 0,
+    "no_image": 3,
+    "original_smaller": 0,
+    "source_unavailable": 77,
+    "local_source_unavailable": 9,
+    "original_bytes": 19935766,
+    "thumbnail_bytes": 333492,
+    "saved_percent": 98.33,
+    "max_edge": 512,
+    "webp_quality": 88
+  },
+  "images": [
+    {
+      "id": "6ab66ca8ff297ddb85cafe0b",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/fbadfab31_02-Americano-23000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab09d03ee1e0fe983f",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/848864f83_36-Anchan-Klassik-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa14121508cfbde2a8",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/c7ed3d3e9_14-Ays-Kakao-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa3f0c0eb00a96db3a",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f2ddf2a61_09-Ice-Latte-30000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab678d6bcf228643d949c4d",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8abf0e622_15-Ays-Klassik-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab678d6f732914823507f65",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f4a47e572_29-Banana-Smile-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab7064b094da7411b1",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/04f6075f1_40-Berries-Caribbean-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6abcc6dcd77d24f298b94cfa",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/54f67c7a5_lavash-molgoshti.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6abcc6dc9729cb9d1a13c0ca",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/748f9337f_lavash-tovuqli.jpg",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6acd7b9a18f64265b3ca88d4",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/6b5e1f023_lavash-spicy-chicken.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab546e3e87e400ee14b2c6c",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/291ecb623_biskvit.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546e3e87e400ee14b2c6c-0810de7b0fd1.webp",
+      "original_bytes": 2011513,
+      "thumbnail_bytes": 27350,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6ab66cabd3697f85f1b0e883",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/3313d0c29_42-Black-Berry-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c5cd61222b38b4b90d",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/501087f8e_Burger_Big__52000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c5c1c33517e6eea448",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/84425d13b_Burger_classic__42000.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea448-c9eef7134c2b.webp",
+      "original_bytes": 2116575,
+      "thumbnail_bytes": 58376,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        512,
+        512
+      ],
+      "reused_approved_thumbnail": false
+    },
+    {
+      "id": "6ab66caa6f891c8e60c62c89",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/489b9c8a0_12-Cold-Kiss-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cabdf0b623eed81aab2",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/18f532457_37-Cool-Strawberry-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66ca9da250aea36b7fea7",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/69907eb2d_07-Double-Kapuchino-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66ca9aea6ce327608325f",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/ea34a2494_08-Double-Latte-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa762b7cddeaf3fbc8",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8eb772b2b_10-Double-Mokko-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa57e56b3657a4c6c6",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/4935e9a22_20-Dark-Ocean-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6abcf3de695398c25e468fd2",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/4055603e9_ekler.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab603c27a61b5ecce2dad69",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/69d8eea56_ekler20mingsom.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab5574f07f5d91b8b469e26",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b9a0e7037_eksimo.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66ca8d37aca9c9c1ac964",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/5ed64451b_01-Espresso-20000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c449971912c8124c26",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b8cdb805d_Fri__22000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caba02dd1b5a53431c5",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/5c5c2a623_38-Fusetea-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66ca9c34c6a8844c78e34",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/234cf84fc_05-Glisse-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab546e0d3b3bba25340fb13",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b40f830d8_gozli-pirojni.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546e0d3b3bba25340fb13-bb5db3e6c2c3.webp",
+      "original_bytes": 1775459,
+      "thumbnail_bytes": 22076,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6acc604fccd06dd4bac7f6fb",
+      "name": "",
+      "source": "/images/salads/grecheskiy-hq-v1.svg",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6ab747c6b2234597d7d0a40b",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e3d73ad6f_HotDog_Chilli__35000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c52c94d3a7933d0037",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8b9c44a2c_HotDog_Classic__28000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c6015bd487c746082f",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/30cfd8e10_HotDog_French__36000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa13225d52beea7f29",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/fc0674bf8_13-Ice-Baby-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66ca8ae6223ce0f93e5ea",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/31dee9a49_03-Kapuchino-28000-UZS.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ea-52f8273950ae.webp",
+      "original_bytes": 219684,
+      "thumbnail_bytes": 22748,
+      "original_size": [
+        512,
+        512
+      ],
+      "thumbnail_size": [
+        512,
+        512
+      ],
+      "reused_approved_thumbnail": false
+    },
+    {
+      "id": "6ab603c21d89b2f3e0a638ec",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/cd31d86e3_karamelnitvorog35mingsom.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6accb8875cc172100902de96",
+      "name": "",
+      "source": "/images/salads/karamli-hq-v1.svg",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6accb7509c16cdd06b817ea2",
+      "name": "",
+      "source": "/images/salads/karoliviskiy-hq-v1.svg",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6ab5571a82bb146f0a461bc1",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/05ecebc8c_krasniybarxit.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6abcc6dcc47808841d536b73",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/01d4cab25_lavash-molgoshti.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6abcc6dcf34f6be76db20d39",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/af16b8df0_lavash-tovuq.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c6b6b0f30171e3aa6d",
+      "name": "",
+      "source": "",
+      "status": "no_image"
+    },
+    {
+      "id": "6ab678d671e7c6e1f87f4db2",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/ba825b740_25-Limonad-apelsin-limon-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6a96f0a5d5c4e463dab503f3",
+      "name": "",
+      "source": "",
+      "status": "no_image"
+    },
+    {
+      "id": "6ab603c234feadccb1324a5a",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0ad888397_makaronniki15mingsom.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa72cc8a6c70c45cf9",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/81a00a374_19-Mango-Bliss-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab0ee54d97943653cd",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/105e444fd_32-Mango-Sohil-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab678d682b1c9a22fdb9158",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/4fa60afb8_33-Matcha-Klassik-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab678d6ee4f31030cb6c6bc",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/62c0003a4_34-Matcha-Malina-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab193d326bb782e750",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b91c03e7a_35-Matcha-Qulupnay-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab546cc9d99abaff9b7a539",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/71c2f0df1_medavik-damashniy.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546cc9d99abaff9b7a539-53b951b8fc27.webp",
+      "original_bytes": 2254304,
+      "thumbnail_bytes": 38622,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6ab546d28badecb776d7b864",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f9d5967a0_medavik-kaymoq.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546d28badecb776d7b864-7aa1b1a3366a.webp",
+      "original_bytes": 2119929,
+      "thumbnail_bytes": 33680,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6ab557230fc661ec69178653",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/3dab2c85b_medaviktart.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab54752101d0d287f5bba6e",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/57bfbc61a_medavik18.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6a96f0a5c54828911a573ad6",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1b3018187_medovik-cake.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caafe36d40680f85cb8",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/a053e8e46_11-Mocha-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa5a2b10a4b5d25815",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/2180d13b5_24-Mojito-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66ca9bc5352994bdb94d1",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/48c0ef2d8_04-Mokko-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab5570fe785ab858264c080",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/26a7e6c53_molochniy.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c409564cead4465b54",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/62101b9f8_Naggets__33000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa4e5a1b9c89839e97",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0479b6ec9_22-Orange-Wind-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c5cb48238547042609",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b516cd3d6_Ostriye_Krilishki__35000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c48968a1f5e93d7592",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e1c3d5a15_Pizza_Goshtli__75000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c4b30518690bef5d5e",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/487cc8c29_Pizza_Italiano__65000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c3a07ee6e2e3a187de",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1f9785988_Pizza_Margarita__55000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c3cb6cc31fbbe6f18a",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/a10269e55_Pizza_Pepperoni__65000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c359d75799a60d835d",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0c4d8a9ac_Pizza_Veggie__65000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c3db3a83a30ee1562e",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/11dfc2a29_Pizza_Zakir__85000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab747c21e5e813a7185730c",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0a3dc4a71_Pizza_Kurinniy__65000.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab546cfded029118ff61c26",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/906e9b372_prechuda.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546cfded029118ff61c26-a5967a5ffef1.webp",
+      "original_bytes": 2047005,
+      "thumbnail_bytes": 30526,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6ab66ca9a79b154026ab696b",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1f9b3f6f5_06-Raf-35000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab545488dba97b5991",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/40afc2d01_31-Sakura-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6acc60c396da2cf89a96a49d",
+      "name": "",
+      "source": "/images/salads/sezar-hq-white-v1.svg",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6aebdf4b21a9067389dc2e14",
+      "name": "",
+      "source": "/images/salads/koreyscha-hq-white-v1.svg",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6ab603c210352ffe2f0d90fa",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b4eb02112_sansebastian30mingsom.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab603c210352ffe2f0d90fa-a52e5a7539a4.webp",
+      "original_bytes": 1349638,
+      "thumbnail_bytes": 22134,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        512,
+        512
+      ],
+      "reused_approved_thumbnail": false
+    },
+    {
+      "id": "6ab6696295ccc2ce2e0f929c",
+      "name": "",
+      "source": "/images/sandwich/chicken-sandwich.png",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6aebcd583a6103f5acc0e928",
+      "name": "",
+      "source": "/images/sandwich/beef-sandwich.png",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6aebcd8fe6824758b09ecd8e",
+      "name": "",
+      "source": "/images/sandwich/tuna-sandwich.png",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6ab66cab3b789947b78e8df6",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0c113350d_28-Shokolad-Charm-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa73c6d2869c8c77c5",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b7b3e0056_23-Sitrus-Anchan-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab603c3b743990b6f17a107",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/7786d114f_snickers35mingsom.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab546e601804895b9374e80",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8626ae888_spartak.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546e601804895b9374e80-26e6cfa67c1b.webp",
+      "original_bytes": 2067437,
+      "thumbnail_bytes": 30014,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6abcc7465ba17e9d4b922cd3",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/d02e7f37a_boyli-lanch.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab25d371e41f6bfa3a",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f3298b76b_39-Strawberry-Lady-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cabc7ecffd45b5b20b9",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b3121cf02_41-Summer-Passion-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6a96f0a5055a660032790f13",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/ff4fd7051_chocolate-cake.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab55ebfe850d3049435b3b7",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/543561c62_tort01.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab5603058aa8018b918ed18",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/7f21f93b3_tort02.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab560979fdac2f489252cda",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/443be9513_tort03.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab560d4b089d163e0afef32",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1430a245f_tort04.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab560ddd2190eca3216cb81",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/d1c945cec_tort05.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66caa1bf2e152a09f0554",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/fd5cb1a6f_21-Tutti-Fru-40000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab546d671c7683c19867ccf",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9ea742922_tvarojniy.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab546d671c7683c19867ccf-ad589c4ea858.webp",
+      "original_bytes": 1915792,
+      "thumbnail_bytes": 23286,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6ab547558236a1ca9d5f497b",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/749470c80_tvarojniy18.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab54689fddbaa9a6a528495",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e7fbb35db_twix.png",
+      "status": "optimized",
+      "thumbnail": "/images/pos-v2/6ab54689fddbaa9a6a528495-a6a59577f979.webp",
+      "original_bytes": 2058430,
+      "thumbnail_bytes": 24680,
+      "original_size": [
+        1254,
+        1254
+      ],
+      "thumbnail_size": [
+        400,
+        400
+      ],
+      "reused_approved_thumbnail": true
+    },
+    {
+      "id": "6abce8d7543be74f1ddbd50b",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/3757527e7_vafli-malina.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab67a2b7cf5e2df37c92a00",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e1380d46c_30-Vanilla-Dream-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6ab66cab9cb7255a8df4a2eb",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8de15001a_27-Yozgi-Opish-45000-UZS.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    },
+    {
+      "id": "6abcf3dea85738da1a982de2",
+      "name": "",
+      "source": "",
+      "status": "no_image"
+    },
+    {
+      "id": "6acc5fbb8d80381ac3b1138c",
+      "name": "",
+      "source": "/images/salads/achichuk-hq-v1.svg",
+      "status": "local_source_unavailable"
+    },
+    {
+      "id": "6abcc77388ecb5c3cc4e0a38",
+      "name": "",
+      "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e3108b2b8_boyli-lanch-pizza.png",
+      "status": "source_unavailable",
+      "http_status": 404
+    }
+  ]
+}

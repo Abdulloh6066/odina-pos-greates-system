@@ -2,35 +2,35 @@
 export const POS_THUMBNAILS = Object.freeze({
   "6ab54689fddbaa9a6a528495": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e7fbb35db_twix.png",
-    "thumbnail": "/images/pos-v2/6ab54689fddbaa9a6a528495-6c2952fb4c7f.webp"
+    "thumbnail": "/images/pos-v2/6ab54689fddbaa9a6a528495-a6a59577f979.webp"
   },
   "6ab546cc9d99abaff9b7a539": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/71c2f0df1_medavik-damashniy.png",
-    "thumbnail": "/images/pos-v2/6ab546cc9d99abaff9b7a539-3993486d981f.webp"
+    "thumbnail": "/images/pos-v2/6ab546cc9d99abaff9b7a539-53b951b8fc27.webp"
   },
   "6ab546cfded029118ff61c26": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/906e9b372_prechuda.png",
-    "thumbnail": "/images/pos-v2/6ab546cfded029118ff61c26-fb26ed6bfe9b.webp"
+    "thumbnail": "/images/pos-v2/6ab546cfded029118ff61c26-a5967a5ffef1.webp"
   },
   "6ab546d28badecb776d7b864": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f9d5967a0_medavik-kaymoq.png",
-    "thumbnail": "/images/pos-v2/6ab546d28badecb776d7b864-2aff6dcdce52.webp"
+    "thumbnail": "/images/pos-v2/6ab546d28badecb776d7b864-7aa1b1a3366a.webp"
   },
   "6ab546d671c7683c19867ccf": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9ea742922_tvarojniy.png",
-    "thumbnail": "/images/pos-v2/6ab546d671c7683c19867ccf-a86d5afd5020.webp"
+    "thumbnail": "/images/pos-v2/6ab546d671c7683c19867ccf-ad589c4ea858.webp"
   },
   "6ab546e0d3b3bba25340fb13": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b40f830d8_gozli-pirojni.png",
-    "thumbnail": "/images/pos-v2/6ab546e0d3b3bba25340fb13-cb55c7114628.webp"
+    "thumbnail": "/images/pos-v2/6ab546e0d3b3bba25340fb13-bb5db3e6c2c3.webp"
   },
   "6ab546e3e87e400ee14b2c6c": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/291ecb623_biskvit.png",
-    "thumbnail": "/images/pos-v2/6ab546e3e87e400ee14b2c6c-9257ab874132.webp"
+    "thumbnail": "/images/pos-v2/6ab546e3e87e400ee14b2c6c-0810de7b0fd1.webp"
   },
   "6ab546e601804895b9374e80": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8626ae888_spartak.png",
-    "thumbnail": "/images/pos-v2/6ab546e601804895b9374e80-69c17dcd50aa.webp"
+    "thumbnail": "/images/pos-v2/6ab546e601804895b9374e80-26e6cfa67c1b.webp"
   },
   "6ab603c210352ffe2f0d90fa": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b4eb02112_sansebastian30mingsom.png",
