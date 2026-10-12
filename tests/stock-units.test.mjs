@@ -80,11 +80,13 @@ function loadHandler(name, client) {
     const forecast = readFileSync('base44/shared/production-forecast-logic.ts', 'utf8').replace(/export /g, '');
     helpers = cost + '\n' + forecast;
   }
+  helpers += '\nconst resolveAppUser = async (_service, auth) => auth;\nconst assertManagerRequestScope = async () => {};';
   let source = readFileSync(path, 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/user-helpers\.ts";/, '')
     .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
     .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/production-forecast-logic\.ts";/, '')
+    .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/manager-request-scope\.ts";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
   source = helpers + '\n' + source + '\nglobalThis.testHandler = handler;';
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
