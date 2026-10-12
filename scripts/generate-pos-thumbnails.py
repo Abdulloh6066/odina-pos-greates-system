@@ -39,7 +39,7 @@ def convert(product: dict) -> dict:
         if not existing.is_file():
             raise ValueError(f"Missing local SVG for {product_id}")
         return {**row, "status": "existing_svg", "bytes": existing.stat().st_size}
-    if not re.fullmatch(r"[a-f0-9]{24}", product_id) or not source.startswith(SOURCE_PREFIX):
+    if not re.fullmatch(r"[a-f0-9]{16,64}", product_id) or not source.startswith(SOURCE_PREFIX):
         raise ValueError(f"Unsupported source for {product_id}; original left unchanged")
 
     cache = Path("/tmp/odina-pos-image-originals")
