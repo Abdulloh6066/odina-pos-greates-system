@@ -159,6 +159,14 @@ export default async function(req) {
         if (!Number.isFinite(purchaseQuantity) || purchaseQuantity <= 0 || unitPrice < 0) {
           throw new Error("Miqdor va xarid narxini to‘g‘ri kiriting.");
         }
+        if (ingredient.is_cake_layer === true && (location.location_type !== "production"
+          || ingredient.base_unit !== "piece" || ingredient.purchase_unit !== "piece"
+          || Number(ingredient.conversion_to_base) !== 1
+          || !Number.isSafeInteger(Number(input.purchase_quantity)))) {
+          const error: any = new Error("Qavatlar faqat markaziy omborga, butun list sonida kirim qilinadi.");
+          error.status = 400;
+          throw error;
+        }
         const baseQuantity = quantity(purchaseQuantity * Number(ingredient.conversion_to_base || 1));
         return {
           ingredient,
