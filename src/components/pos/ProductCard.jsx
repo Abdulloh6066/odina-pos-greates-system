@@ -3,7 +3,7 @@ import { Image } from '@/components/ui/image';
 import { formatUZS } from '@/lib/pos';
 import { posThumbnailFor } from '@/lib/pos-thumbnails';
 
-function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false }) {
+function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false, priority = false }) {
   const [failedThumbnail, setFailedThumbnail] = React.useState(null);
   const thumbnail = posThumbnailFor(product, shopId);
   const useThumbnail = Boolean(thumbnail && thumbnail !== failedThumbnail);
@@ -21,8 +21,8 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
         {product.image_url ? (
           <Image
             src={imageSrc}
-            loading={useThumbnail ? 'eager' : undefined}
-            decoding={useThumbnail ? 'async' : undefined}
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
             onError={useThumbnail ? () => setFailedThumbnail(thumbnail) : undefined}
             alt={product.name}
             fittingType="fill"
