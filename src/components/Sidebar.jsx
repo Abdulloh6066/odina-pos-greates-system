@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import {
   Archive, Armchair, ArrowRightLeft, BarChart3, Banknote, BookOpen, Boxes, Building2, Cake, ChefHat, ChevronDown, Circle, Clock,
-  ClipboardList, Contact, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
+  ClipboardList, Contact, Layers3, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
   ReceiptText, Settings, Shield, ShieldCheck, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp, ClipboardCheck, FileSpreadsheet,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
@@ -25,6 +25,7 @@ const SCREENS_CHILDREN = [
   { key: 'launch-production', label: 'Ishlab chiqarish ekranini ochish', path: '/production-screen', icon: ChefHat, roles: ['admin', 'production'] },
 ];
 const WAREHOUSE_CHILDREN = [
+  { key: 'warehouse-cake-layers', label: 'Qavatlar va listlar', path: '/warehouse?tab=cake_layers', icon: Layers3, tab: 'cake_layers', roles: ['admin', 'manager', 'accountant', 'production'] },
   { key: 'warehouse-ingredients', label: 'Masalliqlar va qadoqlar', path: '/warehouse?tab=ingredients', icon: Archive, tab: 'ingredients' },
   { key: 'warehouse-products', label: 'Tayyor mahsulotlar', path: '/warehouse?tab=products', icon: Boxes, tab: 'products', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-suppliers', label: 'Kirim va qarzlar', path: '/warehouse?tab=suppliers', icon: Truck, tab: 'suppliers', roles: ['admin', 'manager', 'warehouse', 'accountant'] },
