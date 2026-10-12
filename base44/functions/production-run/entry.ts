@@ -88,6 +88,12 @@ export default async function(req) {
         if (!ingredient || ingredient.active === false) {
           return Response.json({ error: "Retseptdagi masalliq topilmadi yoki faol emas." }, { status: 404 });
         }
+        if (ingredient.is_cake_layer === true && (product.source_type !== "central_produced"
+          || ingredient.base_unit !== "piece" || ingredient.purchase_unit !== "piece"
+          || Number(ingredient.conversion_to_base) !== 1
+          || !Number.isSafeInteger(Number(requested.quantity) / outputQuantity))) {
+          return Response.json({ error: "Qavatlar faqat markaziy mahsulot uchun, har bir natijaga butun list sonida kiritiladi." }, { status: 400 });
+        }
         normalizedItems.push({
           ingredient_id: ingredient.id,
           ingredient_name_snapshot: ingredient.name,
@@ -308,6 +314,16 @@ export default async function(req) {
       const usagePlans = [];
       const shortages = [];
       for (const item of recipeItems) {
+        const ingredient = await service.entities.Ingredient.get(item.ingredient_id);
+        if (!ingredient || ingredient.active === false || ingredient.base_unit !== item.unit) {
+          return Response.json({ error: "Retsept masallig‘i yoki birligi noto‘g‘ri. Retseptni tekshiring." }, { status: 409 });
+        }
+        if (ingredient.is_cake_layer === true && (ingredient.base_unit !== "piece"
+          || ingredient.purchase_unit !== "piece" || Number(ingredient.conversion_to_base) !== 1
+          || !Number.isSafeInteger(Number(item.quantity) / recipeOutput)
+          || !Number.isSafeInteger(Number(body?.produced_quantity)))) {
+          return Response.json({ error: "Qavat retseptida har bir mahsulot uchun butun list soni bo‘lishi kerak." }, { status: 409 });
+        }
         const required = cleanNumber(Number(item.quantity) * producedQuantity / recipeOutput);
         if (!Number.isFinite(required) || required <= 0) {
           return Response.json({ error: "Retseptdagi masalliq miqdori noto‘g‘ri." }, { status: 409 });
@@ -321,6 +337,9 @@ export default async function(req) {
         }
         const stock = rows?.[0] || null;
         const before = cleanNumber(stock?.quantity || 0);
+        if (stock && (stock.unit !== item.unit || (ingredient.is_cake_layer === true && !Number.isSafeInteger(before)))) {
+          return Response.json({ error: "Masalliq/qavat qoldig‘i birligi retseptga mos emas." }, { status: 409 });
+        }
         const after = cleanNumber(before - required);
         if (!stock || after < 0) {
           shortages.push({
