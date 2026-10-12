@@ -12,6 +12,7 @@ import {
 } from "./shop-ingredient-deduction.ts";
 
 import { recipeWithBurgerFries } from "./burger-fries.js";
+import type { CheckoutRecipeLoader } from "./checkout-recipes.ts";
 
 const httpError = (message: string, status: number) => {
   const error: any = new Error(message);
@@ -27,6 +28,7 @@ const movementNumber = (now: string) =>
 export async function loadShopRecipes(
   service: any,
   shopPreparedItems: any[],
+  recipeLoader?: CheckoutRecipeLoader,
 ): Promise<{ byProduct: Map<string, any | null>; missing: string[] }> {
   const productIds = Array.from(new Set(
     shopPreparedItems.map((row) => String(row.product_id)).filter(Boolean),
@@ -36,9 +38,9 @@ export async function loadShopRecipes(
 
   if (!productIds.length) return { byProduct, missing: [] };
 
-  const recipes = await service.entities.Recipe.filter(
-    { active: true }, "-version", 1000,
-  );
+  const recipes = recipeLoader
+    ? (await Promise.all(productIds.map(id => recipeLoader.recipesForProduct(id, true)))).flat()
+    : await service.entities.Recipe.filter({ active: true }, "-version", 1000);
   const byProductId = new Map<string, any[]>();
   for (const r of recipes || []) {
     const key = String(r.product_id);
@@ -64,9 +66,9 @@ export async function loadShopRecipes(
 
   let recipeItems: any[] = [];
   if (recipeIds.length) {
-    recipeItems = await service.entities.RecipeItem.filter(
-      { recipe_id: { $in: recipeIds } }, "position", 5000,
-    );
+    recipeItems = recipeLoader
+      ? (await Promise.all(recipeIds.map(id => recipeLoader.itemsForRecipe(id, true)))).flat()
+      : await service.entities.RecipeItem.filter({ recipe_id: { $in: recipeIds } }, "position", 5000);
   }
   const itemsByRecipe = new Map<string, any[]>();
   for (const ri of recipeItems || []) {
@@ -101,14 +103,14 @@ export async function prepareSaleIngredientDeduction(
   service: any,
   shopId: string,
   items: any[],
-  options: { allowMissing?: boolean } = {},
+  options: { allowMissing?: boolean; recipeLoader?: CheckoutRecipeLoader } = {},
 ) {
   const shopPrepared = items.filter((row: any) => row.source_type === "shop_prepared");
   if (!shopPrepared.length) {
     return { lines: [], requirements: [], plans: [], shortages: [] };
   }
 
-  const { byProduct } = await loadShopRecipes(service, shopPrepared);
+  const { byProduct } = await loadShopRecipes(service, shopPrepared, options.recipeLoader);
   for (const recipe of byProduct.values()) {
     if (recipe && !recipe.items.length) {
       throw httpError("Faol tex-kartada masalliqlar kiritilmagan. Egasi tekshirishi kerak.", 409);

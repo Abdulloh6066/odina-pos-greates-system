@@ -38,27 +38,27 @@ const deferred = () => {
   return { promise, resolve };
 };
 
-test('independent recipe reads overlap with a four-product limit and preserve snapshots and retry safety', { timeout: 5000 }, async () => {
+test('one scoped recipe read settles before financial writes and preserves snapshots and retry safety', { timeout: 5000 }, async () => {
   const f = checkoutFixture();
   const gate = deferred(); const firstBatch = deferred();
   let active = 0; let maximum = 0; let started = 0;
   const original = f.entities.Recipe.filter;
   f.entities.Recipe.filter = async (...args) => {
     active++; started++; maximum = Math.max(maximum, active);
-    if (started === 4) firstBatch.resolve();
+    if (started === 1) firstBatch.resolve();
     try { await gate.promise; return await original(...args); }
     finally { active--; }
   };
   const pending = f.invoke(file, f.request);
   try {
     await firstBatch.promise;
-    assert.equal(started, 4);
+    assert.equal(started, 1);
     assert.equal(f.calls.length, 0, 'financial writes wait until snapshot reads settle');
   } finally { gate.resolve(); }
   const result = await pending;
   assert.equal(result.status, 200, JSON.stringify(result));
-  assert.equal(maximum, 4);
-  assert.equal(started, 5);
+  assert.equal(maximum, 1);
+  assert.equal(started, 1);
   assert.equal(f.db.SaleItem.length, 5);
   for (const item of f.db.SaleItem) {
     assert.equal(item.unit_cost_at_sale, 500);
@@ -81,6 +81,7 @@ test('one failed cost lookup does not race pending reads or discard other produc
   const gate = deferred(); const started = deferred();
   const original = f.entities.Recipe.filter;
   f.entities.Recipe.filter = async query => {
+    if (query.product_id?.$in) throw new Error('Mock bulk cost lookup failure');
     if (query.product_id === 'cake-0') throw new Error('Mock cost lookup failure');
     started.resolve();
     await gate.promise;

@@ -101,7 +101,7 @@ test('checkout reuses validated products and recipes; baskets without recipes sk
   f.entities.Product.get = async (...args) => { products++; return get(...args); };
   f.entities.Recipe.filter = async (...args) => { recipes++; return filter(...args); };
   assert.equal((await f.invoke(file, f.request)).status, 200);
-  assert.equal(products, 2); assert.equal(recipes, 2);
+  assert.equal(products, 2); assert.equal(recipes, 1);
   assert.ok(f.db.SaleItem.every(row => row.unit_cost_at_sale === 500 && !row.cost_is_estimate));
   const noRecipes = checkoutFixture(1); noRecipes.db.Recipe = []; let supplierReads = 0;
   noRecipes.entities.SupplierReceipt.list = async () => { supplierReads++; throw new Error('Unexpected supplier read'); };

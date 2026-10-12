@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { memoryBackend } from './helpers/memory-backend.mjs';
 
 function fixture() {
   const db = {
@@ -122,18 +123,27 @@ function fixture() {
 }
 
 function loadHandler(client) {
-  const sharedSrc = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, '');
+  const userHelpers = readFileSync('base44/shared/user-helpers.ts', 'utf8').replace(/export /g, '');
+  const managerScope = readFileSync('base44/shared/manager-request-scope.ts', 'utf8')
+    .replace(/^import .*;$/gm, '').replace(/export /g, '');
+  const sharedSrc = userHelpers + '\n' + managerScope + '\n'
+    + readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
+      .replace(/^export \{[^\n]*\} from [^\n]*;$/gm, '').replace(/export /g, '');
   const sharedCode = ts.transpileModule(sharedSrc, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
 
   let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
+    .replace(/^import .*manager-request-scope.*;$/gm, '')
+    .replace(/^import .*checkout-recipes.*;$/gm, '')
+    .replace(/^import .*burger-fries.*;$/gm, '')
+    .replace(/import \{\s*prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,\s*\} from "\.\.\/\.\.\/shared\/sale-ingredient-flow\.ts";/, '')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
   // Load the real local cost helpers added to complete-sale, without importing the live SDK.
   const costSource = readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, '');
-  source = source.replace(/import \{ loadIngredientCosts, computeProductCost \} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '');
+  source = source.replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '');
   const shopPricing = readFileSync('base44/shared/shop-pricing.ts', 'utf8').replace(/export /g, '');
   source = source.replace(/import \{ priceForShop \} from "\.\.\/\.\.\/shared\/shop-pricing\.ts";/, '');
   source = sharedCode + '\n' + costSource + '\n' + shopPricing + '\n' + source;
@@ -141,7 +151,12 @@ function loadHandler(client) {
   const code = ts.transpileModule(source, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
   }).outputText;
-  const context = vm.createContext({ client, Response, crypto: webcrypto, console, structuredClone });
+  const context = vm.createContext({
+    ...memoryBackend().load('base44/shared/sale-ingredient-flow.ts'),
+    ...memoryBackend().load('base44/shared/checkout-recipes.ts'),
+    ...memoryBackend().load('base44/shared/burger-fries.js'),
+    client, Response, crypto: webcrypto, TextEncoder, console, structuredClone,
+  });
   vm.runInContext(code, context);
   return async (body) => {
     const response = await context.testHandler({ json: async () => body });

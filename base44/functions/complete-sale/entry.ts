@@ -33,7 +33,8 @@ import {
   BUDGET_ACCOUNT_LABELS, creditBudgetBalance, rollbackBudgetBalance,
   allocateServiceTicketNumber, finishServiceTicketCycleIfLastShift,
 } from "../../shared/shift-close-helpers.ts";
-import { loadIngredientCosts, computeProductCost } from "../../shared/cost-engine.ts";
+import { loadIngredientCosts, recipeCostFromMap, costPerPiece, num } from "../../shared/cost-engine.ts";
+import { createCheckoutRecipeLoader, type CheckoutRecipeLoader } from "../../shared/checkout-recipes.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
 import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries } from "../../shared/burger-fries.js";
 import {
@@ -42,11 +43,11 @@ import {
 
 // Restore only Odina Branch's deferred tech-card connection.
 const BRANCH_TECH_CARD_SHOP_ID = "6a96f0a4ecc85c2fc57f3174";
-async function prepareBranchIngredients(service: any, shopId: string, items: any[]) {
+async function prepareBranchIngredients(service: any, shopId: string, items: any[], recipeLoader?: CheckoutRecipeLoader) {
   const eligible = shopId === BRANCH_TECH_CARD_SHOP_ID
     ? items.filter((item) => item.source_type === "shop_prepared" && item.sale_unit !== "gram")
     : [];
-  const prepared = await prepareSaleIngredientDeduction(service, shopId, eligible, { allowMissing: true });
+  const prepared = await prepareSaleIngredientDeduction(service, shopId, eligible, { allowMissing: true, recipeLoader });
   const linked = new Set(prepared.lines.map((line: any) => line.product_id));
   for (const item of items) {
     if (linked.has(item.product_id)) {
@@ -66,18 +67,19 @@ async function settleCheckoutWrites(tasks: Array<() => Promise<unknown>>) {
 }
 
 // Preserve the existing immutable cost snapshots while stock checks run.
-async function loadSaleCostSnapshots(service: any, normalizedItems: any[], productsAtSale: Map<string, any>) {
+async function loadSaleCostSnapshots(service: any, normalizedItems: any[], productsAtSale: Map<string, any>, recipeLoader: CheckoutRecipeLoader) {
   const unitCostByProduct: Map<string, any> = new Map();
   const recipesByProduct: Map<string, any> = new Map();
   // Products without recipes retain the estimate fallback without loading
   // supplier history. Reuse verified recipes and product data below.
-  for (let start = 0; start < normalizedItems.length; start += 4) {
-    const batch = normalizedItems.slice(start, start + 4);
+  const productIds = [...new Set<string>(normalizedItems.map(item => String(item.product_id)))];
+  for (let start = 0; start < productIds.length; start += 4) {
+    const batch = productIds.slice(start, start + 4);
     const recipes = await Promise.allSettled(batch.map((item) =>
-      service.entities.Recipe.filter({ product_id: item.product_id, active: true })));
+      recipeLoader.recipesForProduct(item)));
     for (const [index, result] of recipes.entries()) {
       if (result.status === "fulfilled") {
-        if (result.value?.[0]) recipesByProduct.set(batch[index].product_id, result.value[0]);
+        if (result.value?.[0]) recipesByProduct.set(batch[index], result.value[0]);
       } else {
         console.warn("Cost snapshot skipped:", result.reason);
       }
@@ -86,19 +88,38 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
   if (!recipesByProduct.size) return unitCostByProduct;
   try {
     const ingredientCosts = await loadIngredientCosts(service);
-    const recipeItems = normalizedItems.filter((item) => recipesByProduct.has(item.product_id));
-    for (let start = 0; start < recipeItems.length; start += 4) {
-      const batch = recipeItems.slice(start, start + 4);
-      const costs = await Promise.allSettled(batch.map((item) =>
-        computeProductCost(service, item.product_id, ingredientCosts,
-          productsAtSale.get(item.product_id), recipesByProduct.get(item.product_id))));
+    const baseCostByProduct = new Map<string, any>();
+    const costProductIds = productIds.filter(id => recipesByProduct.has(id));
+    for (let start = 0; start < costProductIds.length; start += 4) {
+      const batch = costProductIds.slice(start, start + 4);
+      const costs = await Promise.allSettled(batch.map(async (productId) => {
+        const recipe = recipesByProduct.get(productId);
+        const [rawItems, product] = await Promise.all([
+          recipeLoader.itemsForRecipe(recipe.id),
+          productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
+        ]);
+        const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts);
+        const outputUnit = String(recipe.output_unit || product?.production_unit || "piece");
+        return {
+          costPerPiece: costPerPiece(batchCost, num(recipe.output_quantity), outputUnit,
+            num(product?.pieces_per_sheet) || 20),
+          hasPrice: hasAllPrices && rawItems.length > 0,
+          missing, outputUnit,
+        };
+      }));
       for (const [index, result] of costs.entries()) {
         if (result.status === "fulfilled") {
-          unitCostByProduct.set(saleLineKey(batch[index]), costWithBurgerFries(batch[index], result.value, ingredientCosts));
+          baseCostByProduct.set(batch[index], result.value);
         } else {
           console.warn("Cost snapshot skipped:", result.reason);
         }
       }
+    }
+    // Cached items remain RAW: ingredient deduction and costing each apply
+    // their own optional-fries rule exactly once for each sale line.
+    for (const item of normalizedItems) {
+      const baseCost = baseCostByProduct.get(item.product_id);
+      if (baseCost) unitCostByProduct.set(saleLineKey(item), costWithBurgerFries(item, baseCost, ingredientCosts));
     }
   } catch (costError) {
     console.warn("Cost snapshot skipped:", costError);
@@ -927,7 +948,8 @@ export default async function(req) {
         normalizeSaleItems(service, requestedItems, shift.shop_id, tableItems),
         stockPolicy(service),
       ]);
-      const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems);
+      const recipeLoader = createCheckoutRecipeLoader(service, normalizedItems.map(item => item.product_id));
+      const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader);
       if (ingredientPrep.shortages.length && !allowNegativeStock) {
         return Response.json({
           error: "Branch omborida tex-karta masalliqlari yetarli emas: " + ingredientPrep.shortages.map((row: any) => row.ingredient_name).join(", "),
@@ -1371,14 +1393,15 @@ export default async function(req) {
       normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null, productsAtSale),
       stockPolicy(service),
     ]);
-    const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems);
+    const recipeLoader = createCheckoutRecipeLoader(service, normalizedItems.map(item => item.product_id));
+    const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader);
     if (ingredientPrep.shortages.length && !allowNegativeStock) {
       throw httpError("Branch omborida tex-karta masalliqlari yetarli emas: "
         + ingredientPrep.shortages.map((row: any) => row.ingredient_name).join(", "), 409);
     }
     const [{ plans: stockPlans, shortages: stockWarnings }, unitCostByProduct] = await Promise.all([
       planSaleStock(service, shift.shop_id, normalizedItems),
-      loadSaleCostSnapshots(service, normalizedItems, productsAtSale),
+      loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader),
     ]);
     if (stockWarnings.length && !allowNegativeStock) {
       return Response.json({
