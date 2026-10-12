@@ -6,11 +6,12 @@ import vm from 'node:vm';
 import * as helpers from '../src/lib/burger-fries.js';
 
 const source = readFileSync('src/pages/POS.jsx', 'utf8');
-const callbacks = source.slice(source.indexOf('  const addToCart = (product) => {'),
+const callbacks = source.slice(source.indexOf('  const addToCart = useStableEvent((product) => {'),
   source.indexOf('  useEffect(() => { setBurgerProduct(null);'));
 const [classicId, miniId] = helpers.BURGER_PRODUCT_IDS;
 function harness(shift = null) {
   const ctx = { ...helpers, shift, user: { role: 'admin' }, cart: [], burgerProduct: null,
+    useStableEvent: callback => callback,
     tableLocked: false, paying: false, payOpen: false, stockChecking: false,
     openWeight: () => { throw new Error('Unexpected weight prompt'); },
     setCart: update => { ctx.cart = update(ctx.cart); },

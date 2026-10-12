@@ -3,6 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
+import { isStaffTicketEnabled } from '../src/lib/staff-order-ticket.js';
 
 const receipt = fs.readFileSync(new URL('../src/components/pos/Receipt.jsx', import.meta.url), 'utf8');
 const pos = fs.readFileSync(new URL('../src/pages/POS.jsx', import.meta.url), 'utf8');
@@ -29,10 +31,32 @@ test('receipt delegates print lifecycle, preserves the off preference, and suppl
 });
 
 test('POS decides post-print presentation without repeating the financial transaction', () => {
-  assert.match(pos, /if \(sale\?\.items\?\.length && !sale\?\.table_number_snapshot && !sale\?\.table_order_id_snapshot\)/);
+  assert.match(pos, /isStaffTicketEnabled\(sale\?\.shop_id \|\| shift\?\.shop_id \|\| user\?\.shop_id\)/);
   assert.match(pos, /onAfterPrint=\{finishSalePresentation\}/);
   const start = pos.indexOf('  const finishSalePresentation =');
   const end = pos.indexOf('  const finishQueuedSale =', start);
   assert.ok(start >= 0 && end > start);
   assert.doesNotMatch(pos.slice(start, end), /functions\.invoke|entities\./);
+});
+
+test('post-print Branch service ticket and Central pause both preserve the saved sale without a new transaction', () => {
+  const start = pos.indexOf('  const finishSalePresentation =');
+  const end = pos.indexOf('  const presentCompletedSale =', start);
+  const events = [];
+  const ctx = {
+    isStaffTicketEnabled, shift: null, user: {}, selectedTable: null,
+    setReceiptPrintSale: value => events.push(['receipt', value]),
+    setStaffTicket: value => events.push(['service', value]),
+  };
+  vm.runInNewContext(pos.slice(start, end) + '\nglobalThis.finish = finishSalePresentation;', ctx);
+  const branchSale = { id: 'sale', shop_id: 'branch', items: [{ product_name: 'Tort', quantity: 1 }] };
+  ctx.finish(branchSale);
+  assert.equal(events[0][0], 'receipt');
+  assert.equal(events[0][1], null);
+  assert.equal(events[1][0], 'service');
+  assert.equal(events[1][1].order, branchSale);
+  assert.equal(events[1][1].autoPrint, true);
+  events.length = 0;
+  ctx.finish({ ...branchSale, shop_id: '6a96f0a4ecc85c2fc57f3173' });
+  assert.deepEqual(events, [['receipt', null]]);
 });

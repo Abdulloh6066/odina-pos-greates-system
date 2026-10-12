@@ -3,7 +3,7 @@ import { Image } from '@/components/ui/image';
 import { formatUZS } from '@/lib/pos';
 import { posThumbnailFor } from '@/lib/pos-thumbnails';
 
-export default function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false }) {
+function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false }) {
   const [failedThumbnail, setFailedThumbnail] = React.useState(null);
   const thumbnail = posThumbnailFor(product, shopId);
   const useThumbnail = Boolean(thumbnail && thumbnail !== failedThumbnail);
@@ -43,3 +43,4 @@ export default function ProductCard({ product, shopId, stockQuantity = null, onA
     </button>
   );
 }
+export default React.memo(ProductCard);

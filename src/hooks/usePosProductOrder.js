@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
+const EMPTY_ORDER = Object.freeze([]);
+
 export default function usePosProductOrder(shopId, userId) {
   const [snapshot, setSnapshot] = useState(null);
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function usePosProductOrder(shopId, userId) {
     };
   }, [shopId, userId]);
   return {
-    order: snapshot?.shop_id === shopId ? snapshot.order : [],
+    order: snapshot && snapshot.shop_id === shopId ? (snapshot.order || EMPTY_ORDER) : EMPTY_ORDER,
     accept: next => setSnapshot(current => current?.shop_id === next.shop_id && current.version > next.version ? current : next),
   };
 }

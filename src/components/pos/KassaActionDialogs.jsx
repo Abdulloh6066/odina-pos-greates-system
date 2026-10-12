@@ -50,7 +50,7 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
   );
 }
 
-export function CashWithdrawalDialog({ open, shift, user, recipients = [], supplierDebts = {}, onClose, onConfirm, loading }) {
+export function CashWithdrawalDialog({ open, shift, user, recipients = [], supplierDebts = {}, onClose, onConfirm, loading, dataLoading = false, dataError = '', onRetryData }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('shop_expense');
@@ -80,7 +80,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
   const valid = Number(amount) > 0
     && Number(amount) <= Number(shift?.expected_cash || 0)
     && reason.trim()
-    && (!recipientRequired || (recipientId && Number(amount) <= selectedDebt))
+    && (!recipientRequired || (!dataLoading && !dataError && recipientId && Number(amount) <= selectedDebt))
     && (!ownerPinRequired || /^\d{4,8}$/.test(ownerPin))
     && (!ownerRequired || ownerName);
   const employeeName = user?.full_name || user?.email || 'Joriy Kassa xodimi';
@@ -128,11 +128,16 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
           {recipientRequired && (
             <div>
               <Label className="text-xs mb-1.5 block">Kompaniya / yetkazib beruvchi</Label>
-              <OdinaSelect value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect disabled={dataLoading || Boolean(dataError)} value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="">Ro‘yxatdan tanlang</option>
                 {debtRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name} · qarz {formatUZS(supplierDebts[recipient.id])}</option>)}
               </OdinaSelect>
-              {debtRecipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Hozir to‘lanadigan yetkazib beruvchi qarzi yo‘q.</p>}
+              {dataLoading && <p role="status" className="text-xs text-muted-foreground mt-1.5">Yetkazib beruvchilar yuklanmoqda…</p>}
+              {!dataLoading && dataError && <div role="alert" className="mt-1.5 text-xs text-amber-700">
+                <p>{dataError}</p>
+                {onRetryData && <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetryData}>Qayta yuklash</Button>}
+              </div>}
+              {!dataLoading && !dataError && debtRecipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Hozir to‘lanadigan yetkazib beruvchi qarzi yo‘q.</p>}
               {recipientId && <p className="text-xs text-muted-foreground mt-1.5">Qolgan umumiy qarz: <span className="font-semibold text-foreground">{formatUZS(selectedDebt)}</span></p>}
             </div>
           )}

@@ -11,7 +11,10 @@ import { priceForShop } from '@/lib/shop-pricing';
 import { canPreviewBurgerFries, repriceBurgerCartForShop, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
-import ProductCard from '@/components/pos/ProductCard';
+import ProductGrid from '@/components/pos/ProductGrid';
+import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
+import useStableEvent from '@/hooks/use-stable-event';
+import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
 import usePosProductOrder from '@/hooks/usePosProductOrder';
 import { sortByShopOrder } from '@/lib/pos-product-order';
@@ -78,6 +81,10 @@ export default function POS() {
   const [settings, setSettings] = useState(null);
   const [cashRecipients, setCashRecipients] = useState([]);
   const [supplierDebts, setSupplierDebts] = useState({});
+  const [cashDataLoading, setCashDataLoading] = useState(true);
+  const [cashDataError, setCashDataError] = useState('');
+  const loadGenerationRef = useRef(0);
+  const wasteAlertGenerationRef = useRef(0);
   const [loadingData, setLoadingData] = useState(true);
   const [stockChecking, setStockChecking] = useState(false);
   const [wasteAlerts, setWasteAlerts] = useState([]);
@@ -485,65 +492,94 @@ export default function POS() {
     }
   };
 
+  const loadCashData = async (generation = loadGenerationRef.current) => {
+    setCashDataLoading(true);
+    setCashDataError('');
+    try {
+      const [recipientList, response] = await Promise.all([
+        base44.entities.CashRecipient.list('name', 500),
+        base44.functions.invoke('supplier-ledger', { action: 'get_debts' }),
+      ]);
+      if (generation !== loadGenerationRef.current) return;
+      const payload = response?.data || response;
+      setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
+      setSupplierDebts(payload?.debts || {});
+    } catch (error) {
+      if (generation === loadGenerationRef.current) setCashDataError('Yetkazib beruvchilar ma’lumoti yuklanmadi. Qayta urinib ko‘ring.');
+    } finally {
+      if (generation === loadGenerationRef.current) setCashDataLoading(false);
+    }
+  };
+
+  const loadWasteAlerts = async (generation = loadGenerationRef.current) => {
+    const alertGeneration = ++wasteAlertGenerationRef.current;
+    try {
+      const response = await base44.functions.invoke('waste-ledger', { action: 'get_alerts' });
+      if (generation !== loadGenerationRef.current || alertGeneration !== wasteAlertGenerationRef.current) return;
+      const payload = response?.data || response;
+      setWasteAlerts(payload?.expired_items || []);
+    } catch { /* Keep the last known alerts when a background refresh fails. */ }
+  };
+
   const loadAll = async () => {
+    const generation = ++loadGenerationRef.current;
     setLoadingData(true);
-    const [cats, prods, shopList, settingsList, , recipientList, supplierReceipts, stockList, wasteAlertResult] = await Promise.all([
-      base44.entities.Category.list(),
-      base44.entities.Product.list(),
-      base44.entities.Shop.list(),
-      base44.entities.Settings.list(),
-      loadCurrentShift().catch(() => null),
-      base44.entities.CashRecipient.list('name', 500),
-      base44.functions.invoke('supplier-ledger', { action: 'get_debts' }).catch(() => ({ data: { debts: {} } })),
-      base44.entities.ProductStock.list('-updated_at', 500),
-      base44.functions.invoke('waste-ledger', { action: 'get_alerts' }).catch(() => ({ data: { expired_items: [] } })),
-    ]);
-    const categoryPriority = {
-      '15 somlik': 1,
-      '18 somlik': 2,
-      'aralash': 3,
-      'mini/tart': 4,
-      'pishiriqlar': 5,
-      'tortlar': 6,
-    };
-    const activeCategories = (cats || []).filter((c) => c.active);
-    const normalizeCategoryName = (name) => String(name || '').trim().toLowerCase();
-    const categoryByName = new Map(activeCategories.map((c) => [normalizeCategoryName(c.name), c]));
-    const pairedCategories = {
-      'kofe/issiq&kofe/ice': 'kofe/ice',
-      'limonadlar&matcha/anchan': 'matcha anchan',
-      'milkshake&smuzi': 'smuzi',
-    };
-    const hiddenCategoryIds = new Set();
-    const displayCategories = activeCategories.map((category) => {
-      const paired = categoryByName.get(pairedCategories[normalizeCategoryName(category.name)]);
-      if (paired) hiddenCategoryIds.add(paired.id);
-      return {
-        ...category,
-        sourceCategoryIds: paired ? [category.id, paired.id] : [category.id],
+    try {
+      const [cats, prods, shopList, settingsList, , stockList] = await Promise.all([
+        base44.entities.Category.list(),
+        base44.entities.Product.list(),
+        base44.entities.Shop.list(),
+        base44.entities.Settings.list(),
+        loadCurrentShift().catch(() => null),
+        base44.entities.ProductStock.list('-updated_at', 500),
+      ]);
+      if (generation !== loadGenerationRef.current) return;
+      const categoryPriority = {
+        '15 somlik': 1,
+        '18 somlik': 2,
+        'aralash': 3,
+        'mini/tart': 4,
+        'pishiriqlar': 5,
+        'tortlar': 6,
       };
-    });
-    setCategories(
-      displayCategories
-        .filter((c) => !hiddenCategoryIds.has(c.id))
-        .sort((a, b) => {
-          const aName = normalizeCategoryName(a.name);
-          const bName = normalizeCategoryName(b.name);
-          const aPriority = categoryPriority[aName] ?? 100;
-          const bPriority = categoryPriority[bName] ?? 100;
-          return aPriority - bPriority;
-        }),
-    );
-    setProducts((prods || []).filter((p) => p.active && p.archived !== true));
-    setProductStock(stockList || []);
-    setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
-    setSettings(settingsList?.[0] || null);
-    setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
-    const debtPayload = supplierReceipts?.data || supplierReceipts;
-    setSupplierDebts(debtPayload?.debts || {});
-    const wastePayload = wasteAlertResult?.data || wasteAlertResult;
-    setWasteAlerts(wastePayload?.expired_items || []);
-    setLoadingData(false);
+      const activeCategories = (cats || []).filter((c) => c.active);
+      const normalizeCategoryName = (name) => String(name || '').trim().toLowerCase();
+      const categoryByName = new Map(activeCategories.map((c) => [normalizeCategoryName(c.name), c]));
+      const pairedCategories = {
+        'kofe/issiq&kofe/ice': 'kofe/ice',
+        'limonadlar&matcha/anchan': 'matcha anchan',
+        'milkshake&smuzi': 'smuzi',
+      };
+      const hiddenCategoryIds = new Set();
+      const displayCategories = activeCategories.map((category) => {
+        const paired = categoryByName.get(pairedCategories[normalizeCategoryName(category.name)]);
+        if (paired) hiddenCategoryIds.add(paired.id);
+        return {
+          ...category,
+          sourceCategoryIds: paired ? [category.id, paired.id] : [category.id],
+        };
+      });
+      setCategories(
+        displayCategories
+          .filter((c) => !hiddenCategoryIds.has(c.id))
+          .sort((a, b) => {
+            const aName = normalizeCategoryName(a.name);
+            const bName = normalizeCategoryName(b.name);
+            const aPriority = categoryPriority[aName] ?? 100;
+            const bPriority = categoryPriority[bName] ?? 100;
+            return aPriority - bPriority;
+          }),
+      );
+      setProducts((prods || []).filter((p) => p.active && p.archived !== true));
+      setProductStock(stockList || []);
+      setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
+      setSettings(settingsList?.[0] || null);
+      // Auxiliary data never holds the product grid behind a loading screen.
+      void loadCashData(generation);
+      void loadWasteAlerts(generation);
+    } finally {
+      if (generation === loadGenerationRef.current) setLoadingData(false);
+    }
   };
 
   const {
@@ -557,27 +593,15 @@ export default function POS() {
   } = useOfflineSaleQueue(user?.id, () => loadAll().catch(() => {}));
 
   useEffect(() => {
-    if (user) loadAll().catch(() => setLoadingData(false));
+    if (user) void loadAll().catch(() => {});
+    return () => { loadGenerationRef.current++; wasteAlertGenerationRef.current++; };
   }, [user]);
 
   useEffect(() => {
     if (!user) return undefined;
 
     const unsubscribe = base44.entities.ProductStock.subscribe((event) => {
-      const recordId = event?.data?.id || event?.id;
-      if (!recordId) return;
-
-      setProductStock((current) => {
-        if (event.type === 'delete') {
-          return current.filter((stock) => stock.id !== recordId);
-        }
-
-        const existing = current.find((stock) => stock.id === recordId);
-        const nextRecord = { ...(existing || {}), ...(event.data || {}), id: recordId };
-        return existing
-          ? current.map((stock) => stock.id === recordId ? nextRecord : stock)
-          : [nextRecord, ...current];
-      });
+      setProductStock((current) => mergePosStockEvent(current, event));
     });
 
     return () => unsubscribe?.();
@@ -744,7 +768,7 @@ export default function POS() {
     });
     setWeightProduct(null);
   };
-  const addToCart = (product) => {
+  const addToCart = useStableEvent((product) => {
     if (tableLocked || paying || payOpen || stockChecking) return;
     if (canPreviewBurgerFries(product.id, shift?.shop_id || user?.shop_id)) {
       setBurgerProduct({ ...product, shopId: shift?.shop_id || user?.shop_id });
@@ -759,7 +783,7 @@ export default function POS() {
       }
       return [...prev, { product_id: product.id, product_name: product.name, image_url: product.image_url, price: product.price, sale_unit: 'piece', quantity: 1, subtotal: product.price }];
     });
-  };
+  });
 
   const saveBurgerChoice = (option) => {
     if (!burgerProduct || !['with', 'without'].includes(option) || tableLocked || paying || payOpen || stockChecking
@@ -1253,9 +1277,7 @@ export default function POS() {
     if (payload.table_released === false) {
       void odinaAlert('Savdo yozildi, lekin ochiq buyurtmani yopish tasdiqlanmadi. Qayta pul olmang! Ochiq buyurtmalar yoki Stollar ichida «To‘lovni tekshirish» orqali yakunlang.');
     }
-    base44.functions.invoke('waste-ledger', { action: 'get_alerts' })
-      .then((result) => setWasteAlerts((result?.data || result)?.expired_items || []))
-      .catch(() => {});
+    void loadWasteAlerts();
   };
 
   const completeSale = async (payments, printReceipt = true) => {
@@ -1693,6 +1715,8 @@ export default function POS() {
         </div>
       )}
 
+      <PaymentSavingStatus saving={paying} />
+
       {!screenMode && wasteAlerts.length > 0 && (
         <button
           type="button"
@@ -1745,29 +1769,10 @@ export default function POS() {
             </div>
 
             <div className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
-              {loadingData ? (
-                <div className="odina-product-grid grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
-                  {Array.from({ length: 8 }).map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-secondary animate-pulse" />)}
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                  <div className="text-5xl mb-3">🧁</div>
-                  <p className="text-sm font-medium text-muted-foreground">Mahsulot topilmadi</p>
-                </div>
-              ) : (
-                <div className="odina-product-grid grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
-                  {filtered.map((p) => (
-                    <ProductCard
-                      key={p.id}
-                      product={p}
-                      shopId={catalogShopId}
-                      stockQuantity={p.track_stock === false || !shift ? null : Number(stockByProduct[p.id] || 0)}
-                      onAdd={addToCart}
-                      disabled={tableLocked || paying}
-                    />
-                  ))}
-                </div>
-              )}
+              <ProductGrid products={filtered} shopId={catalogShopId}
+                stockByProduct={stockByProduct} showStock={Boolean(shift)}
+                onAdd={addToCart} disabled={tableLocked || paying || payOpen || stockChecking}
+                loading={loadingData} />
             </div>
           </div>
         </div>
@@ -1958,6 +1963,9 @@ export default function POS() {
         user={user}
         recipients={cashRecipients}
         supplierDebts={supplierDebts}
+        dataLoading={cashDataLoading}
+        dataError={cashDataError}
+        onRetryData={() => void loadCashData()}
         onClose={() => setCashWithdrawalOpen(false)}
         onConfirm={recordCashWithdrawal}
         loading={cashWithdrawalLoading}

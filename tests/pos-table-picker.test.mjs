@@ -5,6 +5,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { transformSync } from 'esbuild';
+import { isStaffTicketEnabled } from '../src/lib/staff-order-ticket.js';
 
 const read = (path) => readFileSync(path, 'utf8');
 const pos = read('src/pages/POS.jsx');
@@ -94,10 +95,11 @@ test('saving an unpaid table returns to clean POS only after server confirmation
 // not mount the app or invoke any live backend endpoint.
 const fastSaveAction = pos.slice(pos.indexOf('const saveAndStartNextOrder = async () => {'), pos.indexOf('const tableShop = selectedTable')).trim();
 const exerciseFastSave = async ({ dirty = true, order = { id: 'mock-order', state: 'occupied' },
-  succeeds = true, error = '', busy = false } = {}) => {
+  succeeds = true, error = '', busy = false, shopId = 'shop-1' } = {}) => {
   const events = [];
   const context = {
-    selectedTable: { number: 3, shopId: 'shop-1' }, tableShop: { id: 'shop-1', name: 'Mock shop' }, tableOrderLoading: busy,
+    selectedTable: { number: 3, shopId }, tableShop: { id: shopId, name: 'Mock shop' }, tableOrderLoading: busy,
+    isStaffTicketEnabled,
     savingTableRef: { current: false }, paying: false, payOpen: false,
     stockChecking: false, tableOrderError: error, tableOrder: order,
     tableCartDirty: dirty,
@@ -137,6 +139,14 @@ test('failed server save, existing saved order and pending load never silently l
   assert.equal(existing[0], 'reset-cart');
   assert.equal(existing.at(-2), 'navigate:/pos:3');
   assert.equal(existing.at(-1), 'ticket:table:shop-1:3');
+});
+
+test('Central saves and resets its table order while respecting the paused service ticket preference', async () => {
+  const events = await exerciseFastSave({ shopId: '6a96f0a4ecc85c2fc57f3173' });
+  assert.equal(events[0], 'server-save');
+  assert.ok(events.includes('reset-cart'));
+  assert.ok(events.includes('navigate:/pos:3'));
+  assert.equal(events.some(event => event.startsWith('ticket:')), false);
 });
 
 test('Kassa selection stays a real authenticated completed sale with no premature inventory deduction', () => {
