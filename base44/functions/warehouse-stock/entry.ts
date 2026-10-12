@@ -60,6 +60,16 @@ export default async function(req) {
       return Response.json({ error: "Stock item not found or inactive." }, { status: 404 });
     }
 
+    if (itemKind === "ingredient" && item.is_cake_layer === true) {
+      if (location.location_type !== "production") {
+        return Response.json({ error: "Qavat/list qoldig‘i faqat markaziy ishlab chiqarishda yuritiladi." }, { status: 400 });
+      }
+      if (item.base_unit !== "piece" || item.purchase_unit !== "piece" || Number(item.conversion_to_base) !== 1
+        || !Number.isSafeInteger(Number(body?.quantity_change))) {
+        return Response.json({ error: "Qavatlar butun list sonida, dona birligida kiritiladi." }, { status: 400 });
+      }
+    }
+
     const stockEntity = itemKind === "ingredient"
       ? service.entities.IngredientStock
       : service.entities.ProductStock;
@@ -73,6 +83,10 @@ export default async function(req) {
     const existing = matches?.[0] || null;
     const balanceBefore = number(existing?.quantity || 0);
     const balanceAfter = number(balanceBefore + quantityChange);
+    if (itemKind === "ingredient" && item.is_cake_layer === true
+      && ((existing && existing.unit !== "piece") || !Number.isSafeInteger(balanceBefore) || !Number.isSafeInteger(balanceAfter))) {
+      return Response.json({ error: "Qavat qoldig‘i yoki uning birligi noto‘g‘ri." }, { status: 409 });
+    }
     if (balanceAfter < 0) {
       return Response.json({ error: "This change would make stock negative." }, { status: 409 });
     }
