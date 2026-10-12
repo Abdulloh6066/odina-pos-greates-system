@@ -431,7 +431,7 @@ export default function Warehouse() {
             <SupplierLedgerPanel
               user={user}
               location={selectedLocationRecord}
-              ingredients={ingredients}
+              ingredients={ingredients.filter((ingredient) => !isCakeLayer(ingredient) || selectedLocationRecord?.location_type === 'production')}
               recipients={recipients}
               search={search}
             />
@@ -781,7 +781,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
           </div>
           <div className="rounded-xl bg-secondary/60 p-3 text-sm flex items-center justify-between">
             <span className="text-muted-foreground">O‘zgarishdan keyingi qoldiq</span>
-            <span className={`font-semibold ${after < 0 ? 'text-destructive' : ''}`}>{formatNum(after)} {UNIT_LABELS[unit] || unit}</span>
+            <span className={`font-semibold ${after < 0 ? 'text-destructive' : ''}`}>{formatNum(after)} {unitLabel}</span>
           </div>
         </div>
         <DialogFooter>
