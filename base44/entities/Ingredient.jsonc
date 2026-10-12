@@ -40,6 +40,11 @@
         "piece"
       ],
       "type": "string"
+    },
+    "is_cake_layer": {
+      "type": "boolean",
+      "default": false,
+      "description": "Pishirilgan biskvit/korj qavati. Markaziy ishlab chiqarishda butun list/qavat soni bilan yuritiladi; asosiy va xarid birligi piece."
     }
   },
   "required": [
