@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
@@ -142,14 +143,15 @@ export default function Waste() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-waste p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Chiqitlar"
+        eyebrow="MAHSULOT NAZORATI"
         subtitle="Muddat nazorati va mahsulotlarni birgalikda hisobdan chiqarish"
         icon={Trash2}
         actions={(
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => load({ quiet: true })} disabled={refreshing} className="min-h-11 rounded-xl touch-manipulation">
+            <Button aria-label="Chiqit ma’lumotlarini yangilash" variant="outline" onClick={() => load({ quiet: true })} disabled={refreshing} className="min-h-11 rounded-xl touch-manipulation">
               <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Yangilash</span>
             </Button>
@@ -160,7 +162,7 @@ export default function Waste() {
         )}
       />
 
-      <div className="odina-panel rounded-2xl border border-brand-sand/45 bg-brand-sand/15 p-4 sm:p-5 premium-shadow mb-5">
+      <div className="odina-operations-note odina-panel rounded-2xl border border-brand-sand/45 bg-brand-sand/15 p-4 sm:p-5 mb-5">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/25 text-brand-ink flex items-center justify-center shrink-0">
             <Clock3 className="w-5 h-5" />
@@ -176,7 +178,7 @@ export default function Waste() {
       </div>
 
       {context.shops.length > 1 && (
-        <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 mb-5">
+        <div className="odina-operations-toolbar odina-panel rounded-2xl bg-card border border-border p-4 mb-5">
           <Label htmlFor="waste-location" className="text-xs mb-1.5 block">Do‘kon</Label>
           <OdinaSelect
             id="waste-location"
@@ -195,7 +197,7 @@ export default function Waste() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="odina-operations-metrics odina-waste-metrics grid grid-cols-2 lg:grid-cols-4">
             <Metric icon={Clock3} label="24 soat ichida muddat" value={`${formatNum(locationSummary.nearExpiryQuantity)} dona`} />
             <Metric icon={PackageX} label="3 kundan oshgan mahsulot" value={`${formatNum(locationSummary.expiredQuantity)} dona`} danger={locationSummary.expiredQuantity > 0} />
             <Metric icon={Trash2} label="Jami faol chiqit" value={`${formatNum(locationSummary.wasteQuantity)} dona`} />
@@ -203,7 +205,7 @@ export default function Waste() {
           </div>
 
           <section className="mt-7">
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+            <div className="odina-operations-section-heading flex flex-wrap items-end justify-between gap-3 mb-3">
               <div>
                 <p className="odina-page-eyebrow">NAZORAT</p>
                 <h2 className="font-display text-xl sm:text-2xl font-bold">Mahsulotlar muddati</h2>
@@ -214,7 +216,7 @@ export default function Waste() {
                 </Button>
               )}
             </div>
-            <div role="group" aria-label="Muddat bo‘yicha ro‘yxat" className="flex flex-wrap gap-2 mb-4">
+            <div role="group" aria-label="Muddat bo‘yicha ro‘yxat" className="odina-period-switch flex flex-wrap gap-2 mb-4">
               <Button variant={expiryFilter === 'expired' ? 'default' : 'outline'}
                 aria-pressed={expiryFilter === 'expired'} onClick={() => setExpiryFilter('expired')} className="min-h-11 rounded-xl">
                 <AlertTriangle className="w-4 h-4 mr-2" /> 3 kundan oshganlar · {locationExpired.length} tur
@@ -237,7 +239,7 @@ export default function Waste() {
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {alertItems.map((item) => (
                   <div key={`${item.location_id}:${item.product_id}`}
-                    className={`odina-panel overflow-hidden rounded-2xl border bg-card premium-shadow ${expiryFilter === 'expired' ? 'border-red-200' : 'border-brand-sand/60'}`}>
+                    className={`odina-expiry-card odina-panel overflow-hidden rounded-2xl border bg-card ${expiryFilter === 'expired' ? 'border-red-200' : 'border-brand-sand/60'}`}>
                     <div className="flex gap-3 p-4">
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
                         {item.image_url
@@ -271,9 +273,10 @@ export default function Waste() {
           </section>
 
           <section className="mt-8">
-            <div className="mb-3">
-              <p className="odina-page-eyebrow">TARIX</p>
-              <h2 className="font-display text-xl sm:text-2xl font-bold">Chiqit yozuvlari</h2>
+            <div className="odina-operations-section-heading mb-3">
+              <div><p className="odina-page-eyebrow">TARIX</p>
+              <h2 className="font-display text-xl sm:text-2xl font-bold">Chiqit yozuvlari</h2></div>
+              <p>{formatNum(locationRecords.length)} ta yozuv · mahsulot va sabab tafsilotlari</p>
             </div>
             {locationRecords.length === 0 ? (
               <div className="odina-panel rounded-2xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
@@ -281,7 +284,7 @@ export default function Waste() {
                 <p className="text-sm">Hali chiqit yozuvi yo‘q.</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="odina-ledger space-y-3">
                 {locationRecords.map((record) => (
                   <WasteRow
                     key={record.id}
@@ -315,7 +318,7 @@ export default function Waste() {
 
 function Metric({ icon: Icon, label, value, danger = false }) {
   return (
-    <div className={`odina-panel rounded-2xl border p-4 sm:p-5 premium-shadow ${danger ? 'border-red-200 bg-red-50/60' : 'border-border bg-card'}`}>
+    <div className={`odina-operations-metric odina-waste-metric rounded-2xl border p-4 sm:p-5 ${danger ? 'border-red-200 bg-red-50/60' : 'border-border bg-card'}`}>
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${danger ? 'bg-red-100 text-red-700' : 'bg-primary/15 text-brand-ink'}`}>
         <Icon className="w-4.5 h-4.5" />
       </div>
@@ -328,7 +331,7 @@ function Metric({ icon: Icon, label, value, danger = false }) {
 function WasteRow({ record, canCancel, cancelling, onCancel }) {
   const cancelled = record.status === 'cancelled';
   return (
-    <div className={`odina-panel rounded-2xl border bg-card premium-shadow p-4 ${cancelled ? 'border-border opacity-70' : 'border-border'}`}>
+    <div className={`odina-ledger-row odina-waste-row odina-panel rounded-2xl border bg-card p-4 ${cancelled ? 'border-border opacity-70' : 'border-border'}`}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
           {record.photo_url
@@ -367,5 +370,6 @@ function WasteRow({ record, canCancel, cancelling, onCancel }) {
     </div>
   );
 }
+
 
 
