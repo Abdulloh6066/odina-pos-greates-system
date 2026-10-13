@@ -15,7 +15,7 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
       onClick={() => onAdd(product)}
       disabled={disabled}
       aria-label={`${product.name}, ${formatUZS(product.price)}. Buyurtmaga qo‘shish`}
-      className="odina-product-card group relative text-left bg-card rounded-2xl overflow-hidden border border-border hover:border-brand-sand premium-shadow hover:premium-shadow-lg transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation select-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="odina-product-card odina-workbench-product group relative text-left bg-card rounded-2xl overflow-hidden border border-border transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation select-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <div className="odina-product-photo relative aspect-square bg-white overflow-hidden">
         {product.image_url ? (
@@ -26,7 +26,7 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
             onError={useThumbnail ? () => setFailedThumbnail(thumbnail) : undefined}
             alt={product.name}
             fittingType="fill"
-            className="w-full h-full transition-transform duration-300 group-hover:scale-105"
+            className="w-full h-full"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-4xl font-display text-muted-foreground/40">
@@ -44,3 +44,4 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
   );
 }
 export default React.memo(ProductCard);
+
