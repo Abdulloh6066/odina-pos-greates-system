@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate, useOutletContext } from "react-router-dom";
 import {
@@ -193,16 +194,18 @@ export default function AuditExport() {
   const summary = data.summary || {};
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-[1500px] mx-auto">
+    <div className="odina-page odina-workbench odina-operations odina-auditexport p-5 sm:p-8 max-w-[1500px] mx-auto">
       <PageHeader
         title="Nazorat va eksport"
-        subtitle={formatNum(data.total || 0) + " ta yozuv · faqat Egasi / Admin"}
+        eyebrow="AMALLAR JURNALI"
+        subtitle={formatNum(data.total || 0) + " ta yozuv · savdo, to‘lov, smena va qoldiq harakatlari · faqat Egasi / Admin"}
         icon={ShieldCheck}
         actions={(
           <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
+              aria-label="Nazorat jurnalini yangilash"
               onClick={() => setReloadKey((value) => value + 1)}
               disabled={loading}
               className="min-h-11 rounded-xl"
@@ -223,7 +226,7 @@ export default function AuditExport() {
         )}
       />
 
-      <section aria-label="Qisqa xulosa" className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+      <section aria-label="Qisqa xulosa" className="odina-operations-metrics odina-audit-metrics grid grid-cols-2 lg:grid-cols-5 mb-5">
         <SummaryCard
           icon={ReceiptText}
           label="Savdolar"
@@ -259,8 +262,9 @@ export default function AuditExport() {
 
       <form
         onSubmit={applyFilters}
-        className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4 mb-5"
+        className="odina-operations-toolbar odina-panel rounded-2xl bg-card border border-border p-4 sm:p-5 mb-5"
       >
+        <div className="odina-toolbar-heading"><h2>Tekshirish doirasi</h2><p>Filtrlarni tanlab qo‘llang. CSV eksport ham shu natijalar bo‘yicha tayyorlanadi.</p></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
           <FilterField label="Boshlanish sanasi">
             <Input
@@ -350,7 +354,7 @@ export default function AuditExport() {
         </div>
       )}
 
-      <section className="odina-panel rounded-2xl bg-card border border-border premium-shadow overflow-hidden">
+      <section className="odina-operations-table-panel odina-panel rounded-2xl bg-card border border-border overflow-hidden">
         <div className="px-4 sm:px-5 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
           <div>
             <h2 className="font-display text-lg font-bold">Amallar tarixi</h2>
@@ -380,7 +384,7 @@ export default function AuditExport() {
         ) : (
           <>
             <div className="hidden md:block">
-              <Table>
+              <Table className="odina-operations-table">
                 <TableHeader>
                   <TableRow className="bg-secondary/35 hover:bg-secondary/35">
                     <TableHead className="pl-5 min-w-36">Vaqt</TableHead>
@@ -445,14 +449,14 @@ function FilterField({ label, children }) {
 
 function SummaryCard({ icon: Icon, label, value, note, danger = false }) {
   return (
-    <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4 min-w-0">
+    <div className="odina-operations-metric p-3 sm:p-4 min-w-0">
       <div className="flex items-start gap-3">
         <div className={"w-10 h-10 rounded-xl flex items-center justify-center shrink-0 " + (danger ? "bg-red-50 text-destructive" : "brand-surface text-brand-ink")}>
           <Icon className="w-5 h-5" />
         </div>
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="font-display text-base sm:text-lg font-bold truncate mt-0.5" title={value}>{value}</p>
+          <p className="odina-metric-value font-display text-base sm:text-lg font-bold mt-0.5" title={value}>{value}</p>
           <p className="text-[11px] text-muted-foreground truncate mt-0.5" title={note}>{note}</p>
         </div>
       </div>
@@ -462,7 +466,7 @@ function SummaryCard({ icon: Icon, label, value, note, danger = false }) {
 
 function AuditBadge({ row }) {
   return (
-    <span className={"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold " + (AUDIT_CATEGORY_STYLES[row.category] || AUDIT_CATEGORY_STYLES.action)}>
+    <span className={"odina-audit-badge inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold " + (AUDIT_CATEGORY_STYLES[row.category] || AUDIT_CATEGORY_STYLES.action)}>
       {row.category_label}
     </span>
   );
@@ -582,3 +586,4 @@ function LoadingRows() {
     </div>
   );
 }
+
