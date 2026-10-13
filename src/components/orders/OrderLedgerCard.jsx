@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image } from '@/components/ui/image';
-import { ArrowUpRight, Repeat2, User, Phone, Calendar, Clock, Store, ImageIcon } from 'lucide-react';
+import { ArrowUpRight, Repeat2, User, Phone, Calendar, Store, ImageIcon } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { displayOrderNumber, statusLabel, statusTone, typeLabel, payStatusLabel, payStatusTone, fulfilmentLabel } from '@/lib/orders';
 
@@ -25,12 +25,12 @@ export default function OrderLedgerCard({ order, isAdmin, onOpen, onRepeat }) {
         <ArrowUpRight className="opl-open-arrow" size={20} aria-hidden="true" />
       </div>
       <p className="opl-order-type-line">{typeLabel(order.order_type)} · {fulfilmentLabel(order.fulfilment_type)}</p>
-
+      <div className="opl-order-customer">
+        <div><span className="opl-order-customer-label">Mijoz</span><h3>{order.customer_name || '—'}</h3></div>
+        <div className="opl-order-due"><Calendar size={16} aria-hidden="true" /><span>{displayDate(order.required_date)}<strong>{order.required_time || '—'}</strong></span></div>
+      </div>
       <div className="opl-order-meta">
-        <MetaRow icon={User} label="Mijoz" value={order.customer_name} />
         <MetaRow icon={Phone} label="Telefon" value={order.customer_phone || '—'} />
-        <MetaRow icon={Calendar} label="Sana" value={displayDate(order.required_date)} />
-        <MetaRow icon={Clock} label="Vaqt" value={order.required_time || '—'} />
         {isAdmin && order.shop_name_snapshot && <MetaRow icon={Store} label="Do‘kon" value={order.shop_name_snapshot} />}
         {order.creator_name && <MetaRow icon={User} label="Yaratdi" value={`${order.creator_name}${order.creator_role ? ` (${order.creator_role})` : ''}`} />}
       </div>
