@@ -56,7 +56,11 @@ test('two consecutive transport failures pause connections; validation/auth/serv
   }
   assert.equal(network.isPosNetworkError(new Error('Invalid product')), false);
   assert.equal(network.isPosNetworkError({ code: 'ERR_CANCELED', request: {} }), false);
-  assert.equal(network.nextPosConnectionState({ failures: 2, offline: true }, error(503)).offline, true);
+  const recovering = network.nextPosConnectionState({ failures: 2, offline: true }, error(503));
+  assert.equal(recovering.offline, true);
+  const stillUnavailable = network.nextPosConnectionState(recovering, error(0));
+  assert.equal(stillUnavailable.offline, true);
+  assert.equal(network.nextPosConnectionState(stillUnavailable).offline, false);
   assert.equal(network.isPosNetworkError(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })), true);
   assert.equal(network.queueAuthorizationBlocked([{ last_error_status: 401 }]), true);
   assert.equal(network.isPosAuthorizationError(error(403)), true);
