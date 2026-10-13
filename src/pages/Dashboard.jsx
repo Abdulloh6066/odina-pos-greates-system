@@ -1,11 +1,23 @@
+import '@/styles/dashboard-workbench.css';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { AlertTriangle, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
 import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey, canAccess } from '@/lib/pos';
-import { formatUzbekistan } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import OdinaSelect from '@/components/ui/odina-select';
+
+const DASHBOARD_MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'];
+const DASHBOARD_WEEKDAYS = ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'];
+
+// Display the existing Tashkent report date consistently when browser locale names fall back.
+function formatDashboardDate(dateKey) {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || ''));
+  if (!parts) return '—';
+  const date = new Date(`${dateKey}T12:00:00+05:00`);
+  if (Number.isNaN(date.getTime())) return '—';
+  return `${DASHBOARD_WEEKDAYS[date.getUTCDay()]}, ${Number(parts[3])}-${DASHBOARD_MONTHS[Number(parts[2]) - 1]}`;
+}
 
 export default function Dashboard() {
   const { user } = useOutletContext();
@@ -188,11 +200,21 @@ export default function Dashboard() {
   if (role === 'cashier') return null;
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
-      <PageHeader title="Bosh sahifa" subtitle={formatUzbekistan(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' })} icon={LayoutDashboard} />
+    <div className="odina-page odina-home p-5 sm:p-8 max-w-7xl mx-auto">
+      <PageHeader
+        title="Bosh sahifa"
+        eyebrow="Bugungi ish kuni"
+        subtitle={<time dateTime={businessDate}>{formatDashboardDate(businessDate)}</time>}
+        icon={LayoutDashboard}
+        actions={canAccess(role, 'pos') && (
+          <button type="button" onClick={() => navigate('/pos')} className="odina-home-pos-action odina-button odina-button-primary">
+            Kassani ochish <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </button>
+        )}
+      />
 
-      <div className="odina-panel mb-5 rounded-2xl border border-border bg-card p-4 premium-shadow">
-        <label htmlFor="dashboard-shop" className="block text-sm font-semibold mb-3">Do‘konni tanlang</label>
+      <div className="odina-home-filter">
+        <label htmlFor="dashboard-shop" className="odina-home-filter-label">Do‘konni tanlang</label>
         <OdinaSelect
           id="dashboard-shop"
           aria-label="Do‘kon bo‘yicha ko‘rish"
@@ -200,7 +222,7 @@ export default function Dashboard() {
           disabled={loading || shops.length === 0}
           onChange={(event) => setSelectedShopId(event.target.value)}
           placeholder={shopName}
-          className="w-full sm:max-w-sm min-h-12 bg-primary text-primary-foreground border-transparent font-semibold touch-manipulation"
+          className="odina-home-shop-select w-full min-h-11 touch-manipulation"
         >
           {[
             ...(role === 'manager' ? [] : [{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }]),
@@ -210,76 +232,85 @@ export default function Dashboard() {
             <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name}</option>
           ))}
         </OdinaSelect>
-        <p aria-live="polite" className="mt-3 text-xs text-muted-foreground">{shopName} · Bugungi ko‘rsatkichlar</p>
+        <p aria-live="polite" className="odina-home-filter-scope">{shopName} · Bugungi ko‘rsatkichlar</p>
       </div>
 
       {visibleExpiredItems.length > 0 && (
         <button
           type="button"
           onClick={() => navigate('/waste')}
-          className="w-full mb-5 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-left text-red-900 hover:bg-red-100 transition-colors premium-shadow touch-manipulation"
+          className="odina-home-expiry w-full flex items-center gap-3 text-left touch-manipulation"
         >
-          <span className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5" />
+          <span className="odina-home-expiry-icon flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">{visibleExpiredItems.length} tur mahsulot 3 kundan oshgan</span>
-            <span className="block text-sm text-red-700/80 mt-0.5">{shopName} · Ko‘rish va chiqitga chiqarish uchun bosing.</span>
+            <span className="block text-sm mt-0.5">{shopName} · Ko‘rish va chiqitga chiqarish uchun bosing.</span>
           </span>
-          <ArrowRight className="w-5 h-5 shrink-0" />
+          <ArrowRight className="w-5 h-5 shrink-0" aria-hidden="true" />
         </button>
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}
+        <div className="odina-home-loading" role="status" aria-label="Bosh sahifa yuklanmoqda" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="odina-home-placeholder rounded-2xl bg-secondary animate-pulse" aria-hidden="true" />)}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <StatCard icon={TrendingUp} label="Bugungi olingan pul" value={dailyTotals ? formatUZS(dailyTotals.collections) : '—'} accent />
-            <StatCard icon={Receipt} label="Kassa savdolari" value={dailyTotals ? formatNum(todayOrders) : '—'} />
-            <StatCard icon={ShoppingBag} label="Kassa o‘rtacha sof savdosi" value={dailyTotals ? formatUZS(avgOrder) : '—'} />
-            <StatCard icon={Star} label="Mahsulotlar" value={formatNum(productCount)} />
+          <div className="odina-home-overview">
+            <section className="odina-home-collections" aria-labelledby="dashboard-collections">
+              <div className="odina-home-collections-heading">
+                <TrendingUp className="w-5 h-5" aria-hidden="true" />
+                <h2 id="dashboard-collections">Bugungi olingan pul</h2>
+              </div>
+              <p className="odina-home-collections-value">{dailyTotals ? formatUZS(dailyTotals.collections) : '—'}</p>
+              {reportError ? <p role="alert" className="odina-home-report-error">Kunlik jami yuklanmadi: {reportError}</p>
+                : dailyTotals && <div className="odina-home-collections-detail">
+                  <dl className="odina-home-money-breakdown">
+                    <div><dt>Kassa sof savdo</dt><dd>{formatUZS(dailyTotals.revenue)}</dd></div>
+                    <div><dt>Buyurtma to‘lovlari</dt><dd>{formatUZS(dailyTotals.orderPayments)}</dd></div>
+                  </dl>
+                  <p className="odina-home-money-note">Jami olingan pul foyda emas.</p>
+                </div>}
+            </section>
+            <dl className="odina-home-metrics">
+              <StatCard icon={Receipt} label="Kassa savdolari" value={dailyTotals ? formatNum(todayOrders) : '—'} />
+              <StatCard icon={ShoppingBag} label="Kassa o‘rtacha sof savdosi" value={dailyTotals ? formatUZS(avgOrder) : '—'} />
+              <StatCard icon={Star} label="Katalogdagi mahsulotlar" value={formatNum(productCount)} />
+            </dl>
           </div>
 
-          {reportError ? <p role="alert" className="mt-3 text-sm text-destructive">Kunlik jami yuklanmadi: {reportError}</p>
-            : dailyTotals && <p className="mt-3 text-xs text-muted-foreground">Kassa sof savdo: {formatUZS(dailyTotals.revenue)} · Buyurtma to‘lovlari: {formatUZS(dailyTotals.orderPayments)}. Jami olingan pul foyda emas.</p>}
-          <div className="grid lg:grid-cols-2 gap-5 mt-6">
+          <div className="odina-home-rankings">
             <Panel title="Bugungi Kassa mahsulotlari" icon={Star}>
               {bestSellers.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
-                <div className="space-y-2.5">
+                <ol className="odina-home-ranking-list" role="list">
                   {bestSellers.map(({ key, name, quantity, unit }, i) => (
-                    <div key={key} className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-primary/15 text-brand-ink flex items-center justify-center text-xs font-bold">{i + 1}</div>
-                      <span className="flex-1 text-sm font-medium truncate">{name}</span>
-                      <span className="text-sm font-semibold text-muted-foreground">{Number(quantity.toFixed(3))} {unit} sotildi</span>
-                    </div>
+                    <li key={key} className="odina-home-ranking-row">
+                      <span className="odina-home-rank" aria-hidden="true">{i + 1}</span>
+                      <span className="odina-home-ranking-name">{name}</span>
+                      <span className="odina-home-ranking-value">{Number(quantity.toFixed(3))} {unit} sotildi</span>
+                    </li>
                   ))}
-                </div>
+                </ol>
               )}
             </Panel>
 
             <Panel title="Bugungi Kassa xodimlari" icon={UsersIcon}>
               {topEmployees.length === 0 ? <Empty text="Bugun hali savdo yo‘q" /> : (
-                <div className="space-y-2.5">
+                <ol className="odina-home-ranking-list" role="list">
                   {topEmployees.map(([name, amt], i) => (
-                    <div key={name} className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-primary/15 text-brand-ink flex items-center justify-center text-xs font-bold">{i + 1}</div>
-                      <span className="flex-1 text-sm font-medium truncate">{name}</span>
-                      <span className="text-sm font-semibold">{formatUZS(amt)}</span>
-                    </div>
+                    <li key={name} className="odina-home-ranking-row">
+                      <span className="odina-home-rank" aria-hidden="true">{i + 1}</span>
+                      <span className="odina-home-ranking-name">{name}</span>
+                      <span className="odina-home-ranking-value">{formatUZS(amt)}</span>
+                    </li>
                   ))}
-                </div>
+                </ol>
               )}
             </Panel>
           </div>
 
-          {canAccess(role, 'pos') && (
-            <button onClick={() => navigate('/pos')} className="mt-6 w-full min-h-14 flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-primary-foreground font-semibold premium-shadow hover:bg-primary-strong active:scale-[0.99] transition-all touch-manipulation">
-              Kassani ochish <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
         </>
       )}
     </div>
@@ -288,28 +319,26 @@ export default function Dashboard() {
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
-    <div className={`odina-panel odina-metric rounded-2xl p-4 sm:p-5 border transition-all hover:-translate-y-0.5 ${accent ? 'odina-metric-accent bg-primary text-primary-foreground border-transparent premium-shadow' : 'bg-card border-border premium-shadow'}`}>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${accent ? 'bg-primary-foreground/15' : 'bg-primary/15 text-brand-ink'}`}>
-        <Icon className="w-4.5 h-4.5" />
-      </div>
-      <div className="text-xs uppercase tracking-wide opacity-70 mb-1">{label}</div>
-      <div className="font-display text-xl sm:text-2xl font-bold leading-tight">{value}</div>
+    <div className={`odina-home-stat ${accent ? 'odina-home-stat-accent' : ''}`}>
+      <dt><Icon className="w-4 h-4" aria-hidden="true" /><span>{label}</span></dt>
+      <dd>{value}</dd>
     </div>
   );
 }
 
 function Panel({ title, icon: Icon, children }) {
   return (
-    <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className="w-4.5 h-4.5 text-brand-ink" />
-        <h3 className="font-display text-lg font-bold">{title}</h3>
-      </div>
+    <section className="odina-home-panel" aria-label={title}>
+      <header className="odina-home-panel-heading">
+        <Icon className="w-4 h-4" aria-hidden="true" />
+        <h2>{title}</h2>
+      </header>
       {children}
-    </div>
+    </section>
   );
 }
 
 function Empty({ text }) {
-  return <div className="text-sm text-muted-foreground py-6 text-center">{text}</div>;
+  return <div className="odina-home-empty">{text}</div>;
 }
+
