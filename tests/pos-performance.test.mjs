@@ -139,6 +139,7 @@ test('late background data from an earlier catalog load cannot overwrite its rep
 
 function gridFixture() {
   const renders = new Map();
+  const SearchIcon = props => React.createElement('svg', { ...props, 'aria-hidden': true });
   const instrumentedReact = { ...React, memo: (render, compare) => React.memo(props => {
     renders.set(props.product.id, (renders.get(props.product.id) || 0) + 1);
     return render(props);
@@ -151,6 +152,7 @@ function gridFixture() {
   });
   const Grid = component('src/components/pos/ProductGrid.jsx', {
     react: React,
+    'lucide-react': { Search: SearchIcon, PackageSearch: SearchIcon },
     '@/components/pos/ProductCard': Card,
     './ProductCard': Card,
   });
