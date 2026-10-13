@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -179,16 +180,17 @@ export default function DailyExport() {
   }, [history]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Kunlik eksport" subtitle="Kassa savdosi, buyurtma to‘lovlari va olingan pul — Google Sheets, email va CSV" />
+    <div className="odina-page odina-workbench odina-operations odina-daily-export p-5 sm:p-8 max-w-[1500px] mx-auto space-y-6">
+      <PageHeader title="Kunlik eksport" eyebrow="HISOBOTLARNI YETKAZISH" icon={FileSpreadsheet} subtitle="Kassa savdosi, buyurtma to‘lovlari va olingan pul — Google Sheets, email va CSV" />
 
       {/* Config */}
       {isAdmin && (
-        <Card>
+        <Card className="odina-export-config odina-operations-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <FileSpreadsheet className="w-5 h-5 text-brand-olive" /> Sozlamalar
+              <FileSpreadsheet className="w-5 h-5 text-brand-olive" /> Avtomatik yetkazish
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">Email, ulanish va eslatmalarni bir joyda sozlang.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
@@ -213,7 +215,7 @@ export default function DailyExport() {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-6 pt-1">
+            <div className="odina-export-switches flex flex-wrap gap-6 pt-1">
               <label className="flex items-center gap-3 text-sm">
                 <Switch checked={autoSend} onCheckedChange={setAutoSend} />
                 <span>Avtomatik yuborish (smena yopilganda, 23:00+)</span>
@@ -238,12 +240,11 @@ export default function DailyExport() {
       )}
 
       {/* Preview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
-            <span>Kunlik hisobot</span>
-            <div className="flex flex-wrap items-center gap-2">
-              <Input type="date" value={businessDate} max={tashkentDateKey()} onChange={(e) => setBusinessDate(e.target.value)} className="w-44 h-10" />
+      <Card className="odina-export-preview odina-operations-card">
+        <CardHeader className="odina-export-preview-heading">
+          <div><CardTitle className="text-base">Kunlik hisobot</CardTitle><p className="text-xs text-muted-foreground mt-1">Sanani tanlang, tekshiring va eksport qiling.</p></div>
+            <div className="odina-export-actions flex flex-wrap items-center gap-2">
+              <Input aria-label="Kunlik hisobot sanasi" type="date" value={businessDate} max={tashkentDateKey()} onChange={(e) => setBusinessDate(e.target.value)} className="w-44 h-10" />
               <Button variant="outline" size="sm" onClick={() => loadPreview(businessDate)} disabled={loading}>
                 <RefreshCw className="w-4 h-4" /> Yangilash
               </Button>
@@ -256,21 +257,20 @@ export default function DailyExport() {
                 </Button>
               )}
             </div>
-          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="mb-3 text-xs text-muted-foreground leading-relaxed">Buyurtma avansi va qoldig‘i pul olingan kuni hisoblanadi, Kassa foydasiga qo‘shilmaydi. Kassa yalpi foydasidan do‘kon xarajatlari ayrilmagan.
+          <p className="odina-operations-note mb-3 text-xs text-muted-foreground leading-relaxed">Buyurtma avansi va qoldig‘i pul olingan kuni hisoblanadi, Kassa foydasiga qo‘shilmaydi. Kassa yalpi foydasidan do‘kon xarajatlari ayrilmagan.
             {reports.some(row => row.unknown_cost_count > 0) && ' Ayrim tannarxlar noma’lum yoki taxminiy; foyda to‘liq emas.'}
           </p>
           {loading ? (
             <div className="py-10 text-center text-sm text-muted-foreground">Hisoblanmoqda…</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="odina-operations-table w-full text-sm">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border">
                     {COLS.map((c) => (
-                      <th key={c.key} className="py-2 pr-3 font-medium whitespace-nowrap">{c.label}</th>
+                      <th key={c.key} className={`py-2 pr-3 font-medium whitespace-nowrap ${c.num ? 'text-right' : 'text-left'}`}>{c.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -278,7 +278,7 @@ export default function DailyExport() {
                   {reports.map((r) => (
                     <tr key={r.shop_id} className="border-b border-border/60 hover:bg-secondary/40">
                       {COLS.map((c) => (
-                        <td key={c.key} className={`py-2.5 pr-3 whitespace-nowrap ${c.profit ? (Number(r.real_profit) < 0 ? 'text-destructive' : 'text-emerald-600') : ''} ${c.num ? 'tabular-nums' : 'font-medium'}`}>
+                        <td key={c.key} className={`py-2.5 pr-3 whitespace-nowrap ${c.profit ? (Number(r.real_profit) < 0 ? 'text-destructive' : 'text-emerald-600') : ''} ${c.num ? 'tabular-nums text-right' : 'font-medium'}`}>
                           {c.num ? formatNum(r[c.key]) : r[c.key]}
                         </td>
                       ))}
@@ -291,7 +291,7 @@ export default function DailyExport() {
                 {reports.length > 0 && (
                   <tfoot>
                     <tr className="font-semibold bg-secondary/40">
-                      {COLS.map(c => <td key={c.key} className="py-2.5 pr-3 tabular-nums">{c.num ? formatNum(totals[c.key]) : 'JAMI'}</td>)}
+                      {COLS.map(c => <td key={c.key} className={`py-2.5 pr-3 tabular-nums ${c.num ? 'text-right' : 'text-left'}`}>{c.num ? formatNum(totals[c.key]) : 'JAMI'}</td>)}
                     </tr>
                   </tfoot>
                 )}
@@ -302,7 +302,7 @@ export default function DailyExport() {
       </Card>
 
       {/* History */}
-      <Card>
+      <Card className="odina-export-history odina-operations-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Mail className="w-5 h-5 text-brand-olive" /> Yuborilgan hisobotlar tarixi
@@ -314,7 +314,7 @@ export default function DailyExport() {
           ) : (
             <div className="space-y-3">
               {historyByDate.map(([date, rows]) => (
-                <div key={date} className="rounded-xl border border-border p-3">
+                <div key={date} className="odina-export-history-date rounded-xl border border-border p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-3">
                       <span className="font-display font-semibold">{date}</span>
@@ -327,7 +327,7 @@ export default function DailyExport() {
                     </div>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="odina-operations-table w-full text-xs">
                       <thead>
                         <tr className="text-left text-muted-foreground border-b border-border">
                           <th className="py-1.5 pr-3 font-medium">Do‘kon</th>
