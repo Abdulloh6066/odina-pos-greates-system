@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, Navigate } from 'react-router-dom';
@@ -14,12 +15,12 @@ import { odinaConfirm } from '@/lib/odina-dialog';
 import { Trash2, RotateCcw } from 'lucide-react';
 
 const ROLE_COLORS = {
-  admin: 'bg-red-50 text-red-700',
-  manager: 'bg-cyan-50 text-cyan-700',
-  cashier: 'bg-blue-50 text-blue-700',
-  accountant: 'bg-violet-50 text-violet-700',
-  production: 'bg-amber-50 text-amber-700',
-  warehouse: 'bg-emerald-50 text-emerald-700',
+  admin: 'bg-secondary text-brand-ink',
+  manager: 'bg-secondary text-brand-ink',
+  cashier: 'bg-secondary text-brand-ink',
+  accountant: 'bg-secondary text-brand-ink',
+  production: 'bg-secondary text-brand-ink',
+  warehouse: 'bg-secondary text-brand-ink',
 };
 
 const ROLE_LABELS = {
@@ -134,21 +135,22 @@ export default function Users() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-users p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
         title="Xodimlar"
-        subtitle={`${users.length} ta xodim`}
+        eyebrow="JAMOA BOSHQARUVI"
+        subtitle={`${users.length} ta xodim · lavozim, ish joyi va kirish ruxsatlari`}
         icon={UsersIcon}
         actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
 
-      <p className="mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi biriktirilgan faol ish joyida kassa, buyurtmalar, stollar, ombor, kirim va do‘kon narxlarini boshqaradi. Budget, global katalog va sozlamalar hamda xodim ruxsatlari egasi boshqaruvida qoladi. Qaytarish va 100% chegirma egasi PIN kodi bilan tasdiqlanadi. Yordam: @Abdulloh1100.</p>
+      <p className="odina-operations-note mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi biriktirilgan faol ish joyida kassa, buyurtmalar, stollar, ombor, kirim va do‘kon narxlarini boshqaradi. Budget, global katalog va sozlamalar hamda xodim ruxsatlari egasi boshqaruvida qoladi. Qaytarish va 100% chegirma egasi PIN kodi bilan tasdiqlanadi. Yordam: @Abdulloh1100.</p>
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
-        <div className="space-y-3">
+        <div className="odina-ledger odina-staff-ledger space-y-3">
           {users.map((u) => (
-            <div key={u.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 flex flex-col gap-4">
+            <div key={u.id} className="odina-ledger-row odina-staff-row odina-panel rounded-2xl bg-card border border-border p-4 flex flex-col gap-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-semibold shrink-0">
                   {(u.full_name || u.email || '?').charAt(0).toUpperCase()}
