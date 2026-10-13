@@ -11,7 +11,6 @@ export default function Layout() {
   const [posCompact, setPosCompact] = useState(() => localStorage.getItem('odina-pos-density') === 'compact');
   const [compactSidebarOpen, setCompactSidebarOpen] = useState(false);
   const location = useLocation();
-  const redesigned = location.pathname !== '/';
   const compactPOS = location.pathname === '/pos' && posCompact;
   const effectiveSidebarCollapsed = compactPOS ? !compactSidebarOpen : sidebarCollapsed;
   const togglePosCompact = () => {
@@ -69,7 +68,7 @@ export default function Layout() {
   }
 
   return (
-    <div className={`${redesigned ? 'odina-redesign-shell ' : ''}min-h-dvh bg-background flex`}>
+    <div className="odina-redesign-shell min-h-dvh bg-background flex">
       <Sidebar
         user={user}
         mobileOpen={mobileOpen}
@@ -85,7 +84,7 @@ export default function Layout() {
           <OdinaBrand compact />
           <div className="w-9" />
         </div>
-        <main className={`odina-workspace ${redesigned ? 'odina-workbench ' : ''}flex-1 min-w-0`} data-page={location.pathname}>
+        <main className="odina-workspace odina-workbench flex-1 min-w-0" data-page={location.pathname}>
           <Suspense fallback={pageFallback}>
             <Outlet context={{ user, sidebarCollapsed: effectiveSidebarCollapsed, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: false }} />
           </Suspense>
