@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -43,10 +44,11 @@ export default function DiscountCodes() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-discountcodes p-5 sm:p-8 max-w-4xl mx-auto animate-fade-in">
       <PageHeader
         title="Chegirma kodlari"
-        subtitle={`${codes.length} ta kod`}
+        eyebrow="SAVDO AKSIYALARI"
+        subtitle={`${codes.length} ta kod · chegirma shartlari, muddati va foydalanish tartibi`}
         icon={Ticket}
         actions={canManage && (
           <Button onClick={() => { setEditing(null); setOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
@@ -57,15 +59,15 @@ export default function DiscountCodes() {
       {loading ? (
         <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : codes.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-16 text-center">Hozircha chegirma kodi yo‘q.</p>
+        <p className="odina-operations-empty text-sm text-muted-foreground py-16 text-center">Hozircha chegirma kodi yo‘q.</p>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="odina-discount-grid grid sm:grid-cols-2 gap-4">
           {codes.map((c) => (
-            <div key={c.id} className="odina-panel flex items-center gap-3 rounded-2xl bg-card border border-border premium-shadow p-4">
-              <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center"><Ticket className="w-5 h-5" /></div>
+            <div key={c.id} className="odina-discount-card odina-panel flex items-center gap-3 rounded-2xl bg-card border border-border p-4">
+              <div className="odina-discount-percent" aria-label={`${c.percentage}% chegirma`}>{c.percentage}<span>%</span></div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold font-mono truncate">{c.code}</div>
-                <div className="text-xs text-muted-foreground">{c.percentage}% chegirma · {c.single_use === false ? 'Cheksiz foydalanish' : 'Bir martalik'}</div>
+                <div className="text-xs text-muted-foreground">{c.single_use === false ? 'Cheksiz foydalanish' : 'Bir martalik'}</div>
                 <div className="text-xs text-muted-foreground mt-1">
                   {c.valid_until ? c.valid_until.split('-').reverse().join('.') + ' gacha' : 'Muddatsiz'}
                   {' · '}{c.valid_until && Date.now() > Date.parse(c.valid_until + 'T23:59:59.999+05:00') ? 'Muddati tugagan' : 'Faol'}
@@ -73,8 +75,8 @@ export default function DiscountCodes() {
               </div>
               {canManage && (
                 <div className="flex gap-1">
-                  <button onClick={() => { setEditing(c); setOpen(true); }} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => remove(c)} className="w-9 h-9 rounded-lg border border-border flex items-center justify-center hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
+                  <button aria-label={`${c.code} — tahrirlash`} onClick={() => { setEditing(c); setOpen(true); }} className="w-11 h-11 rounded-lg border border-border flex items-center justify-center hover:bg-secondary"><Pencil className="w-4 h-4" /></button>
+                  <button aria-label={`${c.code} — o‘chirish`} onClick={() => remove(c)} className="w-11 h-11 rounded-lg border border-border flex items-center justify-center hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
                 </div>
               )}
             </div>
