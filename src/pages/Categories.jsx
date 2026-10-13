@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import CategoryIcon from '@/components/CategoryIcon';
 import { TEA_ICON_URL, APELSIN_ICON_URL, SMOOTHIE_ICON_URL, MILKSHAKE_ICON_URL } from '@/lib/category-icon';
 import '@/styles/categories-catalog.css';
+import '@/styles/catalog-workbench.css';
+import PageHeader from '@/components/PageHeader';
 
 const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '🥤', '🍰', '🍪', '🍩', '🥧', '🍫', '🍓', '🍋', '🫐', '🍔', '➕', TEA_ICON_URL, APELSIN_ICON_URL, SMOOTHIE_ICON_URL, MILKSHAKE_ICON_URL];
 
@@ -51,24 +53,23 @@ export default function Categories() {
   };
 
   return (
-    <div className="cat-page">
+    <div className="cat-page odina-page odina-workbench catalog-workbench catalog-categories">
       <div className="cat-shell">
-        <div className="cat-header">
-          <div className="cat-header-left">
-            <span className="cat-eyebrow">KATALOG</span>
-            <h1>Kategoriyalar</h1>
-            <p>Mahsulotlar kategoriya bo‘yicha ixcham tartiblangan.</p>
-          </div>
-          {canManage && (
+        <PageHeader title="Kategoriyalar" subtitle="Mahsulotlarni tartiblang va katalogni boshqaring" icon={Tags} actions={canManage && (
             <button className="cat-add" onClick={() => { setEditing(null); setOpen(true); }}>
               <Plus size={18} aria-hidden="true" /> Qo‘shish
             </button>
-          )}
+          )} />
+
+        <div className="category-overview" aria-label="Kategoriya holatlari">
+          <div><Tags className="w-5 h-5" aria-hidden="true" /><span>Barcha kategoriyalar</span><strong>{categories.length}</strong></div>
+          <div><span className="category-overview-dot" aria-hidden="true" /><span>Faol</span><strong>{categories.filter((c) => c.active !== false).length}</strong></div>
+          <div><span className="category-overview-dot is-inactive" aria-hidden="true" /><span>Nofaol</span><strong>{categories.filter((c) => c.active === false).length}</strong></div>
         </div>
 
         <div className="cat-workspace">
-          <div className="cat-toolbar">
-            <div className="cat-search">
+          <div className="cat-toolbar catalog-toolbar">
+            <label className="catalog-filter-field category-search-field"><span>Kategoriya qidirish</span><div className="cat-search">
               <Search size={18} aria-hidden="true" />
               <input
                 type="text"
@@ -77,8 +78,8 @@ export default function Categories() {
                 placeholder="Kategoriya qidirish…"
                 aria-label="Kategoriya qidirish"
               />
-            </div>
-            <span className="cat-count-pill">{filtered.length} / {categories.length}</span>
+            </div></label>
+            <span className="cat-count-pill" aria-live="polite">{filtered.length} / {categories.length} ta kategoriya</span>
           </div>
 
           {loading ? (
@@ -121,23 +122,23 @@ export default function Categories() {
 function CategoryCard({ category: c, canManage, onEdit, onRemove }) {
   const active = c.active !== false;
   return (
-    <div className={`cat-card${active ? '' : ' is-inactive'}`}>
+    <article className={`cat-card${active ? '' : ' is-inactive'}`}>
       <div className="cat-card-top">
         <div className="cat-icon-box">
           <CategoryIcon icon={c.icon} />
         </div>
-        <div className="cat-card-name">{c.name}</div>
+        <h2 className="cat-card-name">{c.name}</h2>
+        <span className={`cat-status${active ? ' is-active' : ' is-inactive'}`}>
+          <span className="cat-dot" /> {active ? 'Faol' : 'Nofaol'}
+        </span>
       </div>
-      <span className={`cat-status${active ? ' is-active' : ' is-inactive'}`}>
-        <span className="cat-dot" /> {active ? 'Faol' : 'Nofaol'}
-      </span>
       {canManage && (
         <div className="cat-actions">
           <button className="cat-act" onClick={onEdit}><Pencil size={15} aria-hidden="true" /> Tahrirlash</button>
           <button className="cat-act cat-act-danger" onClick={onRemove}><Trash2 size={15} aria-hidden="true" /> O‘chirish</button>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
