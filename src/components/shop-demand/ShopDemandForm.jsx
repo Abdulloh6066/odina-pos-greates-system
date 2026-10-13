@@ -69,7 +69,7 @@ export default function ShopDemandForm({ open, onClose, user, shopName, products
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-3xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? 'Talabni tahrirlash' : "Markazga talab yuborish"}</DialogTitle>
         </DialogHeader>
