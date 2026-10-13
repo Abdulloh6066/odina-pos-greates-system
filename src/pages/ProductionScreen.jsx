@@ -81,8 +81,8 @@ function ScreenCrashFallback({ error, onReset }) {
   const homePath = ROLE_HOME[user?.role] || '/';
   const logout = () => base44.auth.logout();
   return (
-    <div className="min-h-dvh bg-background flex flex-col">
-      <header className="shrink-0 sticky top-0 z-20 bg-card border-b border-border premium-shadow">
+    <div className="odina-production-board min-h-dvh bg-background flex flex-col">
+      <header className="odina-production-header shrink-0 sticky top-0 z-20 bg-card border-b border-border premium-shadow">
         <div className="px-4 sm:px-6 h-16 flex items-center gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="hidden sm:flex"><OdinaBrand /></div>
@@ -332,9 +332,9 @@ function ProductionScreenInner() {
   const homePath = ROLE_HOME[user?.role] || '/';
 
   return (
-    <div className="min-h-dvh bg-background flex flex-col">
+    <div className="odina-production-board min-h-dvh bg-background flex flex-col">
       {/* Header — always rendered */}
-      <header className="shrink-0 sticky top-0 z-20 bg-card border-b border-border premium-shadow">
+      <header className="odina-production-header shrink-0 sticky top-0 z-20 bg-card border-b border-border premium-shadow">
         <div className="px-4 sm:px-6 h-16 flex items-center gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="hidden sm:flex"><OdinaBrand /></div>
@@ -366,7 +366,7 @@ function ProductionScreenInner() {
       </header>
 
       {/* Body — always one of loading / error / empty / orders */}
-      <main className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 sm:p-6">
+      <main className="odina-production-content flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 sm:p-6">
         {loading ? (
           <div className="h-[60vh] flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="w-8 h-8 animate-spin text-brand-olive" />
@@ -572,8 +572,8 @@ function OrderDaySection({
   title, date, orders, itemsByOrder, busyId, onReady, onShip, onPreview, forecast,
 }) {
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-3">
+    <section className="odina-production-day">
+      <div className="odina-production-day-heading mb-3 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-brand-olive/15 flex items-center justify-center shrink-0">
           <CalendarDays className="w-5 h-5 text-brand-olive" />
         </div>
@@ -630,7 +630,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
   const hasImage = !!order.reference_image;
 
   return (
-    <div className={`rounded-2xl border bg-card premium-shadow overflow-hidden ${
+    <div className={`odina-production-ticket rounded-2xl border bg-card premium-shadow overflow-hidden ${
       u === 'overdue' ? 'border-rose-300' : u === 'urgent' ? 'border-amber-300' : 'border-border'
     }`}>
       <div className="flex flex-col xl:flex-row xl:items-stretch">
