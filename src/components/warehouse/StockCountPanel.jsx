@@ -101,7 +101,7 @@ export default function StockCountPanel({ user, location, locations }) {
       )}
 
       <Dialog open={showNew} onOpenChange={(o) => !o && !starting && setShowNew(false)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="warehouse-dialog sm:max-w-md">
           <DialogHeader><DialogTitle className="font-display text-xl">Yangi ombor sanog‘i</DialogTitle></DialogHeader>
           <div className="space-y-3">
             {(role === 'admin') ? (
