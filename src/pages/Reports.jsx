@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useState, useMemo } from 'react';
 import { useOutletContext, Navigate } from 'react-router-dom';
 import { BarChart3 } from 'lucide-react';
@@ -6,7 +7,7 @@ import { formatUZS, formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import RealProfitDashboard from '@/components/reports/RealProfitDashboard';
 
-const PAY_COLORS = { cash: 'hsl(var(--primary))', bank_card: 'hsl(var(--brand-olive))', online: 'hsl(var(--brand-sand))', uzcard: 'hsl(var(--brand-olive))', humo: 'hsl(197 37% 40%)', click: 'hsl(var(--brand-sand))', payme: 'hsl(43 74% 55%)', bank_transfer: 'hsl(215 55% 52%)', other: 'hsl(0 0% 60%)' };
+const PAY_COLORS = { cash: 'hsl(var(--primary))', bank_card: 'hsl(var(--brand-olive))', online: 'hsl(var(--brand-sand))', uzcard: 'hsl(var(--brand-olive))', humo: '#86895a', click: 'hsl(var(--brand-sand))', payme: '#b58b52', bank_transfer: '#676653', other: 'hsl(0 0% 60%)' };
 const PAY_LABELS = { cash: 'Naqd pul', bank_card: 'Bank card', online: 'Online', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
 
 export default function Reports() {
@@ -33,15 +34,16 @@ export default function Reports() {
   if (role === 'cashier') return <Navigate to="/pos" replace />;
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
-      <PageHeader title="Hisobotlar" subtitle={reportData ? `${reportData.date_from} — ${reportData.date_to} · ${formatNum(reportData.grand?.sales || 0)} ta Kassa savdosi · olingan pul ${formatUZS(totalRev)}` : 'Davr bo‘yicha pul tushumi va Kassa foydasi'} icon={BarChart3} />
+    <div className="odina-page odina-workbench odina-operations odina-reports p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+      <PageHeader title="Hisobotlar" eyebrow="BIZNES TAHLILI" subtitle={reportData ? `${reportData.date_from} — ${reportData.date_to} · ${formatNum(reportData.grand?.sales || 0)} ta Kassa savdosi · olingan pul ${formatUZS(totalRev)}` : 'Davr bo‘yicha pul tushumi va Kassa foydasi'} icon={BarChart3} />
 
-      <RealProfitDashboard onData={acceptReport} />
+      <div className="odina-report-summary"><RealProfitDashboard onData={acceptReport} /></div>
+      <div className="odina-operations-section-heading"><div><p className="odina-page-eyebrow">TUSHUM TAQSIMOTI</p><h2>Davr natijalari</h2></div><p>Tanlangan davr bo‘yicha kunlar, to‘lov usullari va do‘konlar.</p></div>
 
       {loading ? (
         <div className="grid lg:grid-cols-2 gap-5">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-64 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : !reportData || last7.length === 0 ? (
-        <div className="text-center py-20"><div className="text-5xl mb-3">📊</div><p className="text-sm text-muted-foreground">Hali savdo ma’lumotlari yo‘q.</p></div>
+        <div className="odina-operations-empty text-center py-20"><BarChart3 aria-hidden="true" className="w-9 h-9 mx-auto mb-3 text-muted-foreground" /><p className="text-sm text-muted-foreground">Hali savdo ma’lumotlari yo‘q.</p></div>
       ) : (
         <div className="grid lg:grid-cols-2 gap-5">
           <Panel title="Olingan pul — tanlangan davr">
@@ -69,7 +71,7 @@ export default function Reports() {
             {allMethods.some(row => row.value < 0) && <p className="text-xs text-muted-foreground">Qaytarish sababli manfiy usullar doirada ko‘rsatilmaydi: {allMethods.filter(row => row.value < 0).map(row => `${PAY_LABELS[row.name]} ${formatUZS(row.value)}`).join(', ')}.</p>}
             <div className="flex flex-wrap gap-3 justify-center mt-2">
               {byMethod.map((m) => (
-                <div key={m.name} className="flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full" style={{ background: PAY_COLORS[m.name] || 'hsl(0 0% 60%)' }} /><span>{PAY_LABELS[m.name] || m.name}</span></div>
+                <div key={m.name} className="odina-chart-legend-item flex items-center gap-1.5 text-xs"><span className="w-3 h-3 rounded-full" style={{ background: PAY_COLORS[m.name] || 'hsl(0 0% 60%)' }} /><span>{PAY_LABELS[m.name] || m.name}</span><strong className="tabular-nums">{formatUZS(m.value)}</strong></div>
               ))}
             </div>
           </Panel>
@@ -93,7 +95,7 @@ export default function Reports() {
 
 function Panel({ title, children, className }) {
   return (
-    <div className={`odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 ${className || ''}`}>
+    <div className={`odina-chart-panel odina-panel rounded-2xl bg-card border border-border p-4 sm:p-5 ${className || ''}`}>
       <h3 className="font-display text-lg font-bold mb-4">{title}</h3>
       {children}
     </div>
