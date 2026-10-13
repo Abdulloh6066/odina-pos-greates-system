@@ -15,7 +15,7 @@ export function nextPosConnectionState(current, error = null) {
   if (!error) return current.failures === 0 && !current.offline ? current : { failures: 0, offline: false };
   if (isPosNetworkError(error)) {
     const failures = current.failures + 1;
-    return { failures, offline: failures >= POS_NETWORK_FAILURE_LIMIT };
+    return { failures, offline: current.offline || failures >= POS_NETWORK_FAILURE_LIMIT };
   }
   // An HTTP response proves connectivity, including a rejected payment/session.
   if (Number(error?.response?.status || error?.status || 0)) {
