@@ -125,12 +125,12 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="odina-payment-workbench sm:max-w-lg max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">To‘lov</DialogTitle>
         </DialogHeader>
 
-        <div className="rounded-2xl bg-primary/10 px-4 py-3 mb-4 flex items-center justify-between">
+        <div className="odina-payment-total rounded-2xl bg-primary/10 px-4 py-3 mb-4 flex items-center justify-between">
           <span className="text-sm font-medium text-brand-ink">To‘lanadigan jami</span>
           <span className="font-display text-2xl font-bold text-brand-ink">{formatUZS(total)}</span>
         </div>
@@ -138,7 +138,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
         {/* Announce the check without adding/removing space above the touch targets. */}
         <span role="status" className="sr-only">{checking ? 'Qoldiq tekshirilmoqda.' : ''}</span>
 
-        {discountControls && <div className="border-b border-border pb-4 mb-1">{discountControls}</div>}
+        {discountControls && <div className="odina-payment-adjustments border-b border-border pb-4 mb-1">{discountControls}</div>}
 
         {total <= 0 && fullDiscount && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm font-medium text-emerald-700 flex items-center gap-2">
@@ -159,10 +159,12 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
         )}
 
         <div className={total <= 0 ? 'hidden' : 'space-y-2.5'}>
+          {payments.length > 0 && <div className={`odina-payment-column-labels ${payments.length > 1 ? 'odina-payment-split-labels' : ''}`} aria-hidden="true"><span>To‘lov usuli</span><span>Summa (UZS)</span></div>}
           {payments.map((p, idx) => (
-            <div key={idx} className="flex gap-2 items-center">
+            <div key={idx} className="odina-payment-row flex gap-2 items-center">
               <OdinaSelect
                 value={p.method}
+                aria-label={`To‘lov usuli ${idx + 1}`}
                 onChange={(e) => updatePayment(idx, 'method', e.target.value)}
                 className="h-10 rounded-lg border border-input bg-card px-2 text-sm font-medium flex-1 min-w-0"
               >
@@ -176,13 +178,14 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
                 type="number"
                 step={1000}
                 min={0}
+                aria-label={`To‘lov summasi ${idx + 1}`}
                 value={p.amount}
                 onChange={(e) => updatePayment(idx, 'amount', e.target.value)}
                 className="w-32 h-10 text-right font-medium"
                 placeholder="0"
               />
               {payments.length > 1 && (
-                <button onClick={() => removeRow(idx)} className="w-9 h-10 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0">
+                <button type="button" aria-label="To‘lov usulini olib tashlash" onClick={() => removeRow(idx)} className="odina-payment-remove w-9 h-10 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -191,7 +194,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
         </div>
 
         <div className={total <= 0 ? 'hidden' : 'mt-3'}>
-          <div className="flex items-center justify-between text-sm gap-3">
+          <div className="odina-payment-balance-toolbar flex items-center justify-between text-sm gap-3">
             <button
               type="button"
               onClick={() => setShowMethodPicker((prev) => !prev)}
@@ -213,7 +216,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           </div>
 
           {showMethodPicker && availableMethods.length > 0 && (
-            <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3">
+            <div className="odina-payment-method-picker mt-3 rounded-2xl border border-border bg-muted/30 p-3">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <p className="font-semibold text-sm text-foreground">To‘lov usulini tanlang</p>
@@ -239,7 +242,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
                       key={method.id}
                       type="button"
                       onClick={() => addPaymentMethod(method.id)}
-                      className="min-h-14 rounded-xl border border-border bg-card px-3 py-2.5 flex items-center gap-2.5 text-left font-semibold text-sm hover:bg-primary/10 hover:border-primary/40 active:scale-[0.98] transition"
+                      className="odina-payment-method min-h-14 rounded-xl border border-border bg-card px-3 py-2.5 flex items-center gap-2.5 text-left font-semibold text-sm hover:bg-primary/10 hover:border-primary/40 transition-colors"
                     >
                       <span className="w-9 h-9 rounded-lg bg-primary/10 text-brand-ink flex items-center justify-center shrink-0">
                         <MethodIcon className="w-4.5 h-4.5" />
@@ -253,10 +256,10 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           )}
         </div>
 
-        {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+        {error && <p role="alert" className="text-sm text-destructive mt-2">{error}</p>}
 
-        <div className="mt-4 grid grid-cols-2 items-center gap-2 border-t border-border pt-4 sm:grid-cols-[max-content_max-content_minmax(0,1fr)]">
-          <div className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
+        <div className="odina-payment-footer mt-4 grid grid-cols-2 items-center gap-2 border-t border-border pt-4 sm:grid-cols-[max-content_max-content_minmax(0,1fr)]">
+          <div className="odina-payment-print-choice flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
             <ReceiptText className="h-4 w-4 text-brand-ink" aria-hidden="true" />
             <label htmlFor="print-receipt" className="cursor-pointer whitespace-nowrap text-sm font-semibold">Chek chiqarish</label>
             <Switch
@@ -274,7 +277,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
           <Button
             onClick={handleConfirm}
             disabled={checking || loading || discountPending || (total <= 0 && !fullDiscount) || (total > 0 && payments.length === 0)}
-            className="col-span-2 min-h-11 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary-strong sm:col-span-1"
+            className="odina-payment-confirm col-span-2 min-h-11 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary-strong sm:col-span-1"
           >
             {loading
               ? 'Amalga oshirilmoqda…'
