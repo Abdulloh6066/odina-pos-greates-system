@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -85,20 +86,27 @@ export default function SalesHistory({ embedded = false }) {
   };
 
   return (
-    <div className={embedded ? 'min-w-0 space-y-4' : 'odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in'}>
+    <div className={embedded ? 'odina-workbench odina-operations odina-saleshistory min-w-0 space-y-4' : 'odina-page odina-workbench odina-operations odina-saleshistory p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in'}>
       {embedded
         ? <p className="text-sm text-muted-foreground">{formatNum(visible.length)} ta savdo · {formatUZS(totalRev)}</p>
-        : <PageHeader title="Savdolar tarixi" subtitle={`${formatNum(visible.length)} ta savdo · ${formatUZS(totalRev)}`} icon={ReceiptText} />}
+        : <PageHeader title="Savdolar tarixi" eyebrow="KASSA JURNALI" subtitle="Savdo, to‘lov va qaytarish tafsilotlarini bir joyda ko‘ring." icon={ReceiptText} />}
+      {!embedded && <div className="odina-operations-metrics odina-sales-metrics grid grid-cols-2 mb-5">
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Tanlangan savdolar</p><p className="odina-metric-value">{formatNum(visible.length)} ta</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Savdo tushumi</p><p className="odina-metric-value">{formatUZS(totalRev)}</p></div>
+      </div>}
       {loadError && <div role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive">
         {loadError} <Button variant="outline" onClick={load} disabled={loading}>Qayta urinish</Button>
       </div>}
 
-      <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
+      <div className="odina-operations-toolbar odina-panel mb-5 rounded-2xl bg-card border border-border p-4 sm:p-5">
+        <div className="odina-toolbar-heading"><h2>Savdolarni saralash</h2><p>Kassir, to‘lov usuli yoki sana bo‘yicha izlang.</p></div>
+        <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Kassir yoki to‘lov usuli bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
+          <Input aria-label="Kassir yoki to‘lov usuli bo‘yicha qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Kassir yoki to‘lov usuli bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
         </div>
-        <Input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="sm:w-48 h-11 rounded-xl" />
+        <Input aria-label="Savdo sanasi" type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="sm:w-48 h-11 rounded-xl" />
+        </div>
       </div>
 
       {loading ? (
@@ -106,14 +114,14 @@ export default function SalesHistory({ embedded = false }) {
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}
         </div>
       ) : visible.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="text-5xl mb-3">🧾</div>
+        <div className="odina-operations-empty text-center py-20">
+          <ReceiptText aria-hidden="true" className="w-9 h-9 mx-auto mb-3 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Savdo topilmadi.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="odina-ledger space-y-3">
           {visible.map((s) => (
-            <button key={s.id} onClick={() => setSelected(s)} className="odina-panel w-full text-left rounded-2xl bg-card border border-border premium-shadow hover:premium-shadow-lg transition-all p-4 flex items-center gap-4">
+            <button key={s.id} onClick={() => setSelected(s)} className="odina-ledger-row odina-sale-row odina-panel w-full text-left rounded-2xl bg-card border border-border premium-shadow hover:premium-shadow-lg transition-all p-4 flex items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
                 <Eye className="w-5 h-5" />
               </div>
