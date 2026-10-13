@@ -7,6 +7,8 @@ import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
+import { WarehouseStockTable, WarehouseHistoryTable } from '@/components/warehouse/WarehouseTables';
+import '@/components/warehouse/warehouse-workspace.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -82,7 +84,7 @@ export default function Warehouse() {
   const [recipients, setRecipients] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState((user?.role === 'admin') ? '' : assignedShopId);
   const requestedTab = searchParams.get('tab');
-  const [newLayerView, setNewLayerView] = useState(false);
+  const [newLayerView, setNewLayerView] = useState(true);
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
   const tab = resolveWarehouseTab(requestedTab, user?.role);
@@ -324,16 +326,16 @@ export default function Warehouse() {
   const stockedCount = balancesForLocation.filter((balance) => Number(balance.quantity || 0) > 0).length;
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className={`odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in ${newLayerView ? 'warehouse-workspace' : ''}`}>
       <PageHeader
         title={visibleTabs.find((item) => item.id === tab)?.label || 'Ombor'}
         subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
-        actions={(tab === 'cake_layers' || canCreateIngredients) && (
+        actions={(
           <div className="flex flex-wrap items-center gap-2">
-          {tab === 'cake_layers' && (
+          {(
             <Button type="button" aria-pressed={newLayerView} onClick={() => setNewLayerView((current) => !current)} className="min-h-11 rounded-xl">
-              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Eski ko‘rinish' : 'Yangi ko‘rinish'}
+              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Avvalgi dizayn' : 'Yangi dizayn'}
             </Button>
           )}
           {canCreateIngredients && (
@@ -345,6 +347,20 @@ export default function Warehouse() {
         )}
       />
 
+      <div className={newLayerView ? 'warehouse-frame' : undefined}>
+      {newLayerView && (
+        <nav className="warehouse-nav" aria-label="Ombor bo‘limlari">
+          <p className="warehouse-nav-heading"><WarehouseIcon aria-hidden="true" className="w-4 h-4" /> Ombor bo‘limlari</p>
+          <div className="warehouse-nav-items">
+            {visibleTabs.filter((item) => (item.id !== 'suppliers' || canViewSupplierLedger) && (item.id !== 'cake_layers' || selectedLocationRecord?.location_type === 'production')).map(({ id, label, icon: Icon }) => (
+              <button key={id} type="button" aria-current={tab === id ? 'page' : undefined} onClick={() => changeTab(id)}>
+                <Icon className="w-4 h-4 shrink-0" aria-hidden="true" /><span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+      <div className={newLayerView ? 'warehouse-content' : undefined}>
       {loadWarning && (
         <div role="status" className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 flex flex-col sm:flex-row sm:items-center gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />
@@ -411,14 +427,21 @@ export default function Warehouse() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+          {(!newLayerView || ['ingredients', 'products'].includes(tab)) && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+            {newLayerView ? <>
+              <Summary label="Filtrdagi turlar" value={items.length} />
+              <Summary label="Qoldiq mavjud" value={items.filter((item) => Number(stockMap[item.id]?.quantity || 0) > 0).length} />
+              <Summary label="Qoldiq yo‘q" value={items.filter((item) => Number(stockMap[item.id]?.quantity || 0) === 0).length} />
+              <Summary label="Manfiy qoldiq" value={items.filter((item) => Number(stockMap[item.id]?.quantity || 0) < 0).length} />
+            </> : <>
             <Summary label="Masalliqlar" value={ingredients.filter((item) => !isCakeLayer(item)).length} />
             <Summary label="Tayyor mahsulotlar" value={products.length} />
             <Summary label="Omborda mavjud turlar" value={stockedCount} />
             <Summary label="Ombor harakatlari" value={movements.filter((m) => m.location_id === selectedLocation).length} />
-          </div>
+            </>}
+          </div>}
 
-          <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3">
+          <div className={newLayerView ? 'hidden' : 'flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3'}>
             {visibleTabs.filter((item) => (item.id !== 'suppliers' || canViewSupplierLedger) && (item.id !== 'cake_layers' || selectedLocationRecord?.location_type === 'production')).map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
@@ -436,9 +459,10 @@ export default function Warehouse() {
               {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-32 rounded-2xl bg-secondary animate-pulse" />)}
             </div>
           ) : tab === 'history' ? (
-            <HistoryList movements={visibleMovements} />
+            <HistoryList movements={visibleMovements} modernView={newLayerView} />
           ) : tab === 'suppliers' && canViewSupplierLedger ? (
             <SupplierLedgerPanel
+              modernView={newLayerView}
               user={user}
               location={selectedLocationRecord}
               ingredients={ingredients.filter((ingredient) => !isCakeLayer(ingredient) || selectedLocationRecord?.location_type === 'production')}
@@ -494,6 +518,7 @@ export default function Warehouse() {
                 </div>
               )}
               <StockGrid
+                modernView={newLayerView}
                 items={items}
                 stockMap={stockMap}
                 location={selectedLocationRecord}
@@ -504,6 +529,9 @@ export default function Warehouse() {
           )}
         </>
       )}
+
+      </div>
+      </div>
 
       <IngredientDialog
         open={ingredientOpen}
@@ -534,11 +562,12 @@ function Summary({ label, value }) {
   );
 }
 
-function StockGrid({ items, stockMap, kind, location, onAdjust }) {
+function StockGrid({ items, stockMap, kind, location, onAdjust, modernView = false }) {
   if (!items.length) {
     return <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Mos mahsulot topilmadi.</div>;
   }
   return (
+    modernView ? <WarehouseStockTable items={items} stockMap={stockMap} kind={kind} location={location} onAdjust={onAdjust} unitLabels={UNIT_LABELS} categoryLabels={INGREDIENT_CATEGORY_LABELS} sourceLabels={SOURCE_LABELS} /> :
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {items.map((item) => {
         const stock = stockMap[item.id];
@@ -570,11 +599,12 @@ function StockGrid({ items, stockMap, kind, location, onAdjust }) {
   );
 }
 
-function HistoryList({ movements }) {
+function HistoryList({ movements, modernView = false }) {
   if (!movements.length) {
     return <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Bu joylashuvda ombor harakati yo‘q.</div>;
   }
   return (
+    modernView ? <WarehouseHistoryTable movements={movements} movementLabels={MOVEMENT_LABELS} unitLabels={UNIT_LABELS} /> :
     <div className="space-y-3">
       {movements.map((movement) => (
         <div key={movement.id} className="odina-panel rounded-2xl bg-card border border-border p-4 flex items-start gap-3">
@@ -651,7 +681,7 @@ function IngredientDialog({ open, asLayer = false, existingIngredients = [], onC
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle className="font-display text-xl">{asLayer ? 'Yangi qavat / list turi' : 'Yangi masalliq, qadoq yoki xo‘jalik buyumi'}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
@@ -760,7 +790,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{kind === 'product' ? 'Tayyor mahsulot qoldig‘ini tuzatish' : 'Ombor qoldig‘ini yangilash'}</DialogTitle>
           <p className="text-sm text-muted-foreground">{item?.name} · {location?.name}</p>
