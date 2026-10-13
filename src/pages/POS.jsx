@@ -138,11 +138,11 @@ export default function POS() {
   const cashWithdrawalSubmittingRef = useRef(false);
   const cashWithdrawalRequestRef = useRef(null);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
-  // Match the cart's lg:hidden breakpoint, including tablets and window resizing.
+  // Match the cart dock/sheet viewport, including tablets and window resizing.
   const [compactCartViewport, setCompactCartViewport] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches);
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1279px)').matches);
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 1023px)');
+    const media = window.matchMedia('(max-width: 1279px)');
     const syncCartViewport = () => {
       setCompactCartViewport(media.matches);
       if (!media.matches) setMobileCartOpen(false);
@@ -387,7 +387,7 @@ export default function POS() {
       setTakeawayOrder(result.order);
       setCart(result.order.items);
       setOpenOrdersOpen(false);
-      setMobileCartOpen(window.matchMedia('(max-width: 1023px)').matches);
+      setMobileCartOpen(window.matchMedia('(max-width: 1279px)').matches);
     } catch (error) {
       setOpenOrdersError(error?.response?.data?.error || error?.message || 'Buyurtma ochilmadi.');
     } finally { setOpenOrdersLoading(false); }
@@ -2071,3 +2071,4 @@ function Chip({ active, onClick, children }) {
     </button>
   );
 }
+
