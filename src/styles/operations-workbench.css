@@ -1,0 +1,205 @@
+/* Reports and administration share a calm, compact workbench. Print layouts stay intact. */
+@media screen {
+  .odina-workbench.odina-operations { min-width: 0; }
+  .odina-operations :is(.odina-budget-total,.odina-budget-account,.odina-shift-card) { min-width: 0; }
+  .odina-operations :is(.odina-budget-total,.odina-ledger-row,.odina-shift-card) :is(p,.font-semibold,.font-medium) { overflow-wrap: anywhere; }
+  .odina-operations .odina-budget-row .whitespace-nowrap { max-width: 100%; white-space: normal; }
+  .odina-operations :is(.odina-staff-row,.odina-operations-toolbar,.odina-shift-card) > .grid > * { min-width: 0; }
+  .odina-operations .odina-panel,
+  .odina-operations .odina-operations-card { box-shadow: none; }
+  .odina-operations .odina-operations-toolbar {
+    padding: 20px; border-color: var(--odina-line); border-radius: 20px;
+    background: var(--odina-surface); box-shadow: none;
+  }
+  .odina-operations .odina-toolbar-heading {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
+    margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--odina-line);
+  }
+  .odina-operations .odina-toolbar-heading h2 {
+    margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -.015em;
+  }
+  .odina-operations .odina-toolbar-heading p {
+    margin: 0; color: var(--odina-muted); font-size: 12px; line-height: 1.6;
+  }
+  .odina-operations .odina-operations-metrics {
+    overflow: hidden; border: 1px solid var(--odina-line); border-radius: 20px;
+    background: var(--odina-surface); gap: 0;
+  }
+  .odina-operations .odina-operations-metric {
+    min-width: 0; padding: 20px; border: 0; border-radius: 0;
+    border-right: 1px solid var(--odina-line); background: transparent; box-shadow: none;
+  }
+  .odina-operations .odina-operations-metric:last-child { border-right: 0; }
+  .odina-operations .odina-metric-value {
+    margin-top: 8px; color: var(--odina-text); font-size: clamp(18px, 1.9vw, 26px);
+    font-weight: 650; letter-spacing: -.035em; line-height: 1.3;
+    font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+  }
+  .odina-operations .odina-category-metrics .odina-operations-metric { padding: 16px 20px; }
+  .odina-operations .odina-profit-metrics .odina-operations-metric,
+  .odina-operations .odina-audit-metrics .odina-operations-metric { padding: 18px 16px; }
+  .odina-operations .odina-profit-metrics .odina-metric-value { font-size: clamp(16px, 1.25vw, 22px); }
+  .odina-operations .odina-operations-section-heading {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 12px; margin-top: 28px; margin-bottom: 16px;
+  }
+  .odina-operations .odina-operations-section-heading h2 {
+    font-size: 20px; font-weight: 650; letter-spacing: -.025em; line-height: 1.35;
+  }
+  .odina-operations .odina-operations-section-heading > p {
+    color: var(--odina-muted); font-size: 12px; line-height: 1.6; max-width: 58ch;
+  }
+  .odina-operations .odina-operations-note {
+    padding: 16px 18px; border: 1px solid var(--odina-line); border-radius: 16px;
+    background: color-mix(in srgb, var(--odina-surface) 65%, var(--odina-soft));
+    color: var(--odina-muted); line-height: 1.7; box-shadow: none;
+  }
+  .odina-operations .odina-period-switch {
+    padding: 5px; border-radius: 14px; border: 1px solid var(--odina-line);
+    background: var(--odina-soft); gap: 4px;
+  }
+  .odina-operations .odina-period-switch > button { flex: 1 1 auto; border-radius: 10px; box-shadow: none; }
+  .odina-operations .odina-period-switch > button.odina-button-outline { background: transparent; border-color: transparent; }
+  .odina-operations .odina-ledger {
+    border: 1px solid var(--odina-line); border-radius: 20px; overflow: hidden;
+    background: var(--odina-surface);
+  }
+  .odina-operations .odina-ledger > .odina-ledger-row {
+    margin-top: 0; border: 0; border-radius: 0; border-bottom: 1px solid var(--odina-line);
+    background: transparent; box-shadow: none; padding: 20px 22px;
+  }
+  .odina-operations .odina-ledger > .odina-ledger-row:last-child { border-bottom: 0; }
+  .odina-operations button.odina-ledger-row:hover { background: var(--odina-soft); box-shadow: none; }
+  .odina-operations .odina-ledger-row :is(.font-semibold,.font-medium) { font-variant-numeric: tabular-nums; }
+  .odina-operations .odina-ledger-amount { font-size: 18px; letter-spacing: -.02em; }
+  .odina-operations .odina-operations-empty { border: 1px dashed var(--odina-line); border-radius: 20px; padding-inline: 20px; }
+  .odina-operations .odina-operations-table-panel,
+  .odina-operations .odina-operations-card { border: 1px solid var(--odina-line); border-radius: 20px; background: var(--odina-surface); }
+  .odina-operations .odina-operations-table { border-collapse: separate; border-spacing: 0; }
+  .odina-operations .odina-operations-table :is(th,td) { padding: 14px 16px; }
+  .odina-operations .odina-operations-table th {
+    background: var(--odina-soft); color: var(--odina-muted); font-size: 12px;
+    font-weight: 600; text-transform: none; letter-spacing: 0; white-space: nowrap;
+  }
+  .odina-operations .odina-operations-table td { border-bottom: 1px solid var(--odina-line); font-variant-numeric: tabular-nums; }
+  .odina-operations .odina-operations-table tr:last-child td { border-bottom: 0; }
+  .odina-operations .odina-operations-table tbody tr:hover { background: var(--odina-soft); }
+  .odina-operations .odina-operations-table tfoot td { background: var(--odina-soft); border-top: 1px solid var(--odina-line); }
+  .odina-operations .odina-audit-badge { color: var(--odina-olive); background: var(--odina-soft); border-color: var(--odina-line); }
+  .odina-operations .odina-shift-card { border-radius: 20px; box-shadow: none; }
+  .odina-operations .odina-shift-card:hover { border-color: #b8b58e; background: var(--odina-surface); box-shadow: 0 5px 16px -12px #3b3c2450; }
+  .odina-operations .odina-shift-card > .grid { gap: 7px; }
+  .odina-operations .odina-shift-card > .grid > div { gap: 8px; flex-wrap: wrap; background: var(--odina-soft); padding: 10px; }
+  .odina-operations .odina-chart-panel { border-radius: 20px; }
+  .odina-operations .odina-chart-panel > h3 { font-size: 15px; padding-bottom: 16px; border-bottom: 1px solid var(--odina-line); }
+  .odina-operations .odina-chart-legend-item { padding: 7px 10px; border-radius: 9px; background: var(--odina-soft); flex-wrap: wrap; }
+  .odina-operations .odina-chart-legend-item strong { margin-left: 5px; font-weight: 600; }
+  .odina-operations .odina-budget-balances { align-items: stretch; }
+  .odina-operations .odina-budget-account {
+    display: grid; grid-template-columns: 40px 1fr; column-gap: 14px; align-content: center;
+    padding: 22px; border-radius: 20px;
+  }
+  .odina-operations .odina-budget-account > div { grid-row: span 2; }
+  .odina-operations .odina-budget-account > p { margin-top: 0; }
+  .odina-operations .odina-budget-account > p:last-child { margin-top: 5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .odina-operations .odina-budget-total { display: flex; flex-direction: column; justify-content: center; padding: 24px; border-radius: 20px; }
+  .odina-operations .odina-partner-card { padding: 22px; border-radius: 20px; }
+  .odina-operations .odina-partner-card button { min-height: 44px; min-width: 44px; }
+  .odina-operations .odina-partner-card p.font-semibold { white-space: normal; overflow-wrap: anywhere; }
+  .odina-operations .odina-staff-row > .grid { padding-top: 16px; border-top: 1px solid var(--odina-line); }
+  .odina-operations .odina-staff-row button { min-height: 44px; }
+  .odina-operations .odina-settings-grid { display: grid; gap: 20px; align-items: start; }
+  .odina-operations .odina-settings-grid > .odina-panel { padding: 24px; border-radius: 20px; }
+  .odina-operations .odina-settings-section-heading { padding-bottom: 16px; border-bottom: 1px solid var(--odina-line); }
+  .odina-operations .odina-shop-settings-card { min-width: 0; }
+  .odina-operations .odina-export-preview-heading {
+    display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--odina-line); margin-bottom: 20px;
+  }
+  .odina-operations .odina-export-switches { border-top: 1px solid var(--odina-line); padding-top: 18px; }
+  .odina-operations .odina-export-switches label { min-height: 44px; }
+  .odina-operations .odina-export-actions button { min-height: 44px; }
+  .odina-operations .odina-export-history-date { padding: 18px; border-radius: 16px; }
+  .odina-operations .odina-waste-metric > div:first-child { width: 28px; height: 28px; margin-bottom: 10px; background: transparent; justify-content: flex-start; }
+  .odina-operations .odina-waste-metric > div:last-child { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .odina-operations .odina-expiry-card { border-radius: 20px; }
+  .odina-operations .odina-discount-card { align-items: flex-start; padding: 22px; border-radius: 20px; flex-wrap: wrap; }
+  .odina-operations .odina-discount-percent {
+    min-width: 60px; padding-right: 14px; margin-right: 1px; border-right: 1px solid var(--odina-line);
+    color: var(--odina-olive); font-size: 28px; line-height: 1.2; font-weight: 650;
+    letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+  }
+  .odina-operations .odina-discount-percent span { font-size: 15px; margin-left: 2px; }
+  .odina-operations .odina-discount-card > .flex { width: 100%; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--odina-line); }
+  .dark .odina-operations {
+    --odina-status-success: #9ed8b4;
+    --odina-status-success-surface: #243a2d;
+    --odina-status-success-line: #4d7457;
+    --odina-status-danger: #ffb2a6;
+    --odina-status-danger-surface: #432b29;
+    --odina-status-danger-line: #77534c;
+    --odina-status-warning: #efd092;
+    --odina-status-warning-surface: #423826;
+    --odina-status-warning-line: #756548;
+  }
+  .dark .odina-operations :is(.text-emerald-600,.text-emerald-700,.text-emerald-800,[class~="text-emerald-700/75"]) { color: var(--odina-status-success); }
+  .dark .odina-operations :is(.bg-emerald-50,[class~="bg-emerald-50/60"]) { background-color: var(--odina-status-success-surface); }
+  .dark .odina-operations .border-emerald-200 { border-color: var(--odina-status-success-line); }
+  .dark .odina-operations :is(.text-destructive,.text-red-700,.text-red-800,.text-rose-600,.text-rose-700) { color: var(--odina-status-danger); }
+  .dark .odina-operations :is(.bg-red-50,.bg-red-100,.bg-rose-50,[class~="bg-red-50/60"]) { background-color: var(--odina-status-danger-surface); }
+  .dark .odina-operations :is(.border-red-100,.border-red-200,.border-rose-200) { border-color: var(--odina-status-danger-line); }
+  .dark .odina-operations :is(.text-amber-600,.text-amber-700,.text-amber-800,.text-amber-950) { color: var(--odina-status-warning); }
+  .dark .odina-operations .bg-amber-50 { background-color: var(--odina-status-warning-surface); }
+  .dark .odina-operations .border-amber-200 { border-color: var(--odina-status-warning-line); }
+}
+@media screen and (min-width: 768px) {
+  .odina-operations .odina-staff-row { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: 28px; align-items: start; }
+  .odina-operations .odina-staff-row > .grid { padding-top: 0; border-top: 0; }
+}
+@media screen and (min-width: 1024px) {
+  .odina-operations .odina-settings-grid { grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); }
+  .odina-operations .odina-settings-receipt { grid-row: span 2; }
+  .odina-operations .odina-settings-shops { grid-column: 1 / -1; }
+  .odina-operations .odina-shop-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media screen and (max-width: 1279px) {
+  .odina-operations .odina-profit-metrics .odina-operations-metric { border-bottom: 1px solid var(--odina-line); }
+  .odina-operations .odina-profit-metrics .odina-operations-metric:nth-last-child(-n+3) { border-bottom: 0; }
+}
+@media screen and (max-width: 1023px) {
+  .odina-operations .odina-category-metrics .odina-operations-metric,
+  .odina-operations .odina-waste-metrics .odina-operations-metric,
+  .odina-operations .odina-audit-metrics .odina-operations-metric { border-bottom: 1px solid var(--odina-line); }
+  .odina-operations .odina-category-metrics .odina-operations-metric:nth-last-child(-n+2),
+  .odina-operations .odina-waste-metrics .odina-operations-metric:nth-last-child(-n+2),
+  .odina-operations .odina-audit-metrics .odina-operations-metric:last-child { border-bottom: 0; }
+  .odina-operations .odina-audit-metrics .odina-operations-metric:last-child { grid-column: 1 / -1; }
+}
+@media screen and (max-width: 639px) {
+  .odina-operations .odina-operations-toolbar { padding: 16px; }
+  .odina-operations .odina-toolbar-heading { margin-bottom: 14px; padding-bottom: 12px; }
+  .odina-operations .odina-operations-metric { padding: 16px 12px; }
+  .odina-operations .odina-operations-metric > p.text-xs { font-size: 11px; }
+  .odina-operations .odina-sales-metrics .odina-metric-value { font-size: 20px; }
+  .odina-operations .odina-profit-metrics .odina-operations-metric:nth-last-child(3) { border-bottom: 1px solid var(--odina-line); }
+  .odina-operations .odina-profit-metrics .odina-operations-metric:nth-child(even),
+  .odina-operations .odina-category-metrics .odina-operations-metric:nth-child(even),
+  .odina-operations .odina-waste-metrics .odina-operations-metric:nth-child(even),
+  .odina-operations .odina-audit-metrics .odina-operations-metric:nth-child(even) { border-right: 0; }
+  .odina-operations .odina-ledger > .odina-ledger-row { padding: 18px 16px; }
+  .odina-operations .odina-sale-row { flex-wrap: wrap; gap: 12px; }
+  .odina-operations .odina-sale-row > div:last-child { flex-basis: 100%; display: flex; justify-content: space-between; text-align: left; padding-left: 55px; }
+  .odina-operations .odina-cashout-row > div { flex-wrap: wrap; gap: 12px; }
+  .odina-operations .odina-ledger-amount { white-space: normal; overflow-wrap: anywhere; }
+  .odina-operations .odina-budget-account { padding: 18px 14px; grid-template-columns: 1fr; }
+  .odina-operations .odina-budget-account > div { grid-row: auto; margin-bottom: 10px; }
+  .odina-operations .odina-budget-account > p:last-child { font-size: 17px; }
+  .odina-operations .odina-settings-grid > .odina-panel { padding: 20px 16px; }
+  .odina-operations .odina-shop-settings-card > div:first-child { flex-wrap: wrap; }
+  .odina-operations .odina-export-actions { width: 100%; }
+  .odina-operations .odina-export-actions > input { width: 100%; }
+  .odina-operations .odina-export-actions > button { flex: 1 1 auto; white-space: normal; }
+  .odina-operations .odina-operations-table :is(th,td) { padding: 12px; }
+  .odina-operations .odina-discount-card { padding: 20px 16px; }
+  .odina-operations .odina-operations-section-heading { align-items: flex-start; }
+}
