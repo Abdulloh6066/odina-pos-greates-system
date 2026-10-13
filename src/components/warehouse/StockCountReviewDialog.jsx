@@ -9,7 +9,7 @@ const UNIT = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
 export default function StockCountReviewDialog({ changes, onConfirm, onClose, approving }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="warehouse-dialog sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Tasdiqlash: qoldiq tuzatishlari</DialogTitle>
           <DialogDescription>Quyidagi {changes.length} ta o‘zgarish qoldiqqa qo‘llanadi. Aniq sanab bo‘lganingizni tekshiring.</DialogDescription>
