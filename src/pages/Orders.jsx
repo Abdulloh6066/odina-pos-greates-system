@@ -152,7 +152,7 @@ export default function Orders() {
   return (
     <div className="opl-page">
       <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />
-      <main className="opl-workspace">
+      <div className="opl-workspace">
         <nav className="opl-tabs" aria-label="Buyurtma sanalari">
           {tabs.map((tab) => (
             <button key={tab.key} type="button" className={`opl-tab ${view === tab.key ? 'is-active' : ''}`}
@@ -199,7 +199,7 @@ export default function Orders() {
             ))}</div>
           )}
         </section>
-      </main>
+      </div>
       <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
       <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} onPaid={() => { loadOrders(); }} onRepeat={handleRepeat}
         onStaffTicket={(order, items) => { setDetailOrder(null); setStaffTicket({ order, items }); }} />
@@ -211,3 +211,4 @@ export default function Orders() {
     </div>
   );
 }
+
