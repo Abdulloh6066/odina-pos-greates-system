@@ -4,7 +4,7 @@ import odinaMark from "./brand/odina-mark";
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
-    <div className="odina-auth-layout">
+    <div className="odina-auth-layout odina-workbench-auth">
       <div className="odina-auth-shell">
         <aside className="odina-auth-story" aria-label="Odina Cake">
           <OdinaBrand />
