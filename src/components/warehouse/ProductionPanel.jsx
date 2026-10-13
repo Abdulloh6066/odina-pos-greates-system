@@ -163,7 +163,7 @@ export default function ProductionPanel({
           </div>
         )}
         <Dialog open={recipePickerOpen} onOpenChange={setRecipePickerOpen}>
-          <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+          <DialogContent className="warehouse-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>Retsept uchun mahsulot tanlang</DialogTitle></DialogHeader>
             {products.some((product) => product.source_type !== 'resale') ? (
               <OdinaSelect aria-label="Retsept mahsuloti" defaultValue="" className="w-full h-11 rounded-xl border border-input bg-card px-3"
@@ -289,7 +289,7 @@ export default function ProductionPanel({
           onTransfer={onTransfer}
         />
         <Dialog open={recipePickerOpen} onOpenChange={setRecipePickerOpen}>
-          <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
+          <DialogContent className="warehouse-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>Qavat retsepti uchun mahsulot tanlang</DialogTitle></DialogHeader>
             <p className="text-sm text-muted-foreground">Har bir mahsulotga nechta qavat/list, qancha krem va boshqa masalliq ketishini kiriting.</p>
             <OdinaSelect aria-label="Qavat retsepti mahsuloti" defaultValue="" className="w-full h-11 rounded-xl border border-input bg-card px-3"
@@ -483,7 +483,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{product?.name} retsepti</DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -615,7 +615,7 @@ function ProductionDialog({ open, product, recipe, recipeItems, balances, locati
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{product?.name} ishlab chiqarish</DialogTitle>
           <p className="text-sm text-muted-foreground">{location?.name} · Retsept v{recipe?.version}</p>
