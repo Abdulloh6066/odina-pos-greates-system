@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Navigate, useOutletContext } from 'react-router-dom';
@@ -39,9 +40,10 @@ export default function CashRecipients() {
   if (!['admin', 'manager'].includes(user?.role)) return <Navigate to="/" replace />;
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-cashrecipients p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
       <PageHeader
         title="Qabul qiluvchilar"
+        eyebrow="HAMKORLAR"
         subtitle="Tovarlarga pul beriladigan kompaniya va yetkazib beruvchilar"
         icon={Building2}
         actions={canManage && (
@@ -51,10 +53,11 @@ export default function CashRecipients() {
         )}
       />
 
-      <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 mb-5">
+      <div className="odina-operations-toolbar odina-panel rounded-2xl bg-card border border-border p-4 sm:p-5 mb-5">
+        <div className="odina-toolbar-heading"><h2>Hamkorlar ro‘yxati</h2><p>{filtered.length} ta qabul qiluvchi · nomi yoki izohi bo‘yicha qidiring.</p></div>
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kompaniya yoki yetkazib beruvchini qidirish…" className="h-11 pl-10 rounded-xl" />
+          <Input aria-label="Qabul qiluvchini qidirish" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Kompaniya yoki yetkazib beruvchini qidirish…" className="h-11 pl-10 rounded-xl" />
         </div>
       </div>
 
@@ -67,9 +70,9 @@ export default function CashRecipients() {
           <p className="text-sm text-muted-foreground mt-1">“Yangi qabul qiluvchi” orqali birinchi kompaniyani kiriting.</p>
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="odina-partner-grid grid sm:grid-cols-2 gap-3">
           {filtered.map((item) => (
-            <article key={item.id} className={`odina-panel rounded-2xl border border-border bg-card premium-shadow p-4 ${item.active === false ? 'opacity-60' : ''}`}>
+            <article key={item.id} className={`odina-partner-card odina-panel rounded-2xl border border-border bg-card p-4 ${item.active === false ? 'opacity-60' : ''}`}>
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0"><Building2 className="w-4.5 h-4.5" /></div>
                 <div className="flex-1 min-w-0">
@@ -78,7 +81,7 @@ export default function CashRecipients() {
                   {item.notes && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{item.notes}</p>}
                 </div>
                 {canManage && (
-                  <Button variant="outline" size="icon" onClick={() => setEditing(item)} className="h-10 w-10 rounded-xl shrink-0"><Pencil className="w-4 h-4" /></Button>
+                  <Button aria-label={`${item.name} — tahrirlash`} variant="outline" size="icon" onClick={() => setEditing(item)} className="h-10 w-10 rounded-xl shrink-0"><Pencil className="w-4 h-4" /></Button>
                 )}
               </div>
             </article>
@@ -153,3 +156,4 @@ function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
     </Dialog>
   );
 }
+
