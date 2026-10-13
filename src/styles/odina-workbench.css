@@ -1,4 +1,4 @@
-/* Odina's operational workspace. The homepage and printed documents keep their existing appearance. */
+/* Odina's shared workspace appearance. Printed documents keep their existing appearance. */
 @media screen {
   body[data-odina-workspace] {
     --odina-canvas: #f6f5ef;
