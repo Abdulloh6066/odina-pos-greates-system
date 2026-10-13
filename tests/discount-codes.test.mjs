@@ -690,10 +690,14 @@ test('rounding idempotency key is tied to requested target', async () => {
   assert.equal(f.db.Sale.length,1);
 });
 
-test('rounding UI requires online checkout; existing offline queue remains unmodified', () => {
+test('rounding UI stays online-only through the shared offline eligibility check', async () => {
+  const { canQueuePosSale } = await import('../src/lib/pos-network.js');
   const source = readFileSync('src/pages/POS.jsx','utf8');
   assert.match(source,/discountCode \|\| roundingTarget !== null/);
-  assert.match(source,/!selectedTable && !takeawayOrder && !takeawayRequestIdRef.current && !discountCode && roundingTarget === null/);
+  assert.match(source,/const queueEligible = canQueuePosSale/);
+  assert.equal(canQueuePosSale({ roundingTarget: 75000 }), false);
+  assert.equal(canQueuePosSale({ discountCode: 'coupon' }), false);
+  assert.equal(canQueuePosSale({}), true);
   assert.match(source,/rounding_total: adjustmentMode === 'rounding'/);
   assert.match(source,/manual_discount_amount: adjustmentMode === 'manual'/);
   const cart = readFileSync('src/components/pos/Cart.jsx','utf8');
