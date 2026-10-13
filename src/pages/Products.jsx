@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Image } from '@/components/ui/image';
+import '@/styles/catalog-workbench.css';
 
 export default function Products() {
   const { user } = useOutletContext();
@@ -90,7 +91,7 @@ export default function Products() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench catalog-workbench catalog-products p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Mahsulotlar"
         subtitle={`${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
@@ -104,73 +105,77 @@ export default function Products() {
 
       {!loading && <TestCatalogCleanup user={user} products={products} onComplete={load} />}
 
-      <div className="odina-panel flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
-        </div>
+      <div className="odina-panel catalog-toolbar catalog-product-toolbar flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
+        <label className="catalog-filter-field flex-1">
+          <span>Mahsulot qidirish</span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulot nomini kiriting…" className="pl-9 h-11 rounded-xl" />
+          </div>
+        </label>
+        <label className="catalog-filter-field catalog-category-field"><span>Kategoriya</span>
         <OdinaSelect value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium sm:w-56">
           <option value="all">Barcha kategoriyalar</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </OdinaSelect>
+        </label>
         {role === 'admin' && (
-          <Button variant="outline" onClick={() => setShowArchived((value) => !value)} className="whitespace-nowrap min-h-11 rounded-xl touch-manipulation">
+          <Button variant="outline" aria-pressed={showArchived} onClick={() => setShowArchived((value) => !value)} className="catalog-archive-toggle whitespace-nowrap min-h-11 rounded-xl touch-manipulation">
             {showArchived ? <Cake className="w-4 h-4 mr-1.5" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
             {showArchived ? 'Faol mahsulotlar' : 'Arxiv' }
           </Button>
         )}
       </div>
 
+      <div className="catalog-section-heading">
+        <div><h2>{showArchived ? 'Arxivdagi mahsulotlar' : 'Mahsulotlar katalogi'}</h2><p>Mahsulot, kategoriya va sotuv narxi</p></div>
+        <span className="catalog-result-count" aria-live="polite">{filtered.length} ta mahsulot</span>
+      </div>
+
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
-          {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-52 rounded-2xl bg-secondary animate-pulse" />)}
+        <div className="catalog-product-grid">
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-40 rounded-2xl bg-secondary animate-pulse" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20"><div className="text-5xl mb-3">🍰</div><p className="text-sm text-muted-foreground">Mahsulot topilmadi.</p></div>
+        <div className="catalog-empty"><Cake className="w-10 h-10" aria-hidden="true" /><h3>Mahsulot topilmadi</h3><p>Qidiruv yoki kategoriya filtrini o‘zgartiring.</p>{(search || filterCat !== 'all') && <Button variant="outline" onClick={() => { setSearch(''); setFilterCat('all'); }}>Filtrlarni tozalash</Button>}</div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+        <div className="catalog-product-grid">
           {filtered.map((p) => (
-            <div key={p.id} className={`odina-panel group rounded-2xl bg-card border border-border premium-shadow overflow-hidden transition-all hover:-translate-y-0.5 hover:premium-shadow-lg ${p.active === false ? 'opacity-90' : ''}`}>
-              <div className="relative aspect-square bg-secondary/70 overflow-hidden">
+            <article key={p.id} className={`odina-panel catalog-product-card rounded-2xl bg-card border border-border overflow-hidden ${p.active === false ? 'is-unavailable' : ''}`}>
+              <div className="catalog-product-image relative bg-secondary/70 overflow-hidden">
                 {p.image_url ? (
                   <Image src={p.image_url} alt={p.name} fittingType="fill" className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/35">
                     <Cake className="w-8 h-8" />
-                    <span className="text-[10px] font-medium tracking-wide uppercase">Rasm yo‘q</span>
+                    <span className="text-xs font-medium">Rasm yo‘q</span>
                   </div>
                 )}
-                {p.is_favorite && <Star className="absolute top-2 left-2 w-4 h-4 fill-primary text-primary" />}
-                {p.active === false && (
-                  <div className="absolute left-2 bottom-2 rounded-full border border-border bg-card/95 px-2 py-1 text-[10px] font-semibold text-muted-foreground shadow-sm backdrop-blur">
-                    Sotuvda emas
-                  </div>
-                )}
-                {canManageCatalog && (
-                  <button onClick={() => openEdit(p)} className="absolute top-2 right-2 w-10 h-10 rounded-full bg-card/95 backdrop-blur flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shadow touch-manipulation" aria-label={`${p.name} mahsulotini tahrirlash`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                {p.is_favorite && <span className="catalog-favorite" aria-label="Sevimli mahsulot"><Star className="w-4 h-4 fill-primary text-primary" aria-hidden="true" /></span>}
               </div>
-              <div className="p-3.5">
-                <div className="text-sm font-semibold leading-snug whitespace-normal break-words min-h-10">{p.name}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{localizedCategoryName(p.category_name)}</div>
-                <div className={`text-sm font-semibold mt-2 ${Number(p.price) === 0 ? 'text-muted-foreground' : 'text-brand-ink'}`}>
+              <div className="catalog-product-info">
+                <div className="catalog-product-heading"><h3>{p.name}</h3><span className={`catalog-product-status ${p.active === false ? '' : 'is-active'}`}>{p.active === false ? 'Sotuvda emas' : 'Sotuvda'}</span></div>
+                <p className="catalog-product-category">{localizedCategoryName(p.category_name)}</p>
+                <div className={`catalog-product-price ${Number(p.price) === 0 ? 'text-muted-foreground' : 'text-brand-ink'}`}>
                   {Number(p.price) === 0 ? '0 so‘m' : formatUZS(p.price)}
+                  <span>{p.sale_unit === 'gram' ? '/ 1 kg' : p.production_unit === 'sheet' ? '/ bo‘lak' : '/ dona'}</span>
                 </div>
                 {shops.some((shop) => priceForShop(p, shop.id) !== Number(p.price)) && (
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="catalog-shop-prices">
                     {shops.map((shop) => `${shop.name}: ${formatUZS(priceForShop(p, shop.id))}`).join(' · ')}
                   </div>
                 )}
-                {role === 'manager' && <Button variant="outline" size="sm" className="w-full mt-3" onClick={() => { setShopPriceProduct(p); setShopPrice(String(priceForShop(p, user.shop_id))); }}>Do‘kon narxi: {formatUZS(priceForShop(p, user.shop_id))}</Button>}
+              </div>
+              <div className="catalog-product-actions">
+                {canManageCatalog && <Button variant="outline" size="sm" onClick={() => openEdit(p)} aria-label={`${p.name} mahsulotini tahrirlash`}><Pencil className="w-4 h-4" aria-hidden="true" /> Tahrirlash</Button>}
+                {role === 'manager' && <Button variant="outline" size="sm" onClick={() => { setShopPriceProduct(p); setShopPrice(String(priceForShop(p, user.shop_id))); }}>Do‘kon narxi: {formatUZS(priceForShop(p, user.shop_id))}</Button>}
                 {(role === 'production' || canManageCatalog) && (
-                  <Button variant="outline" size="sm" className="w-full mt-3 h-9 rounded-lg px-2 text-[11px] font-semibold whitespace-nowrap touch-manipulation" onClick={() => setAvailability(p)}>
+                  <Button variant="outline" size="sm" className="catalog-availability" onClick={() => setAvailability(p)}>
                     {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
                   </Button>
                 )}
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
