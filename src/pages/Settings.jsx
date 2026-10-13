@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -138,15 +139,15 @@ export default function Settings() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-3xl mx-auto animate-fade-in">
-      <PageHeader title="Sozlamalar" subtitle="Do‘kon, chek va xavfsizlik sozlamalari" icon={SettingsIcon} />
+    <div className="odina-page odina-workbench odina-operations odina-settings p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+      <PageHeader title="Sozlamalar" eyebrow="TIZIM BOSHQARUVI" subtitle="Cheklar, sotuv qoidalari va do‘kon ma’lumotlarini boshqaring." icon={SettingsIcon} />
       <TelegramSetup user={user} />
       {loading ? (
         <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
-        <>
-          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 space-y-4">
-            <h2 className="font-display text-lg font-bold">Chek sozlamalari</h2>
+        <div className="odina-settings-grid">
+          <div className="odina-settings-receipt odina-panel rounded-2xl bg-card border border-border p-5 space-y-4">
+            <div className="odina-settings-section-heading"><p className="odina-page-eyebrow">MIJOZGA KO‘RINADIGAN MATN</p><h2 className="font-display text-lg font-bold">Chek sozlamalari</h2><p className="text-xs text-muted-foreground mt-1">Umumiy nom va xabarlar barcha do‘konlar cheklarida chiqadi.</p></div>
             <div>
               <Label className="text-xs mb-1.5 block">Do‘kon nomi</Label>
               <Input value={shopName} onChange={(e) => setShopName(e.target.value)} />
@@ -169,10 +170,10 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
+          <div className="odina-settings-stock odina-panel rounded-2xl bg-card border border-border p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-display text-lg font-bold">Qoldiqsiz sotuv</h2>
+                <p className="odina-page-eyebrow">SOTUV QOIDASI</p><h2 className="font-display text-lg font-bold">Qoldiqsiz sotuv</h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   Yoqilganida qoldiq yetmasa kassir ogohlantiriladi, ammo tasdiqlab sotishi mumkin.
                   O‘chirilganda qoldiqsiz sotuv bloklanadi.
@@ -193,9 +194,9 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 mt-5 space-y-4">
+          <div className="odina-settings-pin odina-panel rounded-2xl bg-card border border-border p-5 space-y-4">
             <div>
-              <h2 className="font-display text-lg font-bold">Egasi tasdiqlash PIN kodi</h2>
+              <p className="odina-page-eyebrow">HIMOYALANGAN AMALLAR</p><h2 className="font-display text-lg font-bold">Egasi tasdiqlash PIN kodi</h2>
               <p className="text-xs text-muted-foreground mt-1">Qaytarish va himoyalangan kassa amallarida ishlatiladi. PIN kodning o‘zi saqlanmaydi.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -213,14 +214,14 @@ export default function Settings() {
             </Button>
           </div>
 
-          <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-5 mt-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="odina-settings-shops odina-panel rounded-2xl bg-card border border-border p-5">
+            <div className="odina-settings-section-heading flex flex-wrap items-center justify-between gap-3 mb-4">
               <h2 className="font-display text-lg font-bold flex items-center gap-2"><Building2 className="w-5 h-5 text-brand-ink" /> Do‘konlar</h2>
               <Button variant="outline" size="sm" onClick={addShop}>Do‘kon qo‘shish</Button>
             </div>
-            <div className="space-y-2">
+            <div className="odina-shop-settings-grid grid gap-3">
               {shops.map((s) => (
-                <div key={s.id} className="p-3 rounded-xl bg-secondary/50 space-y-3">
+                <div key={s.id} className="odina-shop-settings-card p-4 rounded-xl border border-border bg-secondary/30 space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{s.name} {s.is_main && <span className="text-xs text-brand-ink">· Asosiy</span>}</div>
@@ -259,7 +260,7 @@ export default function Settings() {
               {shops.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Hali do‘konlar yo‘q.</p>}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
