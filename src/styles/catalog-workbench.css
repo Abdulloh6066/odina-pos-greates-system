@@ -62,7 +62,7 @@
 .catalog-products .catalog-shop-prices { margin-top: 7px; font-size: 12px; line-height: 1.5; color: var(--odina-muted, #626653); overflow-wrap: anywhere; }
 .catalog-products .catalog-product-actions { grid-column: 1 / -1; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--odina-line, #e2dfd0); padding-top: 12px; }
 .catalog-products .catalog-product-actions:empty { display: none; }
-.catalog-products .catalog-product-actions button { font-size: 12px; border-radius: 9px; gap: 6px; padding-inline: 12px; }
+.catalog-products .catalog-product-actions button { min-width: 0; max-width: 100%; min-height: 44px; height: auto; white-space: normal; line-height: 1.4; font-size: 12px; border-radius: 9px; gap: 6px; padding: 10px 12px; }
 .catalog-products .catalog-availability { color: var(--odina-muted, #626653); }
 
 /* The directory uses aligned columns, then labelled details on smaller screens. */
@@ -88,6 +88,8 @@
 .catalog-customers .customer-directory-chevron { color: var(--odina-muted, #626653); }
 .catalog-customers .customer-mobile-label { display: none; }
 .catalog-customers .customer-birthday-panel { background: var(--odina-surface, #fffefa); border-color: var(--odina-line, #e2dfd0); box-shadow: none; }
+.catalog-customers .customer-birthday-panel > div:first-child > button { min-width: 0; max-width: 100%; min-height: 44px; height: auto; white-space: normal; line-height: 1.45; padding-block: 10px; }
+.catalog-customers .customer-birthday-panel > div:first-child > button svg { flex-shrink: 0; }
 .catalog-customers .customer-birthday-counter { background: var(--odina-soft); border-color: var(--odina-line, #e2dfd0); }
 
 /* Category groups share the same header, search bar and quiet surfaces. */
@@ -219,7 +221,8 @@ body:has(.catalog-warehouse) .warehouse-dialog .font-display { font-family: var(
   .catalog-categories .cat-card { padding: 16px; }
   .catalog-categories .cat-card-top { gap: 10px; }
   .catalog-categories .cat-card-name { font-size: 15px; }
-  .catalog-categories .cat-actions button { flex: 1; justify-content: center; }
+  .catalog-categories .cat-actions button { flex: 1; min-width: 0; max-width: 100%; height: auto; white-space: normal; line-height: 1.4; justify-content: center; }
+  .catalog-customers .customer-birthday-panel > div:first-child > button { width: 100%; }
   .catalog-customers .customer-directory-toolbar > .catalog-filter-field { width: 100%; }
   .catalog-customers .customer-sort { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalog-customers .customer-sort button { white-space: normal; height: auto; padding: 10px; font-size: 11px; line-height: 1.4; }
@@ -228,3 +231,4 @@ body:has(.catalog-warehouse) .warehouse-dialog .font-display { font-family: var(
 @media screen and (prefers-reduced-motion: reduce) {
   .catalog-workbench *, .catalog-workbench *::before, .catalog-workbench *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
