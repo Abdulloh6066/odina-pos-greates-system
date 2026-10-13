@@ -56,6 +56,7 @@ const receiptPaid = (receipt) => {
 };
 
 export default function SupplierLedgerPanel({
+  modernView = false,
   user,
   location,
   ingredients,
@@ -354,7 +355,16 @@ export default function SupplierLedgerPanel({
             <p className="text-sm text-muted-foreground mt-1">Filtrlarni o‘zgartiring yoki yangi kirim yarating.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          modernView ? <div className="warehouse-table-wrap"><table className="warehouse-table"><caption className="sr-only">Kirim hujjatlari</caption><thead><tr><th scope="col">Hujjat / yetkazib beruvchi</th><th scope="col">Sana</th><th scope="col">Kirim summasi</th><th scope="col">Qolgan qarz</th><th scope="col">Holati</th><th scope="col">Amal</th></tr></thead><tbody>
+            {visible.map((receipt) => <tr key={receipt.id}>
+              <td data-label="Hujjat"><strong>{receipt.supplier_name_snapshot}</strong><span className="warehouse-cell-note">{receipt.receipt_number} · {receipt.location_name_snapshot}</span></td>
+              <td data-label="Sana">{formatUzbekistanDateTime(receipt.received_at || receipt.created_date)}</td>
+              <td data-label="Kirim summasi" className="warehouse-number">{formatUZS(receipt.total_amount)}</td>
+              <td data-label="Qolgan qarz" className="warehouse-number">{formatUZS(Number(receipt.remaining_debt || 0))}</td>
+              <td data-label="Holati"><span className={'warehouse-status ' + (STATUS_STYLES[receipt.status] || 'bg-secondary text-muted-foreground')}>{STATUS_LABELS[receipt.status] || receipt.status}</span></td>
+              <td data-label="Amal"><Button type="button" variant="outline" onClick={() => setSelectedReceipt(receipt)} aria-label={receipt.receipt_number + ' — tafsilotlar'}>Tafsilotlar<ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" /></Button></td>
+            </tr>)}
+          </tbody></table></div> : <div className="space-y-3">
             {visible.map((receipt) => {
               const items = receiptItems.filter((item) => item.receipt_id === receipt.id);
               const receiptPayments = payments.filter((payment) => payment.receipt_id === receipt.id);
@@ -535,7 +545,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
 
   return (
     <Dialog open={!!receipt} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Kirim tafsilotlari</DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -630,7 +640,7 @@ function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, 
 
   return (
     <Dialog open={!!supplier} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-3xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{supplier.name}</DialogTitle>
           <p className="text-sm text-muted-foreground">Yetkazib beruvchining to‘liq tarixi</p>
@@ -768,7 +778,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
 
   return (
     <Dialog open={!!supplier} onOpenChange={(open) => !open && !saving && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="warehouse-dialog sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Budgetdan qarzni to‘lash</DialogTitle>
           <p className="text-sm text-muted-foreground">{supplier?.name} · Qarz {formatUZS(debt)}</p>
@@ -887,7 +897,7 @@ function CancelReceiptDialog({ receipt, onClose, onCancelled }) {
 
   return (
     <Dialog open={!!receipt} onOpenChange={(open) => !open && !saving && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="warehouse-dialog sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Kirimni bekor qilish</DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -1039,7 +1049,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog warehouse-receipt-drawer sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Yetkazib beruvchidan yangi kirim</DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -1083,7 +1093,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
               const ingredient = ingredients.find((item) => item.id === line.ingredient_id);
               return (
                 <div key={index} className="rounded-2xl border border-border bg-secondary/30 p-3">
-                  <div className="grid sm:grid-cols-[1fr_130px_160px_auto] gap-2 items-end">
+                  <div className="warehouse-receipt-line grid sm:grid-cols-[1fr_130px_160px_auto] gap-2 items-end">
                     <div>
                       <Label className="text-xs mb-1.5 block">Masalliq yoki qadoq</Label>
                       <OdinaSelect
