@@ -387,7 +387,7 @@ function ProductionScreenInner() {
         ) : (
           <div className="space-y-8">
             {refreshError && (
-              <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-brand-ink flex items-center gap-2">
+              <div role="status" className="odina-production-warning rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-brand-ink flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 {refreshError}
               </div>
@@ -640,11 +640,11 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
           aria-expanded={expanded}
           aria-controls={detailsId}
           onClick={() => setExpanded((open) => !open)}
-          className="w-full min-w-0 flex-1 min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
+          className="odina-production-summary w-full min-w-0 flex-1 min-h-[72px] p-3 sm:px-4 flex items-center gap-3 text-left hover:bg-secondary/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-olive"
         >
-          <span className="min-w-0 flex-1 grid gap-x-4 gap-y-1 lg:grid-cols-[minmax(250px,0.9fr)_minmax(110px,0.7fr)_minmax(0,1.4fr)] lg:items-center">
+          <span className="odina-production-summary-content min-w-0 flex-1 grid gap-x-4 gap-y-1 lg:grid-cols-[minmax(250px,0.9fr)_minmax(110px,0.7fr)_minmax(0,1.4fr)] lg:items-center">
             <span className="flex flex-wrap items-center gap-2 min-w-0">
-              <span className="inline-flex items-center rounded-lg border border-border bg-secondary/70 px-2.5 py-1 font-sans text-sm sm:text-base font-semibold tabular-nums whitespace-nowrap">Buyurtma №{displayOrderNumber(order)}</span>
+              <span className="odina-production-number inline-flex items-center rounded-lg border border-border bg-secondary/70 px-2.5 py-1 font-sans text-sm sm:text-base font-semibold tabular-nums whitespace-nowrap">Buyurtma №{displayOrderNumber(order)}</span>
               <span className="inline-flex items-center gap-1.5 text-sm sm:text-base font-semibold tabular-nums shrink-0 bg-secondary/70 border border-border rounded-lg px-2.5 py-1">
                 <Clock className="w-3.5 h-3.5 text-brand-olive" /> {order.required_time || '—'}
               </span>
@@ -658,7 +658,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
               <span className="truncate">{productSummary}</span>
             </span>
           </span>
-          <span className="shrink-0 flex flex-col lg:flex-row items-end lg:items-center gap-1.5">
+          <span className="odina-production-status shrink-0 flex flex-col lg:flex-row items-end lg:items-center gap-1.5">
             <span className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium rounded-full px-2.5 py-1 ${isReady ? 'text-brand-ink bg-brand-olive/20' : 'text-muted-foreground bg-secondary'}`}>
               {isReady && <CheckCircle2 className="w-3.5 h-3.5" />}
               {statusLabel}
@@ -674,7 +674,7 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
               </span>
             )}
           </span>
-          <ChevronDown aria-hidden="true" className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          <ChevronDown aria-hidden="true" className={`odina-production-summary-chevron w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
         <div className="grid grid-cols-2 gap-2 px-3 py-2.5 border-t xl:border-t-0 xl:border-l border-border bg-secondary/20 xl:shrink-0">
           <Button
@@ -774,3 +774,4 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
     </div>
   );
 }
+
