@@ -1,9 +1,11 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { formatUZS } from '@/lib/pos';
 import { uzbekistanDateKey, uzbekistanMonthStartKey } from '@/lib/uzbekistan-time';
+import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Image } from '@/components/ui/image';
@@ -99,29 +101,26 @@ export default function ProfitReport() {
   const productsRows = report?.products || [];
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
-          <TrendingUp className="w-6 h-6 text-brand-olive" /> Tannarx va foyda
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">Kassa savdosi tannarxi va foydasi. Buyurtma avanslari foydaga qayta qo‘shilmaydi.</p>
-      </div>
+    <div className="odina-page odina-workbench odina-operations odina-profitreport p-5 sm:p-8 max-w-7xl mx-auto">
+      <PageHeader title="Tannarx va foyda" eyebrow="MOLIYAVIY TAHLIL" icon={TrendingUp}
+        subtitle="Kassa savdosi tannarxi va foydasi. Buyurtma avanslari foydaga qayta qo‘shilmaydi." />
 
       {/* Filters */}
-      <div className="bg-card rounded-2xl border border-border premium-shadow p-4 mb-6">
+      <div className="odina-operations-toolbar odina-panel bg-card rounded-2xl border border-border p-4 sm:p-5 mb-6">
+        <div className="odina-toolbar-heading"><h2>Tahlil doirasi</h2><p>Davr va mahsulotni tanlang, so‘ng hisobotni yangilang.</p></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground">Sanadan</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm" />
+            <input aria-label="Hisobot boshlanish sanasi" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm" />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Sanagacha</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm" />
+            <input aria-label="Hisobot tugash sanasi" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm" />
           </div>
           {isAdmin && (
             <div>
               <label className="text-xs font-medium text-muted-foreground">Do‘kon</label>
-              <OdinaSelect value={shopId} onChange={(e) => setShopId(e.target.value)} className="h-11 w-full">
+              <OdinaSelect aria-label="Hisobot do‘koni" value={shopId} onChange={(e) => setShopId(e.target.value)} className="h-11 w-full">
                 <option value="">Barcha do‘konlar</option>
                 {shops.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               </OdinaSelect>
@@ -129,14 +128,14 @@ export default function ProfitReport() {
           )}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Kategoriya</label>
-            <OdinaSelect value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="h-11 w-full">
+            <OdinaSelect aria-label="Hisobot kategoriyasi" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="h-11 w-full">
               <option value="">Barcha kategoriyalar</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </OdinaSelect>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Mahsulot</label>
-            <OdinaSelect value={productId} onChange={(e) => setProductId(e.target.value)} className="h-11 w-full">
+            <OdinaSelect aria-label="Hisobot mahsuloti" value={productId} onChange={(e) => setProductId(e.target.value)} className="h-11 w-full">
               <option value="">Barcha mahsulotlar</option>
               {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </OdinaSelect>
@@ -154,7 +153,7 @@ export default function ProfitReport() {
         <div className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700 p-3 mb-4 text-sm">{error}</div>
       )}
 
-      <p className="mb-4 text-xs text-muted-foreground leading-relaxed">
+      <p className="odina-operations-note mb-4 text-xs text-muted-foreground leading-relaxed">
         Tanlangan davr va do‘konlar bo‘yicha buyurtma to‘lovlari: {formatUZS(s.order_payment_total || 0)}.
         {' '}Kassa sof savdosi bilan jami olingan pul: {formatUZS(s.collections_total || 0)}.
         {' '}Bu pul tushumi; buyurtmalar foydasi emas.
@@ -162,7 +161,7 @@ export default function ProfitReport() {
         {s.incomplete_sale_count > 0 && ' Ayrim savdolarning mahsulot tafsiloti to‘liq emas; foydani yakuniy deb hisoblamang.'}
       </p>
       {/* Summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+      <div className="odina-operations-metrics odina-profit-metrics grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-6">
         <StatCard icon={Receipt} label="Kassa sof savdo" value={s.net_revenue} />
         <StatCard icon={Coins} label="Sotilgan tannarx" value={s.cost_of_goods} tone="muted" />
         <StatCard icon={PiggyBank} label={s.unknown_count > 0 || s.estimate_count > 0 ? 'Taxminiy yalpi foyda' : 'Kassa yalpi foyda'} value={s.gross_profit} tone="positive" />
@@ -184,9 +183,10 @@ export default function ProfitReport() {
       )}
 
       {/* Product table */}
-      <div className="bg-card rounded-2xl border border-border premium-shadow overflow-hidden">
+      <div className="odina-operations-table-panel odina-panel bg-card rounded-2xl border border-border overflow-hidden">
         <div className="px-4 py-3 border-b border-border">
           <h2 className="font-display text-lg font-semibold">Mahsulotlar bo‘yicha tahlil</h2>
+          <p className="text-xs text-muted-foreground mt-1">Mahsulotni tanlab, tannarx tarkibini ko‘ring.</p>
         </div>
         {loading && !report ? (
           <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-muted-foreground" /></div>
@@ -197,7 +197,7 @@ export default function ProfitReport() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="odina-operations-table w-full text-sm">
               <thead className="bg-secondary/40 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="text-left font-semibold px-4 py-3">Mahsulot</th>
@@ -250,11 +250,11 @@ export default function ProfitReport() {
 function StatCard({ icon: Icon, label, value, suffix, tone }) {
   const toneClass = tone === 'positive' ? 'text-emerald-600' : tone === 'muted' ? 'text-muted-foreground' : 'text-foreground';
   return (
-    <div className="rounded-2xl border border-border bg-card premium-shadow p-3 sm:p-4">
+    <div className="odina-operations-metric p-3 sm:p-4">
       <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground mb-1.5">
         <Icon className="w-3.5 h-3.5" /> {label}
       </div>
-      <div className={`text-lg sm:text-xl font-bold ${toneClass}`}>
+      <div className={`odina-metric-value text-lg sm:text-xl font-bold ${toneClass}`}>
         {suffix !== undefined && suffix !== null ? suffix : formatUZS(value ?? 0)}
       </div>
     </div>
