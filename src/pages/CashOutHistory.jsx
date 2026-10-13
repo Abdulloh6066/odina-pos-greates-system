@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
@@ -113,15 +114,17 @@ export default function CashOutHistory() {
   const ownerView = ['admin', 'manager'].includes(user?.role);
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-cashouthistory p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
         title="Kassadan pul olish tarixi"
+        eyebrow="NAQD PUL JURNALI"
         subtitle={ownerView ? 'Barcha do‘konlardan olingan naqd pullar' : 'Faqat sizning hisobingiz orqali olingan pullar'}
         icon={Banknote}
       />
 
-      <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 mb-6 space-y-4">
-        <div className="flex flex-wrap gap-2">
+      <div className="odina-operations-toolbar odina-panel rounded-2xl bg-card border border-border p-4 sm:p-5 mb-6 space-y-4">
+        <div className="odina-toolbar-heading"><h2>Chiqimlarni saralash</h2><p>Davr, do‘kon va qabul qiluvchi bo‘yicha naqd pul harakatlarini ko‘ring.</p></div>
+        <div className="odina-period-switch flex flex-wrap gap-2">
           {[
             ['today', 'Bugun'],
             ['yesterday', 'Kecha'],
@@ -201,6 +204,7 @@ export default function CashOutHistory() {
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
+            aria-label="Chiqim tarixi bo‘yicha qidirish"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Xodim, sabab, qabul qiluvchi yoki summa…"
@@ -221,26 +225,27 @@ export default function CashOutHistory() {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-3 mb-3">
-        <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
+      <div className="odina-operations-metrics grid sm:grid-cols-2 mb-3">
+        <div className="odina-operations-metric p-4">
           <p className="text-xs text-muted-foreground">Jami olingan naqd pul</p>
           <p className="text-2xl font-semibold mt-1">{formatUZS(total)}</p>
         </div>
-        <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4">
+        <div className="odina-operations-metric p-4">
           <p className="text-xs text-muted-foreground">Yozuvlar</p>
           <p className="text-2xl font-semibold mt-1">{formatNum(filtered.length)}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="odina-operations-metrics odina-category-metrics grid grid-cols-2 lg:grid-cols-4 mb-6">
         {categoryTotals.map((item) => (
-          <div key={item.key} className="odina-panel rounded-2xl bg-card border border-border p-3 sm:p-4">
+          <div key={item.key} className="odina-operations-metric p-3 sm:p-4">
             <p className="text-xs text-muted-foreground">{item.label}</p>
             <p className="text-base sm:text-lg font-semibold mt-1">{formatUZS(item.total)}</p>
           </div>
         ))}
       </div>
 
+      <div className="odina-operations-section-heading"><div><p className="odina-page-eyebrow">CHIQIMLAR</p><h2>Pul olish yozuvlari</h2></div><p>{formatNum(filtered.length)} ta yozuv · {formatUZS(total)}</p></div>
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, index) => (
@@ -256,13 +261,13 @@ export default function CashOutHistory() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="odina-ledger space-y-3">
           {filtered.map((movement) => {
             const date = new Date(movement.created_at || movement.created_date);
             const employee = movement.employee_name || movement.user_name || 'Noma’lum xodim';
             const category = categoryOf(movement);
             return (
-              <div key={movement.id} className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
+              <div key={movement.id} className="odina-ledger-row odina-cashout-row odina-panel rounded-2xl bg-card border border-border p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -289,7 +294,7 @@ export default function CashOutHistory() {
                       )}
                     </div>
                   </div>
-                  <p className="text-lg font-semibold text-amber-700 whitespace-nowrap">−{formatUZS(movement.amount)}</p>
+                  <p className="odina-ledger-amount text-lg font-semibold text-brand-ink whitespace-nowrap">−{formatUZS(movement.amount)}</p>
                 </div>
               </div>
             );
@@ -299,4 +304,5 @@ export default function CashOutHistory() {
     </div>
   );
 }
+
 
