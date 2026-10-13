@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
@@ -166,9 +167,10 @@ export default function Shifts() {
   };
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-shifts p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader
         title="Smenalar"
+        eyebrow="SMENA NAZORATI"
         subtitle={role === "cashier"
           ? `${formatNum(filtered.length)} ta smena · faqat sizniki`
           : `${formatNum(filtered.length)} ta smena · barcha do‘konlar`}
@@ -177,8 +179,9 @@ export default function Shifts() {
 
       <section
         aria-label="Smenalar tarixini qidirish"
-        className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4 mb-5"
+        className="odina-operations-toolbar odina-panel rounded-2xl bg-card border border-border p-4 sm:p-5 mb-5"
       >
+        <div className="odina-toolbar-heading"><h2>Smena jurnalini saralash</h2><p>Do‘kon, kassir va holat bo‘yicha kerakli smenani toping.</p></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
           <FilterField label="Qidirish" className="sm:col-span-2 xl:col-span-1">
             <div className="relative">
@@ -250,6 +253,11 @@ export default function Shifts() {
         )}
       </section>
 
+      <div className="odina-operations-metrics grid grid-cols-3 mb-6">
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Tanlangan smenalar</p><p className="odina-metric-value">{formatNum(filtered.length)}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Hozir ochiq</p><p className="odina-metric-value">{formatNum(open.length)}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Yopilgan</p><p className="odina-metric-value">{formatNum(closed.length)}</p></div>
+      </div>
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -318,7 +326,7 @@ function ShiftCard({ shift, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="odina-panel w-full text-left rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 transition-all hover:-translate-y-0.5 hover:premium-shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="odina-shift-card odina-panel w-full text-left rounded-2xl bg-card border border-border p-4 sm:p-5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
@@ -819,3 +827,4 @@ function Cell({ label, value, bold }) {
     </div>
   );
 }
+
