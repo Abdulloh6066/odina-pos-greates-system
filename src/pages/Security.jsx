@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Shield, RefreshCw } from 'lucide-react';
@@ -42,13 +43,14 @@ export default function Security() {
   useEffect(() => { load(); }, [reloadKey, load]);
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-security p-5 sm:p-8 max-w-5xl mx-auto animate-fade-in">
       <PageHeader
         title="Xavfsizlik"
+        eyebrow="HIMOYA MARKAZI"
         subtitle="Tizim himoyasi va kirish nazorati · faqat Egasi / Admin"
         icon={Shield}
         actions={(
-          <Button variant="outline" onClick={() => setReloadKey((k) => k + 1)} disabled={loading} className="min-h-11 rounded-xl">
+          <Button aria-label="Xavfsizlik holatini yangilash" variant="outline" onClick={() => setReloadKey((k) => k + 1)} disabled={loading} className="min-h-11 rounded-xl">
             <RefreshCw className={loading ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">Yangilash</span>
           </Button>
@@ -62,16 +64,25 @@ export default function Security() {
       {loading ? (
         <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
-        <div className="space-y-5">
-          <SecurityPosture users={users} pinSet={pinSet} />
-          <RoleMatrix />
-          <div className="grid lg:grid-cols-2 gap-5">
-            <PinManager onSaved={() => setReloadKey((k) => k + 1)} />
-            <StaffAccessPanel users={users} currentUser={user} canManageAdmins={canManageAdmins} onChanged={() => setReloadKey((k) => k + 1)} />
-          </div>
-          <SecurityAuditFeed entries={audit} />
-          <BusinessBackupPanel user={user} />
-          <DataCleanupPanel />
+        <div className="odina-security-sections space-y-7">
+          <section className="space-y-4">
+            <div className="odina-operations-section-heading"><div><p className="odina-page-eyebrow">UMUMIY HOLAT</p><h2>Tizim himoyasi</h2></div><p>Kirish darajalari va himoya holatini tekshiring.</p></div>
+            <SecurityPosture users={users} pinSet={pinSet} />
+            <RoleMatrix />
+          </section>
+          <section className="space-y-4">
+            <div className="odina-operations-section-heading"><div><p className="odina-page-eyebrow">KIRISH NAZORATI</p><h2>PIN va xodim ruxsatlari</h2></div><p>Himoyalangan amallar va jamoa kirishini boshqaring.</p></div>
+            <div className="grid lg:grid-cols-2 gap-5">
+              <PinManager onSaved={() => setReloadKey((k) => k + 1)} />
+              <StaffAccessPanel users={users} currentUser={user} canManageAdmins={canManageAdmins} onChanged={() => setReloadKey((k) => k + 1)} />
+            </div>
+            <SecurityAuditFeed entries={audit} />
+          </section>
+          <section className="space-y-4">
+            <div className="odina-operations-section-heading"><div><p className="odina-page-eyebrow">MA’LUMOTLAR</p><h2>Zaxira va xizmat amallari</h2></div><p>Biznes ma’lumotlarini saqlash va tizimga xizmat ko‘rsatish.</p></div>
+            <BusinessBackupPanel user={user} />
+            <DataCleanupPanel />
+          </section>
         </div>
       )}
     </div>
