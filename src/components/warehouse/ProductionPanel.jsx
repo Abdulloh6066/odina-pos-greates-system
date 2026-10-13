@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import CakeLayersPanel from '@/components/warehouse/CakeLayersPanel';
+import CakeLayersPanelV2 from '@/components/warehouse/CakeLayersPanelV2';
 import { isCakeLayer, ingredientUnitLabel, cakeLayerStockRows, calculateProductionCapacity } from '@/lib/cake-layer-inventory';
 
 const UNIT_LABELS = { g: 'g', ml: 'ml', piece: 'dona', sheet: 'list' };
@@ -26,6 +27,7 @@ const errorMessage = (error, fallback) =>
 
 export default function ProductionPanel({
   mode,
+  newLayerView = false,
   user,
   location,
   products,
@@ -271,9 +273,10 @@ export default function ProductionPanel({
   }
 
   if (mode === 'cake_layers') {
+    const LayerPanel = newLayerView ? CakeLayersPanelV2 : CakeLayersPanel;
     return (
       <>
-        <CakeLayersPanel
+        <LayerPanel
           layerRows={layerRows}
           capacityRows={capacityRows}
           canManage={canManageRecipes}
