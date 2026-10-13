@@ -177,6 +177,8 @@
 }
 @media screen and (max-width: 639px) {
   .odina-operations .odina-operations-toolbar { padding: 16px; }
+  .odina-reports .odina-report-summary .odina-panel > .flex:first-child > .flex { width: 100%; min-width: 0; flex-wrap: wrap; }
+  .odina-settings .odina-button { max-width: 100%; min-width: 0; height: auto; min-height: 44px; white-space: normal; overflow-wrap: anywhere; text-align: center; }
   .odina-operations .odina-toolbar-heading { margin-bottom: 14px; padding-bottom: 12px; }
   .odina-operations .odina-operations-metric { padding: 16px 12px; }
   .odina-operations .odina-operations-metric > p.text-xs { font-size: 11px; }
@@ -203,3 +205,4 @@
   .odina-operations .odina-discount-card { padding: 20px 16px; }
   .odina-operations .odina-operations-section-heading { align-items: flex-start; }
 }
+
