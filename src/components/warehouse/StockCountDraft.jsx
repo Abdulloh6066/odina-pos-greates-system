@@ -146,7 +146,7 @@ export default function StockCountDraft({ user, data, onClose, onSaved }) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-4xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-4xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl flex items-center gap-2">
             {count.count_number}
