@@ -1,0 +1,113 @@
+/* Today's overview shares Odina's workbench materials without changing printed pages. */
+@media screen {
+  .odina-home {
+    --odina-home-hero: var(--odina-olive);
+    --odina-home-hero-text: var(--odina-surface);
+    --odina-home-danger: #991b1b;
+    --odina-home-danger-surface: #fef2f2;
+    --odina-home-danger-line: #fecaca;
+    min-width: 0;
+  }
+  .dark .odina-home {
+    --odina-home-hero: var(--odina-selection);
+    --odina-home-hero-text: var(--odina-text);
+    --odina-home-danger: var(--odina-status-danger, #ffb2a6);
+    --odina-home-danger-surface: var(--odina-status-danger-surface, #432b29);
+    --odina-home-danger-line: var(--odina-status-danger-line, #77534c);
+  }
+  .odina-home .odina-home-pos-action {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    min-height: 44px; padding: 11px 18px; cursor: pointer; white-space: normal;
+  }
+  .odina-home .odina-home-filter {
+    display: grid; grid-template-columns: max-content minmax(180px,300px) minmax(0,1fr);
+    align-items: center; gap: 16px; margin-bottom: 24px; padding: 14px 18px;
+    border: 1px solid var(--odina-line); border-radius: 14px; background: var(--odina-surface);
+  }
+  .odina-home .odina-home-filter-label { font-size: 13px; font-weight: 600; color: var(--odina-text); }
+  .odina-home .odina-home-shop-select { min-width: 0; min-height: 44px; box-shadow: none; }
+  .odina-home .odina-home-filter-scope { margin: 0; text-align: right; color: var(--odina-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+  .odina-home .odina-home-expiry {
+    min-height: 72px; margin-bottom: 24px; padding: 16px 18px; border-radius: 14px;
+    border: 1px solid var(--odina-home-danger-line); background: var(--odina-home-danger-surface);
+    color: var(--odina-home-danger); cursor: pointer; transition: border-color .14s, background-color .14s;
+  }
+  .odina-home .odina-home-expiry:hover { border-color: var(--odina-home-danger); }
+  .odina-home .odina-home-expiry-icon { width: 36px; height: 36px; }
+  .odina-home .odina-home-expiry > .min-w-0 { overflow-wrap: anywhere; }
+  .odina-home .odina-home-overview { display: grid; gap: 20px; align-items: stretch; }
+  .odina-home .odina-home-collections {
+    min-width: 0; min-height: 264px; display: flex; flex-direction: column; padding: 28px;
+    background: var(--odina-home-hero); color: var(--odina-home-hero-text);
+    border: 1px solid transparent; border-radius: 18px;
+  }
+  .odina-home .odina-home-collections-heading { display: flex; align-items: center; gap: 10px; }
+  .odina-home .odina-home-collections-heading h2 { margin: 0; color: inherit; font-size: 14px; font-weight: 500; letter-spacing: 0; }
+  .odina-home .odina-home-collections-heading svg { flex-shrink: 0; }
+  .odina-home .odina-home-collections-value {
+    margin: 22px 0 26px; font-size: clamp(32px,4vw,52px); font-weight: 600;
+    letter-spacing: -.045em; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+  }
+  .odina-home .odina-home-collections-detail { margin-top: auto; }
+  .odina-home .odina-home-money-breakdown { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; padding-top: 20px; border-top: 1px solid color-mix(in srgb,currentColor 26%,transparent); }
+  .odina-home .odina-home-money-breakdown dt { font-size: 12px; line-height: 1.5; }
+  .odina-home .odina-home-money-breakdown dd { margin: 6px 0 0; font-size: 17px; font-weight: 500; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .odina-home .odina-home-money-note { margin-top: 16px; font-size: 12px; line-height: 1.5; }
+  .odina-home .odina-home-report-error { margin-top: auto; padding: 12px 14px; border-radius: 10px; background: var(--odina-home-danger-surface); color: var(--odina-home-danger); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+  .odina-home .odina-home-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin: 0; border: 1px solid var(--odina-line); border-radius: 16px; background: var(--odina-surface); overflow: hidden; }
+  .odina-home .odina-home-stat { min-width: 0; padding: 20px; border-right: 1px solid var(--odina-line); }
+  .odina-home .odina-home-stat:last-child { border-right: 0; }
+  .odina-home .odina-home-stat dt { display: flex; align-items: center; gap: 9px; color: var(--odina-muted); font-size: 12px; line-height: 1.5; }
+  .odina-home .odina-home-stat dt svg { flex-shrink: 0; color: var(--odina-olive); }
+  .odina-home .odina-home-stat dd { margin: 12px 0 0; color: var(--odina-text); font-size: 24px; font-weight: 600; letter-spacing: -.03em; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .odina-home .odina-home-rankings { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin-top: 24px; }
+  .odina-home .odina-home-panel { min-width: 0; padding: 22px; border: 1px solid var(--odina-line); border-radius: 16px; background: var(--odina-surface); }
+  .odina-home .odina-home-panel-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; padding-bottom: 18px; border-bottom: 1px solid var(--odina-line); }
+  .odina-home .odina-home-panel-heading h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.025em; line-height: 1.4; }
+  .odina-home .odina-home-panel-heading svg { flex-shrink: 0; color: var(--odina-olive); }
+  .odina-home .odina-home-ranking-list { list-style: none; margin: 0; padding: 0; }
+  .odina-home .odina-home-ranking-row { display: grid; grid-template-columns: 24px minmax(0,1.2fr) minmax(0,.8fr); align-items: center; gap: 12px; min-height: 58px; padding: 14px 0; border-bottom: 1px solid var(--odina-line); }
+  .odina-home .odina-home-ranking-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .odina-home .odina-home-rank { color: var(--odina-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .odina-home .odina-home-ranking-name { min-width: 0; color: var(--odina-text); font-size: 14px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+  .odina-home .odina-home-ranking-value { min-width: 0; color: var(--odina-olive); text-align: right; font-size: 14px; font-weight: 600; line-height: 1.5; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .odina-home .odina-home-empty { padding: 40px 8px; color: var(--odina-muted); text-align: center; font-size: 14px; line-height: 1.6; }
+  .odina-home .odina-home-loading { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+  .odina-home .odina-home-placeholder { min-height: 100px; }
+  .odina-home .odina-home-placeholder:first-child { grid-column: 1 / -1; min-height: 240px; }
+}
+@media screen and (min-width: 1100px) {
+  .odina-home .odina-home-overview { grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); }
+  .odina-home .odina-home-metrics { grid-template-columns: minmax(0,1fr); }
+  .odina-home .odina-home-stat { padding: 18px 22px; border-right: 0; border-bottom: 1px solid var(--odina-line); }
+  .odina-home .odina-home-stat:last-child { border-bottom: 0; }
+  .odina-home .odina-home-stat dd { margin-top: 6px; }
+  .odina-home .odina-home-loading { grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); }
+  .odina-home .odina-home-placeholder { min-height: 82px; }
+  .odina-home .odina-home-placeholder:first-child { grid-column: 1; grid-row: 1 / span 3; min-height: 280px; }
+}
+@media screen and (max-width: 767px) {
+  .odina-home .odina-home-filter { grid-template-columns: minmax(0,1fr); gap: 9px; padding: 14px 16px; margin-bottom: 20px; }
+  .odina-home .odina-home-filter-scope { text-align: left; }
+  .odina-home .odina-home-expiry { padding: 14px; margin-bottom: 20px; }
+  .odina-home .odina-home-expiry-icon { width: 28px; }
+  .odina-home .odina-home-collections { padding: 24px 20px; }
+  .odina-home .odina-home-collections-value { margin-top: 20px; font-size: clamp(30px,6vw,40px); }
+  .odina-home .odina-home-money-breakdown { gap: 14px; }
+  .odina-home .odina-home-money-breakdown dd { font-size: 15px; }
+  .odina-home .odina-home-rankings { grid-template-columns: minmax(0,1fr); margin-top: 20px; }
+  .odina-home .odina-home-panel { padding: 20px 16px; }
+  .odina-home .odina-home-ranking-row { grid-template-columns: 20px minmax(0,1.15fr) minmax(0,.85fr); gap: 10px; }
+}
+@media screen and (max-width: 639px) {
+  .odina-home .odina-home-metrics { grid-template-columns: minmax(0,1fr); }
+  .odina-home .odina-home-stat { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr); align-items: center; gap: 16px; padding: 18px 16px; border-right: 0; border-bottom: 1px solid var(--odina-line); }
+  .odina-home .odina-home-stat:last-child { border-bottom: 0; }
+  .odina-home .odina-home-stat dd { margin: 0; text-align: right; font-size: 21px; }
+  .odina-home .odina-home-loading { grid-template-columns: minmax(0,1fr); }
+  .odina-home .odina-home-placeholder { min-height: 70px; }
+}
+@media screen and (prefers-reduced-motion: reduce) {
+  .odina-home.odina-page, .odina-home .odina-home-placeholder { animation: none; }
+  .odina-home.odina-page :is(button,[role="combobox"]) { transition: none; transform: none; }
+}
