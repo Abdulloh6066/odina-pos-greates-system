@@ -77,8 +77,7 @@ function RouteTitle() {
     const pageTitle = ROUTE_TITLES[pathname];
     document.title = pageTitle ? `${pageTitle} · Odina POS` : 'Odina POS';
     // Portal-based dialogs and sheets share the current workspace appearance.
-    if (pathname === '/') delete document.body.dataset.odinaWorkspace;
-    else document.body.dataset.odinaWorkspace = pathname;
+    document.body.dataset.odinaWorkspace = pathname;
   }, [pathname]);
   return null;
 }
