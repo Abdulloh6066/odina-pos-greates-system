@@ -386,7 +386,7 @@ function SendTransferDialog({ open, onClose, source, locations, products, produc
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && resetAndClose()}>
-      <DialogContent className="sm:max-w-4xl max-h-[92dvh] overflow-y-auto">
+      <DialogContent className="warehouse-dialog sm:max-w-4xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
@@ -587,7 +587,7 @@ function TransferProductPicker({ products, stockByProduct, selectedQuantities, o
       </button>
 
       <Dialog open={open} onOpenChange={(value) => !value && closePicker()}>
-        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl h-[92dvh] max-h-[92dvh] overflow-hidden p-0 flex flex-col">
+        <DialogContent className="warehouse-dialog w-[calc(100vw-1rem)] sm:max-w-4xl h-[92dvh] max-h-[92dvh] overflow-hidden p-0 flex flex-col">
           <DialogHeader className="p-5 pb-3 border-b border-border">
             <DialogTitle className="font-display text-xl">Transfer mahsulotlarini tanlash</DialogTitle>
             <p className="text-sm text-muted-foreground">Ombordagi qoldiqdan oshirmasdan bir nechta mahsulot tanlashingiz mumkin.</p>
