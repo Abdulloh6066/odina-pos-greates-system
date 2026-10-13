@@ -35,7 +35,7 @@ export default function ShopDemandSendDialog({ open, onClose, request, onSend })
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="warehouse-dialog sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Do'konga yuborish — {request?.request_number}</DialogTitle>
         </DialogHeader>
