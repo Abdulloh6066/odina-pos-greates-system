@@ -1,3 +1,4 @@
+import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useState } from "react";
 import OdinaSelect from "@/components/ui/odina-select";
 import {
@@ -25,11 +26,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const ACCOUNTS = [
-  { id: "cash", label: "Naqd pul", icon: Banknote, tone: "bg-emerald-50 text-emerald-700" },
-  { id: "uzcard", label: "Bank card", icon: CreditCard, tone: "bg-blue-50 text-blue-700" },
-  { id: "humo", label: "Humo", icon: WalletCards, tone: "bg-violet-50 text-violet-700" },
-  { id: "online", label: "Online", icon: Smartphone, tone: "bg-amber-50 text-amber-700" },
-  { id: "bank", label: "Bank", icon: Landmark, tone: "bg-slate-100 text-slate-700" },
+  { id: "cash", label: "Naqd pul", icon: Banknote, tone: "bg-secondary text-brand-ink" },
+  { id: "uzcard", label: "Bank card", icon: CreditCard, tone: "bg-secondary text-brand-ink" },
+  { id: "humo", label: "Humo", icon: WalletCards, tone: "bg-secondary text-brand-ink" },
+  { id: "online", label: "Online", icon: Smartphone, tone: "bg-secondary text-brand-ink" },
+  { id: "bank", label: "Bank", icon: Landmark, tone: "bg-secondary text-brand-ink" },
 ];
 
 const TYPE_LABELS = {
@@ -96,9 +97,10 @@ export default function Budget() {
   if (user?.role !== "admin") return null;
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
+    <div className="odina-page odina-workbench odina-operations odina-budget p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Budget"
+        eyebrow="EGASI MOLIYASI"
         subtitle="Smenalardan tushgan mablag‘lar va egasi tasdiqlagan chiqimlar"
         icon={WalletCards}
         actions={(
@@ -112,7 +114,7 @@ export default function Budget() {
         )}
       />
 
-      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 mb-5 flex gap-3">
+      <div className="odina-operations-note rounded-2xl border border-primary/20 bg-primary/5 p-4 mb-5 flex gap-3">
         <ShieldCheck className="w-5 h-5 text-brand-ink shrink-0 mt-0.5" />
         <div>
           <p className="font-semibold text-sm">Faqat egasi ko‘radi</p>
@@ -131,14 +133,14 @@ export default function Budget() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div className="odina-metric-accent col-span-2 lg:col-span-1 rounded-2xl border border-primary/25 bg-primary text-primary-foreground p-5 premium-shadow">
+          <div className="odina-budget-balances grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="odina-budget-total odina-metric-accent col-span-2 lg:col-span-1 rounded-2xl border border-primary/25 bg-primary text-primary-foreground p-5 premium-shadow">
               <p className="text-xs opacity-80">Jami Budget</p>
               <p className="text-2xl sm:text-3xl font-semibold mt-2">{formatUZS(totalBalance)}</p>
               <p className="text-xs opacity-75 mt-2">Barcha pul manbalari yig‘indisi</p>
             </div>
             {ACCOUNTS.map(({ id, label, icon: Icon, tone }) => (
-              <div key={id} className="odina-panel rounded-2xl border border-border bg-card p-4 premium-shadow">
+              <div key={id} className="odina-budget-account odina-panel rounded-2xl border border-border bg-card p-4">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tone}`}>
                   <Icon className="w-5 h-5" />
                 </div>
@@ -148,7 +150,7 @@ export default function Budget() {
             ))}
           </div>
 
-          <div className="odina-panel rounded-2xl border border-border bg-card p-4 sm:p-5 mt-6">
+          <div className="odina-operations-toolbar odina-panel rounded-2xl border border-border bg-card p-4 sm:p-5 mt-6">
             <div className="flex flex-col lg:flex-row lg:items-end gap-3">
               <div className="flex-1">
                 <h3 className="font-display text-lg font-semibold">Budget tarixi</h3>
@@ -178,7 +180,7 @@ export default function Budget() {
             </div>
           </div>
 
-          <div className="space-y-3 mt-4">
+          <div className="odina-ledger space-y-3 mt-4">
             {visibleTransactions.length === 0 ? (
               <div className="odina-panel rounded-2xl border border-dashed border-border bg-card py-14 text-center text-sm text-muted-foreground">
                 Hozircha Budget harakati yo‘q.
@@ -188,7 +190,7 @@ export default function Budget() {
               const account = ACCOUNTS.find((item) => item.id === transaction.account);
               const Icon = incoming ? ArrowDownLeft : ArrowUpRight;
               return (
-                <div key={transaction.id} className="odina-panel rounded-2xl border border-border bg-card p-4 flex items-start gap-3">
+                <div key={transaction.id} className="odina-ledger-row odina-budget-row odina-panel rounded-2xl border border-border bg-card p-4 flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${incoming ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-destructive"}`}>
                     <Icon className="w-5 h-5" />
                   </div>
@@ -330,3 +332,4 @@ function AdjustmentDialog({ open, balances, onClose, onSaved }) {
     </Dialog>
   );
 }
+
