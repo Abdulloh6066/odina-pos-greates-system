@@ -14,7 +14,7 @@ export default function Cart({
   takeawayOrder, onServiceTicket, onOpenOrders, onLeaveTakeaway, savingTakeaway = false,
 }) {
   return (
-    <div className="odina-cart flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
+    <div className="odina-cart odina-workbench-receipt flex flex-col w-full min-w-0 min-h-0 h-full bg-card overflow-hidden">
       <div className="odina-cart-header px-4 py-3 pr-16 xl:pr-4 shrink-0 border-b border-brand-sand/40 brand-surface flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="odina-cart-header-icon" aria-hidden="true"><ReceiptText className="w-4 h-4" /></span>
@@ -24,17 +24,17 @@ export default function Cart({
           </div>
         </div>
         {cart.length > 0 && !tableSaved && !takeawayOrder && (
-          <button onClick={onClear} type="button" disabled={locked} className="min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
+          <button onClick={onClear} type="button" disabled={locked} className="odina-cart-clear min-h-11 px-2 rounded-xl text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center gap-1">
             <Trash2 className="w-3.5 h-3.5" /> Tozalash
           </button>
         )}
       </div>
 
-      {takeawayOrder && <div className="px-4 py-2 border-b border-brand-sand/40 flex items-center justify-between gap-2 text-xs">
+      {takeawayOrder && <div className="odina-cart-order-context px-4 py-2 border-b border-brand-sand/40 flex items-center justify-between gap-2 text-xs">
         <span className="font-semibold">Olib ketish #{takeawayOrder.ticket_number} · To‘lanmagan</span>
         <Button type="button" variant="ghost" className="min-h-11 text-xs" disabled={locked} onClick={onLeaveTakeaway}>Yangi buyurtma</Button>
       </div>}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
+      <div className="odina-cart-items flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-16">
             <div className="odina-cart-empty-icon w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
@@ -45,9 +45,9 @@ export default function Cart({
           </div>
         ) : (
           cart.map((item) => (
-            <div key={saleLineKey(item)} onClick={() => onSelectItem?.(item)} onFocus={() => onSelectItem?.(item)} style={selectedProductId === saleLineKey(item) ? { backgroundColor: 'rgba(254, 205, 124, 0.18)' } : undefined} className="odina-cart-line grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(6.5rem,auto)_2.75rem] items-center gap-2 border-b border-dashed border-brand-sand/60 px-1 py-1.5 animate-pop-in last:border-b-0">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="w-9 h-9 rounded-lg bg-card overflow-hidden shrink-0 border border-border/60">
+            <div key={saleLineKey(item)} onClick={() => onSelectItem?.(item)} onFocus={() => onSelectItem?.(item)} style={selectedProductId === saleLineKey(item) ? { backgroundColor: 'rgba(254, 205, 124, 0.18)' } : undefined} className="odina-cart-line grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(6.5rem,auto)_2.75rem] items-center gap-2 border-b border-brand-sand/60 px-1 py-1.5 last:border-b-0">
+              <div className="odina-cart-line-product flex min-w-0 items-center gap-2">
+                <div className="odina-cart-line-image w-9 h-9 rounded-lg bg-card overflow-hidden shrink-0 border border-border/60">
                   {item.image_url ? (
                     <img src={item.image_url} alt={item.product_name || 'Mahsulot rasmi'} className="w-full h-full object-cover" />
                   ) : (
@@ -55,13 +55,13 @@ export default function Cart({
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold leading-snug" title={item.product_name}>{item.product_name}</div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{formatUZS(item.price)}{item.sale_unit === 'gram' ? ' / kg' : ''}</div>
+                  <div className="odina-cart-line-name truncate text-sm font-semibold leading-snug" title={item.product_name}>{item.product_name}</div>
+                  <div className="odina-cart-line-unit-price mt-0.5 truncate text-xs text-muted-foreground">{formatUZS(item.price)}{item.sale_unit === 'gram' ? ' / kg' : ''}</div>
                 </div>
               </div>
               {item.sale_unit === 'gram' ? (
-                <button type="button" disabled={locked} onClick={() => onInc(item)} className="h-11 px-2 rounded-lg border border-border text-xs font-semibold" aria-label={item.product_name + ' grammini o‘zgartirish'}>{item.quantity} g ✎</button>
-              ) : <div className="inline-flex shrink-0 items-center rounded-lg border border-border bg-card">
+                <button type="button" disabled={locked} onClick={() => onInc(item)} className="odina-cart-line-quantity odina-cart-weight h-11 px-2 rounded-lg border border-border text-xs font-semibold" aria-label={item.product_name + ' grammini o‘zgartirish'}>{item.quantity} g ✎</button>
+              ) : <div className="odina-cart-line-quantity inline-flex shrink-0 items-center rounded-lg border border-border bg-card">
                 <button type="button" onClick={() => onDec(item)} disabled={locked} aria-label={`${item.product_name} miqdorini kamaytirish`} className="w-9 h-9 rounded-l-lg flex items-center justify-center hover:bg-brand-olive/15 active:bg-brand-olive/25 touch-manipulation">
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -70,8 +70,8 @@ export default function Cart({
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>}
-              <div className="min-w-0 text-right text-sm font-bold leading-snug text-brand-ink break-words tabular-nums">{formatUZS(item.subtotal)}</div>
-              <button type="button" onClick={() => onRemove(item)} disabled={locked} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="h-11 w-11 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
+              <div className="odina-cart-line-amount min-w-0 text-right text-sm font-bold leading-snug text-brand-ink break-words tabular-nums">{formatUZS(item.subtotal)}</div>
+              <button type="button" onClick={() => onRemove(item)} disabled={locked} aria-label={`${item.product_name}ni buyurtmadan olib tashlash`} className="odina-cart-line-remove h-11 w-11 shrink-0 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive touch-manipulation">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -125,7 +125,7 @@ export default function Cart({
           className="odina-checkout w-full min-h-12 h-auto py-3 whitespace-normal text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong disabled:opacity-40"
         >
           <span>{tableMode ? 'Hisobni yopish · To‘lov' : 'To‘lovga o‘tish'}</span>
-          <span className="flex items-center gap-2">{formatUZS(total)} <ArrowUpRight className="w-4 h-4 shrink-0" aria-hidden="true" /></span>
+          <span className="flex items-center gap-2"><span className="odina-checkout-amount">{formatUZS(total)}</span><ArrowUpRight className="w-4 h-4 shrink-0" aria-hidden="true" /></span>
         </Button>
       </div>
     </div>
@@ -145,9 +145,9 @@ export function RoundingRow({ subtotal, discountCode, roundingTarget, adjustment
   );
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="outline" className="h-11 text-xs sm:text-sm px-2" disabled={Boolean(discountCode)} onClick={() => setManualOpen((open) => !open)}>− Qaytib berish</Button>
-        <Button type="button" variant="outline" className="h-11 text-xs sm:text-sm px-2" disabled={Boolean(discountCode) || rounded <= 0 || rounded === subtotal} onClick={() => { setManualOpen(false); onApplyRounding(); }}>Yaxlitlash ↘</Button>
+      <div className="odina-rounding-options grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" className="min-h-11 h-auto whitespace-normal text-xs sm:text-sm px-2" disabled={Boolean(discountCode)} onClick={() => setManualOpen((open) => !open)}>− Qaytib berish</Button>
+        <Button type="button" variant="outline" className="min-h-11 h-auto whitespace-normal text-xs sm:text-sm px-2" disabled={Boolean(discountCode) || rounded <= 0 || rounded === subtotal} onClick={() => { setManualOpen(false); onApplyRounding(); }}>Yaxlitlash ↘</Button>
       </div>
       {manualOpen && !discountCode && (
         <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export function DiscountRow({ discountCode, discount, onApplyDiscount, onRemoveD
   return (
     <div>
       <div className="flex gap-2">
-        <div className="relative flex-1">
+        <div className="relative min-w-0 flex-1">
           <Ticket className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={code}
