@@ -11,6 +11,7 @@ import { transformSync } from 'esbuild';
 
 const source = readFileSync('src/components/pos/Cart.jsx', 'utf8');
 const css = readFileSync('src/styles/odina-retail.css', 'utf8');
+const workbenchCss = readFileSync('src/components/pos/pos-workbench.css', 'utf8');
 const start = source.indexOf('export default function Cart(');
 assert.ok(start >= 0);
 const componentSource = source.slice(start).replace('export default function Cart(', 'function Cart(').replace(/export function /g, 'function ');
@@ -45,10 +46,19 @@ function render(overrides = {}) {
   }));
 }
 
+function cartRowClasses(html) {
+  return [...html.matchAll(/\bclass="([^"]*)"/g)]
+    .map(([, className]) => className.split(/\s+/))
+    .filter(classes => classes.includes('odina-cart-line'));
+}
+
 test('six products render as compact receipt-like rows with prices, totals, image/fallback and separators', () => {
   const html = render();
-  assert.equal((html.match(/odina-cart-line /g) || []).length, 6);
-  assert.equal((html.match(/border-b border-dashed/g) || []).length, 6);
+  assert.equal(cartRowClasses(html).length, 6);
+  const separatorRule = workbenchCss.match(/\.odina-workbench-receipt\s+\.odina-cart-line\s*\{([^}]*)\}/)?.[1];
+  assert.ok(separatorRule, 'receipt rows need their scoped workbench separator rule');
+  assert.match(separatorRule, /border-style\s*:\s*solid\s*;/);
+  assert.match(separatorRule, /border-color\s*:\s*var\(--pos-line\)\s*;/);
   assert.match(html, /Mahsulot 1/);
   assert.match(html, /Mahsulot 6/);
   assert.match(html, /5,000 UZS/);
@@ -86,5 +96,6 @@ test('locked cart still disables editing; table-save, discount and checkout acti
   assert.match(source, /disabled=\{disabled \|\| locked \|\| cart\.length === 0\}/);
   const empty = render({ cart: [], subtotal: 0, total: 0 });
   assert.match(empty, /Yangi buyurtma kutmoqda/);
-  assert.equal((empty.match(/odina-cart-line /g) || []).length, 0);
+  assert.equal(cartRowClasses(empty).length, 0);
 });
+
