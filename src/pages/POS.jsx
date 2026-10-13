@@ -32,6 +32,7 @@ import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActi
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
+import { canQueuePosSale } from '@/lib/pos-network';
 import CategoryIcon from '@/components/CategoryIcon';
 import {
   buildPendingSale,
@@ -521,9 +522,9 @@ export default function POS() {
     } catch { /* Keep the last known alerts when a background refresh fails. */ }
   };
 
-  const loadAll = async () => {
+  const loadAll = async ({ showLoading = true } = {}) => {
     const generation = ++loadGenerationRef.current;
-    setLoadingData(true);
+    if (showLoading) setLoadingData(true);
     try {
       const [cats, prods, shopList, settingsList, , stockList] = await Promise.all([
         base44.entities.Category.list(),
@@ -584,13 +585,23 @@ export default function POS() {
 
   const {
     isOnline,
+    browserOnline,
+    connectionPaused,
+    authorizationBlocked: queueAuthorizationError,
+    reportRequestSuccess,
+    reportRequestError,
     records: offlineSales,
     syncing: offlineSyncing,
     storageError: offlineStorageError,
     syncError: offlineSyncError,
     enqueue: enqueueOfflineSale,
     syncNow: syncOfflineSales,
-  } = useOfflineSaleQueue(user?.id, () => loadAll().catch(() => {}));
+  } = useOfflineSaleQueue(user?.id, () => loadAll({ showLoading: false }).catch(() => {}), (currentShift) => {
+    setShift(currentShift);
+    setShiftReadState('ready');
+  });
+  const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
+    takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
 
   useEffect(() => {
     if (user) void loadAll().catch(() => {});
@@ -1119,7 +1130,11 @@ export default function POS() {
       }
       return;
     }
-    if (!cart.length || payOpen || stockChecking || offlineSyncing || tableLocked) return;
+    if (!cart.length || payOpen || stockChecking || (offlineSyncing && !queueEligible) || tableLocked) return;
+    if (queueAuthorizationError) {
+      await odinaAlert('Server seansi tasdiqlanmadi. Tizimga qayta kiring; saqlangan savdolar qurilmada qoladi.');
+      return;
+    }
     if (total <= 0 && !(discountPct === 100 && subtotal > 0)) {
       await odinaAlert('To‘lov summasi 0 UZS. Mahsulot narxini yoki savatni tekshiring.', {
         title: 'Savdoni yakunlab bo‘lmaydi',
@@ -1142,9 +1157,15 @@ export default function POS() {
         return;
       }
 
-      if (offlineSales.length) {
+      if (offlineSales.length || offlineSyncing) {
+        // New ordinary sales join the durable queue; background synchronization
+        // never holds the next cashier payment behind the previous receipt.
+        if (queueEligible) {
+          await openOfflinePayment();
+          return;
+        }
         const syncResult = await syncOfflineSales();
-        if (syncResult?.remaining > 0) {
+        if (syncResult?.remaining > 0 || syncResult?.failed || syncResult?.skipped) {
           await odinaAlert('Avval qurilmada qolgan savdolarni serverga yuborish kerak.', {
             title: 'Sinxronlash tugamadi',
             details: syncResult?.failed?.message || offlineSyncError || '',
@@ -1164,6 +1185,7 @@ export default function POS() {
         items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...friesOptionFields(item) })),
       });
       if (checkoutCancelledRef.current) return;
+      reportRequestSuccess();
       const payload = result?.data || result;
       const accepted = await confirmStockWarnings(
         payload?.shortages || [],
@@ -1171,6 +1193,7 @@ export default function POS() {
       );
       if (accepted) openPayment(false);
     } catch (error) {
+      reportRequestError(error);
       if (checkoutCancelledRef.current) return;
       if (isRetryableSyncError(error) && !selectedTable && !takeawayOrder && !takeawayRequestIdRef.current) {
         await openOfflinePayment();
@@ -1304,7 +1327,7 @@ export default function POS() {
       if (takeawayOrder && (takeawayDirty || takeawayOrder.state !== 'occupied')) {
         throw new Error('Buyurtmani saqlang va to‘lovni qayta oching.');
       }
-      if (!selectedTable && !takeawayOrder && !takeawayRequestIdRef.current && !discountCode && roundingTarget === null) {
+      if (queueEligible) {
         pendingRecord = buildPendingSale({
           idempotencyKey,
           recordedAt,
@@ -1350,12 +1373,14 @@ export default function POS() {
       try {
         const serverTimingStarted = performance.now();
         const result = await base44.functions.invoke('complete-sale', request);
+        reportRequestSuccess();
         checkoutServerMs = Math.round(performance.now() - serverTimingStarted);
         const payload = result?.data || result;
-        if (!payload?.sale) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
+        if (!payload?.sale?.id) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
         saleCommitted = true;
         applyCompletedSale(payload, printReceipt);
       } catch (error) {
+        reportRequestError(error);
         if (saleCommitted || !pendingRecord || !isRetryableSyncError(error)) throw error;
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
@@ -1422,6 +1447,10 @@ export default function POS() {
   };
 
   const requestCloseShift = async () => {
+    if (offlineStorageError) {
+      await odinaAlert('Qurilmadagi savdolarni tekshirib bo‘lmadi. Xotira xatosi tuzatilmaguncha smenani yopib bo‘lmaydi.');
+      return;
+    }
     if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       await odinaAlert('Smenani yopishdan oldin internetga ulaning.', {
         title: 'Internet kerak',
@@ -1431,7 +1460,7 @@ export default function POS() {
     }
     if (queuedForCurrentShift.length) {
       const result = await syncOfflineSales();
-      if (result?.remaining > 0) {
+      if (result?.remaining > 0 || result?.failed || result?.skipped) {
         await odinaAlert('Qurilmadagi barcha savdolar serverga yuborilmaguncha smenani yopib bo‘lmaydi.', {
           title: 'Navbatdagi savdolar bor',
           details: result?.failed?.message || offlineSyncError || '',
@@ -1469,7 +1498,7 @@ export default function POS() {
       void odinaAlert('Smena ma’lumoti yangilandi. Qayta ochib, yopishni tasdiqlang.');
       return;
     }
-    if (!isOnline || offlineSales.some((record) => record.shift_id === shiftId)) {
+    if (!isOnline || offlineStorageError || offlineSales.some((record) => record.shift_id === shiftId)) {
       void odinaAlert('Smenani yopishdan oldin offline savdolarni serverga yuboring.');
       return;
     }
@@ -1650,6 +1679,7 @@ export default function POS() {
       )}
 
       <OfflineSalesBanner
+        browserOnline={browserOnline} connectionPaused={connectionPaused}
         isOnline={isOnline}
         records={offlineSales}
         syncing={offlineSyncing}
@@ -1974,7 +2004,7 @@ export default function POS() {
   );
 }
 
-function OfflineSalesBanner({ isOnline, records, syncing, storageError, syncError, onRetry }) {
+function OfflineSalesBanner({ isOnline, browserOnline = isOnline, connectionPaused = false, records, syncing, storageError, syncError, onRetry }) {
   const failed = records.find((record) => record.status === 'failed');
   const error = storageError || failed?.last_error || syncError;
   if (isOnline && !records.length && !syncing && !error) return null;
@@ -1987,7 +2017,7 @@ function OfflineSalesBanner({ isOnline, records, syncing, storageError, syncErro
   const title = storageError
     ? 'Offline xotira ishlamayapti'
     : !isOnline
-      ? `Internet yo‘q${records.length ? ` · ${records.length} ta savdo navbatda` : ''}`
+      ? `${connectionPaused && browserOnline ? 'Server bilan aloqa yo‘q' : 'Internet yo‘q'}${records.length ? ` · ${records.length} ta savdo navbatda` : ''}`
       : syncing
         ? `${records.length} ta savdo yuborilmoqda…`
         : `${records.length} ta savdo serverga yuborilmagan`;
@@ -1995,7 +2025,7 @@ function OfflineSalesBanner({ isOnline, records, syncing, storageError, syncErro
     ? error
     : !isOnline
       ? 'Oddiy savdolar shu qurilmada xavfsiz saqlanadi.'
-      : 'Internet ishlayapti. Navbatni qayta yuborishingiz mumkin.';
+      : 'Savdolar navbat bilan serverga yuboriladi. Oddiy savdoni davom ettirishingiz mumkin.';
 
   return (
     <div className={`mx-3 sm:mx-5 mt-3 shrink-0 flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${tone}`}>
@@ -2006,17 +2036,18 @@ function OfflineSalesBanner({ isOnline, records, syncing, storageError, syncErro
         <span className="block text-sm font-semibold">{title}</span>
         <span className="block text-xs opacity-80 mt-0.5 truncate">{description}</span>
       </span>
-      {isOnline && records.length > 0 && (
+      {browserOnline && records.length > 0 && (
         <Button
           type="button"
           variant="outline"
           size="sm"
           disabled={syncing}
           onClick={() => { void onRetry(); }}
+          aria-label={isOnline ? 'Navbatdagi savdolarni yuborish' : 'Server aloqasini tekshirish'}
           className="h-10 shrink-0 bg-white/70"
         >
           <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Qayta yuborish</span>
+          <span className="hidden sm:inline">{isOnline ? 'Qayta yuborish' : 'Aloqani tekshirish'}</span>
         </Button>
       )}
     </div>

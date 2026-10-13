@@ -1,4 +1,5 @@
 import { friesOptionFields } from './burger-fries.js';
+import { isPosNetworkError } from './pos-network.js';
 
 const DB_NAME = 'odina-pos-offline-sales';
 const DB_VERSION = 1;
@@ -337,7 +338,7 @@ export async function syncPendingSales({ userId, send, retryFailed = false,
       try {
         const response = await send(record.request);
         const payload = response?.data || response;
-        if (!payload?.sale) {
+        if (!payload?.sale?.id) {
           const error = errorWithCode(
             payload?.error || 'Server savdoni tasdiqlamadi.',
             'SALE_NOT_CONFIRMED',
@@ -356,9 +357,10 @@ export async function syncPendingSales({ userId, send, retryFailed = false,
         await storage.update(record.id, {
           status: retryable ? 'pending' : 'failed',
           last_error: message,
+          last_error_status: status,
           next_retry_at: retryable ? new Date(now() + delay).toISOString() : '',
         });
-        failed = failed || { id: record.id, retryable, message };
+        failed = failed || { id: record.id, retryable, message, status, network: isPosNetworkError(error) };
         // Connection, throttling and session errors affect the whole queue.
         // A permanently rejected independent POS sale must not block the rest.
         if (retryable) break;

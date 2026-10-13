@@ -154,7 +154,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
 
         {offline && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 mb-3 text-sm text-amber-900">
-            Internet yo‘q. Savdo qurilmaga saqlanib, aloqa qaytganda avtomatik yuboriladi.
+            Savdo avval shu qurilmaga saqlanadi, keyin serverga navbat bilan yuboriladi.
           </div>
         )}
 

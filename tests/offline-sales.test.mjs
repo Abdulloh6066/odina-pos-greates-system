@@ -87,7 +87,7 @@ test('queue persists in IndexedDB and uses a cross-tab sync lock', () => {
   const source = readFileSync('src/lib/offline-sales.js', 'utf8');
   assert.match(source, /indexedDB\.open/);
   assert.match(source, /navigator\.locks\?\.request/);
-  assert.match(source, /if \(!payload\?\.sale\)/);
+  assert.match(source, /if \(!payload\?\.sale\?\.id\)/);
   assert.match(source, /storage = \{ list: listPendingSales, update: updatePendingSale, remove: removePendingSale \}/);
   assert.match(source, /await storage\.remove\(record\.id\)/);
 });
