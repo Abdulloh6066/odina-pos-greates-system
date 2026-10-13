@@ -121,14 +121,16 @@ export default function RestaurantTables() {
   };
 
   const tableCount = selectedShop?.table_count || 0;
+  const occupiedCount = Array.from({ length: tableCount }, (_, index) => index + 1)
+    .filter((number) => (selectedShop?.orders || []).some((order) => order.number === number && order.state !== 'empty')).length;
 
   return (
-    <div className="odina-page p-5 sm:p-8 max-w-7xl mx-auto">
+    <div className="odina-page odina-tables-page p-5 sm:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Stollar"
-        subtitle="Alohida zal ekrani: stolni tanlang, buyurtmani davom ettiring yoki Kassada yangi buyurtma oling."
+        subtitle="Zaldagi holatni ko‘ring, stolni tanlang va xizmatni davom ettiring."
         icon={Armchair}
-        eyebrow="ODINA · RESTORAN"
+        eyebrow="ZAL VA XIZMAT"
         actions={<>
           <Button type="button" onClick={() => void startNewOrder()} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong"><ArrowLeft className="w-4 h-4 mr-2" /> Yangi buyurtma · Kassa</Button>
           <Button type="button" variant="outline" onClick={refresh} disabled={loading || saving} className="min-h-11 rounded-xl"><RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Yangilash</Button>
@@ -148,6 +150,14 @@ export default function RestaurantTables() {
         </div>
       ) : (
         <div className="space-y-5">
+          {selectedShop && <section className="odina-table-overview" aria-label="Zal holati">
+            <div className="odina-table-overview-shop"><Building2 className="h-5 w-5" aria-hidden="true" /><div><span>Tanlangan zal</span><strong>{selectedShop.name}</strong></div></div>
+            <dl className="odina-table-overview-counts">
+              <div><dt>Jami stollar</dt><dd>{tableCount}</dd></div>
+              <div><dt>Band</dt><dd>{occupiedCount}</dd></div>
+              <div><dt>Bo‘sh</dt><dd>{tableCount - occupiedCount}</dd></div>
+            </dl>
+          </section>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 rounded-2xl border border-brand-olive/25 bg-brand-olive/5 px-4 py-3 text-sm text-brand-ink">
               <Armchair className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -161,6 +171,7 @@ export default function RestaurantTables() {
                 <button
                   type="button"
                   onClick={() => setViewMode('map')}
+                  aria-pressed={viewMode === 'map'}
                   className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all touch-manipulation ${
                     viewMode === 'map'
                       ? 'bg-brand-olive/15 text-brand-ink border border-brand-olive/30 shadow-xs'
@@ -173,6 +184,7 @@ export default function RestaurantTables() {
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
+                  aria-pressed={viewMode === 'grid'}
                   className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all touch-manipulation ${
                     viewMode === 'grid'
                       ? 'bg-brand-olive/15 text-brand-ink border border-brand-olive/30 shadow-xs'
@@ -252,7 +264,8 @@ export default function RestaurantTables() {
                         key={number}
                         type="button"
                         onClick={() => setInspectTableNumber(number)}
-                        className={`p-4 rounded-2xl border text-left flex flex-col justify-between min-h-[120px] transition-all touch-manipulation hover:shadow-md relative ${
+                        aria-pressed={isSelected}
+                        className={`odina-table-tile p-4 rounded-2xl border text-left flex flex-col justify-between min-h-[120px] transition-all touch-manipulation hover:shadow-md relative ${
                           isSelected
                             ? 'border-brand-olive bg-[#FECD7C]/40 ring-4 ring-brand-olive/30 shadow-md scale-[1.02]'
                             : isOccupied
@@ -371,3 +384,4 @@ export default function RestaurantTables() {
     </div>
   );
 }
+
