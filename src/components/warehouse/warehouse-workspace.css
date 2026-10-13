@@ -1,0 +1,90 @@
+/* All selectors are confined to the Warehouse workspace, including its portals.
+   No global Sidebar, Home, POS, brand assets, or shared tokens are modified. */
+.warehouse-workspace,
+body:has(.warehouse-workspace) .warehouse-dialog {
+  --background: 210 20% 98%;
+  --foreground: 220 13% 15%;
+  --card: 0 0% 100%;
+  --muted: 210 16% 96%;
+  --muted-foreground: 215 12% 39%;
+  --secondary: 210 16% 95%;
+  --border: 215 16% 87%;
+  --input: 215 12% 66%;
+  --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-display);
+  color: hsl(var(--foreground));
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+.warehouse-workspace.odina-page { max-width: 1680px; background: #f6f7f9; min-height: 100%; padding: 24px; }
+.warehouse-workspace .odina-page-header { margin-bottom: 24px; }
+.warehouse-workspace .odina-page-title { font-family: inherit; font-size: clamp(1.3rem,2vw,1.8rem); line-height: 1.25; letter-spacing: -.025em; }
+.warehouse-workspace .font-display,
+body:has(.warehouse-workspace) .warehouse-dialog .font-display { font-family: inherit; }
+.warehouse-workspace .warehouse-frame { display: grid; gap: 24px; grid-template-columns: 190px minmax(0,1fr); align-items: start; }
+.warehouse-workspace .warehouse-content { min-width: 0; }
+.warehouse-workspace .warehouse-nav { background: #24272c; color: #f7f7f7; border-radius: 16px; padding: 18px 10px 12px; position: sticky; top: 24px; }
+.warehouse-workspace .warehouse-nav-heading { display: flex; gap: 9px; align-items: center; padding: 0 10px 16px; font-size: 12px; font-weight: 600; color: #dedfe2; }
+.warehouse-workspace .warehouse-nav-items { display: grid; gap: 6px; }
+.warehouse-workspace .warehouse-nav button { display: flex; align-items: center; gap: 10px; text-align: left; min-height: 44px; width: 100%; border-radius: 9px; padding: 10px; font-size: 12px; line-height: 1.5; color: #e7e8ea; border: 1px solid transparent; }
+.warehouse-workspace .warehouse-nav button:hover { background: #34383f; }
+.warehouse-workspace .warehouse-nav button[aria-current] { background: #3b3831; color: #ffdaa0; border-color: #61533e; box-shadow: inset 3px 0 #fecd7c; }
+.warehouse-workspace :is(button,input,select,[role="combobox"]),
+body:has(.warehouse-workspace) .warehouse-dialog :is(button,input,select,[role="combobox"]) { min-height: 44px; }
+.warehouse-workspace button, body:has(.warehouse-workspace) .warehouse-dialog button { min-width: 44px; }
+.warehouse-workspace :is(button,a,input,select,textarea,[role="combobox"]):focus-visible,
+body:has(.warehouse-workspace) .warehouse-dialog :is(button,a,input,select,textarea,[role="combobox"]):focus-visible { outline: 2px solid #795629; outline-offset: 3px; }
+.warehouse-workspace .warehouse-nav button:focus-visible { outline-color: #fecd7c; }
+.warehouse-workspace .odina-panel { border-color: #dfe3e8; box-shadow: 0 1px 2px #18212b05; }
+.warehouse-workspace .odina-summary { padding: 16px; border-radius: 12px; transform: none; }
+.warehouse-workspace .odina-summary p:last-child { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.warehouse-workspace .premium-shadow { box-shadow: 0 1px 3px #18212b08; }
+.warehouse-workspace :is(.text-xs,.text-\[10px\],.text-\[11px\]) { font-size: 12px; line-height: 1.5; }
+.warehouse-workspace .warehouse-table-wrap { overflow-x: auto; max-width: 100%; border: 1px solid #dfe3e8; border-radius: 14px; background: #fff; }
+.warehouse-workspace .warehouse-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.warehouse-workspace .warehouse-table th { background: #f8f9fb; color: #56616d; font-size: 12px; font-weight: 600; padding: 14px 16px; white-space: nowrap; border-bottom: 1px solid #dfe3e8; }
+.warehouse-workspace .warehouse-table td { padding: 16px; border-bottom: 1px solid #edf0f3; vertical-align: middle; overflow-wrap: anywhere; }
+.warehouse-workspace .warehouse-table tr:last-child td { border-bottom: none; }
+.warehouse-workspace .warehouse-table tbody tr:hover { background: #fbfbf7; }
+.warehouse-workspace .warehouse-table strong { font-weight: 600; }
+.warehouse-workspace .warehouse-cell-note { display: block; color: #626c78; font-size: 12px; line-height: 1.5; margin-top: 4px; }
+.warehouse-workspace .warehouse-number { font-weight: 600; font-variant-numeric: tabular-nums; }
+.warehouse-workspace .warehouse-status { display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 7px; font-size: 12px; font-weight: 500; line-height: 1.4; }
+.warehouse-workspace .warehouse-table button { font-size: 12px; white-space: normal; height: auto; padding: 10px 12px; }
+.warehouse-workspace [aria-labelledby="cake-layer-stock-title"] article { border-radius: 12px; box-shadow: none; }
+.warehouse-workspace [aria-labelledby="cake-layer-capacity-title"] { padding-top: 24px; }
+.warehouse-workspace [aria-labelledby="cake-layer-stock-title"] .grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); }
+body:has(.warehouse-workspace) .warehouse-dialog { border-color: #dfe3e8; background: #fff; border-radius: 16px; box-shadow: 0 24px 80px #11182726; }
+body:has(.warehouse-workspace) .warehouse-receipt-drawer { top: 0; right: 0; left: auto; bottom: 0; transform: none; width: min(100%,560px); max-width: 560px; height: 100dvh; max-height: 100dvh; border-radius: 16px 0 0 16px; padding: 28px 24px; animation: none; }
+body:has(.warehouse-workspace) .warehouse-receipt-drawer > :first-child { padding-right: 28px; }
+body:has(.warehouse-workspace) .warehouse-receipt-drawer :is(.grid-cols-12) { column-gap: 8px; }
+body:has(.warehouse-workspace) .warehouse-receipt-drawer .warehouse-receipt-line { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+body:has(.warehouse-workspace) .warehouse-receipt-drawer .warehouse-receipt-line > :first-child { grid-column: 1/-1; }
+body:has(.warehouse-workspace) .warehouse-receipt-drawer .bg-amber-50 { flex-wrap: wrap; }
+@media(min-width:1600px) {
+  .warehouse-workspace .warehouse-content > :has(> [aria-labelledby="cake-layer-stock-title"]) { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; align-items: start; }
+  .warehouse-workspace .warehouse-content > :has(> [aria-labelledby="cake-layer-stock-title"]) > header { grid-column: 1/-1; }
+  .warehouse-workspace .warehouse-content > :has(> [aria-labelledby="cake-layer-stock-title"]) > section { margin-top: 0; }
+  .warehouse-workspace [aria-labelledby="cake-layer-capacity-title"] { border-top: 0; padding-top: 0; }
+}
+@media(max-width:1199px) {
+  .warehouse-workspace .warehouse-frame { grid-template-columns: minmax(0,1fr); gap: 18px; }
+  .warehouse-workspace .warehouse-nav { position: static; padding: 10px; }
+  .warehouse-workspace .warehouse-nav-heading { padding-bottom: 10px; }
+  .warehouse-workspace .warehouse-nav-items { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 4px; }
+  .warehouse-workspace .warehouse-nav button { width: auto; flex-shrink: 0; }
+}
+@media(max-width:760px) {
+  .warehouse-workspace.odina-page { padding: 16px; }
+  .warehouse-workspace .warehouse-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .warehouse-workspace .warehouse-table, .warehouse-workspace .warehouse-table tbody { display: block; }
+  .warehouse-workspace .warehouse-table tr { display: grid; grid-template-columns: minmax(0,1fr); padding: 14px; border-bottom: 1px solid #dfe3e8; gap: 10px; }
+  .warehouse-workspace .warehouse-table tr:last-child { border-bottom: none; }
+  .warehouse-workspace .warehouse-table td { display: grid; grid-template-columns: 100px minmax(0,1fr); gap: 10px; padding: 0; border: 0; }
+  .warehouse-workspace .warehouse-table td::before { content: attr(data-label); font-size: 12px; color: #626c78; font-weight: 400; }
+  .warehouse-workspace .warehouse-table td .warehouse-cell-note { grid-column: 2; margin-top: -4px; }
+  .warehouse-workspace .warehouse-table .warehouse-status { justify-self: start; }
+  body:has(.warehouse-workspace) .warehouse-receipt-drawer { border-radius: 0; padding: 24px 16px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .warehouse-workspace *, body:has(.warehouse-workspace) .warehouse-dialog * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
