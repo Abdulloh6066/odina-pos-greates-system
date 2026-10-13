@@ -7,8 +7,9 @@ import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
-import { WarehouseStockTable, WarehouseHistoryTable } from '@/components/warehouse/WarehouseTables';
+import { WarehouseHistoryTable } from '@/components/warehouse/WarehouseTables';
 import '@/components/warehouse/warehouse-workspace.css';
+import '@/styles/catalog-workbench.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -326,7 +327,7 @@ export default function Warehouse() {
   const stockedCount = balancesForLocation.filter((balance) => Number(balance.quantity || 0) > 0).length;
 
   return (
-    <div className={`odina-page p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in ${newLayerView ? 'warehouse-workspace' : ''}`}>
+    <div className={`odina-page odina-workbench catalog-workbench catalog-warehouse p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in ${newLayerView ? 'warehouse-workspace' : ''}`}>
       <PageHeader
         title={visibleTabs.find((item) => item.id === tab)?.label || 'Ombor'}
         subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
@@ -334,8 +335,8 @@ export default function Warehouse() {
         actions={(
           <div className="flex flex-wrap items-center gap-2">
           {(
-            <Button type="button" aria-pressed={newLayerView} onClick={() => setNewLayerView((current) => !current)} className="min-h-11 rounded-xl">
-              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Avvalgi dizayn' : 'Yangi dizayn'}
+            <Button type="button" variant="outline" aria-pressed={newLayerView} onClick={() => setNewLayerView((current) => !current)} className="min-h-11 rounded-xl">
+              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Kartalar ko‘rinishi' : 'Ro‘yxat ko‘rinishi'}
             </Button>
           )}
           {canCreateIngredients && (
@@ -371,8 +372,8 @@ export default function Warehouse() {
         </div>
       )}
 
-      <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="odina-panel catalog-toolbar warehouse-filterbar rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5 mb-5">
+        <div className="warehouse-filter-fields flex flex-col sm:flex-row gap-3">
           {(user?.role === 'admin') ? (
             <label className="sm:w-72 space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
@@ -404,12 +405,12 @@ export default function Warehouse() {
             <span className="text-xs font-medium text-muted-foreground">Qidiruv</span>
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Qoldiq yoki tarixni qidirish…" className="h-11 pl-10 rounded-xl bg-background" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Qoldiq yoki tarixni qidirish…" aria-label="Qoldiq yoki tarixni qidirish" className="h-11 pl-10 rounded-xl bg-background" />
             </div>
           </label>
         </div>
         {tab === 'ingredients' && (
-          <label className="block mt-3 sm:max-w-xs space-y-1.5">
+          <label className="warehouse-category-filter block mt-3 sm:max-w-xs space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Mahsulot turi</span>
             <OdinaSelect value={ingredientCategory} onChange={(event) => setIngredientCategory(event.target.value)} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
               <option value="all">Barcha turlar</option>
@@ -427,7 +428,7 @@ export default function Warehouse() {
         </div>
       ) : (
         <>
-          {(!newLayerView || ['ingredients', 'products'].includes(tab)) && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+          {(!newLayerView || ['ingredients', 'products'].includes(tab)) && <div className="warehouse-summary-strip grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
             {newLayerView ? <>
               <Summary label="Filtrdagi turlar" value={items.length} />
               <Summary label="Qoldiq mavjud" value={items.filter((item) => Number(stockMap[item.id]?.quantity || 0) > 0).length} />
@@ -567,7 +568,31 @@ function StockGrid({ items, stockMap, kind, location, onAdjust, modernView = fal
     return <div className="odina-panel rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">Mos mahsulot topilmadi.</div>;
   }
   return (
-    modernView ? <WarehouseStockTable items={items} stockMap={stockMap} kind={kind} location={location} onAdjust={onAdjust} unitLabels={UNIT_LABELS} categoryLabels={INGREDIENT_CATEGORY_LABELS} sourceLabels={SOURCE_LABELS} /> :
+    modernView ? <section className="inventory-ledger" aria-label={kind === 'product' ? 'Tayyor mahsulotlar qoldig‘i' : 'Masalliqlar va qadoqlar qoldig‘i'}>
+      <div className="catalog-section-heading">
+        <div><h2>{kind === 'product' ? 'Mahsulot qoldiqlari' : 'Masalliq va qadoq qoldiqlari'}</h2><p>{location?.name}</p></div>
+        <span className="catalog-result-count">{items.length} ta tur</span>
+      </div>
+      <div className="warehouse-table-wrap">
+        <table className="warehouse-table inventory-ledger-table">
+          <caption className="sr-only">{kind === 'product' ? 'Tayyor mahsulotlar qoldig‘i' : 'Masalliqlar va qadoqlar qoldig‘i'}</caption>
+          <thead><tr><th scope="col">Nomi</th><th scope="col">{kind === 'product' ? 'Ta’minot turi' : 'Turi'}</th><th scope="col">Qoldiq</th><th scope="col">Birlik</th><th scope="col">Holati</th>{onAdjust && <th scope="col" className="inventory-action-heading">Amal</th>}</tr></thead>
+          <tbody>{items.map((item) => {
+            const stock = stockMap[item.id];
+            const quantity = Number(stock?.quantity || 0);
+            const unit = kind === 'ingredient' ? item.base_unit : (stock?.unit || (location?.location_type === 'production' ? item.production_unit || 'piece' : 'piece'));
+            return <tr key={item.id}>
+              <td data-label="Nomi" className="inventory-name"><strong>{item.name}</strong></td>
+              <td data-label="Turi" className="inventory-category">{kind === 'ingredient' ? (INGREDIENT_CATEGORY_LABELS[item.category] || item.category) : (SOURCE_LABELS[item.source_type] || 'Markaziy ishlab chiqarishda tayyorlanadi')}</td>
+              <td data-label="Qoldiq" className="warehouse-number">{formatNum(quantity)}</td>
+              <td data-label="Birlik" className="inventory-unit">{UNIT_LABELS[unit] || unit}</td>
+              <td data-label="Holati"><span className={`warehouse-status ${quantity > 0 ? 'bg-emerald-50 text-emerald-700' : quantity < 0 ? 'bg-red-50 text-destructive' : 'bg-secondary text-muted-foreground'}`}>{quantity > 0 ? 'Mavjud' : quantity < 0 ? 'Manfiy qoldiq' : 'Qoldiq yo‘q'}</span></td>
+              {onAdjust && <td data-label="Amal" className="inventory-action"><Button type="button" variant="outline" onClick={() => onAdjust(item)} aria-label={item.name + ' — qoldiqni tuzatish'}><PackagePlus className="w-4 h-4 shrink-0" aria-hidden="true" /> Tuzatish</Button></td>}
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
+    </section> :
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {items.map((item) => {
         const stock = stockMap[item.id];
@@ -835,3 +860,4 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
     </Dialog>
   );
 }
+
