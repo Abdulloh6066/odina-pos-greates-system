@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
 import { canQueuePosSale } from '@/lib/pos-network';
 import CategoryIcon from '@/components/CategoryIcon';
+import '@/components/pos/pos-workbench.css';
 import {
   buildPendingSale,
   createSaleIdempotencyKey,
@@ -1589,7 +1590,7 @@ export default function POS() {
   };
 
   return (
-    <div className={`odina-pos ${posCompact ? 'odina-pos-compact' : ''} flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
+    <div className={`odina-pos odina-pos-workbench ${posCompact ? 'odina-pos-compact' : ''} flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
       {productOrderOpen && canEditProductOrder && catalogShopId && <ProductOrderDialog
         key={catalogShopId} shopId={catalogShopId}
         shopName={shops.find(shop => shop.id === catalogShopId)?.name || shift?.shop_name || user?.shop_name || 'Do‘kon'}
@@ -1597,7 +1598,7 @@ export default function POS() {
         onClose={() => setProductOrderOpen(false)} onSaved={acceptProductOrder} />}
       {/* Header */}
       <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="odina-pos-shop-context flex items-center gap-2.5 min-w-0">
           <div className="odina-store-icon w-9 h-9 rounded-xl bg-primary/15 text-brand-ink flex items-center justify-center shrink-0">
             <Building2 className="w-4.5 h-4.5" />
           </div>
@@ -1764,7 +1765,7 @@ export default function POS() {
         </button>
       )}
 
-      <div className="flex-1 flex min-h-0">
+      <div className="odina-pos-body flex-1 flex min-h-0">
         {/* Center: categories + grid */}
         <div className="flex-1 flex min-w-0">
           {/* Category rail */}
@@ -1789,9 +1790,9 @@ export default function POS() {
                 </div>
                 {!loadingData && <span className="odina-catalog-count">{filtered.length} ta mahsulot</span>}
               </div>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
+              <div className="odina-category-chips flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
                 <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
-                <Chip active={showFav} onClick={() => setShowFav(true)}>★ Sevimlilar</Chip>
+                <Chip active={showFav} onClick={() => setShowFav(true)}><Star className="h-4 w-4" aria-hidden="true" /> Sevimlilar</Chip>
                 {visibleCategories.map((c) => (
                   <Chip key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }}>{c.name.replaceAll('&', ' & ')}</Chip>
                 ))}
@@ -1830,8 +1831,8 @@ export default function POS() {
       </div>
 
       {/* Telefon va iPad uchun doim ko‘rinadigan buyurtma paneli */}
-      <div className={`lg:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
-        <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-12 h-12 px-4 py-2 whitespace-nowrap text-sm sm:text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong premium-shadow-lg touch-manipulation">
+      <div className={`odina-mobile-cart-dock lg:hidden fixed left-0 ${screenMode ? '' : sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'} right-0 bottom-0 z-40 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-card/95 backdrop-blur border-t border-border transition-[left] duration-200`}>
+        <Button onClick={() => setMobileCartOpen(true)} className="w-full min-h-12 h-auto px-4 py-3 whitespace-normal text-sm sm:text-base font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
           Buyurtma · {formatUZS(total)} ({cart.reduce((s, i) => s + (i.sale_unit === 'gram' ? 1 : i.quantity), 0)} ta)
         </Button>
       </div>
@@ -2065,7 +2066,7 @@ function CatTab({ active, onClick, icon, label }) {
 
 function Chip({ active, onClick, children }) {
   return (
-    <button type="button" aria-pressed={active} onClick={onClick} className={`whitespace-nowrap min-h-11 px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-[0.98] touch-manipulation ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
+    <button type="button" aria-pressed={active} onClick={onClick} className={`odina-category-chip whitespace-nowrap min-h-11 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
       {children}
     </button>
   );
