@@ -1,0 +1,370 @@
+/* Cashier presentation only. Checkout, stock, payment and print behavior remain in the existing components. */
+.odina-pos.odina-pos-workbench,
+.odina-workbench-receipt,
+.odina-payment-workbench {
+  --pos-canvas: var(--odina-canvas, #f6f5ef);
+  --pos-surface: var(--odina-surface, #fffefa);
+  --pos-text: var(--odina-text, #303326);
+  --pos-muted: var(--odina-muted, #626653);
+  --pos-olive: var(--odina-olive, #62683d);
+  --pos-line: var(--odina-line, #e2dfd0);
+  --pos-selection: var(--odina-selection, #eeeddd);
+  --pos-honey: var(--odina-honey, #fecd7c);
+  color: var(--pos-text);
+}
+
+.odina-pos.odina-pos-workbench { background: var(--pos-canvas); }
+.odina-pos-workbench .odina-pos-header {
+  min-height: 72px;
+  padding: 12px 20px;
+  background: var(--pos-surface);
+  border-color: var(--pos-line);
+  backdrop-filter: none;
+}
+.odina-pos-workbench .odina-pos-shop-context { flex-shrink: 1; }
+.odina-pos-workbench .odina-store-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--pos-olive);
+  background: var(--pos-selection);
+  border-color: var(--pos-line);
+}
+.odina-pos-workbench .odina-pos-header :is(button, a) {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+.odina-pos-workbench .odina-pos-body { overflow: hidden; }
+.odina-pos-workbench .odina-category-rail {
+  width: 148px;
+  gap: 4px;
+  padding-top: 20px;
+  background: var(--pos-canvas);
+  border-color: var(--pos-line);
+}
+.odina-pos-workbench .odina-category-title {
+  padding: 0 18px 14px;
+  color: var(--pos-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+.odina-pos-workbench .odina-category-tab {
+  min-height: 48px;
+  margin: 0 8px;
+  padding: 10px;
+  gap: 8px;
+  border-radius: 10px;
+  color: var(--pos-muted);
+  font-size: 13px;
+  transform: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.odina-pos-workbench .odina-category-tab[aria-pressed="true"] {
+  color: var(--pos-text);
+  background: var(--pos-selection);
+  border-color: #c7c7ac;
+  box-shadow: inset 3px 0 var(--pos-olive);
+}
+.odina-pos-workbench .odina-category-tab[aria-pressed="false"]:hover { background: var(--pos-surface); }
+.odina-pos-workbench .odina-pos-search { padding: 22px 20px 16px; }
+.odina-pos-workbench .odina-catalog-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title count" "search search";
+  gap: 12px;
+}
+.odina-pos-workbench .odina-catalog-toolbar h1 {
+  color: var(--pos-text);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.035em;
+  line-height: 1.3;
+}
+.odina-pos-workbench .odina-catalog-count {
+  padding: 0;
+  background: transparent;
+  color: var(--pos-muted);
+  font-size: 12px;
+}
+.odina-pos-workbench .odina-pos-search input {
+  height: 48px;
+  min-height: 48px;
+  border-color: #bbbba5;
+  border-radius: 10px;
+  background: var(--pos-surface);
+  color: var(--pos-text);
+  font-size: 14px;
+  box-shadow: none;
+}
+.odina-pos-workbench .odina-category-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 1px solid var(--pos-line);
+  border-radius: 9px;
+  background: var(--pos-surface);
+  color: var(--pos-muted);
+  padding: 10px 14px;
+}
+.odina-pos-workbench .odina-category-chip[aria-pressed="true"] {
+  border-color: #b6b995;
+  background: var(--pos-selection);
+  color: var(--pos-text);
+}
+.odina-pos-workbench .odina-product-scroll { padding: 0 20px 24px; }
+.odina-pos-workbench .odina-product-grid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.odina-pos-workbench .odina-workbench-product {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-color: var(--pos-line);
+  border-radius: 12px;
+  background: var(--pos-surface);
+  box-shadow: 0 1px 2px #30332606;
+  transform: none;
+}
+.odina-pos-workbench .odina-workbench-product:not(:disabled):hover {
+  border-color: #a7aa7f;
+  box-shadow: 0 3px 10px #3033260a;
+  transform: none;
+}
+.odina-pos-workbench .odina-workbench-product:not(:disabled):active { background: var(--pos-selection); }
+.odina-pos-workbench .odina-product-photo {
+  width: 100%;
+  aspect-ratio: 1.2;
+  border-radius: 0;
+  border-bottom: 1px solid var(--pos-line);
+}
+.odina-pos-workbench .odina-product-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 12px;
+}
+.odina-pos-workbench .odina-product-name {
+  min-height: 2.65em;
+  color: var(--pos-text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.odina-pos-workbench .odina-product-meta { padding-top: 10px; margin-top: auto; }
+.odina-pos-workbench .odina-product-price {
+  color: var(--pos-olive);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.odina-pos-workbench .odina-product-skeleton { border: 1px solid var(--pos-line); border-radius: 12px; background: var(--pos-selection); }
+.odina-pos-workbench .odina-catalog-empty { padding: 48px 20px; color: var(--pos-muted); }
+.odina-pos-workbench .odina-catalog-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 16px;
+  border: 1px solid var(--pos-line);
+  border-radius: 14px;
+  background: var(--pos-surface);
+}
+.odina-pos-workbench .odina-cart-wrap { width: 360px; padding: 20px 20px 20px 0; border: 0; }
+.odina-workbench-receipt.odina-cart {
+  border: 1px solid var(--pos-line);
+  border-radius: 14px;
+  background: var(--pos-surface);
+  box-shadow: 0 3px 16px #30332605;
+}
+.odina-workbench-receipt .odina-cart-header {
+  padding: 16px;
+  background: var(--pos-surface);
+  border-color: var(--pos-line);
+}
+.odina-workbench-receipt .odina-cart-header h2 { color: var(--pos-text); font-size: 17px; font-weight: 600; letter-spacing: -.025em; }
+.odina-workbench-receipt .odina-cart-header p { color: var(--pos-muted); font-size: 12px; }
+.odina-workbench-receipt .odina-cart-header-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--pos-selection);
+  color: var(--pos-olive);
+}
+.odina-workbench-receipt .odina-cart-clear { min-width: 44px; padding: 8px; }
+.odina-workbench-receipt .odina-cart-items { padding: 4px 12px; }
+.odina-workbench-receipt .odina-cart-empty-icon { width: 60px; height: 60px; border: 1px solid var(--pos-line); border-radius: 14px; background: var(--pos-canvas); transform: none; }
+.odina-workbench-receipt .odina-cart-empty-icon svg { color: var(--pos-muted); transform: none; }
+.odina-workbench-receipt .odina-cart-line {
+  grid-template-columns: minmax(116px, .9fr) minmax(0, 1fr) 44px;
+  grid-template-areas: "product product remove" "quantity amount remove";
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px;
+  border-style: solid;
+  border-color: var(--pos-line);
+  border-radius: 8px;
+}
+.odina-workbench-receipt .odina-cart-line-product { grid-area: product; }
+.odina-workbench-receipt .odina-cart-line-name {
+  color: var(--pos-text);
+  font-size: 14px;
+  font-weight: 500;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.odina-workbench-receipt .odina-cart-line-unit-price { color: var(--pos-muted); font-size: 12px; }
+.odina-workbench-receipt .odina-cart-line-quantity { grid-area: quantity; justify-self: start; max-width: 100%; background: var(--pos-surface); border-color: #bdbda7; border-radius: 8px; }
+.odina-workbench-receipt .odina-cart-line-quantity button { flex: 0 0 44px; width: 44px; height: 44px; color: var(--pos-text); }
+.odina-workbench-receipt .odina-cart-line-quantity span { width: 24px; min-width: 24px; overflow-wrap: anywhere; font-size: 13px; }
+.odina-workbench-receipt .odina-cart-weight { min-height: 44px; height: auto; padding: 0 12px; overflow-wrap: anywhere; font-size: 13px; }
+.odina-workbench-receipt .odina-cart-line-amount { grid-area: amount; min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--pos-text); }
+.odina-workbench-receipt .odina-cart-line-remove { grid-area: remove; align-self: start; width: 44px; height: 44px; color: var(--pos-muted); }
+.odina-workbench-receipt .odina-cart-order-context { flex-wrap: wrap; border-color: var(--pos-line); background: var(--pos-canvas); }
+.odina-workbench-receipt .odina-cart-order-context > span { min-width: 0; overflow-wrap: anywhere; }
+.odina-workbench-receipt .odina-cart-summary { padding: 16px; border-top: 1px solid var(--pos-line); background: var(--pos-surface); }
+.odina-workbench-receipt .odina-cart-total { padding: 0 0 6px; margin: 0; gap: 12px; border: 0; }
+.odina-workbench-receipt .odina-cart-total > span:first-child { font-size: 14px; color: var(--pos-muted); }
+.odina-workbench-receipt .odina-cart-total > span:last-child { min-width: 0; overflow-wrap: anywhere; font-size: 28px; line-height: 1.2; letter-spacing: -.045em; color: var(--pos-text); }
+.odina-workbench-receipt.odina-cart .odina-checkout { flex-wrap: wrap; min-height: 56px; padding: 12px 14px; border-radius: 10px !important; gap: 8px; background: var(--pos-honey); color: #303326; box-shadow: none; font-size: 14px; }
+.odina-workbench-receipt .odina-checkout > span:first-child { flex: 1 1 9rem; min-width: 0; text-align: left; }
+.odina-workbench-receipt .odina-checkout > span:last-child { flex: 1 1 auto; min-width: 0; max-width: 100%; justify-content: flex-end; text-align: right; }
+.odina-workbench-receipt .odina-checkout-amount { min-width: 0; overflow-wrap: anywhere; }
+.odina-workbench-receipt .odina-checkout:not(:disabled):hover { background: #f7c36d; }
+.odina-pos-workbench .odina-mobile-cart-dock { background: var(--pos-surface); border-color: var(--pos-line); backdrop-filter: none; }
+.odina-pos-workbench .odina-mobile-cart-dock button { background: var(--pos-honey); color: #303326; border-radius: 10px; box-shadow: none; }
+.odina-cart-sheet .odina-workbench-receipt { border-radius: 18px 18px 0 0; border: 0; }
+.odina-cart-sheet .odina-workbench-receipt .odina-cart-header { padding-right: 56px; }
+
+.odina-payment-workbench {
+  width: calc(100vw - 24px);
+  max-width: 520px;
+  padding: 24px;
+  border-color: var(--pos-line);
+  border-radius: 18px;
+  background: var(--pos-surface);
+  gap: 16px;
+}
+.odina-payment-workbench .odina-payment-total { margin-bottom: 0; padding: 18px; gap: 16px; border: 1px solid var(--pos-line); border-radius: 12px; background: var(--pos-canvas); }
+.odina-payment-workbench .odina-payment-total > span:first-child { color: var(--pos-muted); font-size: 13px; }
+.odina-payment-workbench .odina-payment-total > span:last-child { min-width: 0; color: var(--pos-text); font-family: var(--font-body); font-size: 28px; line-height: 1.2; letter-spacing: -.04em; text-align: right; overflow-wrap: anywhere; }
+.odina-payment-workbench .odina-payment-adjustments { padding-bottom: 16px; border-color: var(--pos-line); }
+.odina-payment-workbench .odina-payment-column-labels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, .8fr); gap: 8px; color: var(--pos-muted); font-size: 12px; }
+.odina-payment-workbench .odina-payment-column-labels > :last-child { text-align: right; }
+.odina-payment-workbench .odina-payment-split-labels { padding-right: 52px; }
+.odina-payment-workbench .odina-payment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, .8fr) auto; gap: 8px; }
+.odina-payment-workbench .odina-payment-row :is(input, button, [role="combobox"]) { width: 100%; min-height: 44px; border-radius: 9px; }
+.odina-payment-workbench .odina-payment-row input { min-width: 0; font-variant-numeric: tabular-nums; }
+.odina-payment-workbench .odina-payment-row .odina-payment-remove { width: 44px; }
+.odina-payment-workbench .odina-payment-balance-toolbar { flex-wrap: wrap; }
+.odina-payment-workbench .odina-payment-balance-toolbar > button { min-width: 0; max-width: 100%; height: auto; text-align: left; white-space: normal; }
+.odina-payment-workbench .odina-payment-balance-toolbar > div { flex-shrink: 1; min-width: 0; max-width: 100%; margin-left: auto; overflow-wrap: anywhere; }
+.odina-payment-workbench .odina-payment-method-picker { padding: 14px; border-color: var(--pos-line); border-radius: 12px; background: var(--pos-canvas); }
+.odina-payment-workbench .odina-payment-method-picker > div:first-child button { min-width: 44px; min-height: 44px; }
+.odina-payment-workbench .odina-payment-method { min-height: 64px; border-color: #c7c7b4; background: var(--pos-surface); border-radius: 10px; color: var(--pos-text); }
+.odina-payment-workbench .odina-payment-method > span:first-child { background: var(--pos-selection); color: var(--pos-olive); }
+.odina-payment-workbench .odina-payment-method > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.odina-payment-workbench .odina-payment-method:hover { border-color: var(--pos-olive); background: var(--pos-selection); }
+.odina-payment-workbench .odina-payment-footer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-top: 16px; margin-top: 0; border-color: var(--pos-line); gap: 12px; }
+.odina-payment-workbench .odina-payment-print-choice { grid-column: 1 / -1; padding: 10px 12px; border-color: var(--pos-line); border-radius: 10px; background: var(--pos-canvas); }
+.odina-payment-workbench .odina-payment-print-choice [role="switch"] { margin-left: auto; }
+.odina-payment-workbench .odina-payment-print-choice label { min-width: 0; white-space: normal; }
+.odina-payment-workbench .odina-payment-footer > button { min-height: 48px; height: auto; padding: 10px 12px; white-space: normal; border-radius: 10px; }
+.odina-payment-workbench .odina-payment-confirm { grid-column: auto; background: var(--pos-honey); color: #303326; }
+.odina-payment-workbench .odina-payment-confirm:hover { background: #f7c36d; }
+.odina-pos-workbench :is(button, a, input):focus-visible,
+.odina-workbench-receipt :is(button, input):focus-visible,
+.odina-payment-workbench :is(button, input):focus-visible { outline: 2px solid var(--pos-olive); outline-offset: 2px; }
+.odina-workbench-receipt button:disabled { cursor: not-allowed; }
+
+@media (min-width: 1280px) {
+  .odina-pos-workbench .odina-cart-wrap { width: 396px; }
+}
+@media (min-width: 1600px) {
+  .odina-pos-workbench .odina-cart-wrap { width: 420px; }
+  .odina-pos-workbench .odina-product-grid { grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-pos-header { min-height: 60px; padding: 8px 12px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-category-rail { width: 112px; padding-top: 12px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-category-title { padding: 0 10px 10px; letter-spacing: .04em; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-category-tab { margin: 0 4px; padding: 8px 6px; gap: 5px; min-height: 44px; font-size: 12px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-pos-search { padding: 12px 12px 10px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-catalog-toolbar { grid-template-areas: "search count"; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-catalog-toolbar h1 { display: none; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-pos-search input { height: 44px; min-height: 44px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-scroll { padding: 0 12px 12px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-card { padding: 0; border-radius: 10px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-photo { aspect-ratio: 1.55; border-radius: 0; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-info { padding: 8px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-name { font-size: 12px; min-height: 2.65em; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-price { font-size: 13px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-wrap { width: 320px; padding: 12px 12px 12px 0; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-header { padding: 12px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line { grid-template-columns: minmax(116px, .9fr) minmax(0, 1fr) 44px; gap: 6px; padding: 10px 2px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-name { font-size: 13px; display: block; -webkit-line-clamp: unset; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-quantity button { width: 44px; height: 44px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-amount { font-size: 13px; white-space: normal; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-remove { width: 44px; height: 44px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-summary { padding: 12px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-total { padding-top: 0; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-total > span:last-child { font-size: 25px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-checkout { min-height: 52px; padding: 10px 12px; }
+}
+@media (max-width: 1023px) {
+  .odina-pos-workbench .odina-product-scroll { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 639px) {
+  .odina-pos-workbench .odina-pos-header { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .odina-pos-workbench .odina-pos-shop-context { flex-basis: 100%; }
+  .odina-pos-workbench .odina-pos-header > .flex-1 { display: none; }
+  .odina-pos-workbench .odina-pos-search { padding: 18px 12px 12px; }
+  .odina-pos-workbench .odina-catalog-toolbar h1 { font-size: 22px; }
+  .odina-pos-workbench .odina-pos-search input { font-size: 16px; }
+  .odina-pos-workbench .odina-product-scroll { padding-left: 12px; padding-right: 12px; }
+  .odina-pos-workbench .odina-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .odina-pos-workbench .odina-product-info { padding: 10px; }
+  .odina-pos-workbench .odina-product-name { font-size: 13px; }
+  .odina-payment-workbench { padding: 20px 16px; }
+  .odina-payment-workbench .odina-payment-total { padding: 14px; }
+  .odina-payment-workbench .odina-payment-total > span:last-child { font-size: 25px; }
+  .odina-payment-workbench .odina-payment-row input { font-size: 16px; }
+}
+@media (max-width: 359px) {
+  .odina-workbench-receipt .odina-cart-header-icon { display: none; }
+  .odina-workbench-receipt .odina-checkout { flex-wrap: wrap; }
+  .odina-payment-workbench .odina-payment-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .odina-payment-workbench .odina-payment-row > :first-child { grid-column: 1 / -1; }
+  .odina-payment-workbench .odina-payment-row input { grid-column: 1; }
+  .odina-payment-workbench .odina-payment-column-labels { grid-template-columns: 1fr 1fr; }
+  .odina-payment-workbench .odina-payment-split-labels { padding-right: 0; }
+  .odina-payment-workbench .odina-payment-method { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px; }
+  .odina-payment-workbench .odina-payment-total { flex-direction: column; align-items: stretch; gap: 8px; }
+}
+@media (max-width: 1023px) and (max-height: 520px) {
+  .odina-cart-sheet .odina-workbench-receipt { display: block; overflow-y: auto; }
+  .odina-cart-sheet .odina-workbench-receipt .odina-cart-items { overflow: visible; }
+}
+.dark :is(.odina-pos.odina-pos-workbench, .odina-workbench-receipt, .odina-payment-workbench) {
+  --pos-canvas: var(--odina-canvas, hsl(var(--background)));
+  --pos-surface: var(--odina-surface, hsl(var(--card)));
+  --pos-text: var(--odina-text, hsl(var(--foreground)));
+  --pos-muted: var(--odina-muted, hsl(var(--muted-foreground)));
+  --pos-line: var(--odina-line, hsl(var(--border)));
+  --pos-olive: var(--odina-olive, #d4d198);
+  --pos-selection: var(--odina-selection, #3e3d2d);
+}
+@media (prefers-reduced-motion: reduce) {
+  .odina-pos-workbench *, .odina-workbench-receipt *, .odina-payment-workbench * { animation: none; transition: none; }
+}
