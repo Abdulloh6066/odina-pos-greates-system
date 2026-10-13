@@ -82,6 +82,7 @@ export default function Warehouse() {
   const [recipients, setRecipients] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState((user?.role === 'admin') ? '' : assignedShopId);
   const requestedTab = searchParams.get('tab');
+  const [newLayerView, setNewLayerView] = useState(false);
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
   const tab = resolveWarehouseTab(requestedTab, user?.role);
@@ -328,10 +329,19 @@ export default function Warehouse() {
         title={visibleTabs.find((item) => item.id === tab)?.label || 'Ombor'}
         subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
-        actions={canCreateIngredients && (
+        actions={(tab === 'cake_layers' || canCreateIngredients) && (
+          <div className="flex flex-wrap items-center gap-2">
+          {tab === 'cake_layers' && (
+            <Button type="button" aria-pressed={newLayerView} onClick={() => setNewLayerView((current) => !current)} className="min-h-11 rounded-xl">
+              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Eski ko‘rinish' : 'Yangi ko‘rinish'}
+            </Button>
+          )}
+          {canCreateIngredients && (
           <Button onClick={() => { setIngredientIsLayer(tab === 'cake_layers'); setIngredientOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             <Plus className="w-4 h-4 mr-1.5" /> {tab === 'cake_layers' ? 'Qavat turi qo‘shish' : 'Yangi masalliq'}
           </Button>
+          )}
+          </div>
         )}
       />
 
@@ -438,6 +448,7 @@ export default function Warehouse() {
           ) : ['recipes', 'production', 'cake_layers'].includes(tab) ? (
             <ProductionPanel
               mode={tab}
+              newLayerView={newLayerView}
               user={user}
               location={selectedLocationRecord}
               products={products}
