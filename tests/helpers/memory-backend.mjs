@@ -14,6 +14,7 @@ export function matches(row, query = {}) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       return Object.entries(value).every(([op, expected]) => {
         if (op === '$exists') return (actual !== undefined) === expected;
+        if (op === '$eq') return JSON.stringify(actual) === JSON.stringify(expected);
         if (op === '$ne') return Array.isArray(actual) ? !actual.includes(expected) : actual !== expected;
         if (op === '$in') return Array.isArray(actual) ? actual.some(v => expected.includes(v)) : expected.includes(actual);
         if (op === '$nin') return Array.isArray(actual) ? actual.every(v => !expected.includes(v)) : !expected.includes(actual);
@@ -21,14 +22,16 @@ export function matches(row, query = {}) {
         if (op === '$gt') return actual > expected;
         if (op === '$lte') return actual <= expected;
         if (op === '$lt') return actual < expected;
+        if (op === '$regex') return new RegExp(expected, value.$options || '').test(String(actual || ''));
+        if (op === '$options') return true;
         throw new Error('Unsupported mock operator: ' + op);
       });
     }
     return actual === value;
   });
 }
-export function memoryBackend(seed = {}, { now = '2026-09-27T07:00:00Z' } = {}) {
-  const db = clone(seed);
+export function memoryBackend(seed = {}, { now = '2026-09-27T07:00:00Z', copySeed = true } = {}) {
+  const db = copySeed ? clone(seed) : seed;
   let sequence = 0;
   const calls = [];
   const entities = new Proxy({}, { get(target, name) {

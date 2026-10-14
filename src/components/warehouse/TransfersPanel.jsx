@@ -102,8 +102,9 @@ export default function TransfersPanel({
   const pending = visibleGroups.filter((group) => ['pending', 'receiving'].includes(group.status));
   const completed = visibleGroups.filter((group) => ['received', 'archived'].includes(group.status));
 
-  const canReceive = (group) => group.status === 'pending'
-    && group.items.every((item) => item.status === 'pending')
+  const canReceive = (group) => (group.items.every((item) => item.status === 'pending')
+    || group.items.every((item) => item.status === 'receiving' && item.receipt_token
+      && item.receipt_phase === 'recovering' && !item.receipt_claim_token))
     && group.destination_location_id === effectiveLocationId
     && (user?.role === 'admin' || assignedShopId === group.destination_location_id);
 
@@ -131,6 +132,7 @@ export default function TransfersPanel({
       await onReload();
     } catch (error) {
       void odinaAlert('Qabul qilish amalga oshmadi: ' + (error?.response?.data?.error || error?.data?.error || error?.message || error));
+      await onReload();
     } finally {
       setReceivingId('');
     }
@@ -260,7 +262,7 @@ function TransferGroupCard({ group, canReceive, receiving, onReceive }) {
         {canReceive && (
           <Button onClick={onReceive} disabled={receiving} className="w-full mt-4 min-h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 touch-manipulation">
             <PackageCheck className="w-4 h-4 mr-1.5" />
-            {receiving ? 'Qabul qilinmoqda…' : group.items.length > 1 ? 'Hammasini qabul qilish' : 'Qabul qildim'}
+            {receiving ? 'Qabul qilinmoqda…' : group.status === 'receiving' ? 'Tiklash va qayta urinish' : group.items.length > 1 ? 'Hammasini qabul qilish' : 'Qabul qildim'}
           </Button>
         )}
         {group.status === 'received' && (
@@ -689,4 +691,3 @@ function Empty({ text }) {
     </div>
   );
 }
-

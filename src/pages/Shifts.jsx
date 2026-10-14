@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
@@ -33,6 +33,8 @@ import {
   listShiftHistoryShops,
   shiftHistoryStatusGroup,
 } from "@/lib/shift-history";
+import { readAllEntityPages, shiftsHistoryQuery } from "@/lib/history-pagination";
+import { useEntityHistory } from "@/hooks/useEntityHistory";
 
 const PAYMENT_LABELS = {
   cash: "Naqd pul",
@@ -70,12 +72,14 @@ const dateTime = (value) => value
 const errorText = (error) => (
   error?.response?.data?.error || error?.data?.error || error?.message || String(error || "Noma’lum xato")
 );
+const latestFirst = (rows, field) => [...(rows || [])].sort((left, right) =>
+  String(right[field] || '').localeCompare(String(left[field] || '')));
 
 export default function Shifts() {
   const { user } = useOutletContext();
   const role = user?.role || "cashier";
-  const [shifts, setShifts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [shopOptions, setShopOptions] = useState([]);
+  const detailRequest = useRef(0);
   const [selectedShift, setSelectedShift] = useState(null);
   const [detail, setDetail] = useState(EMPTY_DETAIL);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -87,24 +91,28 @@ export default function Shifts() {
     status: "all",
   });
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const all = await base44.entities.Shift.list("-opened_at", 200);
-      setShifts(all || []);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  const { rows: shifts, loading, loadingMore, error: loadError, hasMore, reload: load, loadMore } = useEntityHistory(
+    base44.entities.Shift, shiftsHistoryQuery({ user, ...filters }), "-opened_at",
+  );
+  useEffect(() => {
+    let current = true;
+    readAllEntityPages(base44.entities.Shop, {}, 'name', () => current)
+      .then((rows) => { if (current) setShopOptions(rows); }).catch(() => {});
+    return () => { current = false; detailRequest.current += 1; };
+  }, []);
 
   const visible = useMemo(() => {
     if (role === "cashier") return shifts.filter((shift) => shift.user_id === user?.id);
     return shifts;
   }, [shifts, role, user]);
 
-  const shops = useMemo(() => listShiftHistoryShops(visible), [visible]);
+  const shops = useMemo(() => {
+    const permitted = ['cashier', 'manager'].includes(role)
+      ? shopOptions.filter((shop) => shop.id === (user?.shop_id || user?.data?.shop_id)) : shopOptions;
+    const available = new Map(permitted.map((shop) => [shop.id, { id: shop.id, name: shop.name }]));
+    for (const shop of listShiftHistoryShops(visible)) if (!available.has(shop.id)) available.set(shop.id, shop);
+    return [...available.values()].sort((a, b) => a.name.localeCompare(b.name, 'uz'));
+  }, [visible, shopOptions, role, user]);
   const filtered = useMemo(() => filterShiftHistory(visible, filters), [visible, filters]);
   const open = filtered.filter((shift) => shiftHistoryStatusGroup(shift) === "open");
   const closed = filtered.filter((shift) => shiftHistoryStatusGroup(shift) === "closed");
@@ -124,6 +132,8 @@ export default function Shifts() {
   };
 
   const openDetails = async (shift) => {
+    const request = ++detailRequest.current;
+    const isCurrent = () => request === detailRequest.current;
     setSelectedShift(shift);
     setDetail(EMPTY_DETAIL);
     setDetailError("");
@@ -131,36 +141,40 @@ export default function Shifts() {
 
     const canViewMovements = role === "admin" || role === "manager" || role === "cashier";
     const requests = [
-      base44.entities.Sale.filter({ shift_id: shift.id }, "-created_date", 500),
-      base44.entities.SaleItem.filter({ shift_id: shift.id }, "-created_at", 500),
+      readAllEntityPages(base44.entities.Sale, { shift_id: shift.id }, "id", isCurrent),
+      readAllEntityPages(base44.entities.SaleItem, { shift_id: shift.id }, "id", isCurrent),
       canViewMovements
-        ? base44.entities.CashMovement.filter({ shift_id: shift.id }, "-created_at", 500)
+        ? readAllEntityPages(base44.entities.CashMovement, { shift_id: shift.id }, "id", isCurrent)
         : Promise.resolve([]),
-      base44.entities.Refund.filter({ shift_id: shift.id }, "-created_at", 500),
-      base44.entities.ShiftProductSnapshot.filter({ shift_id: shift.id }, "product_name_snapshot", 500),
+      readAllEntityPages(base44.entities.Refund, { shift_id: shift.id }, "id", isCurrent),
+      readAllEntityPages(base44.entities.ShiftProductSnapshot, { shift_id: shift.id }, "id", isCurrent),
     ];
 
     try {
       const results = await Promise.allSettled(requests);
+      if (!isCurrent()) return;
       if (results[0].status === "rejected") throw results[0].reason;
 
       setDetail({
-        sales: results[0].value || [],
-        saleItems: results[1].status === "fulfilled" ? results[1].value || [] : [],
-        movements: results[2].status === "fulfilled" ? results[2].value || [] : [],
-        refunds: results[3].status === "fulfilled" ? results[3].value || [] : [],
-        stockSnapshots: results[4].status === "fulfilled" ? results[4].value || [] : [],
+        sales: latestFirst(results[0].value, 'created_date'),
+        saleItems: results[1].status === "fulfilled" ? latestFirst(results[1].value, 'created_at') : [],
+        movements: results[2].status === "fulfilled" ? latestFirst(results[2].value, 'created_at') : [],
+        refunds: results[3].status === "fulfilled" ? latestFirst(results[3].value, 'created_at') : [],
+        stockSnapshots: results[4].status === "fulfilled" ? [...(results[4].value || [])].sort((left, right) =>
+          String(left.product_name_snapshot || '').localeCompare(String(right.product_name_snapshot || ''), 'uz')) : [],
         canViewMovements,
         partial: results.slice(1).some((result) => result.status === "rejected"),
       });
     } catch (error) {
-      setDetailError(errorText(error));
+      if (isCurrent()) setDetailError(errorText(error));
     } finally {
-      setDetailLoading(false);
+      if (isCurrent()) setDetailLoading(false);
     }
   };
 
   const closeDetails = () => {
+    detailRequest.current += 1;
+    setDetailLoading(false);
     setSelectedShift(null);
     setDetail(EMPTY_DETAIL);
     setDetailError("");
@@ -172,8 +186,8 @@ export default function Shifts() {
         title="Smenalar"
         eyebrow="SMENA NAZORATI"
         subtitle={role === "cashier"
-          ? `${formatNum(filtered.length)} ta smena · faqat sizniki`
-          : `${formatNum(filtered.length)} ta smena · barcha do‘konlar`}
+          ? `Ko‘rsatilgan: ${formatNum(filtered.length)} ta smena · faqat sizniki`
+          : `Ko‘rsatilgan: ${formatNum(filtered.length)} ta smena`}
         icon={Clock}
       />
 
@@ -248,23 +262,26 @@ export default function Shifts() {
         </div>
         {hasFilters && (
           <p className="text-xs text-muted-foreground mt-3">
-            {formatNum(filtered.length)} ta natija topildi.
+            {formatNum(filtered.length)} ta natija ko‘rsatilgan{hasMore ? '. Yana natijalar bor.' : '.'}
           </p>
         )}
       </section>
 
       <div className="odina-operations-metrics grid grid-cols-3 mb-6">
-        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Tanlangan smenalar</p><p className="odina-metric-value">{formatNum(filtered.length)}</p></div>
-        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Hozir ochiq</p><p className="odina-metric-value">{formatNum(open.length)}</p></div>
-        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Yopilgan</p><p className="odina-metric-value">{formatNum(closed.length)}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Ko‘rsatilgan smenalar</p><p className="odina-metric-value">{formatNum(filtered.length)}{hasMore ? '+' : ''}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Ko‘rsatilgan ochiq smenalar</p><p className="odina-metric-value">{formatNum(open.length)}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Ko‘rsatilgan yopilgan smenalar</p><p className="odina-metric-value">{formatNum(closed.length)}</p></div>
       </div>
+      {loadError && <div role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive mb-4">
+        {loadError} <Button variant="outline" onClick={load} disabled={loading}>Qayta urinish</Button>
+      </div>}
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="h-44 rounded-2xl bg-secondary animate-pulse" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : !loadError && filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border py-16 px-4 text-center">
           <Search className="w-9 h-9 mx-auto text-muted-foreground/60 mb-3" />
           <p className="font-medium">{hasFilters ? "Qidiruv bo‘yicha smena topilmadi." : "Hali smena tarixi yo‘q."}</p>
@@ -305,6 +322,12 @@ export default function Shifts() {
           )}
         </>
       )}
+      {!loading && hasMore && <div className="text-center mt-4">
+        <Button variant="outline" className="min-h-11 rounded-xl" disabled={loadingMore} onClick={loadMore}>
+          {loadingMore ? 'Yuklanmoqda…' : 'Yana smenalarni ko‘rsatish'}
+        </Button>
+        <p className="text-xs text-muted-foreground mt-2">Qidiruv butun tarix bo‘yicha ishlaydi.</p>
+      </div>}
 
       <ShiftDetailDialog
         shift={selectedShift}
@@ -827,4 +850,3 @@ function Cell({ label, value, bold }) {
     </div>
   );
 }
-

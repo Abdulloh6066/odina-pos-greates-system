@@ -2,9 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 
-const baseline = JSON.parse(readFileSync('checkpoints/public-entity-rls-before-2026-09-28.json', 'utf8'));
+const baseline = JSON.parse(readFileSync('checkpoints/audit-fixes-before-2026-10-15.json', 'utf8'));
+const pending = JSON.parse(readFileSync('checkpoints/audit-permissions-pending-2026-10-15.json', 'utf8'));
 const roles = baseline.roles;
 const explicitRole = rule => rule && typeof rule === 'object' && (
   Boolean(rule.user_condition?.role) ||
@@ -33,11 +33,12 @@ function permits(rule, user = {}, row = {}) {
     return actual === expected;
   });
 }
-const schemas = Object.entries(baseline.entities).map(([name, original]) => {
+const schemas = Object.entries(baseline.entities).map(([name, record]) => {
+  const original = { path: record.path, ...record.schema };
   const schema = JSON.parse(readFileSync(original.path, 'utf8'));
   const rules = process.env.SECURITY_RULE_CANDIDATE === '1'
     ? Object.fromEntries(Object.entries(schema.rls).map(([op, rule]) => [op, strengthen(rule)]))
-    : schema.rls;
+    : { ...schema.rls, ...(pending.entities[name] || {}) };
   return { name, original, schema, rules };
 });
 const rowFixtures = [];
@@ -76,7 +77,7 @@ test('every existing staff-role decision is preserved for own/foreign/missing sh
         for (const id of ['person-a', 'person-b']) {
           const user = { id, role, shop_id, active };
           for (const row of rowFixtures) for (const [op, rule] of Object.entries(rules)) {
-            assert.equal(permits(rule, user, row), permits(original.rls[op], user, row),
+            assert.equal(permits(rule, user, row), pending.entities[name]?.[op] === false ? false : permits(original.rls[op], user, row),
               name + '.' + op + ': staff access changed ' + JSON.stringify({ user, row }));
           }
         }
@@ -84,10 +85,17 @@ test('every existing staff-role decision is preserved for own/foreign/missing sh
     }
   }
 });
-test('schema fields, historical snapshot definitions and update/delete permissions are untouched', () => {
+test('existing fields, historical snapshot definitions and required fields are preserved; recovery fields are optional', () => {
   for (const { name, original, schema, rules } of schemas) {
-    const { rls, ...rest } = schema;
-    assert.equal(createHash('sha256').update(JSON.stringify(rest)).digest('hex'), original.non_rls_sha256, name);
+    const { rls, properties, path, ...rest } = schema;
+    const { rls: oldRules, properties: oldProperties, path: originalPath, ...oldRest } = original;
+    assert.deepEqual(rest, oldRest, name + ': existing schema settings');
+    for (const [field, definition] of Object.entries(oldProperties)) {
+      assert.deepEqual(properties[field], definition, name + '.' + field + ': historical field changed');
+    }
+    for (const field of Object.keys(properties).filter(field => !(field in oldProperties))) {
+      assert.equal((schema.required || []).includes(field), false, name + '.' + field + ': recovery field must be optional');
+    }
     assert.deepEqual(rules.update, original.rls.update, name);
     assert.deepEqual(rules.delete, original.rls.delete, name);
   }
@@ -106,5 +114,13 @@ test('manager foreign-shop reads stay blocked, and budget remains admin-only', (
       assert.equal(permits(rule, user, {}), false, name);
       assert.equal(permits(rule, { role: 'admin' }, {}), true, name);
     }
+  }
+});
+test('financial create restrictions are staged only; saved preview permissions match Main', () => {
+  assert.equal(pending.applied, false);
+  assert.deepEqual(Object.keys(pending.entities).sort(), ['CustomerOrder','CustomerOrderItem','OrderPayment']);
+  for (const { name, original, schema, rules } of schemas) {
+    assert.deepEqual(schema.rls, original.rls, name + ': live permission mutation');
+    if (pending.entities[name]) assert.equal(rules.create, false, name + ': direct financial writes blocked by candidate');
   }
 });

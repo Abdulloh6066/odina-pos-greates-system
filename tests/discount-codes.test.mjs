@@ -1,9 +1,10 @@
 // Offline regression tests for one-time discount codes and 100% OWNER PIN approval.
 // No live Base44 records are read, created, updated, or deleted.
 import assert from 'node:assert/strict';
-import { memoryBackend } from './helpers/memory-backend.mjs';
+import { matches } from './helpers/memory-backend.mjs';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { webcrypto } from 'node:crypto';
 import { TextEncoder } from 'node:util';
 import vm from 'node:vm';
@@ -92,25 +93,6 @@ function fixture(percentage = 5) {
 
   let sequence = 0;
   const clone = (value) => value == null ? value : structuredClone(value);
-  const matchesValue = (actual, expected) => {
-    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if ('$gte' in expected && !(actual >= expected.$gte)) return false;
-      if ('$lte' in expected && !(actual <= expected.$lte)) return false;
-      if ('$in' in expected && !expected.$in.includes(actual)) return false;
-      if ('$ne' in expected) {
-        if (Array.isArray(actual) ? actual.includes(expected.$ne) : actual === expected.$ne) return false;
-      }
-      return true;
-    }
-    return actual === expected;
-  };
-  const matches = (row, query) => {
-    if (Array.isArray(query?.$or) && !query.$or.some((condition) => matches(row, condition))) return false;
-    return Object.entries(query || {}).filter(([key]) => key !== '$or').every(
-      ([key, value]) => matchesValue(row[key], value),
-    );
-  };
-
   const entities = Object.fromEntries(Object.keys(db).map((name) => {
     const entity = {
       get: async (id) => clone(db[name].find((row) => row.id === id) || null),
@@ -138,6 +120,7 @@ function fixture(percentage = 5) {
             if (!Array.isArray(row[key])) row[key] = [];
             row[key].push(clone(value));
           }
+          for (const key of Object.keys(operation.$unset || {})) delete row[key];
           for (const [key, value] of Object.entries(operation.$pull || {})) {
             row[key] = (Array.isArray(row[key]) ? row[key] : []).filter((item) => item !== value);
           }
@@ -159,67 +142,36 @@ function fixture(percentage = 5) {
   return { db, entities, client, code };
 }
 
+// Load actual backend modules with memory-only services. Preserve the existing
+// deterministic PIN stub so these behavioral cases exercise discount policy.
 function loadHandler(client, now) {
-  const userHelpers = readFileSync('base44/shared/user-helpers.ts', 'utf8').replace(/export /g, '');
-  const managerScope = readFileSync('base44/shared/manager-request-scope.ts', 'utf8')
-    .replace(/^import .*;$/gm, '').replace(/export /g, '');
-  const sharedSrc = userHelpers + '\n' + managerScope + '\n'
-    + readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
-      .replace(/^export \{[^\n]*\} from [^\n]*;$/gm, '').replace(/export /g, '');
-  const sharedCode = ts.transpileModule(sharedSrc, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-  const costSrc = readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, '');
-  const costCode = ts.transpileModule(costSrc, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-
-  let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
-    .replace(/^import .*manager-request-scope.*;$/gm, '')
-    .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
-    .replace(/import \{[^}]*\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
-    .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
-    .replace(/^import .*checkout-recipes.*;$/gm, '')
-    .replace(/^import .*checkout-reads.*;$/gm, '')
-    .replace(/^import .*burger-fries.*;$/gm, '')
-    .replace(
-      /async function verifyOwnerPin\(service: any, pinValue: unknown, actor: any\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
-      'async function verifyOwnerPin(_service, pinValue, _actor) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN',
-    )
-    .replace(/^import .*manager-request-scope.*;$/gm, '')
-    .replace('export default async function(req)', 'async function handler(req)')
-    .replace(
-      'error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",',
-      'error: error instanceof Error ? (error.stack || error.message) : "Savdoni yakunlab bo‘lmadi.",',
-    );
-  source = source.replace(/import \{\s*prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,\s*\} from "\.\.\/\.\.\/shared\/sale-ingredient-flow\.ts";/, '');
-  const shopPricing = readFileSync('base44/shared/shop-pricing.ts', 'utf8').replace(/export /g, '');
-  source = source.replace(/import \{ priceForShop \} from "\.\.\/\.\.\/shared\/shop-pricing\.ts";/, '');
-  source = sharedCode + '\n' + costCode + '\n' + shopPricing + '\n' + source + '\nglobalThis.testHandler = handler;';
-
-  const code = ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-  const context = vm.createContext({
-    ...memoryBackend().load('base44/shared/sale-ingredient-flow.ts'),
-    ...memoryBackend().load('base44/shared/checkout-recipes.ts'),
-    ...memoryBackend().load('base44/shared/checkout-reads.ts'),
-    ...memoryBackend().load('base44/shared/burger-fries.js'),
+  const cache = new Map();
+  const context = vm.createContext({ Response, Request, crypto: webcrypto, TextEncoder, console, structuredClone,
     Date: now ? class extends Date { static now() { return Date.parse(now); } } : Date,
-    client,
-    Response,
-    crypto: webcrypto,
-    TextEncoder,
-    exports: {},
-    console,
-    structuredClone,
-  });
-  vm.runInContext(code, context);
-
-  return async (body) => {
-    const response = await context.testHandler({ json: async () => body });
-    return { status: response.status, data: await response.json() };
-  };
+    fetch: async () => { throw new Error('Network disabled in offline discount tests'); } });
+  function load(file) {
+    file = resolve(file);
+    if (cache.has(file)) return cache.get(file).exports;
+    const module = { exports: {} }; cache.set(file, module);
+    let source = readFileSync(file, 'utf8');
+    if (file.replaceAll('\\', '/').endsWith('/complete-sale/entry.ts')) {
+      source = source.replace(/async function verifyOwnerPin\(service: any, pinValue: unknown, actor: any\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
+        'async function verifyOwnerPin(_service, pinValue, _actor) { return String(pinValue || "") === "2468"; }\n\nconst IDEMPOTENCY_KEY_PATTERN');
+      source = source.replace('error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",',
+        'error: error instanceof Error ? (error.stack || error.message) : "Savdoni yakunlab bo‘lmadi.",');
+    }
+    const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, allowJs: true } }).outputText;
+    const require = (name) => {
+      if (name === 'npm:@base44/sdk') return { createClientFromRequest: () => client };
+      if (name === 'node:crypto') return { webcrypto, randomUUID: () => webcrypto.randomUUID() };
+      if (!name.startsWith('.')) throw new Error('Unexpected offline dependency: ' + name);
+      return load(resolve(dirname(file), name));
+    };
+    vm.runInContext('(function(require,module,exports){' + code + '\n})', context)(require,module,module.exports);
+    return module.exports;
+  }
+  const handler = load('base44/functions/complete-sale/entry.ts').default;
+  return async (body) => { const response = await handler({ json: async () => body }); return { status: response.status, data: await response.json() }; };
 }
 
 const saleBody = (code, percentage, ownerPin) => ({

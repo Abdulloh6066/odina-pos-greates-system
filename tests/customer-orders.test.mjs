@@ -3,9 +3,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { matches } from './helpers/memory-backend.mjs';
 
 let clock = '2026-09-09T10:00:00.000Z';
 function makeClock() {
@@ -41,6 +43,7 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
       cash_sales: 0, uzcard_sales: 0, humo_sales: 0, online_sales: 0, bank_transfer_sales: 0,
       total_sales: 0, order_count: 0,
     }],
+    Settings: [{ id: 'settings', customer_order_last_number: 0, allow_negative_stock: true }],
     Customer: [],
     CustomerOrder: [],
     CustomerOrderItem: [],
@@ -54,15 +57,6 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
 function harness(db) {
   let sequence = 0;
   const clone = (v) => v == null ? v : structuredClone(v);
-  const matchesValue = (a, e) => {
-    if (e && typeof e === 'object' && !Array.isArray(e)) {
-      if ('$gte' in e && !(a >= e.$gte)) return false;
-      if ('$lte' in e && !(a <= e.$lte)) return false;
-      return true;
-    }
-    return a === e;
-  };
-  const matches = (row, q) => Object.entries(q || {}).every(([k, v]) => matchesValue(row[k], v));
   const entities = Object.fromEntries(Object.keys(db).map((name) => {
     const entity = {
       get: async (id) => clone(db[name].find((r) => r.id === id) || null),
@@ -84,6 +78,7 @@ function harness(db) {
         for (const row of rows) {
           Object.assign(row, clone(op.$set || {}));
           for (const [k, v] of Object.entries(op.$inc || {})) row[k] = Number(row[k] || 0) + Number(v);
+          for (const [k, v] of Object.entries(op.$push || {})) (row[k] ??= []).push(clone(v));
         }
         return { success: true, updated: rows.length };
       },
@@ -99,43 +94,30 @@ function harness(db) {
   return client;
 }
 
-function transpileScript(source) {
-  return ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-}
-
 function loadHandler(client) {
-  const sharedCode = transpileScript(
-    readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, ''),
-  );
-  const costCode = transpileScript(
-    readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, ''),
-  );
-  const readyCode = transpileScript(
-    readFileSync('base44/shared/order-ready-production.ts', 'utf8')
-      .replace(/import \{[\s\S]*?\} from "\.\/cost-engine\.ts";/, '')
-      .replace(/export /g, ''),
-  );
-  const customerCode = transpileScript(
-    readFileSync('base44/shared/customer-helpers.ts', 'utf8').replace(/export /g, ''),
-  );
-  let source = readFileSync('base44/functions/customer-orders/entry.ts', 'utf8')
-    .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
-    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
-    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/order-ready-production\.ts";/, '')
-    .replace(/import \{ ensureCustomer \} from "\.\.\/\.\.\/shared\/customer-helpers\.ts";/, '')
-    .replace(/export default async function\(req[^{]*\{/, 'async function handler(req) {');
-  source = [sharedCode, costCode, readyCode, customerCode, source].join('\n');
-  source += '\nglobalThis.testHandler = handler;';
-  const code = transpileScript(source);
+  const cache = new Map();
   const context = vm.createContext({
-    client, Response, crypto: webcrypto, console, structuredClone, exports: {},
-    Date: makeClock(), __setClock: (v) => { clock = v; },
+    URL, Response, crypto: webcrypto, TextEncoder, console, structuredClone, Date: makeClock(),
   });
-  vm.runInContext(code, context);
+  function load(path) {
+    path = resolve(path);
+    if (cache.has(path)) return cache.get(path).exports;
+    const module = { exports: {} }; cache.set(path, module);
+    const code = ts.transpileModule(readFileSync(path, 'utf8'), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, allowJs: true },
+    }).outputText;
+    const require = name => {
+      if (name === 'npm:@base44/sdk') return { createClientFromRequest: () => client };
+      if (name === 'node:crypto') return { webcrypto, randomUUID: () => webcrypto.randomUUID() };
+      if (!name.startsWith('.')) throw new Error('Unexpected offline dependency ' + name);
+      return load(resolve(dirname(path), name));
+    };
+    vm.runInContext('(function(require,module,exports){\n' + code + '\n})', context)(require,module,module.exports);
+    return module.exports;
+  }
+  const handler = load('base44/functions/customer-orders/entry.ts').default;
   return async (body) => {
-    const res = await context.testHandler({ json: async () => body });
+    const res = await handler({ json: async () => body });
     return { status: res.status, data: await res.json() };
   };
 }

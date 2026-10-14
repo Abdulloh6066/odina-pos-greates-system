@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveAppUser } from "../../shared/user-helpers.ts";
 import {
   loadIngredientCosts, computeProductCost, aggregateReport, num,
 } from "../../shared/cost-engine.ts";
@@ -30,16 +31,17 @@ function saleBusinessDate(sale: any) {
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
-    const role = String(user.role || user?.data?.role || "");
+    const authenticatedUser = await base44.auth.me();
+    if (!authenticatedUser) return Response.json({ error: "Tizimga kirish kerak." }, { status: 401 });
+    const service = base44.asServiceRole;
+    const user = await resolveAppUser(service, authenticatedUser);
+    const role = user.role;
     if (role !== "admin" && role !== "accountant") {
       return Response.json(
         { error: "Tannarx va foyda hisoboti faqat egasi va hisobchi uchun." },
         { status: 403 },
       );
     }
-    const service = base44.asServiceRole;
     const body = await req.json();
     const action = String(body?.action || "report");
     const today = reportDate(new Date().toISOString());
@@ -182,7 +184,7 @@ export default async function (req) {
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Hisobotni tayyorlab bo‘lmadi." },
-      { status: 500 },
+      { status: Number((error as any)?.status || 500) },
     );
   }
 }

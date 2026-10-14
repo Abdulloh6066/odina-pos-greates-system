@@ -5,13 +5,14 @@ import { resolve, dirname } from 'node:path';
 import { webcrypto, randomUUID } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { matches } from './helpers/memory-backend.mjs';
 import { Base44StateStore } from '../base44/shared/order-bot/base44-store.js';
 
 const now = new Date('2026-10-07T07:00:00Z');
 class Clock extends Date { constructor(...a) { super(...(a.length ? a : [now])); } static now() { return +now; } }
 function modules(client) {
   const cache = new Map();
-  const context = vm.createContext({ URL, Response, crypto: webcrypto, console, Date: Clock, structuredClone });
+  const context = vm.createContext({ URL, Response, crypto: webcrypto, TextEncoder, console, Date: Clock, structuredClone });
   function load(path) {
     path = resolve(path);
     if (cache.has(path)) return cache.get(path).exports;
@@ -44,14 +45,6 @@ function fixture(tier = 85000, products = []) {
   };
   let sequence = 0;
   const clone = v => v == null ? v : structuredClone(v);
-  const matches = (r,q) => Object.entries(q || {}).every(([k,v]) => {
-    if (v && typeof v === 'object') {
-      if ('$exists' in v) return Object.hasOwn(r,k) === v.$exists;
-      if ('$eq' in v) return JSON.stringify(r[k]) === JSON.stringify(v.$eq);
-      if ('$nin' in v) return !v.$nin.includes(r[k]);
-    }
-    return r[k] === v;
-  });
   const entities = Object.fromEntries(Object.keys(db).map(name => {
     const e = {
       get: async id => clone(db[name].find(r=>r.id===id)),
@@ -60,7 +53,7 @@ function fixture(tier = 85000, products = []) {
       create: async data => { const r={...clone(data),id:name+'-'+(++sequence)}; db[name].push(r); return clone(r); },
       updateMany: async (q,u) => {
         const rows=db[name].filter(r=>matches(r,q));
-        for(const r of rows) { Object.assign(r,clone(u.$set||{})); for(const [k,v] of Object.entries(u.$inc||{})) r[k]=(r[k]||0)+v; }
+        for(const r of rows) { Object.assign(r,clone(u.$set||{})); for(const [k,v] of Object.entries(u.$inc||{})) r[k]=(r[k]||0)+v; for (const [k,v] of Object.entries(u.$push||{})) (r[k] ??= []).push(clone(v)); }
         return {success:true,updated:rows.length,has_more:false};
       },
       delete: async () => { throw new Error('Offline test forbids deletion'); },

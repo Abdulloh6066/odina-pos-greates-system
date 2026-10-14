@@ -1,16 +1,14 @@
 // Restaurant tables phase 1: memory-only backend tests. No live entities or sales.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import ts from 'typescript';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { transformSync } from 'esbuild';
 import * as lucideIcons from 'lucide-react';
 import * as floorGeometry from '../src/lib/table-floorplan.js';
-import * as burgerFries from '../base44/shared/burger-fries.js';
+import { memoryBackend } from './helpers/memory-backend.mjs';
 import { buildTableLayout, entranceFromPoint, normalizeEntrance, normalizeOutdoorPolygon, nudgeEntrance, pointInOutdoorPolygon, tablesOverlap, validOutdoorPolygon, validateTableLayout } from '../src/lib/table-floorplan.js';
 
 const read = (path) => readFileSync(path, 'utf8');
@@ -97,24 +95,12 @@ function fixture() {
     asServiceRole: { entities },
   };
   let handler;
-  const source = read('base44/functions/restaurant-tables/entry.ts')
-    .replace(/^import .*;\s*$/gm, '');
-  const helperSource = read('base44/shared/shift-close-helpers.ts')
-    .slice(read('base44/shared/shift-close-helpers.ts').indexOf('const serviceTicketVersion = '),
-      read('base44/shared/shift-close-helpers.ts').indexOf('export const money = '))
-    .replace(/export /g, '');
-  const code = ts.transpileModule(helperSource + '\n' + source,
-    { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-  vm.runInNewContext(code, {
+  const runtime = memoryBackend();
+  runtime.client.auth = client.auth;
+  runtime.client.asServiceRole = client.asServiceRole;
+  runtime.load('base44/functions/restaurant-tables/entry.ts', {
+    Date,
     Deno: { serve: (callback) => { handler = callback; } },
-    createClientFromRequest: () => client,
-    resolveStoredAppUser: async (service, auth) => service.entities.User.get(auth.id),
-    userRole: (user) => user?.role || '',
-    userShopId: (user) => user?.shop_id || '',
-    userLabel: (user) => user?.email || 'Xodim',
-    ...burgerFries,
-    Response, console, Date, Set, Number, String, crypto: webcrypto,
-    httpError: (message, status) => Object.assign(new Error(message), { status }),
   });
   assert.equal(typeof handler, 'function');
   return {
@@ -888,4 +874,3 @@ test('simultaneous edit and cancellation cannot silently discard a newly saved r
   assert.equal(results.filter((r) => r.status === 200).length, 1, JSON.stringify(results));
   assert.equal(results.filter((r) => r.status === 409).length, 1, JSON.stringify(results));
 });
-

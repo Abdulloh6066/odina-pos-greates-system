@@ -13,6 +13,7 @@ import ProductCombobox from '@/components/orders/ProductCombobox';
 import { priceForShop } from '@/lib/shop-pricing';
 import ReferenceImageField from '@/components/orders/ReferenceImageField';
 import { useToast } from '@/components/ui/use-toast';
+import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest, orderRequestDefinitelyRejected } from '@/lib/order-request-retry';
 
 const WEDDING_PCS = 40;
 
@@ -67,6 +68,13 @@ function mapPrefillItems(sourceItems, products) {
 
 export default function OrderForm({ open, onClose, onCreated, user, shops, prefill }) {
   const { toast } = useToast();
+  const requestScope = orderRequestScope(user?.id, 'create_order');
+  const pendingRef = useRef(readOrderRequest(requestScope));
+  const [pending, setPending] = useState(() => readOrderRequest(requestScope));
+  useEffect(() => {
+    pendingRef.current = readOrderRequest(requestScope);
+    setPending(pendingRef.current);
+  }, [requestScope]);
   const role = user?.role || 'cashier';
   const isAdmin = role === 'admin';
   const [products, setProducts] = useState([]);
@@ -95,6 +103,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
   useEffect(() => {
     if (!open) return;
+    if (pendingRef.current) return;
     setAcceptanceStamp(tashkentNowStamp());
     const np = tashkentNowParts();
     setDateParts({ day: '', month: String(np.month), year: String(np.year) });
@@ -104,11 +113,22 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     if (open && ['cashier', 'manager'].includes(role)) setForm((f) => ({ ...f, shop_id: user?.shop_id || '' }));
   }, [open, role, user]);
 
+  useEffect(() => {
+    if (!open || !pending || loadingProducts) return;
+    const [year, month, day] = pending.required_date.split('-');
+    setDateParts({ year, month: String(Number(month)), day: String(Number(day)) });
+    setForm((current) => ({ ...current, ...pending,
+      useAdvance: Boolean(pending.advance_payment), advance_method: pending.advance_payment?.method || 'cash',
+      advance_amount: pending.advance_payment?.amount || 0 }));
+    setItems(mapPrefillItems(pending.items, products));
+  }, [open, pending, loadingProducts, products]);
+
   const appliedPrefillId = useRef('');
   const hadPrefill = useRef(false);
 
   useEffect(() => {
     if (!open) { appliedPrefillId.current = ''; return; }
+    if (pendingRef.current) return;
     if (prefill) {
       if (loadingProducts) return;
       if (appliedPrefillId.current === prefill.order.id) return;
@@ -200,41 +220,50 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     && (!form.useAdvance || (advanceAmount > 0 && advanceAmount <= total));
 
   const submit = async () => {
-    if (!valid) { toast({ title: 'Barcha majburiy maydonlarni to‘ldiring', variant: 'destructive' }); return; }
+    if (submitting) return;
+    if (!pendingRef.current && !valid) { toast({ title: 'Barcha majburiy maydonlarni to‘ldiring', variant: 'destructive' }); return; }
     setSubmitting(true);
     try {
-      const payload = {
-        action: 'create_order',
-        idempotency_key: buildIdempotencyKey('order'),
-        order_type: form.order_type,
-        customer_name: form.customer_name.trim(),
-        customer_phone: form.customer_phone.trim(),
-        required_date: form.required_date,
-        required_time: form.required_time,
-        shop_id: isAdmin ? form.shop_id : user.shop_id,
-        fulfilment_type: form.fulfilment_type,
-        delivery_address: form.delivery_address,
-        delivery_fee: form.delivery_fee,
-        cake_shape: form.cake_shape,
-        reference_image: form.reference_image,
-        notes: form.notes,
-        adjustment_amount: adjustment,
-        adjustment_reason: form.adjustment_reason,
-        items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity, customization_note: i.customization_note })),
-      };
-      if (form.useAdvance && advanceAmount > 0) {
-        payload.advance_payment = { method: form.advance_method, amount: advanceAmount, idempotency_key: buildIdempotencyKey('pay') };
+      let payload = pendingRef.current;
+      if (!payload) {
+        payload = {
+          action: 'create_order',
+          idempotency_key: buildIdempotencyKey('order'),
+          order_type: form.order_type,
+          customer_name: form.customer_name.trim(),
+          customer_phone: form.customer_phone.trim(),
+          required_date: form.required_date,
+          required_time: form.required_time,
+          shop_id: isAdmin ? form.shop_id : user.shop_id,
+          fulfilment_type: form.fulfilment_type,
+          delivery_address: form.delivery_address,
+          delivery_fee: form.delivery_fee,
+          cake_shape: form.cake_shape,
+          reference_image: form.reference_image,
+          notes: form.notes,
+          adjustment_amount: adjustment,
+          adjustment_reason: form.adjustment_reason,
+          items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity, customization_note: i.customization_note })),
+        };
+        if (form.useAdvance && advanceAmount > 0) {
+          payload.advance_payment = { method: form.advance_method, amount: advanceAmount, idempotency_key: buildIdempotencyKey('pay') };
+        }
       }
+      payload = retainOrderRequest(requestScope, payload);
+      pendingRef.current = payload;
+      setPending(payload);
       const res = await base44.functions.invoke('customer-orders', payload);
       const data = res?.data || res;
       if (data?.order) {
+        clearOrderRequest(requestScope); pendingRef.current = null; setPending(null);
         toast({ title: 'Buyurtma yaratildi', description: displayOrderNumber(data.order) });
         onCreated(data.order, data.items || []);
         reset();
       } else {
-        throw new Error(data?.error || 'Buyurtma yaratilmadi');
+        throw Object.assign(new Error(data?.error || 'Buyurtma yaratilmadi'), { data, status: res?.status });
       }
     } catch (e) {
+      if (orderRequestDefinitelyRejected(e)) { clearOrderRequest(requestScope); pendingRef.current = null; setPending(null); }
       toast({ title: 'Xatolik', description: e?.message || 'Buyurtma yaratilmadi', variant: 'destructive' });
     } finally {
       setSubmitting(false);
@@ -262,7 +291,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 mt-2">
+        <fieldset disabled={submitting || Boolean(pending)} className="space-y-5 mt-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Buyurtma turi *</Label>
@@ -448,12 +477,13 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
               <Row label="Qoldi (to‘lash)" value={formatUZS(remaining)} strong />
             </>}
           </div>
-        </div>
+        </fieldset>
+        {pending && <p className="mt-3 text-sm text-muted-foreground">Oldingi buyurtma natijasini shu ma’lumotlar bilan qayta tekshiring.</p>}
 
         <div className="flex justify-end gap-2 mt-4 sticky bottom-0 bg-card pt-3">
           <Button variant="outline" onClick={onClose}><X className="w-4 h-4" /> Bekor</Button>
-          <Button onClick={submit} disabled={!valid || submitting}>
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Saqlash
+          <Button onClick={submit} disabled={(!valid && !pending) || submitting}>
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {pending ? 'Qayta tekshirish' : 'Saqlash'}
           </Button>
         </div>
       </DialogContent>

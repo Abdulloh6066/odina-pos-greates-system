@@ -64,6 +64,16 @@
         "completed"
       ],
       "default": "completed"
+    },
+    "request_fingerprint": {
+      "type": "string"
+    },
+    "reconciliation_state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed"
+      ]
     }
   },
   "required": [

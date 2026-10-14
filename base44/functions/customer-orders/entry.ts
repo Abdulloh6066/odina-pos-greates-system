@@ -5,9 +5,9 @@ import {
   completeOrderReadyProduction,
   reservedOrderProductionPieces,
 } from "../../shared/order-ready-production.ts";
-import { createCustomerOrder, PAYMENT_METHODS, tashkentStamp, findOpenShift, applyPaymentToShift, reversePaymentOnShift } from "../../shared/customer-order-create.ts";
+import { createCustomerOrder, PAYMENT_METHODS, tashkentStamp, findOpenShift, recordCustomerOrderPayment, orderRequestFingerprint } from "../../shared/customer-order-create.ts";
 
-const ORDER_RUNTIME_VERSION = "customer-orders-v5-2026-10-07";
+const ORDER_RUNTIME_VERSION = "customer-orders-v6-2026-10-15";
 // Owner requested status-only readiness until customer order recipes are set up.
 // This server policy cannot be overridden by a browser request.
 const ORDER_RECIPE_ACCOUNTING_ENABLED = false;
@@ -89,143 +89,8 @@ export default async function(req: Request): Promise<Response> {
     }
 
     if (action === "record_payment") {
-      const orderId = String(body?.order_id || "");
-      const method = String(body?.method || "");
-      const amount = money(body?.amount || 0);
-      const paymentKind = String(body?.payment_kind || "balance");
-      const idempotencyKey = String(body?.idempotency_key || "");
-      if (!orderId || !idempotencyKey) {
-        return Response.json({ error: "Buyurtma va idempotency kaliti majburiy." }, { status: 400 });
-      }
-      if (!PAYMENT_METHODS.has(method) || amount <= 0) {
-        return Response.json({ error: "To‘lov usuli yoki summasi noto‘g‘ri." }, { status: 400 });
-      }
-      if (!PAYMENT_KINDS.has(paymentKind)) {
-        return Response.json({ error: "To‘lov turi noto‘g‘ri." }, { status: 400 });
-      }
-
-      const existingPayment = await service.entities.OrderPayment.filter({ idempotency_key: idempotencyKey });
-      if (existingPayment && existingPayment.length) {
-        return Response.json({ payment: existingPayment[0], already_exists: true });
-      }
-
-      const order = await service.entities.CustomerOrder.get(orderId);
-      if (!order) {
-        return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
-      }
-      if (["cashier", "manager"].includes(user.role) && order.shop_id !== user.shop_id) {
-        return Response.json({ error: "Bu buyurtma boshqa do‘konga tegishli." }, { status: 403 });
-      }
-      if (order.order_status === "bekor_qilindi") {
-        return Response.json({ error: "Bekor qilingan buyurtmaga to‘lov qabul qilinmaydi." }, { status: 409 });
-      }
-
-      const currentPaid = money(order.paid_amount);
-      const remaining = money(order.remaining_balance);
-      if (amount > remaining) {
-        return Response.json({ error: `To‘lov qolgan qarzdan oshmasligi kerak: ${remaining} UZS.` }, { status: 400 });
-      }
-
-      const shift = await findOpenShift(service, user.id, order.shop_id);
-      if (!shift && method === "cash") {
-        return Response.json({ error: "Naqd to‘lov uchun ushbu do‘konda smenani oching." }, { status: 409 });
-      }
-
-      const now = new Date().toISOString();
-      const newPaid = currentPaid + amount;
-      const newRemaining = money(order.total) - newPaid;
-      const newStatus = newRemaining <= 0 ? "paid" : (newPaid > 0 ? "partial" : "unpaid");
-      const userName = user.full_name || user.email || "Noma’lum xodim";
-
-      const claim = await service.entities.CustomerOrder.updateMany(
-        { id: order.id, paid_amount: currentPaid },
-        {
-          $set: {
-            paid_amount: newPaid,
-            remaining_balance: newRemaining,
-            payment_status: newStatus,
-            updated_at: now,
-          },
-        },
-      );
-      if (!claim?.success || Number(claim.updated || 0) !== 1) {
-        return Response.json({ error: "Buyurtma o‘zgardi. Yangilang va qayta urinib ko‘ring." }, { status: 409 });
-      }
-
-      try {
-        createdPayment = await service.entities.OrderPayment.create({
-          order_id: order.id,
-          order_number_snapshot: order.order_number,
-          payment_kind: paymentKind,
-          payment_method: method,
-          amount,
-          paid_at: now,
-          shop_id: order.shop_id,
-          shop_name_snapshot: order.shop_name_snapshot,
-          employee_id: user.id,
-          employee_name: userName,
-          employee_role: user.role,
-          shift_id: shift?.id || "",
-          idempotency_key: idempotencyKey,
-          status: "completed",
-        });
-
-        if (shift) {
-          try {
-            await applyPaymentToShift(service, shift, method, amount);
-            shiftApplied = { shiftId: shift.id, method, amount };
-          } catch (shiftError) {
-            await service.entities.OrderPayment.delete(createdPayment.id).catch(() => {});
-            await service.entities.CustomerOrder.updateMany(
-              { id: order.id, paid_amount: newPaid },
-              {
-                $set: {
-                  paid_amount: currentPaid,
-                  remaining_balance: remaining,
-                  payment_status: order.payment_status,
-                },
-              },
-            ).catch(() => {});
-            throw shiftError;
-          }
-        }
-
-        await service.entities.ActionHistory.create({
-          user_id: user.id,
-          user_name: userName,
-          action: "order_payment",
-          details: `${order.order_number} · ${paymentKind} · ${method} · ${amount} UZS`,
-        }).catch(() => {});
-
-        return Response.json({
-          payment: createdPayment,
-          order: {
-            ...order,
-            paid_amount: newPaid,
-            remaining_balance: newRemaining,
-            payment_status: newStatus,
-          },
-          runtime_version: ORDER_RUNTIME_VERSION,
-        });
-      } catch (error) {
-        if (shiftApplied) {
-          await reversePaymentOnShift(service, shiftApplied.shiftId, shiftApplied.method, shiftApplied.amount);
-        }
-        if (createdPayment?.id) {
-          await service.entities.OrderPayment.delete(createdPayment.id).catch(() => {});
-        }
-        await service.entities.CustomerOrder.updateMany(
-          { id: order.id, paid_amount: newPaid },
-          {
-            $set: {
-              paid_amount: currentPaid,
-              remaining_balance: remaining,
-              payment_status: order.payment_status,
-            },
-          },
-        ).catch(() => {});
-        throw error;
-      }
+      const result = await recordCustomerOrderPayment(service, user, body);
+      return Response.json({ ...result, runtime_version: ORDER_RUNTIME_VERSION });
     }
 
     if (action === "update_production_status") {
@@ -247,6 +112,12 @@ export default async function(req: Request): Promise<Response> {
           || (order.ready_inventory_location_id && order.ready_inventory_location_id !== assigned.id)) {
           return Response.json({ error: "Siz faol ishlab chiqarish omboriga biriktirilmagansiz." }, { status: 403 });
         }
+      }
+      if (order.creation_state === "pending") {
+        return Response.json({ error: "Buyurtma yaratish hali tasdiqlanmadi. Avval shu so‘rovni tekshiring.", operation_pending: true }, { status: 409 });
+      }
+      if (order.completion_key && order.completion_phase !== "completed") {
+        return Response.json({ error: "Buyurtmani yakunlash davom etmoqda. Avval shu amalni tekshiring.", operation_pending: true }, { status: 409 });
       }
 
       if (step === "ready") {
@@ -301,8 +172,8 @@ export default async function(req: Request): Promise<Response> {
 
     if (action === "complete_order") {
       const orderId = String(body?.order_id || "");
-      const idempotencyKey = String(body?.idempotency_key || "");
-      if (!orderId) {
+      let idempotencyKey = String(body?.idempotency_key || "");
+      if (!orderId || idempotencyKey.length > 200) {
         return Response.json({ error: "Buyurtma ID majburiy." }, { status: 400 });
       }
       if (!["admin", "manager", "cashier"].includes(user.role)) {
@@ -313,15 +184,35 @@ export default async function(req: Request): Promise<Response> {
       if (!order) {
         return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
       }
-      if (String(order.order_status || "") === "yakunlandi") {
-        return Response.json({ order, already_completed: true, runtime_version: ORDER_RUNTIME_VERSION });
-      }
       if (["cashier", "manager"].includes(user.role) && order.shop_id !== user.shop_id) {
         return Response.json({ error: "Bu buyurtma boshqa do‘konga tegishli." }, { status: 403 });
       }
+      if (order.creation_state === "pending") {
+        return Response.json({ error: "Buyurtma yaratish hali tasdiqlanmadi. Avval shu so‘rovni tekshiring.", operation_pending: true }, { status: 409 });
+      }
+      // Keep the established no-payment completion API valid; an order itself
+      // supplies its durable key when no financial amount remains to collect.
+      if (!idempotencyKey && money(order.total) - money(order.paid_amount) <= 0) idempotencyKey = `complete-paid:${order.id}`;
+      const completionFingerprint = await orderRequestFingerprint({ order_id: order.id, actor_id: user.id,
+        method: String(body.method || ""), amount: money(body.amount || 0) });
+      if (order.order_status === "yakunlandi") {
+        if (order.completion_key === idempotencyKey && order.completion_fingerprint !== completionFingerprint) {
+          return Response.json({ error: "Bu so‘rov kaliti boshqa ma’lumotlar uchun ishlatilgan." }, { status: 409 });
+        }
+        return Response.json({ order, already_completed: true, runtime_version: ORDER_RUNTIME_VERSION });
+      }
+      if (order.payment_operation_key && order.payment_operation_key !== idempotencyKey) {
+        return Response.json({ error: "Buyurtmaning oldingi to‘lovi yakunlanmagan. Avval uni tekshiring.", operation_pending: true }, { status: 409 });
+      }
+      if (order.completion_key && (order.completion_key !== idempotencyKey || order.completion_fingerprint !== completionFingerprint)) {
+        return Response.json({ error: "Buyurtmani yakunlash oldin boshlangan. Avval o‘sha so‘rovni tekshiring.", operation_pending: true }, { status: 409 });
+      }
+      if (order.completion_phase === "stock_writing") {
+        return Response.json({ error: "Yakunlash natijasi noaniq. Egasi ombor va buyurtmani tekshirishi kerak.", operation_pending: true }, { status: 503 });
+      }
       const prevStatus = String(order.order_status || "");
       if (prevStatus !== "tayyor" && prevStatus !== "yuborildi_olib_ketildi") {
-        return Response.json({ error: "Buyurtma tayyor yoki yuborilgan holatda bo‘lishi kerak." }, { status: 409 });
+        return Response.json({ request_not_started: !order.completion_key, error: "Buyurtma tayyor yoki yuborilgan holatda bo‘lishi kerak." }, { status: 409 });
       }
 
       const total = money(order.total);
@@ -333,18 +224,18 @@ export default async function(req: Request): Promise<Response> {
       if (remaining > 0) {
         method = String(body?.method || "");
         if (!PAYMENT_METHODS.has(method)) {
-          return Response.json({ error: "To‘lov usuli noto‘g‘ri." }, { status: 400 });
+          return Response.json({ request_not_started: !order.completion_key, error: "To‘lov usuli noto‘g‘ri." }, { status: 400 });
         }
         const providedAmount = money(body?.amount || 0);
         if (providedAmount !== remaining) {
-          return Response.json({ error: `Qoldiq to‘lov aniq ${remaining} UZS bo‘lishi kerak.` }, { status: 400 });
+          return Response.json({ request_not_started: !order.completion_key, error: `Qoldiq to‘lov aniq ${remaining} UZS bo‘lishi kerak.` }, { status: 400 });
         }
         if (!idempotencyKey) {
-          return Response.json({ error: "Idempotency kaliti kerak." }, { status: 400 });
+          return Response.json({ request_not_started: !order.completion_key, error: "Idempotency kaliti kerak." }, { status: 400 });
         }
         shift = await findOpenShift(service, user.id, order.shop_id);
         if (!shift && method === "cash") {
-          return Response.json({ error: "Naqd to‘lov uchun ushbu do‘konda smenani oching." }, { status: 409 });
+          return Response.json({ request_not_started: !order.completion_key, error: "Naqd to‘lov uchun ushbu do‘konda smenani oching." }, { status: 409 });
         }
       }
 
@@ -388,6 +279,18 @@ export default async function(req: Request): Promise<Response> {
         reference_id: order.id, reference_type: "customer_order", movement_type: "sale",
       });
       const stockAlreadyDeducted = (existingMovements && existingMovements.length) > 0;
+      if (stockAlreadyDeducted) {
+        const recorded = new Map<string, number>();
+        for (const movement of existingMovements) {
+          if (movement.location_id !== order.shop_id || movement.item_kind !== "product") {
+            throw Object.assign(httpError("Buyurtmaning oldingi ombor yozuvlari mos emas. Egasi tekshirishi kerak.", 503), { operation_pending: true });
+          }
+          recorded.set(movement.item_id, stockNumber((recorded.get(movement.item_id) || 0) - Number(movement.quantity_change || 0)));
+        }
+        if (recorded.size !== deductionItems.length || deductionItems.some((item) => recorded.get(item.productId) !== item.pieces)) {
+          throw Object.assign(httpError("Buyurtmaning oldingi ombor yechimi to‘liq tasdiqlanmadi. Egasi tekshirishi kerak.", 503), { operation_pending: true });
+        }
+      }
 
       let stockPlans: any[] = [];
       let shortages: any[] = [];
@@ -398,6 +301,7 @@ export default async function(req: Request): Promise<Response> {
         shortages = planned.shortages;
         if (shortages.length && !allowNegativeStock) {
           return Response.json({
+            request_not_started: !order.completion_key,
             error: "Omborda mahsulot yetarli emas. Qoldiqsiz yakunlash bloklangan.",
             shortages,
             allow_negative_stock: false,
@@ -409,8 +313,6 @@ export default async function(req: Request): Promise<Response> {
       const day = now.slice(0, 10).replaceAll("-", "");
       const userName = user.full_name || user.email || "Noma’lum xodim";
       let createdPayment: any = null;
-      let shiftApplied: { shiftId: string; method: string; amount: number } | null = null;
-      let orderPaidUpdated = false;
       let newPaid = currentPaid;
       let newRemaining = remaining;
       let newPayStatus = String(order.payment_status || "unpaid");
@@ -418,68 +320,28 @@ export default async function(req: Request): Promise<Response> {
       const stockMovementRecords: any[] = [];
 
       try {
-        if (remaining > 0) {
-          const existingPayment = await service.entities.OrderPayment.filter({ idempotency_key: idempotencyKey });
-          if (existingPayment && existingPayment.length) {
-            createdPayment = existingPayment[0];
-          } else {
-            newPaid = currentPaid + remaining;
-            newRemaining = money(total - newPaid);
-            newPayStatus = newRemaining <= 0 ? "paid" : (newPaid > 0 ? "partial" : "unpaid");
-            const orderClaim = await service.entities.CustomerOrder.updateMany(
-              { id: order.id, paid_amount: currentPaid },
-              { $set: {
-                paid_amount: newPaid,
-                remaining_balance: newRemaining,
-                payment_status: newPayStatus,
-                updated_at: now,
-              } },
-            );
-            if (!orderClaim?.success || Number(orderClaim.updated || 0) !== 1) {
-              throw httpError("Buyurtma o‘zgardi. Yangilang va qayta urinib ko‘ring.", 409);
-            }
-            orderPaidUpdated = true;
-
-            createdPayment = await service.entities.OrderPayment.create({
-              order_id: order.id,
-              order_number_snapshot: order.order_number,
-              payment_kind: "balance",
-              payment_method: method,
-              amount: remaining,
-              paid_at: now,
-              shop_id: order.shop_id,
-              shop_name_snapshot: order.shop_name_snapshot,
-              employee_id: user.id,
-              employee_name: userName,
-              employee_role: user.role,
-              shift_id: shift?.id || "",
-              idempotency_key: idempotencyKey,
-              status: "completed",
-            });
-
-            if (shift) {
-              try {
-                await applyPaymentToShift(service, shift, method, remaining);
-                shiftApplied = { shiftId: shift.id, method, amount: remaining };
-              } catch (shiftError) {
-                await service.entities.OrderPayment.delete(createdPayment.id).catch(() => {});
-                createdPayment = null;
-                if (orderPaidUpdated) {
-                  await service.entities.CustomerOrder.updateMany(
-                    { id: order.id, paid_amount: newPaid },
-                    { $set: {
-                      paid_amount: currentPaid,
-                      remaining_balance: remaining,
-                      payment_status: String(order.payment_status || "unpaid"),
-                    } },
-                  ).catch(() => {});
-                  orderPaidUpdated = false;
-                }
-                throw shiftError;
-              }
-            }
+        if (!order.completion_key) {
+          const completionClaim = await service.entities.CustomerOrder.updateMany({ id: order.id, order_status: prevStatus,
+            $and: [
+              { $or: [{ completion_key: { $exists: false } }, { completion_key: "" }] },
+              { $or: [{ payment_operation_key: { $exists: false } }, { payment_operation_key: "" }, { payment_operation_key: idempotencyKey }] },
+            ] },
+            { $set: { completion_key: idempotencyKey, completion_fingerprint: completionFingerprint, completion_phase: "claimed" } });
+          if (!completionClaim?.success || Number(completionClaim.updated || 0) !== 1) {
+            throw Object.assign(httpError("Yakunlash boshqa oynada boshlangan. Shu so‘rovni qayta tekshiring.", 409), { operation_pending: true });
           }
         }
+        if (remaining > 0 || order.payment_operation_key === idempotencyKey) {
+          const result = await recordCustomerOrderPayment(service, user, { order_id: order.id, method: String(body.method || ""),
+            amount: money(body.amount || 0), payment_kind: "balance", idempotency_key: idempotencyKey });
+          createdPayment = result.payment;
+          newPaid = money(result.order.paid_amount);
+          newRemaining = money(result.order.remaining_balance);
+          newPayStatus = result.order.payment_status;
+        }
+        const stockClaim = await service.entities.CustomerOrder.updateMany({ id: order.id, completion_key: idempotencyKey, completion_phase: "claimed" },
+          { $set: { completion_phase: "stock_writing" } });
+        if (!stockClaim?.success || Number(stockClaim.updated || 0) !== 1) throw Object.assign(httpError("Yakunlash davom etmoqda. Shu so‘rovni qayta tekshiring.", 503), { operation_pending: true });
 
         if (!stockAlreadyDeducted) {
           for (const plan of stockPlans) {
@@ -543,6 +405,7 @@ export default async function(req: Request): Promise<Response> {
           { id: order.id, order_status: prevStatus },
           { $set: {
             order_status: "yakunlandi",
+            completion_phase: "completed",
             updated_at: now,
           } },
         );
@@ -572,30 +435,14 @@ export default async function(req: Request): Promise<Response> {
           runtime_version: ORDER_RUNTIME_VERSION,
         });
       } catch (error) {
-        for (const movement of stockMovementRecords) {
-          await service.entities.StockMovement.delete(movement.id).catch(() => {});
+        // A final status reply can be lost after all writes committed. Read it
+        // before treating completion as failed; preserve every financial snapshot.
+        const savedOrder = await service.entities.CustomerOrder.get(order.id).catch(() => null);
+        if (savedOrder?.order_status === "yakunlandi" && savedOrder.completion_key === idempotencyKey) {
+          return Response.json({ order: savedOrder, payment: createdPayment, already_completed: true, runtime_version: ORDER_RUNTIME_VERSION });
         }
-        for (const change of stockChanges) {
-          await service.entities.ProductStock.updateMany(
-            { id: change.stockRecord.id },
-            { $inc: { quantity: change.pieces } },
-          ).catch(() => {});
-        }
-        if (shiftApplied) {
-          await reversePaymentOnShift(service, shiftApplied.shiftId, shiftApplied.method, shiftApplied.amount);
-        }
-        if (createdPayment?.id) {
-          await service.entities.OrderPayment.delete(createdPayment.id).catch(() => {});
-        }
-        if (orderPaidUpdated) {
-          await service.entities.CustomerOrder.updateMany(
-            { id: order.id, paid_amount: newPaid },
-            { $set: {
-              paid_amount: currentPaid,
-              remaining_balance: remaining,
-              payment_status: String(order.payment_status || "unpaid"),
-            } },
-          ).catch(() => {});
+        if (savedOrder?.completion_phase === "stock_writing") {
+          (error as any).operation_pending = true;
         }
         throw error;
       }
@@ -606,6 +453,8 @@ export default async function(req: Request): Promise<Response> {
     const payload: Record<string, unknown> = {
       error: error instanceof Error ? error.message : "Buyurtma amali bajarilmadi.",
     };
+    if ((error as any)?.operation_pending) payload.operation_pending = true;
+    if ((error as any)?.request_not_started) payload.request_not_started = true;
     if (Array.isArray((error as any)?.shortages)) {
       payload.shortages = (error as any).shortages;
     }

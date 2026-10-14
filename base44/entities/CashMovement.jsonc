@@ -54,6 +54,12 @@
     },
     "user_name": {
       "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "request_fingerprint": {
+      "type": "string"
     }
   },
   "required": [

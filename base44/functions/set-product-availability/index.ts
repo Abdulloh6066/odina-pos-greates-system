@@ -1,10 +1,12 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveAppUser } from "../../shared/user-helpers.ts";
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const authenticatedUser = await base44.auth.me();
+    if (!authenticatedUser) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const user = await resolveAppUser(base44.asServiceRole, authenticatedUser);
     if (!["admin", "accountant", "production"].includes(user.role)) {
       return Response.json({ error: "Your role cannot change availability." }, { status: 403 });
     }
@@ -23,6 +25,6 @@ Deno.serve(async (req) => {
     });
     return Response.json({ product: updated });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Could not update availability." }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : "Could not update availability." }, { status: Number((error as any)?.status || 500) });
   }
 });

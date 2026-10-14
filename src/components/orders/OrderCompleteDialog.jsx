@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest, orderRequestDefinitelyRejected } from '@/lib/order-request-retry';
 import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
@@ -13,37 +15,52 @@ import { useToast } from '@/components/ui/use-toast';
 
 export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const requestScope = orderRequestScope(user?.id, 'complete_order', order?.id);
+  const pendingRef = useRef(readOrderRequest(requestScope));
+  const [pending, setPending] = useState(() => readOrderRequest(requestScope));
+  React.useEffect(() => {
+    pendingRef.current = readOrderRequest(requestScope);
+    setPending(pendingRef.current);
+  }, [requestScope]);
   const remaining = Number(order?.remaining_balance || 0);
   const needsPayment = remaining > 0;
   const [method, setMethod] = useState('cash');
   const [submitting, setSubmitting] = useState(false);
 
-  React.useEffect(() => { if (open) setMethod('cash'); }, [open]);
+  React.useEffect(() => { if (open) setMethod(readOrderRequest(requestScope)?.method || 'cash'); }, [open, requestScope]);
 
   const handoffLabel = order?.fulfilment_type === 'delivery' ? 'Yuborildi' : 'Olib ketildi';
 
   const submit = async () => {
-    if (!order) return;
+    if (!order || submitting) return;
     setSubmitting(true);
     try {
-      const payload = {
-        action: 'complete_order',
-        order_id: order.id,
-        idempotency_key: buildIdempotencyKey('complete'),
-      };
-      if (needsPayment) {
-        payload.method = method;
-        payload.amount = remaining;
+      let payload = pendingRef.current;
+      if (!payload) {
+        payload = {
+          action: 'complete_order',
+          order_id: order.id,
+          idempotency_key: buildIdempotencyKey('complete'),
+        };
+        if (needsPayment) {
+          payload.method = method;
+          payload.amount = remaining;
+        }
       }
+      payload = retainOrderRequest(requestScope, payload);
+      pendingRef.current = payload; setPending(payload);
       const res = await base44.functions.invoke('customer-orders', payload);
       const data = res?.data || res;
       if (data?.order) {
+        clearOrderRequest(requestScope); pendingRef.current = null; setPending(null);
         toast({ title: data.already_completed ? 'Allaqachon yakunlangan' : handoffLabel, description: displayOrderNumber(data.order) });
         onDone(data);
       } else {
-        throw new Error(data?.error || 'Amal bajarilmadi');
+        throw Object.assign(new Error(data?.error || 'Amal bajarilmadi'), { data });
       }
     } catch (e) {
+      if (orderRequestDefinitelyRejected(e)) { clearOrderRequest(requestScope); pendingRef.current = null; setPending(null); }
       toast({ title: 'Xatolik', description: e?.message || 'Amal bajarilmadi', variant: 'destructive' });
     } finally {
       setSubmitting(false);
@@ -72,6 +89,7 @@ export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
             <div>
               <Label>To‘lov usuli</Label>
               <OdinaSelect
+                disabled={submitting || Boolean(pending)}
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
                 className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm"
@@ -103,7 +121,7 @@ export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
               : order?.fulfilment_type === 'delivery'
                 ? <Truck className="w-4 h-4" />
                 : <PackageCheck className="w-4 h-4" />}
-            {handoffLabel}
+            {pending ? 'Qayta tekshirish' : handoffLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

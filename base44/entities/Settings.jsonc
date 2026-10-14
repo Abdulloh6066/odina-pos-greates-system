@@ -25,6 +25,31 @@
       "type": "boolean",
       "default": true,
       "description": "Qoldiq yetishmasa ogohlantirib sotishga ruxsat"
+    },
+    "customer_order_request_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Server-only permanent request claims; an ambiguous creation is never automatically stolen."
+    },
+    "budget_account_initialization_json": {
+      "type": "string",
+      "description": "Optional server journal for first Budget account initialization; no historical reset."
+    },
+    "customer_order_payment_request_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Server payment key claims shared across orders."
+    },
+    "customer_order_payment_request_fingerprints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Atomic binding of each payment claim to its validated order, actor and amount."
     }
   },
   "required": [

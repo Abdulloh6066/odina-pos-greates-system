@@ -8,6 +8,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { transformSync } from 'esbuild';
 import * as lucide from 'lucide-react';
+import { isStaffTicketEnabled } from '../src/lib/staff-order-ticket.js';
 
 const source = readFileSync('src/components/tables/StaffOrderTicketModal.jsx', 'utf8');
 const start = source.indexOf('function getTicketPrintCount(');
@@ -20,6 +21,7 @@ const context = {
   React, useEffect: React.useEffect, useState: React.useState,
   useRef: React.useRef, useCallback: React.useCallback,
   ...lucide, base44: {}, createPortal: () => null,
+  isStaffTicketEnabled,
   formatUzbekistanDateTime: () => '2026-09-20 00:54',
   Dialog: Wrapper, DialogContent: Wrapper, DialogTitle: Wrapper,
   DialogDescription: Wrapper, Button: Wrapper,

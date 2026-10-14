@@ -28,6 +28,21 @@
     },
     "updated_by_name": {
       "type": "string"
+    },
+    "financial_operations_json": {
+      "type": "string",
+      "description": "Backend-only durable financial request claims and recovery stages."
+    },
+    "shift_settlement_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Backend-only once-only shift settlement credits."
+    },
+    "shift_settlement_operations_json": {
+      "type": "string",
+      "description": "Backend-only per-shift Budget settlement and compensation snapshots."
     }
   },
   "required": [

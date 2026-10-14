@@ -2,16 +2,7 @@
 // The real helper runs against in-memory entities; NEVER create real records.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
-import ts from 'typescript';
-
-const source = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
-  .replace(/export\s*\{[^}]+\}\s*from\s*['"][^'"]+['"];?/g, '')
-  .replace(/export /g, '');
-const compiled = ts.transpileModule(`${source}\nglobalThis.serviceTicket = { allocateServiceTicketNumber, finishServiceTicketCycleIfLastShift };`, {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-}).outputText;
+import { memoryBackend } from './helpers/memory-backend.mjs';
 
 function harness({ legacy = false } = {}) {
   const db = {
@@ -59,9 +50,8 @@ function harness({ legacy = false } = {}) {
       filter: async (query) => clone(db.Shift.filter((shift) => matches(shift, query))),
     },
   } };
-  const sandbox = vm.createContext({ console });
-  vm.runInContext(compiled, sandbox);
-  return { db, service, api: sandbox.serviceTicket, get writes() { return writes; } };
+  const api = memoryBackend().load('base44/shared/shift-close-helpers.ts');
+  return { db, service, api, get writes() { return writes; } };
 }
 
 test('legacy open-shop count is bootstrapped once; midnight and another cashier never reset numbers', async () => {

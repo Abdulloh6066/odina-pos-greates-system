@@ -5,7 +5,7 @@
     "order_sequence": {
       "type": "integer",
       "minimum": 1,
-      "description": "Mijozga ko\u2018rsatiladigan o\u2018zgarmas tartib raqami: 1, 2, 3... barcha kunlar va do\u2018konlar bo\u2018yicha."
+      "description": "Mijozga ko‘rsatiladigan o‘zgarmas tartib raqami: 1, 2, 3... barcha kunlar va do‘konlar bo‘yicha."
     },
     "order_number": {
       "type": "string"
@@ -153,6 +153,61 @@
     "created_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "request_fingerprint": {
+      "type": "string",
+      "description": "Server fingerprint binding the creation request to its actor and payload."
+    },
+    "creation_state": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed"
+      ],
+      "description": "Creation is confirmed only after immutable items and advance accounting are saved."
+    },
+    "creation_item_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "payment_operation_key": {
+      "type": "string"
+    },
+    "payment_operation_phase": {
+      "type": "string",
+      "enum": [
+        "claimed",
+        "ledger_writing",
+        "completed"
+      ]
+    },
+    "payment_operation_payload": {
+      "type": "object",
+      "description": "Server-only frozen payment recovery intent."
+    },
+    "payment_applied_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "completion_key": {
+      "type": "string"
+    },
+    "completion_fingerprint": {
+      "type": "string"
+    },
+    "completion_phase": {
+      "type": "string",
+      "enum": [
+        "claimed",
+        "stock_writing",
+        "completed"
+      ]
+    },
+    "creation_advance_shift_id": {
+      "type": "string",
+      "description": "Server snapshot of the shift selected when the order advance was accepted; retries never move it to a later shift."
     }
   },
   "required": [

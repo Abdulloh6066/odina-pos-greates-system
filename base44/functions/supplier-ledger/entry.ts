@@ -1,6 +1,7 @@
 import { resolveAppUser } from "../../shared/user-helpers.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { financialRequestKey, runSupplierPayment } from "../../shared/supplier-payment-recovery.ts";
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
 const quantity = (value: unknown) => {
@@ -527,153 +528,22 @@ export default async function(req) {
       const shiftId = String(body?.shift_id || "");
       const amount = money(body?.amount);
       const notes = String(body?.notes || "").trim();
-      if (!supplierId || !shiftId || amount <= 0) {
+      if (!supplierId || !shiftId || !Number.isSafeInteger(amount) || amount <= 0) {
         return Response.json({ error: "Yetkazib beruvchi, smena va summa majburiy." }, { status: 400 });
       }
 
-      const [supplier, shift] = await Promise.all([
-        service.entities.CashRecipient.get(supplierId),
-        service.entities.Shift.get(shiftId),
-      ]);
-      if (!supplier || supplier.active === false) return Response.json({ error: "Yetkazib beruvchi topilmadi." }, { status: 404 });
-      if (!shift || shift.status !== "open") return Response.json({ error: "Smena ochiq emas." }, { status: 409 });
-      if (shift.user_id !== user.id) return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
-      if (amount > Number(shift.expected_cash || 0)) {
-        return Response.json({ error: "Kassada kutilayotgan naqd pul yetarli emas." }, { status: 400 });
-      }
-
-      const debts = (await service.entities.SupplierReceipt.filter(
-        { supplier_id: supplier.id, remaining_debt: { $gt: 0 }, ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500,
-      )) || [];
-      const totalDebt = debts.reduce((sum: number, debt: any) => sum + money(debt.remaining_debt), 0);
-      if (totalDebt <= 0) return Response.json({ error: "Bu yetkazib beruvchida qarz yo‘q." }, { status: 409 });
-      if (amount > totalDebt) {
-        return Response.json({ error: `To‘lov qolgan qarzdan oshmasligi kerak: ${totalDebt} UZS.` }, { status: 400 });
-      }
-
-      const now = new Date().toISOString();
-      const userName = user.full_name || user.email || "Noma’lum xodim";
-      const paymentNumber = `QT-${now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-      let unallocated = amount;
-      const changedDebts: any[] = [];
-      const payments: any[] = [];
-      let cashMovement: any = null;
-
-      try {
-        for (const debt of debts) {
-          if (unallocated <= 0) break;
-          const before = money(debt.remaining_debt);
-          const applied = Math.min(before, unallocated);
-          const after = before - applied;
-          const update = await service.entities.SupplierReceipt.updateMany(
-            { id: debt.id, remaining_debt: before },
-            { $set: { remaining_debt: after, status: receiptStatus(after, money(debt.debt_amount)) } },
-          );
-          if (!update?.success || Number(update.updated || 0) !== 1) {
-            throw new Error("Qarz bir vaqtda o‘zgardi. Yangilab qayta urinib ko‘ring.");
-          }
-          changedDebts.push({ debt, before });
-
-          const payment = await service.entities.SupplierPayment.create({
-            payment_number: paymentNumber,
-            receipt_id: debt.id,
-            receipt_number_snapshot: debt.receipt_number,
-            supplier_id: supplier.id,
-            supplier_name_snapshot: supplier.name,
-            amount: applied,
-            shop_id: shift.shop_id,
-            shop_name_snapshot: shift.shop_name,
-            shift_id: shift.id,
-            user_id: user.id,
-            user_name: userName,
-            notes: notes || undefined,
-            paid_at: now,
-          });
-          payments.push(payment);
-          unallocated -= applied;
-        }
-        if (unallocated !== 0) throw new Error("To‘lovni qarzlarga taqsimlab bo‘lmadi.");
-
-        const shiftUpdate = await service.entities.Shift.updateMany(
-          { id: shift.id, expected_cash: Number(shift.expected_cash || 0), status: "open" },
-          { $set: {
-            expected_cash: Number(shift.expected_cash || 0) - amount,
-            cash_removed: Number(shift.cash_removed || 0) + amount,
-          } },
-        );
-        if (!shiftUpdate?.success || Number(shiftUpdate.updated || 0) !== 1) {
-          throw new Error("Kassa summasi bir vaqtda o‘zgardi. Yangilab qayta urinib ko‘ring.");
-        }
-
-        cashMovement = await service.entities.CashMovement.create({
-          shift_id: shift.id,
-          shop_id: shift.shop_id,
-          user_id: user.id,
-          user_name: userName,
-          employee_name: userName,
-          type: "withdrawal",
-          expense_category: "goods_payment",
-          recipient_id: supplier.id,
-          recipient_name_snapshot: supplier.name,
-          amount,
-          reason: notes || `${supplier.name} qarzini to‘lash`,
-          reference_id: paymentNumber,
-          reference_type: "supplier_payment",
-          created_at: now,
-        });
-        for (const payment of payments) {
-          await service.entities.SupplierPayment.update(payment.id, { cash_movement_id: cashMovement.id });
-        }
-
-        await service.entities.ActionHistory.create({
-          user_id: user.id,
-          user_name: userName,
-          action: "supplier_debt_paid",
-          details: `${paymentNumber}. ${supplier.name}. ${shift.shop_name}. ${amount} UZS.`,
-        });
-
-        return Response.json({
-          payments,
-          cash_movement: cashMovement,
-          remaining_debt: totalDebt - amount,
-          shift: {
-            ...shift,
-            expected_cash: Number(shift.expected_cash || 0) - amount,
-            cash_removed: Number(shift.cash_removed || 0) + amount,
-          },
-        });
-      } catch (error) {
-        if (cashMovement?.id) {
-          try { await service.entities.CashMovement.delete(cashMovement.id); } catch {}
-        }
-        for (const payment of payments.reverse()) {
-          try { await service.entities.SupplierPayment.delete(payment.id); } catch {}
-        }
-        for (const changed of changedDebts.reverse()) {
-          try {
-            await service.entities.SupplierReceipt.update(changed.debt.id, {
-              remaining_debt: changed.before,
-              status: receiptStatus(changed.before, money(changed.debt.debt_amount)),
-            });
-          } catch {}
-        }
-        try {
-          const latestShift = await service.entities.Shift.get(shift.id);
-          if (latestShift && Number(latestShift.expected_cash) === Number(shift.expected_cash || 0) - amount) {
-            await service.entities.Shift.update(shift.id, {
-              expected_cash: Number(shift.expected_cash || 0),
-              cash_removed: Number(shift.cash_removed || 0),
-            });
-          }
-        } catch {}
-        throw error;
-      }
+      const result = await runSupplierPayment(service, user, {
+        key: financialRequestKey(body), action, supplier_id: supplierId, shift_id: shiftId, amount, notes,
+      });
+      return Response.json(result);
     }
 
     return Response.json({ error: "Noma’lum amal." }, { status: 400 });
   } catch (error) {
     return Response.json({
       error: error instanceof Error ? error.message : "Yetkazib beruvchi amali bajarilmadi.",
+      operation_pending: Boolean((error as any)?.operation_pending),
+      operation_reversed: Boolean((error as any)?.operation_reversed),
     }, { status: Number((error as any)?.status) || 500 });
   }
 }

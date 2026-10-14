@@ -71,6 +71,12 @@
     "paid_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "request_fingerprint": {
+      "type": "string"
     }
   },
   "required": [

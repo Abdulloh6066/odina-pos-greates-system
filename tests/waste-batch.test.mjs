@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { memoryBackend } from './helpers/memory-backend.mjs';
 import { makeWasteRow, submitWasteRows, validateWasteRows, wasteRequest, wasteDateTime } from '../src/lib/waste.js';
 
 const NOW = Date.parse('2026-09-11T08:00:00.000Z');
@@ -40,48 +41,17 @@ function fixture() {
     ],
     WasteRecord: [], StockMovement: [], ActionHistory: [],
   };
-  let sequence = 0;
-  const clone = (value) => value == null ? value : structuredClone(value);
-  const match = (row, query) => Object.entries(query || {}).every(([key, value]) => row[key] === value);
-  const entities = Object.fromEntries(Object.keys(db).map((name) => [name, {
-    get: async (id) => clone(db[name].find((row) => row.id === id) || null),
-    list: async () => clone(db[name]),
-    filter: async (query) => clone(db[name].filter((row) => match(row, query))),
-    create: async (data) => {
-      const row = { ...clone(data), id: name + '-' + ++sequence };
-      db[name].push(row);
-      return clone(row);
-    },
-    update: async (id, data) => {
-      const row = db[name].find((item) => item.id === id);
-      assert.ok(row);
-      Object.assign(row, clone(data));
-      return clone(row);
-    },
-    updateMany: async (query, operations) => {
-      const rows = db[name].filter((row) => match(row, query));
-      for (const row of rows) {
-        Object.assign(row, clone(operations.$set || {}));
-        row.updated_date = new Date(NOW + ++sequence).toISOString();
-      }
-      return { success: true, updated: rows.length };
-    },
-  }]));
-  const client = { asServiceRole: { entities }, auth: { me: async () => clone(db.User[0]) } };
-  let source = readFileSync('base44/functions/waste-ledger/entry.ts', 'utf8')
-    .replace('import { createClientFromRequest } from "npm:@base44/sdk";', 'const createClientFromRequest = () => client;')
-    .replace('export default async function(req)', 'async function handler(req)');
-  source += '\nglobalThis.testHandler = handler; globalThis.testAgeSummary = ageSummary;';
-  const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-  const context = vm.createContext({ client, Response, crypto: webcrypto, console, Date: FixedDate });
-  vm.runInContext(code, context);
-  const call = async (body) => {
-    const response = await context.testHandler({ json: async () => body });
-    return { status: response.status, data: await response.json() };
-  };
-  return { db, entities, call, age: context.testAgeSummary };
+  const runtime = memoryBackend(db, { now: new Date(NOW).toISOString(), copySeed: false });
+  // Export the private pure helper only inside the test module; application source stays intact.
+  const source = readFileSync('base44/functions/waste-ledger/entry.ts', 'utf8');
+  const helperEnd = source.indexOf('const getRetailShops =');
+  assert.ok(helperEnd > source.indexOf('const ageSummary ='));
+  const helperSource = source.slice(0, helperEnd).replace(/^import .+;$/gm, '') + '\nglobalThis.testAgeSummary = ageSummary;';
+  const context = vm.createContext({ Date: FixedDate });
+  vm.runInContext(ts.transpileModule(helperSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, context);
+  return { db, entities: runtime.entities,
+    call: (body) => runtime.invoke('base44/functions/waste-ledger/entry.ts', body), age: context.testAgeSummary };
 }
-
 const bodyFor = (f, productId = 'cake', quantity = 2) => {
   const stock = f.db.ProductStock.find((row) => row.location_id === 'shop' && row.product_id === productId);
   return {

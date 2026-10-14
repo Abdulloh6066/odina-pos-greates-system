@@ -1,5 +1,5 @@
 import { displayOrderNumber } from '@/lib/orders';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import OrderForm from '@/components/orders/OrderForm';
@@ -13,6 +13,8 @@ import OrderLedgerCard from '@/components/orders/OrderLedgerCard';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import { shiftDateKey, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import { useToast } from '@/components/ui/use-toast';
+import { FINISHED_ORDER_STATUSES, ordersHistoryQuery, readAllEntityPages } from '@/lib/history-pagination';
+import { useEntityHistory } from '@/hooks/useEntityHistory';
 import '@/styles/orders-premium-ledger.css';
 
 const TYPE_OPTIONS = [
@@ -35,16 +37,18 @@ const PAY_OPTIONS = [
   { value: 'partial', label: 'Qisman' },
   { value: 'paid', label: 'To‘langan' },
 ];
-const FINISHED = ['yakunlandi', 'bekor_qilindi'];
+const FINISHED = FINISHED_ORDER_STATUSES;
 
 export default function Orders() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role === 'admin';
 
-  const [orders, setOrders] = useState([]);
+  const [activeOrders, setActiveOrders] = useState([]);
+  const [activeLoading, setActiveLoading] = useState(true);
+  const [activeError, setActiveError] = useState('');
+  const activeRequest = useRef(0);
   const [shops, setShops] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [view, setView] = useState('today');
   const [query, setQuery] = useState('');
   const [shopFilter, setShopFilter] = useState('');
@@ -56,19 +60,29 @@ export default function Orders() {
   const [detailOrder, setDetailOrder] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
-  const { alerts, counts } = useOrderAlerts(orders);
+  const { alerts, counts } = useOrderAlerts(activeOrders);
+  const today = uzbekistanDateKey();
+  const tomorrow = shiftDateKey(today, 1);
+  const { rows: orders, loading, loadingMore, error: loadError, hasMore, reload, loadMore } = useEntityHistory(
+    base44.entities.CustomerOrder,
+    ordersHistoryQuery({ view, today, tomorrow, query, shop: shopFilter, type: typeFilter, status: statusFilter, pay: payFilter, date: dateFilter }),
+    view === 'history' ? '-required_date' : 'required_date',
+  );
 
-  const loadOrders = async () => {
-    setLoading(true);
+  const loadActiveOrders = async () => {
+    const request = ++activeRequest.current;
+    setActiveLoading(true);
+    setActiveError('');
     try {
-      const list = await base44.entities.CustomerOrder.list('-created_date', 500);
-      setOrders(list || []);
+      const list = await readAllEntityPages(base44.entities.CustomerOrder, { order_status: { $nin: FINISHED } }, 'id', () => request === activeRequest.current);
+      if (request === activeRequest.current) setActiveOrders(list);
     } catch (e) {
-      toast({ title: 'Buyurtmalarni yuklab bo‘lmadi', description: e?.message, variant: 'destructive' });
+      if (request === activeRequest.current) setActiveError(e?.message || 'Faol buyurtmalarni yuklab bo‘lmadi.');
     } finally {
-      setLoading(false);
+      if (request === activeRequest.current) setActiveLoading(false);
     }
   };
+  const loadOrders = async () => { await Promise.all([reload(), loadActiveOrders()]); };
 
   const loadShops = async () => {
     if (!isAdmin) return;
@@ -78,17 +92,19 @@ export default function Orders() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { loadOrders(); loadShops(); }, []);
+  useEffect(() => {
+    void loadActiveOrders();
+    void loadShops();
+    return () => { activeRequest.current += 1; };
+  }, [user?.id, isAdmin]);
 
-  const today = uzbekistanDateKey();
-  const tomorrow = shiftDateKey(today, 1);
   const isActive = (order) => !FINISHED.includes(order.order_status);
   const tabs = [
-    { key: 'today', label: 'Bugun', count: orders.filter((o) => isActive(o) && o.required_date === today).length },
-    { key: 'tomorrow', label: 'Ertaga', count: orders.filter((o) => isActive(o) && o.required_date === tomorrow).length },
-    { key: 'other', label: 'Boshqa kunlar', count: orders.filter((o) => isActive(o) && o.required_date !== today && o.required_date !== tomorrow).length },
-    { key: 'history', label: 'Tarix', count: orders.filter((o) => !isActive(o)).length },
-    { key: 'all', label: 'Barchasi', count: orders.length },
+    { key: 'today', label: 'Bugun', count: activeOrders.filter((o) => o.required_date === today).length },
+    { key: 'tomorrow', label: 'Ertaga', count: activeOrders.filter((o) => o.required_date === tomorrow).length },
+    { key: 'other', label: 'Boshqa kunlar', count: activeOrders.filter((o) => o.required_date !== today && o.required_date !== tomorrow).length },
+    { key: 'history', label: 'Tarix' },
+    { key: 'all', label: 'Barchasi' },
   ];
 
   const filtered = useMemo(() => {
@@ -157,7 +173,7 @@ export default function Orders() {
           {tabs.map((tab) => (
             <button key={tab.key} type="button" className={`opl-tab ${view === tab.key ? 'is-active' : ''}`}
               aria-current={view === tab.key ? 'page' : undefined} onClick={() => selectView(tab.key)}>
-              {tab.label}<span className="opl-tab-count">{tab.count}</span>
+              {tab.label}{tab.count != null && <span className="opl-tab-count">{activeLoading || activeError ? '…' : tab.count}</span>}
             </button>
           ))}
         </nav>
@@ -178,16 +194,19 @@ export default function Orders() {
           onClear={clearFilters}
           hasFilters={hasFilters}
         />
-        {view === 'today' && !query && <OrderAlertSummary alerts={alerts} counts={counts} onOpen={setDetailOrder} loading={loading} />}
+        {(loadError || activeError) && <div role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive">
+          {loadError || activeError} <button type="button" className="underline min-h-11 px-3" onClick={loadOrders} disabled={loading || activeLoading}>Qayta urinish</button>
+        </div>}
+        {view === 'today' && !query && !activeError && <OrderAlertSummary alerts={alerts} counts={counts} onOpen={setDetailOrder} loading={activeLoading} />}
         <section className="opl-ledger" aria-live="polite">
           <div className="opl-ledger-head">
             <div>
               <h2 className="opl-ledger-title">{view === 'date' ? `${dateFilter} dagi buyurtmalar` : tabs.find((tab) => tab.key === view)?.label}</h2>
               <p className="opl-ledger-subtitle">{view === 'history' ? 'Yakunlangan va bekor qilingan buyurtmalar' : 'Olish yoki yetkazish vaqti bo‘yicha tartiblangan'}</p>
             </div>
-            <span className="opl-ledger-count">{filtered.length} ta</span>
+            <span className="opl-ledger-count">Ko‘rsatilgan: {filtered.length} ta{hasMore ? '+' : ''}</span>
           </div>
-          {loading ? <div className="opl-loading"><div className="opl-spinner" /><p>Buyurtmalar yuklanmoqda…</p></div> : filtered.length === 0 ? (
+          {loading ? <div className="opl-loading"><div className="opl-spinner" /><p>Buyurtmalar yuklanmoqda…</p></div> : !loadError && filtered.length === 0 ? (
             <div className="opl-empty">
               <strong>{hasFilters ? 'Mos buyurtma topilmadi' : 'Bu bo‘limda buyurtma yo‘q'}</strong>
               <p>{hasFilters ? 'Boshqa sana yoki qidiruvni sinab ko‘ring.' : 'Boshqa sanalarni ko‘ring yoki yangi buyurtma qo‘shing.'}</p>
@@ -198,6 +217,12 @@ export default function Orders() {
               <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} />
             ))}</div>
           )}
+          {!loading && hasMore && <div className="text-center mt-4">
+            <button type="button" className="min-h-11 rounded-xl border border-border px-5 text-sm" disabled={loadingMore} onClick={loadMore}>
+              {loadingMore ? 'Yuklanmoqda…' : 'Yana buyurtmalarni ko‘rsatish'}
+            </button>
+            <p className="text-xs text-muted-foreground mt-2">Qidiruv butun tarix bo‘yicha ishlaydi.</p>
+          </div>}
         </section>
       </div>
       <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
@@ -211,4 +236,3 @@ export default function Orders() {
     </div>
   );
 }
-

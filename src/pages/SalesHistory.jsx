@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
@@ -13,13 +13,12 @@ import { Button } from '@/components/ui/button';
 import { RefundDialog } from '@/components/pos/KassaActionDialogs';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
+import { salesHistoryQuery } from '@/lib/history-pagination';
+import { useEntityHistory } from '@/hooks/useEntityHistory';
 
 export default function SalesHistory({ embedded = false }) {
   const { user } = useOutletContext();
   const role = user?.role || 'cashier';
-  const [sales, setSales] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [selected, setSelected] = useState(null);
@@ -27,19 +26,9 @@ export default function SalesHistory({ embedded = false }) {
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    setLoadError('');
-    try {
-      const all = await base44.entities.Sale.list('-created_date', 500);
-      setSales(all || []);
-    } catch (error) {
-      setLoadError(error?.response?.data?.error || error?.message || 'Tarixni yuklab bo‘lmadi.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => { load(); }, []);
+  const { rows: sales, loading, loadingMore, error: loadError, hasMore, reload: load, loadMore } = useEntityHistory(
+    base44.entities.Sale, salesHistoryQuery({ user, date: filterDate, search }), '-created_date',
+  );
 
   const visible = useMemo(() => {
     let list = sales;
@@ -88,11 +77,11 @@ export default function SalesHistory({ embedded = false }) {
   return (
     <div className={embedded ? 'odina-workbench odina-operations odina-saleshistory min-w-0 space-y-4' : 'odina-page odina-workbench odina-operations odina-saleshistory p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in'}>
       {embedded
-        ? <p className="text-sm text-muted-foreground">{formatNum(visible.length)} ta savdo · {formatUZS(totalRev)}</p>
+        ? <p className="text-sm text-muted-foreground">Ko‘rsatilgan: {formatNum(visible.length)} ta savdo · {formatUZS(totalRev)}</p>
         : <PageHeader title="Savdolar tarixi" eyebrow="KASSA JURNALI" subtitle="Savdo, to‘lov va qaytarish tafsilotlarini bir joyda ko‘ring." icon={ReceiptText} />}
       {!embedded && <div className="odina-operations-metrics odina-sales-metrics grid grid-cols-2 mb-5">
-        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Tanlangan savdolar</p><p className="odina-metric-value">{formatNum(visible.length)} ta</p></div>
-        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Savdo tushumi</p><p className="odina-metric-value">{formatUZS(totalRev)}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Ko‘rsatilgan savdolar</p><p className="odina-metric-value">{formatNum(visible.length)} ta{hasMore ? '+' : ''}</p></div>
+        <div className="odina-operations-metric"><p className="text-xs text-muted-foreground">Ko‘rsatilgan savdolar tushumi</p><p className="odina-metric-value">{formatUZS(totalRev)}</p></div>
       </div>}
       {loadError && <div role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive">
         {loadError} <Button variant="outline" onClick={load} disabled={loading}>Qayta urinish</Button>
@@ -113,7 +102,7 @@ export default function SalesHistory({ embedded = false }) {
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-secondary animate-pulse" />)}
         </div>
-      ) : visible.length === 0 ? (
+      ) : !loadError && visible.length === 0 ? (
         <div className="odina-operations-empty text-center py-20">
           <ReceiptText aria-hidden="true" className="w-9 h-9 mx-auto mb-3 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Savdo topilmadi.</p>
@@ -146,6 +135,12 @@ export default function SalesHistory({ embedded = false }) {
           ))}
         </div>
       )}
+      {!loading && hasMore && <div className="text-center mt-4">
+        <Button variant="outline" className="min-h-11 rounded-xl" disabled={loadingMore} onClick={loadMore}>
+          {loadingMore ? 'Yuklanmoqda…' : 'Yana savdolarni ko‘rsatish'}
+        </Button>
+        <p className="text-xs text-muted-foreground mt-2">Natijalar sahifalab yuklanadi. Qidiruv butun tarix bo‘yicha ishlaydi.</p>
+      </div>}
 
       <SaleDetailDialog sale={selected} canRefund={['admin', 'manager'].includes(role)} onRefund={refundSale}
         onStaffTicket={(sale) => { setSelected(null); setStaffTicketSale(sale); }} onClose={() => setSelected(null)} />
