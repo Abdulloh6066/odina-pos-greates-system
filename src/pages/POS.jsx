@@ -6,7 +6,7 @@ import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, Clou
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
-import { fetchCurrentPosShift } from '@/lib/current-pos-shift';
+import { fetchCurrentPosShift, openPosShift } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
 import { canPreviewBurgerFries, repriceBurgerCartForShop, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
@@ -1309,6 +1309,7 @@ export default function POS() {
     saleSubmittingRef.current = true;
     const checkoutTimingStarted = performance.now();
     let checkoutServerMs = null;
+    let checkoutBackendTiming = null;
     let saleCommitted = false;
     setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
@@ -1377,6 +1378,7 @@ export default function POS() {
         reportRequestSuccess();
         checkoutServerMs = Math.round(performance.now() - serverTimingStarted);
         const payload = result?.data || result;
+        checkoutBackendTiming = payload?.backend_timing || null;
         if (!payload?.sale?.id) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
         saleCommitted = true;
         applyCompletedSale(payload, printReceipt);
@@ -1405,6 +1407,7 @@ export default function POS() {
       setPaying(false);
       console.info('[Odina checkout timing]', JSON.stringify({
         server_ms: checkoutServerMs,
+        backend: checkoutBackendTiming,
         total_ms: Math.round(performance.now() - checkoutTimingStarted),
         completed: saleCommitted,
         print_receipt: printReceipt,
@@ -1423,25 +1426,11 @@ export default function POS() {
     }
     setShiftLoading(true);
     try {
-      const result = await base44.functions.invoke('complete-sale', {
-        action: 'open_shift',
-        shop_id: shop?.id,
-        starting_cash,
-      });
-      const payload = result?.data || result;
-      if (!payload?.shift) throw new Error(payload?.error || 'Smenani ochib bo‘lmadi.');
-      setShift(payload.shift);
+      const currentShift = await openPosShift(base44, { shopId: shop?.id, startingCash: starting_cash });
+      setShift(currentShift);
+      setShiftReadState('ready');
       setOpenShiftOpen(false);
     } catch (e) {
-      // Another tab may already have opened it. Restore that shift instead of
-      // leaving the cashier trapped behind the duplicate-open error.
-      if ((e?.response?.status || e?.status) === 409) {
-        const currentShift = await loadCurrentShift().catch(() => null);
-        if (currentShift) {
-          setOpenShiftOpen(false);
-          return;
-        }
-      }
       void odinaAlert('Smenani ochib bo‘lmadi: ' + syncErrorMessage(e));
     }
     finally { setShiftLoading(false); }
