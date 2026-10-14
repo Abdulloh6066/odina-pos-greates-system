@@ -1961,6 +1961,7 @@ export default async function(req) {
       error: transient
         ? "Server ma’lumotlar bazasiga vaqtincha ulanib bo‘lmadi. Savdo holatini tekshiring va shu so‘rov bilan qayta urinib ko‘ring."
         : error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",
+      ...(transient ? { server_recovery_attempted: readTracker.snapshot().read_retries > 0 } : {}),
     }, { status: transient ? 503 : Number((error as any)?.status || 500) });
   } finally {
     if (trackedAction) console.info("[Odina backend timing]", JSON.stringify({
