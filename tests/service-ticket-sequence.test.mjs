@@ -6,7 +6,9 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 
-const source = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8').replace(/export /g, '');
+const source = readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
+  .replace(/export\s*\{[^}]+\}\s*from\s*['"][^'"]+['"];?/g, '')
+  .replace(/export /g, '');
 const compiled = ts.transpileModule(`${source}\nglobalThis.serviceTicket = { allocateServiceTicketNumber, finishServiceTicketCycleIfLastShift };`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
 }).outputText;
