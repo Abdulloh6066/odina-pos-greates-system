@@ -35,15 +35,17 @@ export async function allocateServiceTicketNumber(service: any, shopId: string, 
           + (Array.isArray(shop.restaurant_table_orders)
             ? shop.restaurant_table_orders.filter((order: any) => !Number.isSafeInteger(order?.ticket_number)).length : 0)
         : 0;
-      if (!Number.isSafeInteger(legacyBaseline) || legacyBaseline > 1_000_000_000) {
+      if (!Number.isSafeInteger(legacyBaseline) || legacyBaseline >= 1_000_000_000) {
         throw httpError("Buyurtma raqamlashini tekshirish kerak. Egaga xabar bering.", 409);
       }
+      // Start the cycle and claim its first ticket in the same version-checked
+      // write. A competing cashier rereads after a failed claim as before.
       const activated = await service.entities.Shop.updateMany(
         { id: shopId, ...serviceTicketVersionQuery(version) },
-        { $set: { service_ticket_cycle_active: true, service_ticket_counter: legacyBaseline },
+        { $set: { service_ticket_cycle_active: true, service_ticket_counter: legacyBaseline + 1 },
           $inc: { service_ticket_version: 1 } },
       );
-      if (activated?.success && Number(activated.updated || 0) === 1) continue;
+      if (activated?.success && Number(activated.updated || 0) === 1) return legacyBaseline + 1;
       continue; // Another cashier initialized this shop; read its counter again.
     }
     if (counter >= 1_000_000_000) throw httpError("Xizmat cheki raqamlash chegarasiga yetdi.", 409);
