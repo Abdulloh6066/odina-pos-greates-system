@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBackend } from './helpers/memory-backend.mjs';
 import { checkoutFixture } from './checkout-read-latency.test.mjs';
-import { openPosShift } from '../src/lib/current-pos-shift.js';
+import { openPosShift, fetchCurrentPosShift } from '../src/lib/current-pos-shift.js';
 const entry = 'base44/functions/complete-sale/entry.ts';
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
@@ -152,4 +152,29 @@ test('purchase prices and recipe items load together while immutable sale costs 
   assert.equal((await pending).status, 200);
   assert.equal(f.db.SaleItem[0].unit_cost_at_sale, 500);
   assert.equal(f.db.SaleItem[0].cost_is_estimate, false);
+});
+
+test('current shift retries a lost gateway response once and preserves a confirmed existing shift', async () => {
+  let reads = 0;
+  const current = { id: 'saved', status: 'open', shop_id: 'shop' };
+  const client = { functions: { invoke: async (_name, body) => {
+    assert.deepEqual(body, { action: 'get_current_shift' });
+    if (++reads === 1) throw { response: { status: 503 } };
+    return { data: { ok: true, shift: current } };
+  } } };
+  assert.deepEqual(await fetchCurrentPosShift(client), current);
+  assert.equal(reads, 2);
+});
+
+test('current shift does not multiply exhausted server retries or retry invalid and denied responses', async () => {
+  for (const mode of ['server exhausted', 'forbidden', 'malformed', 'gateway persists']) {
+    let calls = 0; const client = { functions: { invoke: async () => {
+      calls++;
+      if (mode === 'malformed') return { data: { ok: false } };
+      throw { response: { status: mode === 'forbidden' ? 403 : 503,
+        data: { server_recovery_attempted: mode === 'server exhausted' } } };
+    } } };
+    await assert.rejects(fetchCurrentPosShift(client));
+    assert.equal(calls, mode === 'gateway persists' ? 2 : 1, mode);
+  }
 });
