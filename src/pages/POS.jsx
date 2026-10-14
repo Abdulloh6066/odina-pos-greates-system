@@ -6,7 +6,7 @@ import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, Clou
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
-import { fetchCurrentPosShift, openPosShift } from '@/lib/current-pos-shift';
+import { fetchCurrentPosShift, openPosShift, invokePosRead } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
 import { canPreviewBurgerFries, repriceBurgerCartForShop, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
@@ -1176,7 +1176,7 @@ export default function POS() {
         }
       }
 
-      const result = await base44.functions.invoke('complete-sale', {
+      const result = await invokePosRead(base44, {
         action: 'check_stock',
         shift_id: shift.id,
         ...(savedTakeaway ? { takeaway_order_id: savedTakeaway.id, takeaway_order_revision: savedTakeaway.revision } : {}),
