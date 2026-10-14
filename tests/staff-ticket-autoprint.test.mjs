@@ -4,11 +4,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { staffTicketFromSale, staffTicketFromCustomerOrder } from '../src/lib/staff-order-ticket.js';
+import { staffTicketFromSale, staffTicketFromCustomerOrder, isStaffTicketEnabled } from '../src/lib/staff-order-ticket.js';
 
 const source = readFileSync('src/components/tables/StaffOrderTicketModal.jsx', 'utf8');
 const hookBody = source.slice(source.indexOf('function getTicketPrintCount('), source.indexOf('  // One shared'))
-  .replace('export default function StaffOrderTicketModal', 'function StaffOrderTicketModal')
+  .replace(/export default function StaffOrderTicketModal\(props\)[\s\S]*?\n\}\n/, '')
+  .replace('function EnabledStaffOrderTicketModal', 'function StaffOrderTicketModal')
   + '\n return { ticketReady, ticketOrder, error, handlePrint }; }\nglobalThis.Component = StaffOrderTicketModal;';
 const order = id => ({ id, shop_id: 'shop-1', items: [{ product_name: id, quantity: 1 }], revision: 1 });
 
@@ -112,7 +113,7 @@ test('POS queues service printing without confirmation, preserves receipt prefer
   const body = pos.slice(pos.indexOf('  const finishSalePresentation ='), pos.indexOf('  const finishQueuedSale ='));
   let receipt; let staff; let navigated = 0;
   const ctx = { setReceiptPrintSale: value => { receipt = value; }, setStaffTicket: value => { staff = value; },
-    selectedTable: null, navigate: () => { navigated++; }, posHomePath: '/POS', setTablePickerOpen: () => {},
+    isStaffTicketEnabled, selectedTable: null, navigate: () => { navigated++; }, posHomePath: '/POS', setTablePickerOpen: () => {},
     checkoutCancelledRef: {}, checkoutReadyRef: {} };
   vm.runInNewContext(body + '\nglobalThis.present = presentCompletedSale; globalThis.finish = finishSalePresentation;', ctx);
   const sale = order('paid');
