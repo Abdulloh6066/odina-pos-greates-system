@@ -9,6 +9,9 @@ export async function fetchCurrentPosShift(client) {
     } catch (error) {
       const status = Number(error?.response?.status || error?.status || 0);
       const transient = !status || [408, 429, 502, 503, 504].includes(status);
+      console.warn('[Odina shift read failure]', JSON.stringify({ status,
+        message: String(error?.response?.data?.error || error?.message || 'Unknown shift response'),
+        server_recovery_attempted: Boolean(error?.response?.data?.server_recovery_attempted) }));
       // Do not multiply retries after the backend already exhausted its read
       // recovery budget. Only a lost/gateway response gets one fresh read here.
       if (attempt || !transient || error?.response?.data?.server_recovery_attempted) throw error;
@@ -18,6 +21,8 @@ export async function fetchCurrentPosShift(client) {
   const payload = response?.data || response;
   if (payload?.ok !== true || !Object.prototype.hasOwnProperty.call(payload, 'shift')
       || (payload.shift !== null && (!payload.shift?.id || payload.shift.status !== 'open'))) {
+    console.warn('[Odina invalid shift response]', JSON.stringify({ ok: payload?.ok,
+      has_shift: Object.prototype.hasOwnProperty.call(payload || {}, 'shift'), status: payload?.shift?.status }));
     throw new Error(payload?.error || 'Smena holatini tekshirib bo‘lmadi.');
   }
   return payload.shift;
