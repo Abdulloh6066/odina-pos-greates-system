@@ -177,9 +177,10 @@ function loadHandler(client, now) {
   let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
     .replace(/^import .*manager-request-scope.*;$/gm, '')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
-    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
+    .replace(/import \{[^}]*\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '')
     .replace(/^import .*checkout-recipes.*;$/gm, '')
+    .replace(/^import .*checkout-reads.*;$/gm, '')
     .replace(/^import .*burger-fries.*;$/gm, '')
     .replace(
       /async function verifyOwnerPin\(service: any, pinValue: unknown, actor: any\) \{[\s\S]*?\n\}\n\nconst IDEMPOTENCY_KEY_PATTERN/,
@@ -202,6 +203,7 @@ function loadHandler(client, now) {
   const context = vm.createContext({
     ...memoryBackend().load('base44/shared/sale-ingredient-flow.ts'),
     ...memoryBackend().load('base44/shared/checkout-recipes.ts'),
+    ...memoryBackend().load('base44/shared/checkout-reads.ts'),
     ...memoryBackend().load('base44/shared/burger-fries.js'),
     Date: now ? class extends Date { static now() { return Date.parse(now); } } : Date,
     client,
