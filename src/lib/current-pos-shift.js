@@ -1,23 +1,31 @@
 // The backend resolves the authenticated staff record and owns the shift lookup.
 // Do not substitute an empty entity list for an unconfirmed or failed lookup.
-export async function fetchCurrentPosShift(client) {
+export async function invokePosRead(client, body) {
+  if (!['get_current_shift', 'check_stock'].includes(body?.action)) {
+    throw new Error('Only read-only Kassa actions can use automatic read recovery.');
+  }
   let response;
   for (let attempt = 0; ; attempt++) {
     try {
-      response = await client.functions.invoke('complete-sale', { action: 'get_current_shift' });
+      response = await client.functions.invoke('complete-sale', body);
       break;
     } catch (error) {
       const status = Number(error?.response?.status || error?.status || 0);
       const transient = !status || [408, 429, 502, 503, 504].includes(status);
-      console.warn('[Odina shift read failure]', JSON.stringify({ status,
+      console.warn('[Odina Kassa read failure]', JSON.stringify({ action: body.action, status,
         message: String(error?.response?.data?.error || error?.message || 'Unknown shift response'),
         server_recovery_attempted: Boolean(error?.response?.data?.server_recovery_attempted) }));
       // Do not multiply retries after the backend already exhausted its read
       // recovery budget. Only a lost/gateway response gets one fresh read here.
       if (attempt || !transient || error?.response?.data?.server_recovery_attempted) throw error;
-      console.warn('[Odina shift read retry]', JSON.stringify({ status }));
+      console.warn('[Odina Kassa read retry]', JSON.stringify({ action: body.action, status }));
     }
   }
+  return response;
+}
+
+export async function fetchCurrentPosShift(client) {
+  const response = await invokePosRead(client, { action: 'get_current_shift' });
   const payload = response?.data || response;
   if (payload?.ok !== true || !Object.prototype.hasOwnProperty.call(payload, 'shift')
       || (payload.shift !== null && (!payload.shift?.id || payload.shift.status !== 'open'))) {
