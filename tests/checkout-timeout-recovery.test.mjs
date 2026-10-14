@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBackend } from './helpers/memory-backend.mjs';
 import { checkoutFixture } from './checkout-read-latency.test.mjs';
-import { openPosShift, fetchCurrentPosShift } from '../src/lib/current-pos-shift.js';
+import { openPosShift, fetchCurrentPosShift, invokePosRead } from '../src/lib/current-pos-shift.js';
 const entry = 'base44/functions/complete-sale/entry.ts';
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
@@ -177,4 +177,22 @@ test('current shift does not multiply exhausted server retries or retry invalid 
     await assert.rejects(fetchCurrentPosShift(client));
     assert.equal(calls, mode === 'gateway persists' ? 2 : 1, mode);
   }
+});
+
+test('stock precheck recovers a gateway response once without sending a sale or inventing stock', async () => {
+  const body = { action: 'check_stock', shift_id: 'shift', items: [{ product_id: 'cake', quantity: 1 }] };
+  let reads = 0; const reply = { data: { ok: true, shortages: [], allow_negative_stock: false } };
+  const client = { functions: { invoke: async (_name, request) => {
+    assert.deepEqual(request, body);
+    if (++reads === 1) throw { response: { status: 502 } };
+    return reply;
+  } } };
+  assert.equal(await invokePosRead(client, body), reply); assert.equal(reads, 2);
+});
+test('read recovery refuses sale, shift creation, and discount validation actions before invoking the SDK', async () => {
+  let sent = 0; const client = { functions: { invoke: async () => { sent++; } } };
+  for (const action of ['complete_sale', 'open_shift', 'validate_discount']) {
+    await assert.rejects(invokePosRead(client, { action }), /read-only/);
+  }
+  assert.equal(sent, 0);
 });
