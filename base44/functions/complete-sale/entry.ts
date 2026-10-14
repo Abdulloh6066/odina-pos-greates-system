@@ -1,5 +1,6 @@
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { createCheckoutReadTracker, isTransientCheckoutError } from "../../shared/checkout-reads.ts";
 
 // Expiry uses the server clock, through the selected day's end in Uzbekistan.
 function isDiscountExpired(discount: any, now = Date.now()) {
@@ -12,7 +13,7 @@ function isDiscountExpired(discount: any, now = Date.now()) {
 }
 
 
-const COMPLETE_SALE_RUNTIME_VERSION = "offline-sales-v1-2026-09-12";
+const COMPLETE_SALE_RUNTIME_VERSION = "checkout-latency-v2-2026-10-14";
 
 const PAYMENT_METHODS = new Set([
   "cash",
@@ -87,33 +88,41 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
   }
   if (!recipesByProduct.size) return unitCostByProduct;
   try {
-    const ingredientCosts = await loadIngredientCosts(service);
-    const baseCostByProduct = new Map<string, any>();
     const costProductIds = productIds.filter(id => recipesByProduct.has(id));
-    for (let start = 0; start < costProductIds.length; start += 4) {
-      const batch = costProductIds.slice(start, start + 4);
-      const costs = await Promise.allSettled(batch.map(async (productId) => {
-        const recipe = recipesByProduct.get(productId);
-        const [rawItems, product] = await Promise.all([
-          recipeLoader.itemsForRecipe(recipe.id),
-          productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
-        ]);
-        const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts);
-        const outputUnit = String(recipe.output_unit || product?.production_unit || "piece");
-        return {
-          costPerPiece: costPerPiece(batchCost, num(recipe.output_quantity), outputUnit,
-            num(product?.pieces_per_sheet) || 20),
-          hasPrice: hasAllPrices && rawItems.length > 0,
-          missing, outputUnit,
-        };
-      }));
-      for (const [index, result] of costs.entries()) {
-        if (result.status === "fulfilled") {
-          baseCostByProduct.set(batch[index], result.value);
-        } else {
-          console.warn("Cost snapshot skipped:", result.reason);
+    // Read raw cards while purchase prices load; the same per-request recipe
+    // loader remains authoritative for both costing and ingredient deductions.
+    const [ingredientCosts, cardsByProduct] = await Promise.all([
+      loadIngredientCosts(service),
+      (async () => {
+        const cards = new Map<string, any>();
+        for (let start = 0; start < costProductIds.length; start += 4) {
+          const batch = costProductIds.slice(start, start + 4);
+          const results = await Promise.allSettled(batch.map(async (productId) => {
+            const recipe = recipesByProduct.get(productId);
+            const [rawItems, product] = await Promise.all([
+              recipeLoader.itemsForRecipe(recipe.id),
+              productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
+            ]);
+            return { recipe, rawItems, product };
+          }));
+          for (const [index, result] of results.entries()) {
+            if (result.status === "fulfilled") cards.set(batch[index], result.value);
+            else console.warn("Cost snapshot skipped:", result.reason);
+          }
         }
-      }
+        return cards;
+      })(),
+    ]);
+    const baseCostByProduct = new Map<string, any>();
+    for (const [productId, { recipe, rawItems, product }] of cardsByProduct) {
+      const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts);
+      const outputUnit = String(recipe.output_unit || product?.production_unit || "piece");
+      baseCostByProduct.set(productId, {
+        costPerPiece: costPerPiece(batchCost, num(recipe.output_quantity), outputUnit,
+          num(product?.pieces_per_sheet) || 20),
+        hasPrice: hasAllPrices && rawItems.length > 0,
+        missing, outputUnit,
+      });
     }
     // Cached items remain RAW: ingredient deduction and costing each apply
     // their own optional-fries rule exactly once for each sale line.
@@ -432,7 +441,9 @@ async function changeLockedTable(service: any, shopId: string, orderId: string, 
 
 export default async function(req) {
   const base44 = createClientFromRequest(req);
-  const service = base44.asServiceRole;
+  let service = base44.asServiceRole;
+  const readTracker = createCheckoutReadTracker(service);
+  let trackedAction = "";
   let sale: any = null;
   let saleItems: any[] = [];
   let paymentRecords: any[] = [];
@@ -452,6 +463,12 @@ export default async function(req) {
     if (!authenticatedUser) {
       return Response.json({ error: "Authentication required." }, { status: 401 });
     }
+    const body = await req.json();
+    const action = String(body?.action || "complete_sale");
+    if (["complete_sale", "check_stock", "open_shift", "get_current_shift", "runtime_status"].includes(action)) {
+      service = readTracker.service;
+      trackedAction = action;
+    }
     const user = await resolveAppUser(service, authenticatedUser);
     if (user.active === false) {
       return Response.json({ error: "Xodim akkaunti faol emas." }, { status: 403 });
@@ -460,9 +477,7 @@ export default async function(req) {
       return Response.json({ error: "Your role cannot complete Kassa sales." }, { status: 403 });
     }
 
-    const body = await req.json();
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
-    const action = String(body?.action || "complete_sale");
 
     if (action === "runtime_status") {
       return Response.json({ ok: true, runtime_version: COMPLETE_SALE_RUNTIME_VERSION });
@@ -505,11 +520,20 @@ export default async function(req) {
         shop_id: shop.id, shop_name: shop.name, status: "open", opened_at: now,
         starting_cash: startingCash, expected_cash: startingCash,
       });
-      await service.entities.ActionHistory.create({
-        user_id: user.id, user_name: user.full_name || user.email,
-        action: "shift_opened", details: `${shop.name}, starting cash ${startingCash} UZS`,
-      });
-      return Response.json({ shift: newShift });
+      // The shift is already durable. An unavailable history API must not
+      // turn a successful opening into a second attempt to create that shift.
+      let auditLogged = true;
+      try {
+        await service.entities.ActionHistory.create({
+          user_id: user.id, user_name: user.full_name || user.email,
+          action: "shift_opened", details: `${shop.name}, starting cash ${startingCash} UZS`,
+        });
+      } catch (error) {
+        auditLogged = false;
+        console.error("[Odina shift audit failed]", JSON.stringify({ shift_id: newShift.id,
+          transient: isTransientCheckoutError(error) }));
+      }
+      return Response.json({ shift: newShift, audit_logged: auditLogged });
     }
 
     if (action === "get_shift_stock_report") {
@@ -1341,14 +1365,20 @@ export default async function(req) {
     // Receipt contacts come only from the shop assigned to the authenticated shift.
     // Snapshot them at sale time so changing a shop's Instagram/phone/address
     // never rewrites details on an already completed sale.
-    let receiptShop: any = null;
-    if (service.entities.Shop?.get) {
-      try {
-        receiptShop = await service.entities.Shop.get(shift.shop_id);
-      } catch (error) {
-        console.warn("Receipt shop details could not be loaded:", error);
-      }
-    }
+    const productsAtSale = new Map<string, any>();
+    const [receiptShop, ordinaryItems, allowNegativeStock] = await Promise.all([
+      (async () => {
+        if (!service.entities.Shop?.get) return null;
+        try { return await service.entities.Shop.get(shift.shop_id); }
+        catch (error) { console.warn("Receipt shop details could not be loaded:", error); return null; }
+      })(),
+      // Ordinary sale prices and shop contacts are independent reads after
+      // shift ownership is verified. Saved table prices wait for the shop.
+      !hasTable && !hasTakeaway
+        ? normalizeSaleItems(service, requestedItems, shift.shop_id, null, productsAtSale)
+        : Promise.resolve(null),
+      stockPolicy(service),
+    ]);
 
     if (hasTable && (!receiptShop || receiptShop.active === false
       || receiptShop.location_type !== "shop" || receiptShop.allows_pos === false
@@ -1388,21 +1418,23 @@ export default async function(req) {
         return Response.json({ error: "Stol savati saqlangan buyurtmadan farq qiladi. Avval saqlang." }, { status: 409 });
       }
     }
-    const productsAtSale = new Map<string, any>();
-    const [normalizedItems, allowNegativeStock] = await Promise.all([
-      normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null, productsAtSale),
-      stockPolicy(service),
-    ]);
+    const normalizedItems = ordinaryItems
+      || await normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null, productsAtSale);
     const recipeLoader = createCheckoutRecipeLoader(service, normalizedItems.map(item => item.product_id));
-    const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader);
+    const ingredientPreparation = prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader);
+    const [{ plans: stockPlans, shortages: stockWarnings }, unitCostByProduct, ingredientPrep] = await Promise.all([
+      // Branch recipes can turn off finished-product stock tracking. Wait for
+      // that decision while independent cost snapshots read the same raw cards.
+      ingredientPreparation.then(() => planSaleStock(service, shift.shop_id, normalizedItems)),
+      shift.shop_id === BRANCH_TECH_CARD_SHOP_ID
+        ? ingredientPreparation.then(() => loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader))
+        : loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader),
+      ingredientPreparation,
+    ]);
     if (ingredientPrep.shortages.length && !allowNegativeStock) {
       throw httpError("Branch omborida tex-karta masalliqlari yetarli emas: "
         + ingredientPrep.shortages.map((row: any) => row.ingredient_name).join(", "), 409);
     }
-    const [{ plans: stockPlans, shortages: stockWarnings }, unitCostByProduct] = await Promise.all([
-      planSaleStock(service, shift.shop_id, normalizedItems),
-      loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader),
-    ]);
     if (stockWarnings.length && !allowNegativeStock) {
       return Response.json({
         error: "Omborda mahsulot yetarli emas. Qoldiqsiz sotuv bloklangan.",
@@ -1849,6 +1881,7 @@ export default async function(req) {
       stock_warnings: stockWarnings,
       ingredient_warnings: ingredientPrep.shortages,
       allow_negative_stock: allowNegativeStock,
+      backend_timing: readTracker.snapshot(),
       stock_updates: stockChanges.map((change) => ({
         product_id: change.item.product_id,
         quantity: change.after,
@@ -1923,8 +1956,15 @@ export default async function(req) {
         }
       } catch { /* Fail closed for owner reconciliation. */ }
     }
+    const transient = Boolean(trackedAction) && isTransientCheckoutError(error);
     return Response.json({
-      error: error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",
-    }, { status: Number((error as any)?.status || 500) });
+      error: transient
+        ? "Server ma’lumotlar bazasiga vaqtincha ulanib bo‘lmadi. Savdo holatini tekshiring va shu so‘rov bilan qayta urinib ko‘ring."
+        : error instanceof Error ? error.message : "Savdoni yakunlab bo‘lmadi.",
+    }, { status: transient ? 503 : Number((error as any)?.status || 500) });
+  } finally {
+    if (trackedAction) console.info("[Odina backend timing]", JSON.stringify({
+      action: trackedAction, ...readTracker.snapshot(),
+    }));
   }
 }
