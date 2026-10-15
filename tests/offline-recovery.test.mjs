@@ -270,6 +270,16 @@ test('an online response without a real sale ID queues the ordinary sale instead
 });
 
 
+test('the actual POS checkout preserves its delivery marker in both the offline request and immediate receipt', async () => {
+  const f = checkout({ online: false, isDelivery: true });
+  await f.openCheckout();
+  const payment = f.completeSale([{ method: 'cash', amount: 1000 }], true);
+  f.gate.resolve(); await payment;
+  assert.equal(f.saved.length, 1);
+  assert.equal(f.saved[0].request.is_delivery, true);
+  assert.equal(f.printed[0].is_delivery, true);
+});
+
 test('unknown local storage state cannot be mistaken for an empty queue when closing a shift', async () => {
   const alerts = [], calls = [];
   const source = readFileSync('src/pages/POS.jsx', 'utf8');
