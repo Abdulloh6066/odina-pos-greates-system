@@ -206,7 +206,9 @@ function checkout({ pending = [], syncing = false, online = true, ...flags } = {
     productsById: { cake: { track_stock: false } }, stockByProduct: {}, settings: { allow_negative_stock: false },
     checkoutCancelledRef: { current: false }, checkoutReadyRef: { current: false }, checkoutRequestKeyRef: { current: '' }, checkoutRecordedAtRef: { current: '' },
     saleSubmittingRef: { current: false }, tableCartDirty: false, tableOrder: null, takeawayDirty: false, checkoutOffline: false,
-    shops: [{ id: 'shop' }], performance, console: { info: () => {}, error: () => {} },
+    shops: [{ id: 'shop' }], performance, console: { info: () => {}, error: () => {}, warn: () => {} },
+    timingUserRef: { current: 'cashier' }, createCheckoutTimingEventId: () => 'diagnostic-attempt-1234',
+    reportCheckoutTiming: () => Promise.resolve({}),
     ...flags,
   };
   Object.assign(ctx, { queueEligible: network.canQueuePosSale({ ...ctx, takeawayRequestId: ctx.takeawayRequestIdRef.current }),
