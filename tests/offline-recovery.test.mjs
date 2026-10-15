@@ -214,6 +214,7 @@ function checkout({ pending = [], syncing = false, online = true, ...flags } = {
     createSaleIdempotencyKey: () => `pos-checkout-record-${saved.length}`, reportRequestSuccess: () => {}, reportRequestError: () => {},
     setStockChecking: value => { ctx.stockChecking = value; }, setCheckoutOffline: value => { ctx.checkoutOffline = value; },
     setPayOpen: value => { ctx.payOpen = value; }, setOpenShiftOpen: () => {}, setMobileCartOpen: () => {}, setPaying: value => { ctx.paying = value; },
+    setLastCheckoutTiming: value => { ctx.lastCheckoutTiming = value; },
     syncOfflineSales: () => { throw new Error('Foreground must not wait for queue drain'); }, syncErrorMessage: error => error.message,
     base44: { functions: { invoke: (_, body) => { requests.push(body); throw new Error('Unexpected request'); } } },
     buildPendingSale: offline.buildPendingSale, isRetryableSyncError: offline.isRetryableSyncError, friesOptionFields: () => ({}),
@@ -236,6 +237,7 @@ test('next ordinary checkout immediately joins the queue even while background s
     assert.equal(f.ctx.cart.length, 1); assert.equal(f.printed.length, 0, 'nothing prints before durable storage acknowledgment');
     f.gate.resolve(); await payment;
     assert.equal(f.saved.length, 1); assert.equal(f.printed.length, 1); assert.equal(f.ctx.cart.length, 0);
+    assert.equal(f.ctx.lastCheckoutTiming.outcome, 'queued');
   }
 });
 
@@ -246,6 +248,7 @@ test('storage failure preserves the basket and request key instead of printing a
   f.gate.reject(new Error('Quota exceeded')); await payment;
   assert.equal(f.ctx.cart.length, 1); assert.equal(f.ctx.checkoutRequestKeyRef.current, key);
   assert.equal(f.saved.length, 0); assert.equal(f.printed.length, 0); assert.match(f.alerts[0], /Quota/);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'unconfirmed');
 });
 
 test('known session rejection and protected discounts cannot be bypassed by the queued-sale route', async () => {
@@ -267,6 +270,7 @@ test('an online response without a real sale ID queues the ordinary sale instead
   assert.equal(f.ctx.cart.length, 1); assert.equal(f.printed.length, 0);
   f.gate.resolve(); await pending;
   assert.equal(f.saved.length, 1); assert.equal(f.printed[0].offline_pending, true);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'queued');
 });
 
 
