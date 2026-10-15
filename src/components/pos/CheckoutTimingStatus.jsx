@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 export default function CheckoutTimingStatus({ timing, pending }) {
   const outcomes = {
@@ -17,6 +18,10 @@ export default function CheckoutTimingStatus({ timing, pending }) {
         <span className="font-medium">{result[0]}:</span>
         <span className="font-semibold tabular-nums whitespace-nowrap">{(Math.max(0, timing.totalMs) / 1000).toFixed(1).replace('.', ',')} soniya</span>
         <span className="text-muted-foreground">{result[1]}</span>
+        {timing.completedAt && <time dateTime={timing.completedAt} className="text-muted-foreground">
+          Oxirgi urinish: {formatUzbekistanDateTime(timing.completedAt, { second: '2-digit' })}
+        </time>}
+        {timing.persisted === false && <span className="text-muted-foreground">Vaqt faqat shu oynada: qurilmaga saqlab bo‘lmadi.</span>}
       </> : <span className="text-muted-foreground">
         {pending ? 'Yakunlash vaqti o‘lchanmoqda…' : 'Yakunlashdan so‘ng vaqt shu yerda ko‘rinadi.'}
       </span>}
