@@ -15,6 +15,7 @@ import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductGrid from '@/components/pos/ProductGrid';
 import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
+import CheckoutTimingStatus from '@/components/pos/CheckoutTimingStatus';
 import useStableEvent from '@/hooks/use-stable-event';
 import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
@@ -106,6 +107,7 @@ export default function POS() {
   const checkoutReadyRef = useRef(false);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [lastCheckoutTiming, setLastCheckoutTiming] = useState(null);
   const saleSubmittingRef = useRef(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
@@ -1312,6 +1314,7 @@ export default function POS() {
     const checkoutTimingStarted = performance.now();
     let checkoutServerMs = null;
     let checkoutBackendTiming = null;
+    let checkoutOutcome = 'unconfirmed';
     let saleCommitted = false;
     setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
@@ -1350,6 +1353,7 @@ export default function POS() {
         }
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
+        checkoutOutcome = 'queued';
         finishQueuedSale(pendingRecord, printReceipt);
         return;
       }
@@ -1383,12 +1387,14 @@ export default function POS() {
         checkoutBackendTiming = payload?.backend_timing || null;
         if (!payload?.sale?.id) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
         saleCommitted = true;
+        checkoutOutcome = payload.already_processed ? 'rechecked' : 'confirmed';
         applyCompletedSale(payload, printReceipt);
       } catch (error) {
         reportRequestError(error);
         if (saleCommitted || !pendingRecord || !isRetryableSyncError(error)) throw error;
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
+        checkoutOutcome = 'queued';
         finishQueuedSale(pendingRecord, printReceipt);
       }
     } catch (error) {
@@ -1407,10 +1413,12 @@ export default function POS() {
     } finally {
       saleSubmittingRef.current = false;
       setPaying(false);
+      const checkoutTotalMs = Math.round(performance.now() - checkoutTimingStarted);
+      setLastCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome, shiftId: shift?.id || '' });
       console.info('[Odina checkout timing]', JSON.stringify({
         server_ms: checkoutServerMs,
         backend: checkoutBackendTiming,
-        total_ms: Math.round(performance.now() - checkoutTimingStarted),
+        total_ms: checkoutTotalMs,
         completed: saleCommitted,
         print_receipt: printReceipt,
       }));
@@ -1667,6 +1675,8 @@ export default function POS() {
         )}
       </div>
 
+      <CheckoutTimingStatus pending={paying}
+        timing={lastCheckoutTiming?.shiftId === shift?.id ? lastCheckoutTiming : null} />
 
       {!selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
