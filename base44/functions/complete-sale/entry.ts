@@ -39,7 +39,7 @@ import {
 import { loadIngredientCosts, recipeCostFromMap, costPerPiece, num } from "../../shared/cost-engine.ts";
 import { createCheckoutRecipeLoader, type CheckoutRecipeLoader } from "../../shared/checkout-recipes.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
-import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries } from "../../shared/burger-fries.js";
+import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries, FRIES_INGREDIENT_ID } from "../../shared/burger-fries.js";
 import {
   prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
 } from "../../shared/sale-ingredient-flow.ts";
@@ -91,30 +91,35 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
   if (!recipesByProduct.size) return unitCostByProduct;
   try {
     const costProductIds = productIds.filter(id => recipesByProduct.has(id));
-    // Read raw cards while purchase prices load; the same per-request recipe
-    // loader remains authoritative for both costing and ingredient deductions.
-    const [ingredientCosts, cardsByProduct] = await Promise.all([
-      loadIngredientCosts(service),
-      (async () => {
-        const cards = new Map<string, any>();
-        for (let start = 0; start < costProductIds.length; start += 4) {
-          const batch = costProductIds.slice(start, start + 4);
-          const results = await Promise.allSettled(batch.map(async (productId) => {
-            const recipe = recipesByProduct.get(productId);
-            const [rawItems, product] = await Promise.all([
-              recipeLoader.itemsForRecipe(recipe.id),
-              productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
-            ]);
-            return { recipe, rawItems, product };
-          }));
-          for (const [index, result] of results.entries()) {
-            if (result.status === "fulfilled") cards.set(batch[index], result.value);
-            else console.warn("Cost snapshot skipped:", result.reason);
-          }
+    // Resolve the basket cards first so supplier reads are scoped to exactly
+    // their ingredients. The request-local recipe cache is shared with stock.
+    const cardsByProduct = await (async () => {
+      const cards = new Map<string, any>();
+      for (let start = 0; start < costProductIds.length; start += 4) {
+        const batch = costProductIds.slice(start, start + 4);
+        const results = await Promise.allSettled(batch.map(async (productId) => {
+          const recipe = recipesByProduct.get(productId);
+          const [rawItems, product] = await Promise.all([
+            recipeLoader.itemsForRecipe(recipe.id),
+            productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
+          ]);
+          return { recipe, rawItems, product };
+        }));
+        for (const [index, result] of results.entries()) {
+          if (result.status === "fulfilled") cards.set(batch[index], result.value);
+          else console.warn("Cost snapshot skipped:", result.reason);
         }
-        return cards;
-      })(),
-    ]);
+      }
+      return cards;
+    })();
+    const ingredientIds = new Set<string>();
+    for (const { rawItems } of cardsByProduct.values()) {
+      for (const row of rawItems) if (row.ingredient_id) ingredientIds.add(String(row.ingredient_id));
+    }
+    if (normalizedItems.some(item => item.fries_option === "with" && cardsByProduct.has(item.product_id))) {
+      ingredientIds.add(FRIES_INGREDIENT_ID);
+    }
+    const ingredientCosts = await loadIngredientCosts(service, [...ingredientIds]);
     const baseCostByProduct = new Map<string, any>();
     for (const [productId, { recipe, rawItems, product }] of cardsByProduct) {
       const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts);
