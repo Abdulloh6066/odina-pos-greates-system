@@ -91,7 +91,16 @@ test('existing fields, historical snapshot definitions and required fields are p
     const { rls: oldRules, properties: oldProperties, path: originalPath, ...oldRest } = original;
     assert.deepEqual(rest, oldRest, name + ': existing schema settings');
     for (const [field, definition] of Object.entries(oldProperties)) {
-      assert.deepEqual(properties[field], definition, name + '.' + field + ': historical field changed');
+      let currentDefinition = properties[field];
+      // Main added one optional flag to open orders; every prior definition still matches the audit snapshot.
+      if (name === 'Shop' && field === 'restaurant_table_orders') {
+        const orderFields = currentDefinition.items.properties;
+        assert.deepEqual(orderFields.is_delivery, { type: 'boolean', default: false }, 'optional delivery flag');
+        assert.equal((currentDefinition.items.required || []).includes('is_delivery'), false, 'delivery must stay optional');
+        currentDefinition = { ...currentDefinition, items: { ...currentDefinition.items,
+          properties: Object.fromEntries(Object.entries(orderFields).filter(([key]) => key !== 'is_delivery')) } };
+      }
+      assert.deepEqual(currentDefinition, definition, name + '.' + field + ': historical field changed');
     }
     for (const field of Object.keys(properties).filter(field => !(field in oldProperties))) {
       assert.equal((schema.required || []).includes(field), false, name + '.' + field + ': recovery field must be optional');
