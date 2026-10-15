@@ -51,10 +51,11 @@ export function weightedAvgIngredientCost(lines: any[]): { cost: number; hasPric
 export function recipeCostFromMap(
   recipeItems: any[],
   ingredientCosts: Map<string, any>,
+  takeaway = false,
 ): { batchCost: number; missing: string[]; hasAllPrices: boolean } {
   let batchCost = 0;
   const missing: string[] = [];
-  const items = recipeItems || [];
+  const items = (recipeItems || []).filter((item: any) => takeaway || item.takeaway_only !== true);
   let hasAllPrices = items.length > 0;
   for (const ri of items) {
     const ic = ingredientCosts.get(String(ri.ingredient_id));

@@ -17,6 +17,7 @@ export function staffTicketFromSale(sale) {
     table_number: Number.isInteger(sale.table_number_snapshot) ? sale.table_number_snapshot : null,
     opened_by_name: sale.user_name,
     offline_pending: sale.offline_pending === true,
+    is_delivery: sale.is_delivery === true,
     items: (sale.items || []).map((item) => ({
       product_name: item.product_name,
       quantity: item.quantity,

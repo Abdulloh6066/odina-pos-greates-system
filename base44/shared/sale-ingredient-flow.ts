@@ -29,6 +29,7 @@ export async function loadShopRecipes(
   service: any,
   shopPreparedItems: any[],
   recipeLoader?: CheckoutRecipeLoader,
+  takeaway = false,
 ): Promise<{ byProduct: Map<string, any | null>; missing: string[] }> {
   const productIds = Array.from(new Set(
     shopPreparedItems.map((row) => String(row.product_id)).filter(Boolean),
@@ -83,7 +84,8 @@ export async function loadShopRecipes(
     byProduct.set(productId, {
       recipe_id: recipe.id,
       output_quantity: Number(recipe.output_quantity),
-      items: (itemsByRecipe.get(recipe.id) || []).map((ri: any) => ({
+      items: (itemsByRecipe.get(recipe.id) || [])
+        .filter((ri: any) => takeaway || ri.takeaway_only !== true).map((ri: any) => ({
         ingredient_id: ri.ingredient_id,
         ingredient_name_snapshot: ri.ingredient_name_snapshot,
         quantity: Number(ri.quantity),
@@ -103,14 +105,14 @@ export async function prepareSaleIngredientDeduction(
   service: any,
   shopId: string,
   items: any[],
-  options: { allowMissing?: boolean; recipeLoader?: CheckoutRecipeLoader } = {},
+  options: { allowMissing?: boolean; recipeLoader?: CheckoutRecipeLoader; takeaway?: boolean } = {},
 ) {
   const shopPrepared = items.filter((row: any) => row.source_type === "shop_prepared");
   if (!shopPrepared.length) {
     return { lines: [], requirements: [], plans: [], shortages: [] };
   }
 
-  const { byProduct } = await loadShopRecipes(service, shopPrepared, options.recipeLoader);
+  const { byProduct } = await loadShopRecipes(service, shopPrepared, options.recipeLoader, options.takeaway === true);
   for (const recipe of byProduct.values()) {
     if (recipe && !recipe.items.length) {
       throw httpError("Faol tex-kartada masalliqlar kiritilmagan. Egasi tekshirishi kerak.", 409);

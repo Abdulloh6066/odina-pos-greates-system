@@ -222,10 +222,11 @@ export default function ProductionPanel({
                   <div className="mt-3 space-y-1.5 flex-1">
                     {lines.slice(0, 4).map((line) => (
                       <div key={line.id} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate text-foreground/75">{line.ingredient_name_snapshot}</span>
+                        <span className="truncate text-foreground/75">{line.ingredient_name_snapshot}{line.takeaway_only === true && ' · Dostavka / Soboy'}</span>
                         <span className="font-medium shrink-0">{formatNum(line.quantity)} {UNIT_LABELS[line.unit] || line.unit}</span>
                       </div>
                     ))}
+                    {lines.some((line) => line.takeaway_only === true) && <p className="text-xs font-semibold text-brand-ink">Dostavka / Soboy qadoqlashi: {lines.filter((line) => line.takeaway_only === true).length} qator</p>}
                     {lines.length > 4 && <p className="text-xs text-muted-foreground">+ yana {lines.length - 4} ta masalliq</p>}
                     {!lines.length && <p className="text-sm text-muted-foreground">Masalliqlar kiritilmagan.</p>}
                   </div>
@@ -433,7 +434,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
     setOutputQuantity(String(recipe?.output_quantity || 1));
     setNotes(recipe?.notes || '');
     setRows(existingItems.length
-      ? existingItems.map((item) => ({ ingredient_id: item.ingredient_id, quantity: String(item.quantity) }))
+      ? existingItems.map((item) => ({ ingredient_id: item.ingredient_id, quantity: String(item.quantity), takeaway_only: item.takeaway_only === true }))
       : [{ ingredient_id: '', quantity: '' }]);
   }, [open, recipe?.id]);
 
@@ -469,6 +470,7 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
         items: validRows.map((row) => ({
           ingredient_id: row.ingredient_id,
           quantity: Number(row.quantity),
+          takeaway_only: row.takeaway_only === true,
         })),
       });
       const payload = result?.data || result;
@@ -514,7 +516,10 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
                   <div key={index} className="grid grid-cols-[minmax(0,1fr)_130px_40px] gap-2">
                     <OdinaSelect
                       value={row.ingredient_id}
-                      onChange={(event) => updateRow(index, 'ingredient_id', event.target.value)}
+                      onChange={(event) => {
+                        updateRow(index, 'ingredient_id', event.target.value);
+                        if (ingredients.find((item) => item.id === event.target.value)?.category !== 'packaging') updateRow(index, 'takeaway_only', false);
+                      }}
                       className="h-10 rounded-lg border border-input bg-card px-3 text-sm min-w-0"
                     >
                       <option value="">Masalliqni tanlang</option>
@@ -544,6 +549,10 @@ function RecipeDialog({ open, product, recipe, existingItems, ingredients, onClo
                     >
                       <X className="w-4 h-4" />
                     </button>
+                    {selected?.category === 'packaging' && product?.source_type === 'shop_prepared' && <label className="col-span-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <input type="checkbox" checked={row.takeaway_only === true} onChange={(event) => updateRow(index, 'takeaway_only', event.target.checked)} />
+                      Faqat Dostavka / Soboy
+                    </label>}
                   </div>
                 );
               })}
@@ -580,7 +589,7 @@ function ProductionDialog({ open, product, recipe, recipeItems, balances, locati
   }, [open, product?.id]);
 
   const produced = Number(quantity || 0);
-  const usage = recipeItems.map((item) => {
+  const usage = recipeItems.filter((item) => item.takeaway_only !== true).map((item) => {
     const required = cleanNumber(Number(item.quantity || 0) * produced / Number(recipe?.output_quantity || 1));
     const available = cleanNumber(balances[item.ingredient_id] || 0);
     return { ...item, required, available, after: cleanNumber(available - required) };

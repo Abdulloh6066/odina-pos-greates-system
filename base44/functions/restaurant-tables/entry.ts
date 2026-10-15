@@ -415,9 +415,19 @@ Deno.serve(async (req) => {
           action: takeaway ? "restaurant_takeaway_order_cancelled" : "restaurant_table_order_cancelled", details }).catch(() => { auditWarning = true; });
         return Response.json({ ok: true, cancelled: true, order_id: existing.id, audit_warning: auditWarning });
       }
+      if (body?.is_delivery !== undefined && typeof body.is_delivery !== "boolean") {
+        return Response.json({ error: "Dostavka belgisi noto‘g‘ri." }, { status: 400 });
+      }
+      if (!takeaway && body?.is_delivery === true) {
+        return Response.json({ error: "Stol buyurtmasini dostavka deb belgilab bo‘lmaydi." }, { status: 400 });
+      }
+      // Older clients editing a saved delivery order must preserve its marker.
+      const isDelivery = takeaway && (body?.is_delivery === undefined
+        ? existing?.is_delivery === true : body.is_delivery);
       // A retry after a lost save response returns the same unpaid order.
       if (takeaway && existing && body?.expected_revision === 0 && existing.revision === 1
         && existing.opened_by === actor.id && existing.state === "occupied"
+        && (existing.is_delivery === true) === isDelivery
         && Array.isArray(body?.items) && body.items.length === existing.items.length
         && new Set(body.items.map((row: any) => saleLineKey(row))).size === body.items.length
         && body.items.every((row: any) => existing.items.some((item: any) =>
@@ -491,7 +501,7 @@ Deno.serve(async (req) => {
         ? existing.ticket_number : await allocateServiceTicketNumber(service, shop.id);
       const now = new Date().toISOString();
       const order = { id: existing?.id || (takeaway ? orderId : crypto.randomUUID()),
-        ...(takeaway ? { order_type: "takeaway" } : { number: primaryNumber }), ticket_number: ticketNumber,
+        ...(takeaway ? { order_type: "takeaway", is_delivery: isDelivery } : { number: primaryNumber }), ticket_number: ticketNumber,
         revision: revision + 1,
         state: "occupied", items, total, started_at: existing?.started_at || now,
         opened_by: existing?.opened_by || actor.id,

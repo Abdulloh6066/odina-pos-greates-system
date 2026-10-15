@@ -26,7 +26,7 @@ function savedReceiptPreference() {
   }
 }
 
-export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false, checking = false }) {
+export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false, checking = false, isDelivery = false }) {
   const [payments, setPayments] = useState([]);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
@@ -127,7 +127,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="odina-payment-workbench sm:max-w-lg max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">To‘lov</DialogTitle>
+          <DialogTitle className="font-display text-xl">{isDelivery ? '🚚 Dostavka · To‘lov' : 'To‘lov'}</DialogTitle>
         </DialogHeader>
 
         <div className="odina-payment-total rounded-2xl bg-primary/10 px-4 py-3 mb-4 flex items-center justify-between">

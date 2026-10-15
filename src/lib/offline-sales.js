@@ -58,6 +58,7 @@ export function buildPendingSale({
   shop,
   cart,
   payments,
+  isDelivery = false,
 }) {
   if (!shift?.id || !shift?.shop_id || !user?.id) {
     throw errorWithCode('Offline savdo uchun ochiq smena kerak.', 'SHIFT_REQUIRED');
@@ -112,6 +113,7 @@ export function buildPendingSale({
   const receiptShop = shop?.id === shift.shop_id ? shop : null;
   const request = {
     action: 'complete_sale',
+    is_delivery: isDelivery === true,
     shift_id: String(shift.id),
     items: items.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...friesOptionFields(item) })),
     payments: normalizedPayments,
@@ -132,6 +134,7 @@ export function buildPendingSale({
     shop_id: String(shift.shop_id),
     request,
     local_sale: {
+      is_delivery: isDelivery === true,
       sale_number: saleNumberFromKey(idempotencyKey, recordedIso),
       sold_at: recordedIso,
       business_date: tashkentDateKey(recordedIso),

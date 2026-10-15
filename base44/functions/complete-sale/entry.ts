@@ -46,11 +46,11 @@ import {
 
 // Restore only Odina Branch's deferred tech-card connection.
 const BRANCH_TECH_CARD_SHOP_ID = "6a96f0a4ecc85c2fc57f3174";
-async function prepareBranchIngredients(service: any, shopId: string, items: any[], recipeLoader?: CheckoutRecipeLoader) {
+async function prepareBranchIngredients(service: any, shopId: string, items: any[], recipeLoader?: CheckoutRecipeLoader, takeaway = false) {
   const eligible = shopId === BRANCH_TECH_CARD_SHOP_ID
     ? items.filter((item) => item.source_type === "shop_prepared" && item.sale_unit !== "gram")
     : [];
-  const prepared = await prepareSaleIngredientDeduction(service, shopId, eligible, { allowMissing: true, recipeLoader });
+  const prepared = await prepareSaleIngredientDeduction(service, shopId, eligible, { allowMissing: true, recipeLoader, takeaway });
   const linked = new Set(prepared.lines.map((line: any) => line.product_id));
   for (const item of items) {
     if (linked.has(item.product_id)) {
@@ -70,7 +70,7 @@ async function settleCheckoutWrites(tasks: Array<() => Promise<unknown>>) {
 }
 
 // Preserve the existing immutable cost snapshots while stock checks run.
-async function loadSaleCostSnapshots(service: any, normalizedItems: any[], productsAtSale: Map<string, any>, recipeLoader: CheckoutRecipeLoader) {
+async function loadSaleCostSnapshots(service: any, normalizedItems: any[], productsAtSale: Map<string, any>, recipeLoader: CheckoutRecipeLoader, takeaway = false) {
   const unitCostByProduct: Map<string, any> = new Map();
   const recipesByProduct: Map<string, any> = new Map();
   // Products without recipes retain the estimate fallback without loading
@@ -122,7 +122,7 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
     const ingredientCosts = await loadIngredientCosts(service, [...ingredientIds]);
     const baseCostByProduct = new Map<string, any>();
     for (const [productId, { recipe, rawItems, product }] of cardsByProduct) {
-      const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts);
+      const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts, takeaway);
       const outputUnit = String(recipe.output_unit || product?.production_unit || "piece");
       baseCostByProduct.set(productId, {
         costPerPiece: costPerPiece(batchCost, num(recipe.output_quantity), outputUnit,
@@ -369,6 +369,7 @@ function canonicalSaleRequest(body: any) {
           table_order_id: String(body?.table_order_id || ""), table_order_revision: body?.table_order_revision } : {}),
     ...(body?.takeaway_order_id ? { takeaway_order_id: String(body.takeaway_order_id),
       takeaway_order_revision: body.takeaway_order_revision } : {}),
+    ...(body?.is_delivery === true ? { is_delivery: true } : {}),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
     ...(body?.rounding_total !== undefined && body?.rounding_total !== null
@@ -951,6 +952,9 @@ export default async function(req) {
     }
 
     if (action === "check_stock") {
+      if (body?.is_delivery !== undefined && typeof body.is_delivery !== "boolean") {
+        return Response.json({ error: "Dostavka belgisi noto‘g‘ri." }, { status: 400 });
+      }
       const shiftId = String(body?.shift_id || "");
       const requestedItems = Array.isArray(body?.items) ? body.items : [];
       if (!shiftId || !requestedItems.length) {
@@ -1008,7 +1012,8 @@ export default async function(req) {
         stockPolicy(service),
       ]);
       const recipeLoader = createCheckoutRecipeLoader(service, normalizedItems.map(item => item.product_id));
-      const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader);
+      const ingredientPrep = await prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader,
+        body?.is_delivery === true || Boolean(body?.takeaway_order_id));
       if (ingredientPrep.shortages.length && !allowNegativeStock) {
         return Response.json({
           error: "Branch omborida tex-karta masalliqlari yetarli emas: " + ingredientPrep.shortages.map((row: any) => row.ingredient_name).join(", "),
@@ -1299,6 +1304,10 @@ export default async function(req) {
     if (action !== "complete_sale") {
       return Response.json({ error: "Unknown Kassa action." }, { status: 400 });
     }
+    if (body?.is_delivery !== undefined && typeof body.is_delivery !== "boolean") {
+      return Response.json({ error: "Dostavka belgisi noto‘g‘ri." }, { status: 400 });
+    }
+    const isDelivery = body?.is_delivery === true;
     const shiftId = String(body?.shift_id || "");
     const requestedItems = Array.isArray(body?.items) ? body.items : [];
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
@@ -1331,6 +1340,7 @@ export default async function(req) {
         if (
           existingSale.user_id !== user.id
           || existingSale.shift_id !== shiftId
+          || (existingSale.is_delivery === true) !== isDelivery
           || (existingSale.request_fingerprint && existingSale.request_fingerprint !== requestFingerprint)
         ) {
           return Response.json({
@@ -1385,6 +1395,9 @@ export default async function(req) {
     // solely by this completed-sale path, not when a table is selected.
     const hasTable = body?.table_number !== undefined && body?.table_number !== null;
     const hasTakeaway = Boolean(body?.takeaway_order_id);
+    if (hasTable && isDelivery) {
+      return Response.json({ error: "Stol buyurtmasini dostavka deb belgilab bo‘lmaydi." }, { status: 400 });
+    }
     if (hasTakeaway && (hasTable || body?.table_order_id || body?.table_shop_id)) {
       return Response.json({ error: "Buyurtma turi noto‘g‘ri." }, { status: 400 });
     }
@@ -1437,6 +1450,9 @@ export default async function(req) {
         || !Number.isInteger(revision) || revision !== tableOrder.revision) {
         return Response.json({ error: "Stol buyurtmasi eski yoki saqlanmagan. Stolni yangilang va qayta tekshiring." }, { status: 409 });
       }
+      if (hasTakeaway && (tableOrder.is_delivery === true) !== isDelivery) {
+        return Response.json({ error: "Dostavka belgisi saqlangan buyurtmadan farq qiladi. Avval buyurtmani saqlang." }, { status: 409 });
+      }
       if (tableOrder.state !== "occupied") {
         return Response.json({ error: "Bu stol bo‘yicha to‘lov allaqachon boshlangan. Savdolar tarixini tekshiring." }, { status: 409 });
       }
@@ -1456,14 +1472,15 @@ export default async function(req) {
     const normalizedItems = ordinaryItems
       || await normalizeSaleItems(service, requestedItems, shift.shop_id, tableOrder?.items || null, productsAtSale);
     const recipeLoader = createCheckoutRecipeLoader(service, normalizedItems.map(item => item.product_id));
-    const ingredientPreparation = prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader);
+    const ingredientPreparation = prepareBranchIngredients(service, shift.shop_id, normalizedItems, recipeLoader,
+        body?.is_delivery === true || Boolean(body?.takeaway_order_id));
     const [{ plans: stockPlans, shortages: stockWarnings }, unitCostByProduct, ingredientPrep] = await Promise.all([
       // Branch recipes can turn off finished-product stock tracking. Wait for
       // that decision while independent cost snapshots read the same raw cards.
       ingredientPreparation.then(() => planSaleStock(service, shift.shop_id, normalizedItems)),
       shift.shop_id === BRANCH_TECH_CARD_SHOP_ID
-        ? ingredientPreparation.then(() => loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader))
-        : loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader),
+        ? ingredientPreparation.then(() => loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader, isDelivery || hasTakeaway))
+        : loadSaleCostSnapshots(service, normalizedItems, productsAtSale, recipeLoader, isDelivery || hasTakeaway),
       ingredientPreparation,
     ]);
     if (ingredientPrep.shortages.length && !allowNegativeStock) {
@@ -1697,6 +1714,7 @@ export default async function(req) {
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
       service_ticket_number: serviceTicketNumber,
+      is_delivery: isDelivery,
       idempotency_key: idempotencyKey || undefined,
       request_fingerprint: requestFingerprint || undefined,
       sold_at: soldAt,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight } from 'lucide-react';
+import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight, Truck } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { saleLineKey } from '@/lib/burger-fries';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 
 export default function Cart({
   cart, onInc, onDec, onRemove, onClear, selectedProductId, onSelectItem,
+  isDelivery = false, onDeliveryChange,
   subtotal, discount, couponDiscount, discountCode, onApplyDiscount, onRemoveDiscount, discountError,
   roundingTarget, adjustmentMode, roundingError, onApplyRounding, onApplyManualDiscount, onRemoveRounding,
   total, onCheckout, disabled, tableMode = false, tableDirty = false,
@@ -30,8 +31,16 @@ export default function Cart({
         )}
       </div>
 
+      {!tableMode && onDeliveryChange && <div className="px-4 py-2 border-b border-brand-sand/40 shrink-0">
+        <button type="button" aria-pressed={isDelivery} aria-label="Dostavka"
+          onClick={() => onDeliveryChange(!isDelivery)} disabled={disabled || locked || savingTakeaway}
+          className={`min-h-11 w-full rounded-xl border px-3 py-2 flex items-center justify-center gap-2 text-sm font-semibold touch-manipulation transition-colors disabled:opacity-40 ${isDelivery ? 'bg-primary/15 border-brand-olive text-brand-ink' : 'bg-card border-border text-muted-foreground hover:bg-secondary'}`}>
+          <Truck className="w-4 h-4" aria-hidden="true" /> Dostavka
+          <span className="text-xs">{isDelivery ? 'Yoqilgan' : 'O‘chiq'}</span>
+        </button>
+      </div>}
       {takeawayOrder && <div className="odina-cart-order-context px-4 py-2 border-b border-brand-sand/40 flex items-center justify-between gap-2 text-xs">
-        <span className="font-semibold">Olib ketish #{takeawayOrder.ticket_number} · To‘lanmagan</span>
+        <span className="font-semibold">{isDelivery ? 'Dostavka' : 'Olib ketish'} #{takeawayOrder.ticket_number} · To‘lanmagan</span>
         <Button type="button" variant="ghost" className="min-h-11 text-xs" disabled={locked} onClick={onLeaveTakeaway}>Yangi buyurtma</Button>
       </div>}
       <div className="odina-cart-items flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">

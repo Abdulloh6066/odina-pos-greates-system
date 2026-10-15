@@ -128,7 +128,7 @@ function EnabledStaffOrderTicketModal({
     ? `${displayTableNumber}-stol`
     : mode === 'customer'
       ? (ticketOrder?.fulfilment_type === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')
-      : 'Olib ketish';
+      : ticketOrder?.is_delivery === true ? 'Dostavka' : 'Olib ketish';
   const orderTime = ticketOrder?.updated_at || ticketOrder?.started_at || Date.now();
   const revision = ticketOrder?.revision || 1;
   const orderId = ticketOrder?.id;

@@ -79,6 +79,7 @@ export default function POS() {
   const [search, setSearch] = useState('');
   const [showFav, setShowFav] = useState(false);
   const [cart, setCart] = useState([]);
+  const [isDelivery, setIsDelivery] = useState(false);
   const [keyboardProductId, setKeyboardProductId] = useState(null);
   const [weightProduct, setWeightProduct] = useState(null);
   const [burgerProduct, setBurgerProduct] = useState(null);
@@ -150,8 +151,9 @@ export default function POS() {
   const [cancellingTakeawayId, setCancellingTakeawayId] = useState('');
   const cancellingTakeawayRef = useRef(false);
   const [takeawayCancelError, setTakeawayCancelError] = useState(null);
-  const takeawayDirty = Boolean(takeawayOrder) && JSON.stringify(cart.map((row) => ({ key: saleLineKey(row), quantity: row.quantity })))
-    !== JSON.stringify((takeawayOrder?.items || []).map((row) => ({ key: saleLineKey(row), quantity: row.quantity })));
+  const takeawayDirty = Boolean(takeawayOrder) && (isDelivery !== (takeawayOrder.is_delivery === true)
+    || JSON.stringify(cart.map((row) => ({ key: saleLineKey(row), quantity: row.quantity })))
+      !== JSON.stringify((takeawayOrder.items || []).map((row) => ({ key: saleLineKey(row), quantity: row.quantity }))));
 
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
@@ -196,6 +198,7 @@ export default function POS() {
     priorTableKey.current = tableKey;
     setTakeawayOrder(null);
     takeawayRequestIdRef.current = '';
+    setIsDelivery(false);
     setCart([]);
     setDiscountCode('');
     setDiscountPct(0);
@@ -349,12 +352,14 @@ export default function POS() {
       const response = await base44.functions.invoke('restaurant-tables', {
         action: 'save_takeaway_order', shop_id: shift.shop_id, shift_id: shift.id,
         order_id: orderId, expected_revision: takeawayOrder?.revision || 0,
+        is_delivery: isDelivery,
         items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity, ...friesOptionFields(row),
           variant_name: row.variant_name || row.variant || '', notes: row.notes || '' })),
       });
       const result = response?.data || response;
       if (!result?.ok || !result.order?.id) throw new Error(result?.error || 'Buyurtma saqlanmadi.');
       setTakeawayOrder(result.order);
+      setIsDelivery(result.order.is_delivery === true);
       setCart(result.order.items);
       return result.order;
     } catch (error) {
@@ -413,6 +418,7 @@ export default function POS() {
       if (!result?.ok || !result.order) throw new Error('Buyurtma yopilgan. Ro‘yxatni yangilang.');
       resetCart();
       setTakeawayOrder(result.order);
+      setIsDelivery(result.order.is_delivery === true);
       setCart(result.order.items);
       setOpenOrdersOpen(false);
       setMobileCartOpen(window.matchMedia('(max-width: 1279px)').matches);
@@ -944,7 +950,11 @@ export default function POS() {
     }
     setCart((p) => p.filter((i) => saleLineKey(i) !== saleLineKey(item)));
   };
-  const resetCart = () => { takeawayRequestIdRef.current = ''; setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
+  const changeDelivery = (value) => {
+    if (selectedTable || tableLocked || paying || payOpen || stockChecking || savingTableRef.current) return;
+    setIsDelivery(value === true);
+  };
+  const resetCart = () => { takeawayRequestIdRef.current = ''; setIsDelivery(false); setCart([]); setDiscountCode(''); setDiscountPct(0); setDiscountError(''); setDiscountOwnerPin(''); setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); };
   const clearCart = () => { if (!tableLocked && !paying && (!selectedTable || !tableOrder) && !takeawayOrder) resetCart(); }; 
 
   const validateDiscount = async (code, ownerPin = '') => {
@@ -1207,6 +1217,7 @@ export default function POS() {
       const result = await invokePosRead(base44, {
         action: 'check_stock',
         shift_id: shift.id,
+        is_delivery: isDelivery,
         ...(savedTakeaway ? { takeaway_order_id: savedTakeaway.id, takeaway_order_revision: savedTakeaway.revision } : {}),
         ...(selectedTable ? { table_shop_id: selectedTable.shopId,
           table_number: selectedTable.number,
@@ -1368,6 +1379,7 @@ export default function POS() {
           shop: shops.find((shop) => shop.id === shift.shop_id),
           cart,
           payments,
+          isDelivery,
         });
       }
 
@@ -1386,6 +1398,7 @@ export default function POS() {
       const request = pendingRecord?.request || {
         action: 'complete_sale',
         shift_id: shift.id,
+        is_delivery: isDelivery,
         ...(takeawayOrder ? { takeaway_order_id: takeawayOrder.id, takeaway_order_revision: takeawayOrder.revision } : {}),
         ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number,
           table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
@@ -1867,6 +1880,7 @@ export default function POS() {
         <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
+            isDelivery={isDelivery} onDeliveryChange={changeDelivery}
             selectedProductId={cart.some((row) => saleLineKey(row) === keyboardProductId) ? keyboardProductId : (cart.length ? saleLineKey(cart[cart.length - 1]) : undefined)}
             onSelectItem={(item) => setKeyboardProductId(saleLineKey(item))}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
@@ -1897,6 +1911,7 @@ export default function POS() {
           <SheetTitle className="sr-only">Joriy buyurtma</SheetTitle>
           <Cart
             cart={cart}
+            isDelivery={isDelivery} onDeliveryChange={changeDelivery}
             selectedProductId={cart.some((row) => saleLineKey(row) === keyboardProductId) ? keyboardProductId : (cart.length ? saleLineKey(cart[cart.length - 1]) : undefined)}
             onSelectItem={(item) => setKeyboardProductId(saleLineKey(item))}
             onInc={inc} onDec={dec} onRemove={removeItem} onClear={clearCart}
@@ -1925,7 +1940,7 @@ export default function POS() {
             <div className="space-y-3">{openOrders.map((order) => (
               <div key={order.id} className="rounded-xl border border-brand-sand/50 p-3 space-y-2">
                 <div className="flex justify-between gap-2 font-semibold">
-                  <span>Buyurtma #{order.ticket_number}</span><span>{formatUZS(order.total)}</span>
+                  <span>{order.is_delivery === true ? '🚚 Dostavka' : 'Buyurtma'} #{order.ticket_number}</span><span>{formatUZS(order.total)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">{formatUzbekistanDateTime(order.started_at)} · {order.opened_by_name}</p>
                 <p className="text-sm break-words">{order.items.map((row) => row.product_name + ' × ' + row.quantity + (row.sale_unit === 'gram' ? ' g' : '')).join(', ')}</p>
@@ -1993,6 +2008,7 @@ export default function POS() {
       <PaymentModal
         open={payOpen && cart.length > 0 && !paying}
         total={total}
+        isDelivery={isDelivery}
         checking={stockChecking}
         discountPending={discountLoading}
         discountControls={
@@ -2019,7 +2035,7 @@ export default function POS() {
             </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {salesHistoryOpen && <SalesHistory embedded />}
+            {salesHistoryOpen && <SalesHistory embedded settings={settings} />}
           </div>
         </DialogContent>
       </Dialog>

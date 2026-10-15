@@ -25,6 +25,11 @@
         "piece"
       ]
     },
+    "takeaway_only": {
+      "type": "boolean",
+      "default": false,
+      "description": "Faqat Dostavka yoki Soboy savdosi to‘langanda sarflanadigan qadoqlash"
+    },
     "position": {
       "type": "integer",
       "default": 0

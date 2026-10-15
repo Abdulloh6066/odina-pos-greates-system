@@ -316,7 +316,7 @@ function checkoutHarness({ clock = performance } = {}) {
     cart: [{ product_id: 'cake', product_name: 'Tort', quantity: 1, subtotal: 15000, price: 15000 }],
     stockChecking: false, discountLoading: false, selectedTable: null, tableCartDirty: false,
     tableOrder: null, takeawayOrder: null, takeawayDirty: false, checkoutOffline: false,
-    isOnline: true, queueEligible: true, reportRequestSuccess: () => {}, reportRequestError: () => {},
+    isDelivery: false, isOnline: true, queueEligible: true, reportRequestSuccess: () => {}, reportRequestError: () => {},
     discountCode: '', roundingTarget: null, adjustmentMode: null, discountPct: 0,
     discountOwnerPin: '', subtotal: 15000, shift: { id: 'shift', shop_id: 'branch' },
     user: { id: 'owner', shop_id: 'branch' }, shops: [{ id: 'branch' }],

@@ -200,7 +200,7 @@ function checkout({ pending = [], syncing = false, online = true, ...flags } = {
   const ctx = { selectedTable: null, takeawayOrder: null, takeawayRequestIdRef: { current: '' }, tableSelectionError: '', tableShop: null,
     shift: { id: 'shift', shop_id: 'shop' }, user: { id: 'cashier' }, shiftReadState: 'ready',
     cart: [{ product_id: 'cake', product_name: 'Cake', price: 1000, quantity: 1, subtotal: 1000 }], subtotal: 1000, total: 1000,
-    payOpen: false, paying: false, discountPct: 0, stockChecking: false, offlineSyncing: syncing, tableLocked: false,
+    payOpen: false, paying: false, isDelivery: false, discountPct: 0, stockChecking: false, offlineSyncing: syncing, tableLocked: false,
     discountCode: '', roundingTarget: null, adjustmentMode: null, discountOwnerPin: '', discountLoading: false,
     isOnline: online, navigator: { onLine: online }, offlineSales: pending, offlineSyncError: '', queueAuthorizationError: false,
     productsById: { cake: { track_stock: false } }, stockByProduct: {}, settings: { allow_negative_stock: false },
@@ -275,6 +275,16 @@ test('an online response without a real sale ID queues the ordinary sale instead
   assert.equal(f.ctx.lastCheckoutTiming.outcome, 'queued');
 });
 
+
+test('the actual POS checkout preserves its delivery marker in both the offline request and immediate receipt', async () => {
+  const f = checkout({ online: false, isDelivery: true });
+  await f.openCheckout();
+  const payment = f.completeSale([{ method: 'cash', amount: 1000 }], true);
+  f.gate.resolve(); await payment;
+  assert.equal(f.saved.length, 1);
+  assert.equal(f.saved[0].request.is_delivery, true);
+  assert.equal(f.printed[0].is_delivery, true);
+});
 
 test('unknown local storage state cannot be mistaken for an empty queue when closing a shift', async () => {
   const alerts = [], calls = [];
