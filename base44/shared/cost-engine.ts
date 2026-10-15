@@ -177,14 +177,59 @@ export function aggregateReport(
 
 // ---- SDK-backed loaders (take `service` = base44.asServiceRole) ----
 
-// Weighted-average cost per base unit for every ingredient, from non-cancelled receipts.
+// Weighted-average cost per base unit. Reports keep their existing unscoped
+// loader; checkout passes only the ingredients in its verified basket recipes.
 export async function loadIngredientCosts(
   service: any,
+  ingredientIds?: string[],
 ): Promise<Map<string, { cost: number; hasPrice: boolean }>> {
-  const [receipts, items] = await Promise.all([
-    service.entities.SupplierReceipt.list("-received_at", 500),
-    service.entities.SupplierReceiptItem.list("-created_date", 1000),
-  ]);
+  let receipts: any[];
+  let items: any[];
+  if (ingredientIds === undefined) {
+    [receipts, items] = await Promise.all([
+      service.entities.SupplierReceipt.list("-received_at", 500),
+      service.entities.SupplierReceiptItem.list("-created_date", 1000),
+    ]);
+  } else {
+    const ids = [...new Set(ingredientIds.map(String).filter(Boolean))];
+    if (!ids.length) return new Map();
+    items = [];
+    const seen = new Set<string>();
+    // Never silently compute an average from an incomplete page. Unique IDs
+    // provide stable ordering; malformed/repeated pages use the existing
+    // checkout estimate fallback instead of recording a partial cost as exact.
+    for (let skip = 0; ; skip += 500) {
+      const rows = await service.entities.SupplierReceiptItem.filter(
+        { ingredient_id: { $in: ids } }, "id", 500, skip,
+        ["id", "receipt_id", "ingredient_id", "line_total", "base_quantity", "purchase_quantity", "purchase_unit"],
+      );
+      if (!Array.isArray(rows)) throw new Error("Masalliq tannarxi javobi noto‘g‘ri.");
+      for (const row of rows) {
+        if (!row.id || seen.has(row.id) || !ids.includes(String(row.ingredient_id))) {
+          throw new Error("Masalliq tannarxi sahifalari noto‘g‘ri.");
+        }
+        seen.add(row.id); items.push(row);
+      }
+      if (rows.length < 500) break;
+      if (skip >= 99500) throw new Error("Masalliq tannarxi tarixi juda katta.");
+    }
+    const receiptIds = [...new Set<string>(items.map(row => String(row.receipt_id || "")).filter(Boolean))];
+    receipts = [];
+    // Read only the parent receipts needed to exclude cancelled purchases.
+    // Bound independent requests, without a cross-checkout price cache.
+    for (let start = 0; start < receiptIds.length; start += 2000) {
+      const batch = receiptIds.slice(start, start + 2000);
+      const pages = await Promise.all(Array.from({ length: Math.ceil(batch.length / 500) }, (_, index) =>
+        service.entities.SupplierReceipt.filter(
+          { id: { $in: batch.slice(index * 500, (index + 1) * 500) } },
+          "id", 500, 0, ["id", "status"],
+        )));
+      for (const rows of pages) {
+        if (!Array.isArray(rows)) throw new Error("Kirim tannarxi javobi noto‘g‘ri.");
+        receipts.push(...rows);
+      }
+    }
+  }
   const validIds = new Set(
     (receipts || [])
       .filter((r: any) => r.status !== "cancelled" && r.status !== "cancelling")
