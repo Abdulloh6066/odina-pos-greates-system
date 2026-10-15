@@ -2023,7 +2023,7 @@ export default function POS() {
           </div>
         </DialogContent>
       </Dialog>
-      <CheckoutTimingHistory open={checkoutTimingHistoryOpen} onOpenChange={setCheckoutTimingHistoryOpen}
+      <CheckoutTimingHistory key={user?.id || 'signed-out'} open={checkoutTimingHistoryOpen} onOpenChange={setCheckoutTimingHistoryOpen}
         userRole={user?.role} shops={shops} />
       <ShiftReport shift={shiftReport} onAfterPrint={() => setShiftReport(null)} />
       <Receipt
