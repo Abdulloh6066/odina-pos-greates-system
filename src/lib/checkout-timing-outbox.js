@@ -72,7 +72,29 @@ function listEvents(actorId) {
   return transaction('readonly', (store, done) => {
     const request = store.index('actor_id').getAll(actorId);
     request.onsuccess = () => done((request.result || []).filter(row => row.actor_id === actorId)
-      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id.localeCompare(b.id)));
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || String(a.id).localeCompare(String(b.id))));
+  });
+}
+
+function storedEvent(record, actorId) {
+  try {
+    const event = normalizeEvent(record.event);
+    if (!event || event.actor_id !== actorId || record.actor_id !== actorId
+      || record.id !== JSON.stringify([event.actor_id, event.event_id])
+      || record.event_json !== JSON.stringify(event)) return null;
+    return event;
+  } catch { return null; }
+}
+
+function quarantineEvent(record, actorId) {
+  return transaction('readwrite', store => {
+    const request = store.get(record.id);
+    request.onsuccess = () => {
+      const saved = request.result;
+      if (saved && !storedEvent(saved, actorId)) {
+        store.put({ ...saved, status: 'rejected', last_error_status: 400, last_error: 'corrupt_event' });
+      }
+    };
   });
 }
 
@@ -146,9 +168,15 @@ export async function flushCheckoutTimings(options) {
       const records = (await listEvents(userId)).filter(row => row.status !== 'rejected').slice(0, 50);
       for (const record of records) {
         if (!currentUser(isCurrentUser, userId) || globalThis.navigator?.onLine === false) { stopped = true; break; }
+        const event = storedEvent(record, userId);
+        if (!event) {
+          await quarantineEvent(record, userId);
+          failed ||= { status: 400, retryable: false, reason: 'corrupt_event' };
+          continue;
+        }
         try {
-          const response = await send(reportBody(record.event));
-          if (!acknowledged(response, record.event.event_id)) throw new Error('Timing acknowledgment missing');
+          const response = await send(reportBody(event));
+          if (!acknowledged(response, event.event_id)) throw new Error('Timing acknowledgment missing');
           await changeEvent(record, 0);
           sent++;
         } catch (error) {
