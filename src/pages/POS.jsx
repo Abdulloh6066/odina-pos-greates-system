@@ -16,7 +16,9 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductGrid from '@/components/pos/ProductGrid';
 import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
 import CheckoutTimingStatus from '@/components/pos/CheckoutTimingStatus';
+import CheckoutTimingHistory from '@/components/pos/CheckoutTimingHistory';
 import useCheckoutTiming from '@/hooks/useCheckoutTiming';
+import { createCheckoutTimingEventId, reportCheckoutTiming, flushCheckoutTimings } from '@/lib/checkout-timing-outbox';
 import useStableEvent from '@/hooks/use-stable-event';
 import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
@@ -107,8 +109,29 @@ export default function POS() {
   const checkoutCancelledRef = useRef(false);
   const checkoutReadyRef = useRef(false);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
+  const [checkoutTimingHistoryOpen, setCheckoutTimingHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const { timing: lastCheckoutTiming, recordTiming: recordCheckoutTiming } = useCheckoutTiming(user?.id, shift?.shop_id, shift?.id);
+  const timingUserRef = useRef(user?.id || '');
+  timingUserRef.current = user?.id || '';
+  useEffect(() => {
+    const actorId = user?.id || '';
+    timingUserRef.current = actorId;
+    if (!actorId) return;
+    const flush = async () => {
+      try {
+        let result;
+        do {
+          result = await flushCheckoutTimings({ userId: actorId,
+            send: body => base44.functions.invoke('checkout-timing', body),
+            isCurrentUser: () => timingUserRef.current === actorId });
+        } while (result?.hasMore && timingUserRef.current === actorId);
+      } catch { console.warn('Checkout timing history upload is pending.'); }
+    };
+    void flush();
+    window.addEventListener('online', flush);
+    return () => { timingUserRef.current = ''; window.removeEventListener('online', flush); };
+  }, [user?.id]);
   const saleSubmittingRef = useRef(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
@@ -1316,6 +1339,7 @@ export default function POS() {
     let checkoutServerMs = null;
     let checkoutBackendTiming = null;
     let checkoutOutcome = 'unconfirmed';
+    let checkoutSaleId = '';
     let saleCommitted = false;
     setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
@@ -1387,6 +1411,7 @@ export default function POS() {
         const payload = result?.data || result;
         checkoutBackendTiming = payload?.backend_timing || null;
         if (!payload?.sale?.id) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
+        checkoutSaleId = payload.sale.id;
         saleCommitted = true;
         checkoutOutcome = payload.already_processed ? 'rechecked' : 'confirmed';
         applyCompletedSale(payload, printReceipt);
@@ -1416,6 +1441,19 @@ export default function POS() {
       setPaying(false);
       const checkoutTotalMs = Math.round(performance.now() - checkoutTimingStarted);
       recordCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome });
+      // Diagnostics are separate from financial completion and never delay or retry a sale.
+      try {
+        void reportCheckoutTiming({ event_id: createCheckoutTimingEventId(), actor_id: user?.id || '',
+          shift_id: shift?.id || '', request_key: idempotencyKey,
+          ...(checkoutSaleId ? { sale_id: checkoutSaleId } : {}), total_ms: checkoutTotalMs,
+          ...(checkoutServerMs === null ? {} : { api_round_trip_ms: checkoutServerMs }),
+          outcome: checkoutOutcome, client_completed_at: new Date().toISOString() }, {
+          send: body => base44.functions.invoke('checkout-timing', body),
+          isCurrentUser: () => timingUserRef.current === user?.id,
+        }).then(result => {
+          if (result?.failed || (result?.error && !(result?.sent > 0))) console.warn('Checkout timing history upload is pending.');
+        }).catch(() => console.warn('Checkout timing history upload is pending.'));
+      } catch { console.warn('Checkout timing history upload is pending.'); }
       console.info('[Odina checkout timing]', JSON.stringify({
         server_ms: checkoutServerMs,
         backend: checkoutBackendTiming,
@@ -1677,6 +1715,7 @@ export default function POS() {
       </div>
 
       <CheckoutTimingStatus userRole={user?.role} pending={paying}
+        onOpenHistory={() => setCheckoutTimingHistoryOpen(true)}
         timing={lastCheckoutTiming?.shiftId === shift?.id ? lastCheckoutTiming : null} />
 
       {!selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
@@ -1984,6 +2023,8 @@ export default function POS() {
           </div>
         </DialogContent>
       </Dialog>
+      <CheckoutTimingHistory open={checkoutTimingHistoryOpen} onOpenChange={setCheckoutTimingHistoryOpen}
+        userRole={user?.role} shops={shops} />
       <ShiftReport shift={shiftReport} onAfterPrint={() => setShiftReport(null)} />
       <Receipt
         sale={receiptPrintSale}
