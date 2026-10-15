@@ -138,8 +138,8 @@ async function list(service: any, user: any, body: any) {
   const limit = pageInteger(body.limit, 50, 1, 100);
   const skip = pageInteger(body.skip, 0, 0, 100_000);
   const query: any = { source: "browser" };
-  for (const [input, field] of [["shop_id", "shop_id"], ["user_id", "actor_id"], ["shift_id", "shift_id"]]) {
-    const value = id(body[input], input, true);
+  for (const [input, field, label] of [["shop_id", "shop_id", "Do‘kon"], ["user_id", "actor_id", "Xodim"], ["shift_id", "shift_id", "Smena"]]) {
+    const value = id(body[input], label, true);
     if (value) query[field] = value;
   }
   if (body.outcome !== undefined && body.outcome !== "") {
