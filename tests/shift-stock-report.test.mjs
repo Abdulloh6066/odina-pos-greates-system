@@ -136,10 +136,11 @@ function loadHandler(client) {
   let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
     .replace(/^import .*manager-request-scope.*;$/gm, '')
     .replace(/^import .*checkout-recipes.*;$/gm, '')
+    .replace(/^import .*checkout-reads.*;$/gm, '')
     .replace(/^import .*burger-fries.*;$/gm, '')
     .replace(/import \{\s*prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,\s*\} from "\.\.\/\.\.\/shared\/sale-ingredient-flow\.ts";/, '')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
-    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
+    .replace(/import \{[^}]*\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
   // Load the real local cost helpers added to complete-sale, without importing the live SDK.
   const costSource = readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, '');
