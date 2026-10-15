@@ -1676,7 +1676,7 @@ export default function POS() {
         )}
       </div>
 
-      <CheckoutTimingStatus pending={paying}
+      <CheckoutTimingStatus userRole={user?.role} pending={paying}
         timing={lastCheckoutTiming?.shiftId === shift?.id ? lastCheckoutTiming : null} />
 
       {!selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
