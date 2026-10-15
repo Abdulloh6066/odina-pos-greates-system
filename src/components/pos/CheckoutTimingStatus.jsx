@@ -1,7 +1,8 @@
 import React from 'react';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
-export default function CheckoutTimingStatus({ timing, pending }) {
+export default function CheckoutTimingStatus({ timing, pending, userRole }) {
+  if (userRole !== 'admin') return null;
   const outcomes = {
     confirmed: ['Yakunlash', 'Savdo saqlandi.'],
     rechecked: ['Qayta tekshirish', 'Saqlangan savdo tasdiqlandi.'],
