@@ -16,6 +16,7 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductGrid from '@/components/pos/ProductGrid';
 import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
 import CheckoutTimingStatus from '@/components/pos/CheckoutTimingStatus';
+import useCheckoutTiming from '@/hooks/useCheckoutTiming';
 import useStableEvent from '@/hooks/use-stable-event';
 import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
@@ -107,7 +108,7 @@ export default function POS() {
   const checkoutReadyRef = useRef(false);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
-  const [lastCheckoutTiming, setLastCheckoutTiming] = useState(null);
+  const { timing: lastCheckoutTiming, recordTiming: recordCheckoutTiming } = useCheckoutTiming(user?.id, shift?.shop_id, shift?.id);
   const saleSubmittingRef = useRef(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
@@ -1414,7 +1415,7 @@ export default function POS() {
       saleSubmittingRef.current = false;
       setPaying(false);
       const checkoutTotalMs = Math.round(performance.now() - checkoutTimingStarted);
-      setLastCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome, shiftId: shift?.id || '' });
+      recordCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome });
       console.info('[Odina checkout timing]', JSON.stringify({
         server_ms: checkoutServerMs,
         backend: checkoutBackendTiming,
