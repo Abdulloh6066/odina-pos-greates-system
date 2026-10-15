@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import OdinaSelect from "@/components/ui/odina-select";
+import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from "@/lib/order-request-retry";
 import {
   Ban,
   CalendarDays,
@@ -431,6 +432,7 @@ export default function SupplierLedgerPanel({
       />
 
       <BudgetSupplierPaymentDialog
+        actorId={user?.id}
         supplier={budgetPaymentTarget}
         onClose={() => setBudgetPaymentTarget(null)}
         onPaid={() => { setBudgetPaymentTarget(null); load(); }}
@@ -710,7 +712,7 @@ function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, 
   );
 }
 
-function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
+function BudgetSupplierPaymentDialog({ actorId, supplier, onClose, onPaid }) {
   const [balances, setBalances] = useState({});
   const [account, setAccount] = useState("cash");
   const [amount, setAmount] = useState("");
@@ -718,6 +720,11 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
   const [ownerPin, setOwnerPin] = useState("");
   const [loadingBalances, setLoadingBalances] = useState(false);
   const [saving, setSaving] = useState(false);
+  const requestScope = orderRequestScope(actorId, "pay_supplier");
+  const [retryPending, setRetryPending] = useState(() => Boolean(readOrderRequest(requestScope)));
+  const requestRef = useRef(readOrderRequest(requestScope));
+  const pendingSupplierRef = useRef(requestRef.current?._supplier_label || null);
+  const pendingSupplierChanged = retryPending && requestRef.current?.supplier_id !== supplier?.id;
 
   const debt = supplier
     ? supplier.receipts
@@ -730,10 +737,14 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
 
   useEffect(() => {
     if (!supplier) return undefined;
+    const saved = readOrderRequest(requestScope);
+    requestRef.current = saved;
+    pendingSupplierRef.current = saved?._supplier_label || null;
+    setRetryPending(Boolean(saved));
     let active = true;
-    setAccount("cash");
-    setAmount(String(debt));
-    setNotes("");
+    setAccount(saved?.account || "cash");
+    setAmount(saved ? String(saved.amount) : String(debt));
+    setNotes(saved?.notes || "");
     setOwnerPin("");
     setLoadingBalances(true);
     base44.functions.invoke("budget-ledger", { action: "summary" })
@@ -752,24 +763,39 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
         if (active) setLoadingBalances(false);
       });
     return () => { active = false; };
-  }, [supplier, debt]);
+  }, [supplier, debt, requestScope]);
 
   const submit = async () => {
-    if (!supplier || invalidAmount || !/^\d{4,8}$/.test(ownerPin)) return;
+    if (pendingSupplierChanged) return;
+    if (!supplier || !/^\d{4,8}$/.test(ownerPin) || (!retryPending && invalidAmount)) return;
+    if (saving) return;
+    const hadPending = retryPending;
     setSaving(true);
     try {
-      const result = await base44.functions.invoke("budget-ledger", {
-        action: "pay_supplier",
-        supplier_id: supplier.id,
-        account,
-        amount: value,
-        notes: notes.trim(),
-        owner_pin: ownerPin,
+      requestRef.current = retainOrderRequest(requestScope, requestRef.current || {
+        action: "pay_supplier", supplier_id: supplier.id, account, amount: value,
+        notes: notes.trim(), idempotency_key: crypto.randomUUID(), _supplier_label: supplier.name,
       });
+      pendingSupplierRef.current = requestRef.current._supplier_label;
+      setRetryPending(true);
+      const { _supplier_label: _label, ...submitted } = requestRef.current;
+      const result = await base44.functions.invoke("budget-ledger", { ...submitted, owner_pin: ownerPin });
       const payload = result?.data || result;
-      if (!payload?.paid) throw new Error(payload?.error || "Qarz to‘lovi bajarilmadi.");
+      if (!payload?.paid) throw Object.assign(new Error(payload?.error || "Qarz to‘lovi bajarilmadi."), { data: payload });
+      clearOrderRequest(requestScope);
+      requestRef.current = null;
+      pendingSupplierRef.current = null;
+      setRetryPending(false);
       onPaid();
     } catch (error) {
+      const failure = error?.response?.data || error?.data || {};
+      const status = Number(error?.response?.status || error?.status || 0);
+      if (failure.operation_reversed || (!hadPending && status >= 400 && status < 500 && !failure.operation_pending)) {
+        clearOrderRequest(requestScope);
+        requestRef.current = null;
+        pendingSupplierRef.current = null;
+        setRetryPending(false);
+      }
       void odinaAlert("Qarz to‘lanmadi: " + errorText(error));
     } finally {
       setSaving(false);
@@ -793,7 +819,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
           <OdinaSelect
             value={account}
             onChange={(event) => setAccount(event.target.value)}
-            disabled={saving || loadingBalances}
+            disabled={saving || loadingBalances || retryPending}
             className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
           >
             <option value="cash">Naqd pul · {formatUZS(balances.cash || 0)}</option>
@@ -813,7 +839,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
             placeholder="0"
-            disabled={saving || loadingBalances}
+            disabled={saving || loadingBalances || retryPending}
             className="h-11 rounded-xl"
           />
           {value > debt && <p className="text-xs text-destructive mt-1">To‘lov qolgan qarzdan oshmasligi kerak.</p>}
@@ -827,7 +853,7 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
             onChange={(event) => setNotes(event.target.value)}
             placeholder="Masalan: sentabr kirimlari uchun"
             rows={2}
-            disabled={saving}
+            disabled={saving || retryPending}
           />
         </div>
 
@@ -845,15 +871,16 @@ function BudgetSupplierPaymentDialog({ supplier, onClose, onPaid }) {
           />
         </div>
 
+        {retryPending && <p className="text-xs text-muted-foreground">Avvalgi {pendingSupplierRef.current} to‘lovi saqlandi. {pendingSupplierChanged ? "Natijani tekshirish uchun shu yetkazib beruvchining oynasini oching." : "Qayta tekshirish aynan shu summa va izoh bilan amalga oshadi."}</p>}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>{retryPending ? "Yopish" : "Bekor qilish"}</Button>
           <Button
             type="button"
             onClick={submit}
-            disabled={saving || loadingBalances || invalidAmount || !/^\d{4,8}$/.test(ownerPin)}
+            disabled={saving || loadingBalances || pendingSupplierChanged || (!retryPending && invalidAmount) || !/^\d{4,8}$/.test(ownerPin)}
             className="bg-primary text-primary-foreground hover:bg-primary-strong"
           >
-            {saving ? "To‘lanmoqda…" : "Owner PIN bilan to‘lash"}
+            {saving ? "To‘lanmoqda…" : retryPending ? "Avvalgi to‘lovni tekshirish" : "Owner PIN bilan to‘lash"}
           </Button>
         </DialogFooter>
       </DialogContent>

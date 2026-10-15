@@ -1,0 +1,5526 @@
+{
+  "base_commit": "41d367a0081a52359b48c6ec31a99bb73ea338b1",
+  "roles": [
+    "admin",
+    "manager",
+    "cashier",
+    "accountant",
+    "production",
+    "warehouse"
+  ],
+  "entities": {
+    "CashMovement": {
+      "path": "base44/entities/CashMovement.jsonc",
+      "schema": {
+        "name": "CashMovement",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "employee_name": {
+            "type": "string"
+          },
+          "expense_category": {
+            "default": "other_expense",
+            "enum": [
+              "shop_expense",
+              "goods_payment",
+              "owner_withdrawal",
+              "other_expense"
+            ],
+            "type": "string"
+          },
+          "recipient_id": {
+            "type": "string"
+          },
+          "recipient_name_snapshot": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "reference_type": {
+            "type": "string"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "type": {
+            "default": "withdrawal",
+            "enum": [
+              "withdrawal"
+            ],
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "shift_id",
+          "shop_id",
+          "user_id",
+          "employee_name",
+          "type",
+          "amount",
+          "reason"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "data.user_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        },
+        "type": "object"
+      }
+    },
+    "CustomerOrder": {
+      "path": "base44/entities/CustomerOrder.jsonc",
+      "schema": {
+        "name": "CustomerOrder",
+        "type": "object",
+        "properties": {
+          "order_sequence": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mijozga ko‘rsatiladigan o‘zgarmas tartib raqami: 1, 2, 3... barcha kunlar va do‘konlar bo‘yicha."
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "order_type": {
+            "type": "string",
+            "enum": [
+              "toy_va_bazmlar",
+              "tugilgan_kun_va_boshqa"
+            ]
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name_snapshot": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "description": "Bog'langan mijoz (Customer) yozuvi IDsi"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "customer_phone": {
+            "type": "string"
+          },
+          "required_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "required_time": {
+            "type": "string"
+          },
+          "fulfilment_type": {
+            "type": "string",
+            "enum": [
+              "pickup",
+              "delivery"
+            ]
+          },
+          "delivery_address": {
+            "type": "string"
+          },
+          "reference_image": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "cake_shape": {
+            "type": "string"
+          },
+          "subtotal": {
+            "type": "number",
+            "default": 0
+          },
+          "delivery_fee": {
+            "type": "number",
+            "default": 0
+          },
+          "adjustment_amount": {
+            "type": "number",
+            "default": 0
+          },
+          "adjustment_reason": {
+            "type": "string"
+          },
+          "original_calculated_total": {
+            "type": "number",
+            "default": 0
+          },
+          "total": {
+            "type": "number",
+            "default": 0
+          },
+          "paid_amount": {
+            "type": "number",
+            "default": 0
+          },
+          "remaining_balance": {
+            "type": "number",
+            "default": 0
+          },
+          "payment_status": {
+            "type": "string",
+            "enum": [
+              "unpaid",
+              "partial",
+              "paid"
+            ],
+            "default": "unpaid"
+          },
+          "order_status": {
+            "type": "string",
+            "enum": [
+              "qabul_qilindi",
+              "tayyorlanmoqda",
+              "tayyor",
+              "yuborildi_olib_ketildi",
+              "yakunlandi",
+              "bekor_qilindi"
+            ],
+            "default": "qabul_qilindi"
+          },
+          "ready_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ready_inventory_state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "completed"
+            ],
+            "default": "pending"
+          },
+          "ready_inventory_token": {
+            "type": "string"
+          },
+          "ready_inventory_location_id": {
+            "type": "string"
+          },
+          "ready_inventory_completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shipped_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "creator_id": {
+            "type": "string"
+          },
+          "creator_name": {
+            "type": "string"
+          },
+          "creator_role": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "order_number",
+          "order_type",
+          "shop_id",
+          "customer_name",
+          "customer_phone",
+          "required_date",
+          "required_time",
+          "fulfilment_type",
+          "subtotal",
+          "total",
+          "paid_amount",
+          "remaining_balance",
+          "payment_status",
+          "order_status",
+          "creator_id"
+        ],
+        "rls": {
+          "create": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "data.shop_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "production"
+                            }
+                          },
+                          {
+                            "data.shop_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "CustomerOrderItem": {
+      "path": "base44/entities/CustomerOrderItem.jsonc",
+      "schema": {
+        "name": "CustomerOrderItem",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string"
+          },
+          "order_number_snapshot": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "Katalog mahsuloti IDsi; oddiy buyurtmada bo‘sh."
+          },
+          "item_type": {
+            "type": "string",
+            "enum": [
+              "catalog",
+              "custom"
+            ],
+            "default": "catalog"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "product_image_snapshot": {
+            "type": "string"
+          },
+          "category_name_snapshot": {
+            "type": "string"
+          },
+          "unit_snapshot": {
+            "type": "string",
+            "enum": [
+              "piece",
+              "sheet"
+            ]
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "event_pieces_per_sheet_snapshot": {
+            "type": "number",
+            "default": 0
+          },
+          "unit_price_snapshot": {
+            "type": "number"
+          },
+          "line_total": {
+            "type": "number"
+          },
+          "customization_note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "product_name_snapshot",
+          "unit_snapshot",
+          "quantity",
+          "unit_price_snapshot",
+          "line_total"
+        ],
+        "rls": {
+          "create": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "data.shop_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "production"
+                            }
+                          },
+                          {
+                            "data.shop_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "DailyShopReport": {
+      "path": "base44/entities/DailyShopReport.jsonc",
+      "schema": {
+        "name": "DailyShopReport",
+        "type": "object",
+        "properties": {
+          "business_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Asia/Tashkent bo'yicha savdo kuni (YYYY-MM-DD)"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name": {
+            "type": "string"
+          },
+          "total_revenue": {
+            "type": "number",
+            "default": 0
+          },
+          "total_cost": {
+            "type": "number",
+            "default": 0,
+            "description": "Sotilgan mahsulot tannarxi"
+          },
+          "real_profit": {
+            "type": "number",
+            "default": 0,
+            "description": "Tushum - tannarx"
+          },
+          "sale_count": {
+            "type": "number",
+            "default": 0
+          },
+          "refund_count": {
+            "type": "number",
+            "default": 0
+          },
+          "cash_total": {
+            "type": "number",
+            "default": 0
+          },
+          "uzcard_total": {
+            "type": "number",
+            "default": 0
+          },
+          "humo_total": {
+            "type": "number",
+            "default": 0
+          },
+          "online_total": {
+            "type": "number",
+            "default": 0
+          },
+          "bank_transfer_total": {
+            "type": "number",
+            "default": 0
+          },
+          "sheet_appended": {
+            "type": "boolean",
+            "default": false
+          },
+          "sheet_append_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email_sent": {
+            "type": "boolean",
+            "default": false
+          },
+          "email_sent_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sent_by_id": {
+            "type": "string"
+          },
+          "sent_by_name": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "auto",
+              "shift_close"
+            ],
+            "default": "manual"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "order_payment_total": {
+            "type": "number"
+          },
+          "collections_total": {
+            "type": "number"
+          },
+          "expenses_total": {
+            "type": "number"
+          },
+          "net_profit": {
+            "type": "number"
+          },
+          "unknown_cost_count": {
+            "type": "number"
+          },
+          "delivery_fingerprint": {
+            "type": "string"
+          },
+          "sheet_fingerprint": {
+            "type": "string"
+          },
+          "email_fingerprint": {
+            "type": "string"
+          },
+          "email_delivery_state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "sending",
+              "sent",
+              "failed",
+              "uncertain"
+            ]
+          },
+          "email_recipient_snapshot": {
+            "type": "string"
+          },
+          "email_attempted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_attempted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivery_error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "business_date",
+          "shop_id",
+          "shop_name",
+          "total_revenue",
+          "total_cost",
+          "real_profit"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "$nor": [
+                      {
+                        "user_condition": {
+                          "role": "manager"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "role": "manager"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "role": "accountant"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "manager",
+                      "active": true
+                    }
+                  },
+                  {
+                    "data.shop_id": {
+                      "$nin": [
+                        "",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "data.shop_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "IngredientStock": {
+      "path": "base44/entities/IngredientStock.jsonc",
+      "schema": {
+        "name": "IngredientStock",
+        "type": "object",
+        "properties": {
+          "ingredient_id": {
+            "type": "string"
+          },
+          "ingredient_name": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "low_stock_level": {
+            "default": 0,
+            "type": "number"
+          },
+          "quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "piece"
+            ],
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          },
+          "updated_by_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "location_id",
+          "ingredient_id",
+          "ingredient_name",
+          "unit",
+          "quantity"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "data.location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "manager",
+                              "active": true
+                            }
+                          },
+                          {
+                            "data.location_id": {
+                              "$nin": [
+                                "",
+                                null
+                              ]
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "OrderPayment": {
+      "path": "base44/entities/OrderPayment.jsonc",
+      "schema": {
+        "name": "OrderPayment",
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string"
+          },
+          "order_number_snapshot": {
+            "type": "string"
+          },
+          "payment_kind": {
+            "type": "string",
+            "enum": [
+              "advance",
+              "balance",
+              "additional"
+            ]
+          },
+          "payment_method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_card",
+              "online",
+              "uzcard",
+              "humo",
+              "click",
+              "payme",
+              "bank_transfer",
+              "other"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name_snapshot": {
+            "type": "string"
+          },
+          "employee_id": {
+            "type": "string"
+          },
+          "employee_name": {
+            "type": "string"
+          },
+          "employee_role": {
+            "type": "string"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed"
+            ],
+            "default": "completed"
+          }
+        },
+        "required": [
+          "order_id",
+          "payment_kind",
+          "payment_method",
+          "amount",
+          "paid_at",
+          "shop_id",
+          "employee_id",
+          "idempotency_key",
+          "status"
+        ],
+        "rls": {
+          "create": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "data.shop_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.shop_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "Payment": {
+      "path": "base44/entities/Payment.jsonc",
+      "schema": {
+        "name": "Payment",
+        "type": "object",
+        "properties": {
+          "sale_id": {
+            "type": "string"
+          },
+          "sale_number": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "cashier_id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_card",
+              "online",
+              "uzcard",
+              "humo",
+              "click",
+              "payme",
+              "bank_transfer",
+              "other"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "sale_id",
+          "shop_id",
+          "shift_id",
+          "cashier_id",
+          "method",
+          "amount"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.cashier_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "ProductStock": {
+      "path": "base44/entities/ProductStock.jsonc",
+      "schema": {
+        "name": "ProductStock",
+        "type": "object",
+        "properties": {
+          "location_id": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "low_stock_level": {
+            "default": 0,
+            "type": "number"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "unit": {
+            "default": "piece",
+            "enum": [
+              "piece",
+              "sheet"
+            ],
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "type": "string"
+          },
+          "updated_by_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "location_id",
+          "product_id",
+          "product_name",
+          "unit",
+          "quantity"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "data.location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "manager",
+                              "active": true
+                            }
+                          },
+                          {
+                            "data.location_id": {
+                              "$nin": [
+                                "",
+                                null
+                              ]
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ProductionBatch": {
+      "path": "base44/entities/ProductionBatch.jsonc",
+      "schema": {
+        "name": "ProductionBatch",
+        "type": "object",
+        "properties": {
+          "batch_number": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "order_number_snapshot": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "output_disposition": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "customer_order"
+            ],
+            "default": "stock"
+          },
+          "reserved_pieces": {
+            "type": "number",
+            "default": 0
+          },
+          "recipe_id": {
+            "type": "string"
+          },
+          "recipe_version": {
+            "type": "integer"
+          },
+          "recipe_output_quantity": {
+            "type": "number"
+          },
+          "produced_quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "piece",
+              "sheet"
+            ],
+            "default": "piece"
+          },
+          "unit_cost": {
+            "type": "number",
+            "default": 0,
+            "description": "1 natija birligi (dona/varaq) tannarxi — ishlab chiqarish yakunida saqlanadi"
+          },
+          "total_cost": {
+            "type": "number",
+            "default": 0,
+            "description": "Butun partiya tannarxi = unit_cost * produced_quantity"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "completed",
+              "cancelled"
+            ],
+            "default": "processing"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_number",
+          "location_id",
+          "product_id",
+          "product_name_snapshot",
+          "recipe_id",
+          "produced_quantity",
+          "unit",
+          "status",
+          "created_at",
+          "user_id"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "role": "accountant"
+                        }
+                      },
+                      {
+                        "data.location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "manager",
+                              "active": true
+                            }
+                          },
+                          {
+                            "data.location_id": {
+                              "$nin": [
+                                "",
+                                null
+                              ]
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ProductionBatchItem": {
+      "path": "base44/entities/ProductionBatchItem.jsonc",
+      "schema": {
+        "name": "ProductionBatchItem",
+        "type": "object",
+        "properties": {
+          "production_batch_id": {
+            "type": "string"
+          },
+          "batch_number": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "order_number_snapshot": {
+            "type": "string"
+          },
+          "ingredient_id": {
+            "type": "string"
+          },
+          "ingredient_name_snapshot": {
+            "type": "string"
+          },
+          "quantity_used": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "ml",
+              "piece"
+            ]
+          },
+          "balance_before": {
+            "type": "number"
+          },
+          "balance_after": {
+            "type": "number"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "production_batch_id",
+          "batch_number",
+          "location_id",
+          "product_id",
+          "ingredient_id",
+          "ingredient_name_snapshot",
+          "quantity_used",
+          "unit",
+          "created_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "role": "accountant"
+                        }
+                      },
+                      {
+                        "data.location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "manager",
+                              "active": true
+                            }
+                          },
+                          {
+                            "data.location_id": {
+                              "$nin": [
+                                "",
+                                null
+                              ]
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "Refund": {
+      "path": "base44/entities/Refund.jsonc",
+      "schema": {
+        "name": "Refund",
+        "type": "object",
+        "properties": {
+          "refund_number": {
+            "type": "string"
+          },
+          "sale_id": {
+            "type": "string"
+          },
+          "sale_number": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "cashier_id": {
+            "type": "string"
+          },
+          "cashier_name": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "payment_summary": {
+            "type": "string"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "sale_id",
+          "shop_id",
+          "shift_id",
+          "cashier_id",
+          "amount",
+          "reason"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.cashier_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "Sale": {
+      "path": "base44/entities/Sale.jsonc",
+      "schema": {
+        "name": "Sale",
+        "type": "object",
+        "properties": {
+          "sale_number": {
+            "type": "string"
+          },
+          "service_ticket_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Oshxona xizmat chekining savdo paytida saqlangan do‘kon bo‘yicha raqami; asl sale_number o‘zgarmaydi"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Kassa so‘rovini takroran yozishni oldini oladigan qurilma kaliti"
+          },
+          "request_fingerprint": {
+            "type": "string",
+            "description": "Idempotency kalitiga bog‘langan server hisoblagan so‘rov izi"
+          },
+          "sold_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Savdo kassada amalga oshirilgan vaqt"
+          },
+          "business_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Asia/Tashkent bo‘yicha savdo kuni"
+          },
+          "financial_records_version": {
+            "type": "number",
+            "default": 2
+          },
+          "sale_items_count": {
+            "type": "number",
+            "default": 0
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name": {
+            "type": "string"
+          },
+          "table_order_id_snapshot": {
+            "type": "string",
+            "description": "To‘langan stol buyurtmasining o‘zgarmas identifikatori"
+          },
+          "table_order_revision_snapshot": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "To‘lov paytidagi stol buyurtmasi versiyasi"
+          },
+          "table_number_snapshot": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Kassadan savdo yakunlangan vaqtdagi restoran stoli; keyin o‘zgartirilmaydi"
+          },
+          "receipt_instagram_snapshot": {
+            "type": "string",
+            "description": "Savdo paytidagi do‘kon Instagram username; keyingi sozlama o‘zgarishlaridan mustaqil"
+          },
+          "receipt_phone_snapshot": {
+            "type": "string",
+            "description": "Savdo paytidagi do‘kon telefon raqami"
+          },
+          "receipt_address_snapshot": {
+            "type": "string",
+            "description": "Savdo paytidagi do‘kon manzili"
+          },
+          "customer_id": {
+            "type": "string",
+            "description": "Bog'langan mijoz (Customer) yozuvi IDsi"
+          },
+          "customer_name_snapshot": {
+            "type": "string"
+          },
+          "customer_phone_snapshot": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "stock_tracked": {
+                  "type": "boolean"
+                },
+                "stock_location_id": {
+                  "type": "string"
+                },
+                "stock_quantity_change": {
+                  "type": "number"
+                },
+                "product_name": {
+                  "type": "string"
+                },
+                "image_url": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "number"
+                },
+                "quantity": {
+                  "type": "number"
+                },
+                "subtotal": {
+                  "type": "number"
+                },
+                "sale_unit": {
+                  "type": "string",
+                  "enum": [
+                    "piece",
+                    "gram"
+                  ],
+                  "default": "piece"
+                },
+                "fries_option": {
+                  "type": "string",
+                  "enum": [
+                    "with",
+                    "without"
+                  ],
+                  "description": "Burger fri tanlovi; eski savdolarda bo‘sh qoladi"
+                }
+              }
+            }
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "discount_code": {
+            "type": "string"
+          },
+          "discount_amount": {
+            "type": "number",
+            "default": 0
+          },
+          "total": {
+            "type": "number"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "payment_methods_summary": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "refunded"
+            ],
+            "default": "completed"
+          },
+          "refunded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refunded_by": {
+            "type": "string"
+          },
+          "refund_id": {
+            "type": "string"
+          },
+          "refund_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "shift_id",
+          "user_id",
+          "shop_id",
+          "subtotal",
+          "total",
+          "status"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.user_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "SaleItem": {
+      "path": "base44/entities/SaleItem.jsonc",
+      "schema": {
+        "name": "SaleItem",
+        "type": "object",
+        "properties": {
+          "sale_id": {
+            "type": "string"
+          },
+          "sale_number": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "cashier_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "source_type_snapshot": {
+            "type": "string"
+          },
+          "stock_tracked_snapshot": {
+            "type": "boolean",
+            "default": false
+          },
+          "stock_location_id": {
+            "type": "string"
+          },
+          "stock_quantity_change": {
+            "type": "number",
+            "default": 0
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "image_url_snapshot": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "discount_amount": {
+            "type": "number",
+            "default": 0
+          },
+          "line_total": {
+            "type": "number"
+          },
+          "unit_cost_at_sale": {
+            "type": "number",
+            "default": 0,
+            "description": "Sotuv vaqtidagi o‘zgartirib bo‘lmaydigan tannarx (1 dona)"
+          },
+          "total_cost_at_sale": {
+            "type": "number",
+            "default": 0,
+            "description": "Sotuv vaqtidagi qator tannarxi = unit_cost_at_sale * quantity"
+          },
+          "cost_is_estimate": {
+            "type": "boolean",
+            "default": true,
+            "description": "Tannarx ishonchli hisoblanmagan (retsept/xarid narxi yetishmagan) — Taxminiy"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sale_unit": {
+            "type": "string",
+            "enum": [
+              "piece",
+              "gram"
+            ],
+            "default": "piece"
+          },
+          "fries_option": {
+            "type": "string",
+            "enum": [
+              "with",
+              "without"
+            ],
+            "description": "Burger fri tanlovi; eski savdolarda bo‘sh qoladi"
+          }
+        },
+        "required": [
+          "sale_id",
+          "shop_id",
+          "shift_id",
+          "cashier_id",
+          "product_name_snapshot",
+          "quantity",
+          "unit_price",
+          "line_total"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.cashier_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "Shift": {
+      "path": "base44/entities/Shift.jsonc",
+      "schema": {
+        "name": "Shift",
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closing",
+              "closed"
+            ],
+            "default": "open"
+          },
+          "opened_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "starting_cash": {
+            "type": "number",
+            "default": 0
+          },
+          "expected_cash": {
+            "type": "number",
+            "default": 0
+          },
+          "actual_cash": {
+            "type": "number",
+            "default": 0
+          },
+          "difference": {
+            "type": "number",
+            "default": 0
+          },
+          "cash_sales": {
+            "type": "number",
+            "default": 0
+          },
+          "uzcard_sales": {
+            "type": "number",
+            "default": 0
+          },
+          "humo_sales": {
+            "type": "number",
+            "default": 0
+          },
+          "online_sales": {
+            "type": "number",
+            "default": 0
+          },
+          "bank_transfer_sales": {
+            "type": "number",
+            "default": 0
+          },
+          "total_sales": {
+            "type": "number",
+            "default": 0
+          },
+          "order_count": {
+            "type": "number",
+            "default": 0
+          },
+          "sale_request_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "cash_removed": {
+            "type": "number",
+            "default": 0
+          },
+          "refunds_total": {
+            "type": "number",
+            "default": 0
+          },
+          "stock_count_completed": {
+            "type": "boolean",
+            "default": false
+          },
+          "stock_snapshot_count": {
+            "type": "number",
+            "default": 0
+          },
+          "stock_difference_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "stock_difference_product_count": {
+            "type": "number",
+            "default": 0
+          },
+          "budget_settled": {
+            "type": "boolean",
+            "default": false
+          },
+          "budget_settlement_reference": {
+            "type": "string"
+          },
+          "budget_cash_submitted": {
+            "type": "number",
+            "default": 0
+          },
+          "cash_left_for_next_shift": {
+            "type": "number",
+            "default": 0
+          },
+          "budget_settled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "budget_settled_by_id": {
+            "type": "string"
+          },
+          "budget_settled_by_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "shop_id"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.user_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "ShiftProductSnapshot": {
+      "path": "base44/entities/ShiftProductSnapshot.jsonc",
+      "schema": {
+        "properties": {
+          "cashier_id": {
+            "type": "string"
+          },
+          "cashier_name": {
+            "type": "string"
+          },
+          "closed_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "counted_by_id": {
+            "type": "string"
+          },
+          "counted_by_name": {
+            "type": "string"
+          },
+          "counted_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "difference": {
+            "default": 0,
+            "type": "number"
+          },
+          "expected_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "image_url_snapshot": {
+            "type": "string"
+          },
+          "opening_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "other_change_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "received_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "returned_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name": {
+            "type": "string"
+          },
+          "sold_quantity": {
+            "default": 0,
+            "type": "number"
+          },
+          "unit": {
+            "default": "piece",
+            "enum": [
+              "piece"
+            ],
+            "type": "string"
+          },
+          "waste_quantity": {
+            "default": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "shift_id",
+          "shop_id",
+          "cashier_id",
+          "product_id",
+          "product_name_snapshot",
+          "unit",
+          "expected_quantity",
+          "counted_quantity",
+          "difference",
+          "closed_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": false,
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.cashier_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": false
+        },
+        "type": "object",
+        "name": "ShiftProductSnapshot"
+      }
+    },
+    "shift-product-snapshot": {
+      "path": "base44/entities/shift-product-snapshot.jsonc",
+      "schema": {
+        "name": "ShiftProductSnapshot",
+        "type": "object",
+        "properties": {
+          "shift_id": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name": {
+            "type": "string"
+          },
+          "cashier_id": {
+            "type": "string"
+          },
+          "cashier_name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "image_url_snapshot": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "piece"
+            ],
+            "default": "piece"
+          },
+          "opening_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "received_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "sold_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "waste_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "returned_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "other_change_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "expected_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "counted_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "difference": {
+            "type": "number",
+            "default": 0
+          },
+          "counted_by_id": {
+            "type": "string"
+          },
+          "counted_by_name": {
+            "type": "string"
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "shift_id",
+          "shop_id",
+          "cashier_id",
+          "product_id",
+          "product_name_snapshot",
+          "unit",
+          "expected_quantity",
+          "counted_quantity",
+          "difference",
+          "closed_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "data.cashier_id": "{{user.id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.shop_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.shop_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": false,
+          "delete": false
+        }
+      }
+    },
+    "Shop": {
+      "path": "base44/entities/Shop.jsonc",
+      "schema": {
+        "name": "Shop",
+        "properties": {
+          "pos_product_order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "maxItems": 5000,
+            "description": "Do‘kon kassasidagi mahsulotlar tartibi"
+          },
+          "pos_product_order_version": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Mahsulot tartibini parallel tahrirlash nazorati"
+          },
+          "active": {
+            "default": true,
+            "type": "boolean"
+          },
+          "address": {
+            "type": "string"
+          },
+          "allows_pos": {
+            "default": true,
+            "type": "boolean"
+          },
+          "is_main": {
+            "default": false,
+            "type": "boolean"
+          },
+          "location_type": {
+            "default": "shop",
+            "enum": [
+              "shop",
+              "production"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "service_ticket_counter": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Do‘konning joriy smenalar davridagi oshxona xizmat cheki raqami; savdo ID emas"
+          },
+          "service_ticket_version": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Ikki kassir bir xil xizmat raqamini olmasligi uchun atomik versiya"
+          },
+          "service_ticket_cycle_active": {
+            "type": "boolean",
+            "default": false,
+            "description": "Shu do‘konda smenalar davri davom etmoqda; barcha smenalar yopilsa false"
+          },
+          "restaurant_table_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30,
+            "default": 0,
+            "description": "Stollar soni: 0 = hali sozlanmagan yoki o‘chirilgan"
+          },
+          "restaurant_entrance": {
+            "type": "object",
+            "description": "Do‘kon zalidagi kirish eshigi: devor va devor bo‘ylab 0–1000 koordinata",
+            "properties": {
+              "side": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "right",
+                  "bottom",
+                  "left"
+                ]
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 150,
+                "maximum": 850
+              }
+            },
+            "required": [
+              "side",
+              "offset"
+            ],
+            "default": {
+              "side": "top",
+              "offset": 500
+            }
+          },
+          "restaurant_table_orders_version": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Stollar bo‘yicha to‘lanmagan buyurtmalarni bir vaqtda tahrirlash nazorati"
+          },
+          "restaurant_table_groups": {
+            "type": "array",
+            "description": "Birga o‘tirgan mehmonlar uchun vaqtincha birlashtirilgan stollar; hisob yopilganda guruh avtomatik yechiladi",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "numbers": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 8,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30
+                  }
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "created_by": {
+                  "type": "string"
+                },
+                "created_by_name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "numbers",
+                "created_at",
+                "created_by"
+              ]
+            },
+            "default": []
+          },
+          "restaurant_table_orders": {
+            "type": "array",
+            "description": "Do‘konning ochiq stol buyurtmalari; to‘lovgacha savdo yoki ombor harakati emas",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "order_type": {
+                  "type": "string",
+                  "enum": [
+                    "table",
+                    "takeaway"
+                  ]
+                },
+                "opened_by_name": {
+                  "type": "string"
+                },
+                "customer_name": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "number": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "ticket_number": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Stol buyurtmasi birinchi saqlanganda berilgan do‘kon bo‘yicha xizmat raqami"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "occupied",
+                    "paying"
+                  ]
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "product_id": {
+                        "type": "string"
+                      },
+                      "product_name": {
+                        "type": "string"
+                      },
+                      "image_url": {
+                        "type": "string"
+                      },
+                      "price": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "subtotal": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "stock_tracked": {
+                        "type": "boolean"
+                      },
+                      "source_type": {
+                        "type": "string"
+                      },
+                      "variant_name": {
+                        "type": "string"
+                      },
+                      "notes": {
+                        "type": "string"
+                      },
+                      "sale_unit": {
+                        "type": "string",
+                        "enum": [
+                          "piece",
+                          "gram"
+                        ],
+                        "default": "piece"
+                      },
+                      "fries_option": {
+                        "type": "string",
+                        "enum": [
+                          "with",
+                          "without"
+                        ],
+                        "description": "Burger fri tanlovi; eski savdolarda bo‘sh qoladi"
+                      }
+                    },
+                    "required": [
+                      "product_id",
+                      "product_name",
+                      "price",
+                      "quantity",
+                      "subtotal"
+                    ]
+                  }
+                },
+                "total": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "started_at": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string"
+                },
+                "opened_by": {
+                  "type": "string"
+                },
+                "updated_by": {
+                  "type": "string"
+                },
+                "checkout_key": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "state",
+                "items",
+                "total",
+                "started_at"
+              ]
+            },
+            "default": []
+          },
+          "restaurant_outdoor_polygon": {
+            "type": "array",
+            "description": "Admin chizgan ko‘cha/terassa hududi chegarasi, xaritada 0–1000 koordinatalar; bo‘sh ro‘yxat = hali belgilanmagan",
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "y": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ]
+            },
+            "default": []
+          },
+          "restaurant_table_layout_version": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Stollar joylashuvi versiyasi; bir vaqtda tahrirlash nazorati"
+          },
+          "restaurant_table_layout": {
+            "type": "array",
+            "description": "Stollarning do‘kon bo‘yicha 0–1000 koordinatadagi joylashuvi",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "x": {
+                  "type": "integer",
+                  "minimum": 60,
+                  "maximum": 940
+                },
+                "y": {
+                  "type": "integer",
+                  "minimum": 70,
+                  "maximum": 930
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 80,
+                  "maximum": 140,
+                  "description": "Stolning xaritadagi individual o‘lchami foizda; eski stollar 100%"
+                }
+              },
+              "required": [
+                "number",
+                "x",
+                "y"
+              ]
+            },
+            "default": []
+          },
+          "instagram": {
+            "type": "string",
+            "description": "Ushbu do‘konning chekida ko‘rsatiladigan Instagram username"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        },
+        "type": "object"
+      }
+    },
+    "StockCount": {
+      "path": "base44/entities/StockCount.jsonc",
+      "schema": {
+        "name": "StockCount",
+        "type": "object",
+        "properties": {
+          "count_number": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "submitted",
+              "approved",
+              "cancelled"
+            ],
+            "default": "draft"
+          },
+          "total_items": {
+            "type": "number",
+            "default": 0
+          },
+          "counted_items": {
+            "type": "number",
+            "default": 0
+          },
+          "difference_items": {
+            "type": "number",
+            "default": 0
+          },
+          "net_difference": {
+            "type": "number",
+            "default": 0
+          },
+          "counted_by_id": {
+            "type": "string"
+          },
+          "counted_by_name": {
+            "type": "string"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_by_id": {
+            "type": "string"
+          },
+          "approved_by_name": {
+            "type": "string"
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approval_request_id": {
+            "type": "string"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "count_number",
+          "location_id",
+          "location_name",
+          "status",
+          "counted_by_id",
+          "counted_by_name"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$or": [
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "manager",
+                      "active": true
+                    }
+                  },
+                  {
+                    "data.location_id": {
+                      "$nin": [
+                        "",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "StockCountItem": {
+      "path": "base44/entities/StockCountItem.jsonc",
+      "schema": {
+        "name": "StockCountItem",
+        "type": "object",
+        "properties": {
+          "stock_count_id": {
+            "type": "string"
+          },
+          "count_number": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "item_kind": {
+            "type": "string",
+            "enum": [
+              "product",
+              "ingredient"
+            ],
+            "default": "product",
+            "description": "Sanoq qatori tayyor mahsulotmi yoki masalliq/qadoqmi"
+          },
+          "item_id": {
+            "type": "string",
+            "description": "Mahsulot yoki masalliq IDsi"
+          },
+          "item_name_snapshot": {
+            "type": "string",
+            "description": "Sanoq boshlangan paytdagi nom"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "ml",
+              "piece",
+              "sheet"
+            ],
+            "default": "piece"
+          },
+          "system_quantity": {
+            "type": "number"
+          },
+          "system_version": {
+            "type": "string",
+            "description": "Qoldiq sanog'i boshlanganda olingan updated_date/updated_date surati"
+          },
+          "counted_quantity": {
+            "type": "number",
+            "default": 0
+          },
+          "was_counted": {
+            "type": "boolean",
+            "default": false,
+            "description": "Maydon to'ldirilgan = sanalgan. Bo'sh = sanalmagan (nol emas)."
+          },
+          "difference": {
+            "type": "number",
+            "default": 0
+          },
+          "reason": {
+            "type": "string"
+          },
+          "item_order": {
+            "type": "integer",
+            "default": 0
+          },
+          "applied": {
+            "type": "boolean",
+            "default": false
+          },
+          "stale": {
+            "type": "boolean",
+            "default": false,
+            "description": "Qoldiq sanog'dan keyin o'zgargan — qayta sanash kerak"
+          },
+          "movement_id": {
+            "type": "string"
+          },
+          "applied_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "stock_count_id",
+          "location_id",
+          "product_id",
+          "product_name_snapshot",
+          "unit",
+          "system_quantity"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$or": [
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "manager",
+                      "active": true
+                    }
+                  },
+                  {
+                    "data.location_id": {
+                      "$nin": [
+                        "",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "StockMovement": {
+      "path": "base44/entities/StockMovement.jsonc",
+      "schema": {
+        "name": "StockMovement",
+        "properties": {
+          "balance_after": {
+            "type": "number"
+          },
+          "balance_before": {
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "item_kind": {
+            "enum": [
+              "ingredient",
+              "product"
+            ],
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "movement_number": {
+            "type": "string"
+          },
+          "movement_type": {
+            "enum": [
+              "opening",
+              "adjustment",
+              "receipt",
+              "production_use",
+              "production_output",
+              "transfer_out",
+              "transfer_in",
+              "sale",
+              "waste",
+              "waste_cancel",
+              "refund",
+              "receipt_cancel"
+            ],
+            "type": "string"
+          },
+          "quantity_change": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "reference_type": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "order_number_snapshot": {
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "g",
+              "ml",
+              "piece",
+              "sheet"
+            ],
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "movement_number",
+          "location_id",
+          "item_kind",
+          "item_id",
+          "item_name",
+          "unit",
+          "movement_type",
+          "quantity_change",
+          "balance_before",
+          "balance_after",
+          "reason",
+          "user_id",
+          "created_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "$and": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "admin"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "$and": [
+                      {
+                        "user_condition": {
+                          "role": "manager",
+                          "active": true
+                        }
+                      },
+                      {
+                        "data.location_id": {
+                          "$nin": [
+                            "",
+                            null
+                          ]
+                        }
+                      },
+                      {
+                        "data.location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        },
+        "type": "object"
+      }
+    },
+    "StockTransfer": {
+      "path": "base44/entities/StockTransfer.jsonc",
+      "schema": {
+        "name": "StockTransfer",
+        "type": "object",
+        "properties": {
+          "transfer_number": {
+            "type": "string"
+          },
+          "batch_id": {
+            "type": "string"
+          },
+          "batch_number": {
+            "type": "string"
+          },
+          "line_number": {
+            "type": "integer"
+          },
+          "batch_item_count": {
+            "type": "integer"
+          },
+          "source_location_id": {
+            "type": "string"
+          },
+          "source_location_name": {
+            "type": "string"
+          },
+          "destination_location_id": {
+            "type": "string"
+          },
+          "destination_location_name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "piece",
+              "sheet"
+            ],
+            "default": "piece"
+          },
+          "received_quantity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "conversion_factor": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "receiving",
+              "received"
+            ],
+            "default": "pending"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_by_name": {
+            "type": "string"
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "received_by": {
+            "type": "string"
+          },
+          "received_by_name": {
+            "type": "string"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "transfer_number",
+          "source_location_id",
+          "source_location_name",
+          "destination_location_id",
+          "destination_location_name",
+          "product_id",
+          "product_name_snapshot",
+          "quantity",
+          "unit",
+          "status",
+          "created_by",
+          "created_by_name",
+          "sent_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "data.source_location_id": "{{user.data.shop_id}}"
+                      },
+                      {
+                        "data.destination_location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "manager",
+                              "active": true
+                            }
+                          },
+                          {
+                            "$or": [
+                              {
+                                "$and": [
+                                  {
+                                    "data.source_location_id": {
+                                      "$nin": [
+                                        "",
+                                        null
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "data.source_location_id": "{{user.data.shop_id}}"
+                                  }
+                                ]
+                              },
+                              {
+                                "$and": [
+                                  {
+                                    "data.destination_location_id": {
+                                      "$nin": [
+                                        "",
+                                        null
+                                      ]
+                                    }
+                                  },
+                                  {
+                                    "data.destination_location_id": "{{user.data.shop_id}}"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "SupplierPayment": {
+      "path": "base44/entities/SupplierPayment.jsonc",
+      "schema": {
+        "name": "SupplierPayment",
+        "type": "object",
+        "properties": {
+          "payment_number": {
+            "type": "string"
+          },
+          "receipt_id": {
+            "type": "string"
+          },
+          "receipt_number_snapshot": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string"
+          },
+          "supplier_name_snapshot": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "shop_name_snapshot": {
+            "type": "string"
+          },
+          "shift_id": {
+            "type": "string"
+          },
+          "cash_movement_id": {
+            "type": "string"
+          },
+          "payment_source": {
+            "type": "string",
+            "enum": [
+              "shift_cash",
+              "budget"
+            ],
+            "default": "shift_cash"
+          },
+          "budget_account": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "uzcard",
+              "humo",
+              "online",
+              "bank"
+            ]
+          },
+          "budget_transaction_id": {
+            "type": "string"
+          },
+          "authorized_by_id": {
+            "type": "string"
+          },
+          "authorized_by_name": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "payment_number",
+          "receipt_id",
+          "supplier_id",
+          "supplier_name_snapshot",
+          "amount",
+          "shop_id",
+          "shift_id",
+          "user_id",
+          "paid_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "$and": [
+                      {
+                        "data.payment_source": {
+                          "$ne": "budget"
+                        }
+                      },
+                      {
+                        "$or": [
+                          {
+                            "user_condition": {
+                              "role": "warehouse"
+                            }
+                          },
+                          {
+                            "user_condition": {
+                              "role": "accountant"
+                            }
+                          },
+                          {
+                            "$and": [
+                              {
+                                "$nor": [
+                                  {
+                                    "user_condition": {
+                                      "role": "manager"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "data.user_id": "{{user.id}}"
+                              }
+                            ]
+                          },
+                          {
+                            "$and": [
+                              {
+                                "user_condition": {
+                                  "role": "manager",
+                                  "active": true
+                                }
+                              },
+                              {
+                                "data.shop_id": {
+                                  "$nin": [
+                                    "",
+                                    null
+                                  ]
+                                }
+                              },
+                              {
+                                "data.shop_id": "{{user.data.shop_id}}"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "SupplierReceipt": {
+      "path": "base44/entities/SupplierReceipt.jsonc",
+      "schema": {
+        "name": "SupplierReceipt",
+        "type": "object",
+        "properties": {
+          "receipt_number": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string"
+          },
+          "supplier_name_snapshot": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location_name_snapshot": {
+            "type": "string"
+          },
+          "total_amount": {
+            "type": "number"
+          },
+          "paid_at_receipt": {
+            "type": "number",
+            "default": 0
+          },
+          "debt_amount": {
+            "type": "number",
+            "default": 0
+          },
+          "remaining_debt": {
+            "type": "number",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "paid",
+              "partial",
+              "unpaid",
+              "cancelling",
+              "cancelled"
+            ],
+            "default": "unpaid"
+          },
+          "invoice_reference": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_by_name": {
+            "type": "string"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelled_by": {
+            "type": "string"
+          },
+          "cancelled_by_name": {
+            "type": "string"
+          },
+          "cancellation_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_number",
+          "supplier_id",
+          "supplier_name_snapshot",
+          "location_id",
+          "location_name_snapshot",
+          "total_amount",
+          "paid_at_receipt",
+          "debt_amount",
+          "remaining_debt",
+          "status",
+          "received_at",
+          "created_by"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$or": [
+              {
+                "$and": [
+                  {
+                    "$nor": [
+                      {
+                        "user_condition": {
+                          "role": "manager"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "user_condition": {
+                          "role": "manager"
+                        }
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "warehouse"
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      },
+                      {
+                        "user_condition": {
+                          "role": "accountant"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "manager",
+                      "active": true
+                    }
+                  },
+                  {
+                    "data.location_id": {
+                      "$nin": [
+                        "",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          }
+        }
+      }
+    },
+    "SupplierReceiptItem": {
+      "path": "base44/entities/SupplierReceiptItem.jsonc",
+      "schema": {
+        "name": "SupplierReceiptItem",
+        "type": "object",
+        "properties": {
+          "receipt_id": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "ingredient_id": {
+            "type": "string"
+          },
+          "ingredient_name_snapshot": {
+            "type": "string"
+          },
+          "purchase_quantity": {
+            "type": "number"
+          },
+          "purchase_unit": {
+            "type": "string",
+            "enum": [
+              "kg",
+              "l",
+              "g",
+              "ml",
+              "piece"
+            ]
+          },
+          "base_quantity": {
+            "type": "number"
+          },
+          "base_unit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "ml",
+              "piece"
+            ]
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "line_total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "location_id",
+          "ingredient_id",
+          "ingredient_name_snapshot",
+          "purchase_quantity",
+          "purchase_unit",
+          "base_quantity",
+          "base_unit",
+          "unit_price",
+          "line_total"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$or": [
+              {
+                "user_condition": {
+                  "role": "admin"
+                }
+              },
+              {
+                "user_condition": {
+                  "role": "accountant"
+                }
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "user_condition": {
+                      "role": "manager",
+                      "active": true
+                    }
+                  },
+                  {
+                    "data.location_id": {
+                      "$nin": [
+                        "",
+                        null
+                      ]
+                    }
+                  },
+                  {
+                    "data.location_id": "{{user.data.shop_id}}"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "WasteRecord": {
+      "path": "base44/entities/WasteRecord.jsonc",
+      "schema": {
+        "name": "WasteRecord",
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "description": "Client request identifier for safe retry of the same waste operation."
+          },
+          "waste_number": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "product_name_snapshot": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "piece"
+            ],
+            "default": "piece"
+          },
+          "reason_code": {
+            "type": "string",
+            "enum": [
+              "expired",
+              "damaged",
+              "quality",
+              "other"
+            ]
+          },
+          "reason_label": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "photo_url": {
+            "type": "string"
+          },
+          "unit_price_snapshot": {
+            "type": "number"
+          },
+          "total_retail_value": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "cancelling",
+              "cancelled"
+            ],
+            "default": "recorded"
+          },
+          "source_received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "age_days": {
+            "type": "number"
+          },
+          "expired_quantity_at_record": {
+            "type": "number"
+          },
+          "stock_movement_id": {
+            "type": "string"
+          },
+          "recorded_by_id": {
+            "type": "string"
+          },
+          "recorded_by_name": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelled_by_id": {
+            "type": "string"
+          },
+          "cancelled_by_name": {
+            "type": "string"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancel_reason": {
+            "type": "string"
+          },
+          "cancel_movement_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "waste_number",
+          "location_id",
+          "location_name",
+          "product_id",
+          "product_name_snapshot",
+          "quantity",
+          "unit",
+          "reason_code",
+          "reason_label",
+          "status",
+          "recorded_by_id",
+          "recorded_by_name",
+          "recorded_at"
+        ],
+        "rls": {
+          "create": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "update": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "delete": {
+            "user_condition": {
+              "role": "admin"
+            }
+          },
+          "read": {
+            "$and": [
+              {
+                "$or": [
+                  {
+                    "user_condition": {
+                      "role": "admin"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "manager"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "cashier"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "accountant"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "production"
+                    }
+                  },
+                  {
+                    "user_condition": {
+                      "role": "warehouse"
+                    }
+                  }
+                ]
+              },
+              {
+                "$and": [
+                  {
+                    "$or": [
+                      {
+                        "user_condition": {
+                          "role": "admin"
+                        }
+                      },
+                      {
+                        "data.location_id": "{{user.data.shop_id}}"
+                      }
+                    ]
+                  },
+                  {
+                    "$or": [
+                      {
+                        "$nor": [
+                          {
+                            "user_condition": {
+                              "role": "manager"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "user_condition": {
+                              "role": "manager",
+                              "active": true
+                            }
+                          },
+                          {
+                            "data.location_id": {
+                              "$nin": [
+                                "",
+                                null
+                              ]
+                            }
+                          },
+                          {
+                            "data.location_id": "{{user.data.shop_id}}"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

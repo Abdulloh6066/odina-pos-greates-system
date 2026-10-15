@@ -3,10 +3,7 @@
 // one immutable ShiftProductSnapshot with closing quantity 6. No live records used.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
-import vm from 'node:vm';
-import ts from 'typescript';
+import { memoryBackend } from './helpers/memory-backend.mjs';
 
 function zeroSaleFixture() {
   const db = {
@@ -18,6 +15,7 @@ function zeroSaleFixture() {
       shop_id: 'shop',
       active: true,
     }],
+    Settings: [{ id: 'settings' }],
     Shift: [{
       id: 'shift',
       user_id: 'cashier',
@@ -54,100 +52,21 @@ function zeroSaleFixture() {
 }
 
 function sharedDbHarness(db) {
-  let sequence = 0;
-  const clone = (value) => value == null ? value : structuredClone(value);
-  const matchesValue = (actual, expected) => {
-    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if ('$gte' in expected && !(actual >= expected.$gte)) return false;
-      if ('$lte' in expected && !(actual <= expected.$lte)) return false;
-      return true;
-    }
-    return actual === expected;
-  };
-  const matches = (row, query) => Object.entries(query || {}).every(
-    ([key, value]) => matchesValue(row[key], value),
-  );
-
-  const entities = Object.fromEntries(Object.keys(db).map((name) => {
-    const entity = {
-      get: async (id) => clone(db[name].find((row) => row.id === id) || null),
-      list: async () => clone(db[name]),
-      filter: async (query) => clone(db[name].filter((row) => matches(row, query))),
-      create: async (data) => {
-        const row = { ...clone(data), id: name + '-' + ++sequence };
-        db[name].push(row);
-        return clone(row);
-      },
-      update: async (id, data) => {
-        const row = db[name].find((item) => item.id === id);
-        if (!row) throw new Error('Missing row ' + id);
-        Object.assign(row, clone(data));
-        return clone(row);
-      },
-      updateMany: async (query, operation) => {
-        const rows = db[name].filter((row) => matches(row, query));
-        for (const row of rows) {
-          Object.assign(row, clone(operation.$set || {}));
-          for (const [key, value] of Object.entries(operation.$inc || {})) {
-            row[key] = Number(row[key] || 0) + Number(value);
-          }
-        }
-        return { success: true, updated: rows.length };
-      },
-      delete: async (id) => {
-        db[name] = db[name].filter((row) => row.id !== id);
-      },
-    };
-    entity.bulkCreate = async (rows) => Promise.all(rows.map((row) => entity.create(row)));
-    return [name, entity];
-  }));
-
-  const client = {
-    asServiceRole: { entities },
-    auth: { me: async () => clone(db.User[0]) },
-  };
-  return client;
+  return memoryBackend(db, { now: '2026-09-11T08:00:00.000Z', copySeed: false }).client;
 }
 
 function loadHandler(client, options = {}) {
-  const sharedSrc = readFileSync('base44/shared/user-helpers.ts', 'utf8').replace(/export /g, '') + '\n'
-    + readFileSync('base44/shared/manager-request-scope.ts', 'utf8').replace(/^import .*;$/gm, '').replace(/export /g, '') + '\n'
-    + readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
-      .replace(/^export \{[^\n]*\} from [^\n]*;$/gm, '').replace(/export /g, '');
-  const sharedCode = ts.transpileModule(sharedSrc, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-
-  let source = readFileSync('base44/functions/shift-close-v2/entry.ts', 'utf8')
-    .replace(/^import .*manager-request-scope.*;$/gm, '')
-    .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
-    .replace(/import \{[\s\S]*?\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
-    .replace('export default async function(req)', 'async function handler(req)');
-  source = sharedCode + '\n' + source;
-  source += '\nglobalThis.testHandler = handler;';
-  const code = ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-  const context = vm.createContext({
-    client,
-    Response,
-    crypto: webcrypto,
-    console,
-    structuredClone,
-    AbortSignal,
+  const runtime = memoryBackend({}, { now: options.now || '2026-09-11T08:00:00.000Z' });
+  runtime.client.auth = client.auth;
+  runtime.client.asServiceRole = client.asServiceRole;
+  const extra = {
     Deno: { env: { get: (key) => key === 'TELEGRAM_BOT_TOKEN' ? (options.telegramToken || '') : '' } },
     fetch: options.fetchImpl || (async () => new Response(JSON.stringify({ ok: true, result: { message_id: 1 } }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      status: 200, headers: { 'Content-Type': 'application/json' },
     })),
-  });
-  vm.runInContext(code, context);
-  return async (body) => {
-    const response = await context.testHandler({ json: async () => body });
-    return { status: response.status, data: await response.json() };
   };
+  return (body) => runtime.invoke('base44/functions/shift-close-v2/entry.ts', body, extra);
 }
-
 const closeBody = () => ({
   action: 'close_shift',
   shift_id: 'shift',

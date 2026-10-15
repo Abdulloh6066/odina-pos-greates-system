@@ -39,6 +39,16 @@
     },
     "updated_by_name": {
       "type": "string"
+    },
+    "transfer_receipts_applied": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Backend operation markers committed atomically with receipt deltas."
+    },
+    "transfer_receipts_reversed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Backend markers for exactly-once receipt recovery."
     }
   },
   "required": [

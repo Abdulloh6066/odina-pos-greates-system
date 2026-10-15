@@ -9,6 +9,8 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { mergePosStockEvent } from '../src/lib/pos-stock-events.js';
+import { formatUzbekistanDateTime } from '../src/lib/uzbekistan-time.js';
+import * as checkoutTimingStorage from '../src/lib/checkout-timing.js';
 
 const read = path => readFileSync(path, 'utf8');
 const deferred = () => {
@@ -305,8 +307,8 @@ test('supplier-payment UI distinguishes loading and errors from a genuinely empt
   act(() => { renderer.unmount(); });
 });
 
-function checkoutHarness() {
-  const gate = deferred(); const calls = []; const alerts = []; const receipts = [];
+function checkoutHarness({ clock = performance } = {}) {
+  const gate = deferred(); const calls = []; const alerts = []; const receipts = []; const timings = []; const logs = []; const diagnostics = [];
   const ctx = {
     saleSubmittingRef: { current: false }, checkoutReadyRef: { current: true },
     checkoutCancelledRef: { current: false }, checkoutRequestKeyRef: { current: 'same-checkout-key' },
@@ -318,7 +320,9 @@ function checkoutHarness() {
     discountCode: '', roundingTarget: null, adjustmentMode: null, discountPct: 0,
     discountOwnerPin: '', subtotal: 15000, shift: { id: 'shift', shop_id: 'branch' },
     user: { id: 'owner', shop_id: 'branch' }, shops: [{ id: 'branch' }],
-    performance, navigator: { onLine: true }, console: { info: () => {}, error: () => {} },
+    performance: clock, navigator: { onLine: true }, console: {
+      info: (label, value) => { logs.push([label, JSON.parse(value)]); }, error: () => {}, warn: () => {},
+    },
     createSaleIdempotencyKey: () => 'unexpected-new-key', buildPendingSale: () => null,
     friesOptionFields: () => ({}), isRetryableSyncError: () => false,
     syncErrorMessage: error => error.message, odinaAlert: text => alerts.push(text),
@@ -329,6 +333,10 @@ function checkoutHarness() {
     } } },
     setMobileCartOpen: () => {}, setPayOpen: value => { ctx.payOpen = value; },
     setPaying: value => { ctx.paying = value; }, setCheckoutOffline: value => { ctx.checkoutOffline = value; },
+    recordCheckoutTiming: value => { ctx.lastCheckoutTiming = { ...value, shiftId: ctx.shift.id }; timings.push(value); },
+    timingUserRef: { current: 'owner' },
+    createCheckoutTimingEventId: () => `diagnostic-attempt-${diagnostics.length + 1}`,
+    reportCheckoutTiming: event => { diagnostics.push(event); return Promise.resolve({}); },
     setShift: value => { ctx.shift = value; },
     productStock: [{ id: 'stock', product_id: 'cake', location_id: 'branch', quantity: 3 }],
     setProductStock: update => { ctx.productStock = update(ctx.productStock); },
@@ -342,7 +350,7 @@ function checkoutHarness() {
   const source = read('src/pages/POS.jsx');
   const names = ['finishSalePresentation', 'presentCompletedSale', 'finishQueuedSale', 'applyCompletedSale', 'completeSale'];
   vm.runInNewContext(names.map(name => declaration(source, name)).join('\n') + '\nglobalThis.submit = completeSale;', ctx);
-  return { ctx, gate, calls, alerts, receipts, submit: ctx.submit };
+  return { ctx, gate, calls, alerts, receipts, timings, logs, diagnostics, submit: ctx.submit };
 }
 
 test('payment cannot clear cart or print before acknowledgment and cannot submit twice while pending', { timeout: 5000 }, async () => {
@@ -377,4 +385,313 @@ test('failed payment keeps the cart and receipt unprinted for the same checkout 
   assert.equal(f.ctx.checkoutRequestKeyRef.current, 'same-checkout-key');
   assert.equal(f.receipts.length, 0);
   assert.equal(f.alerts.length, 1);
+});
+
+function checkoutClock() {
+  let elapsed = 1000; let reads = 0;
+  return { now: () => { reads++; return elapsed; }, advance: ms => { elapsed += ms; }, get reads() { return reads; } };
+}
+
+test('visible checkout time reuses the existing total, includes synchronous preparation and presentation, and excludes later work', async () => {
+  const clock = checkoutClock(); const f = checkoutHarness({ clock }); const background = deferred();
+  f.ctx.setMobileCartOpen = () => clock.advance(300);
+  const showReceipt = f.ctx.setReceiptPrintSale;
+  f.ctx.setReceiptPrintSale = sale => { clock.advance(150); showReceipt(sale); };
+  f.ctx.loadWasteAlerts = () => background.promise;
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+  assert.equal(f.timings.length, 0, 'no confirmed time before the server reply');
+  assert.equal(clock.reads, 2);
+  await f.submit([{ method: 'cash', amount: 15000 }], false);
+  assert.equal(clock.reads, 2, 'a blocked second click must not start another clock');
+  assert.equal(f.calls.length, 1);
+  clock.advance(2100);
+  f.gate.resolve({ data: { sale: { id: 'sale', shop_id: 'branch', items: f.ctx.cart }, backend_timing: { total_ms: 1800 } } });
+  await pending;
+  assert.equal(clock.reads, 4, 'the existing four online reads also drive the visible result');
+  assert.equal(f.timings.length, 1);
+  assert.equal(f.ctx.lastCheckoutTiming.totalMs, 2550);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'confirmed');
+  assert.equal(f.ctx.lastCheckoutTiming.shiftId, 'shift');
+  assert.equal(f.logs.length, 1);
+  assert.equal(f.logs[0][0], '[Odina checkout timing]');
+  assert.equal(f.logs[0][1].total_ms, f.ctx.lastCheckoutTiming.totalMs);
+  assert.equal(f.logs[0][1].server_ms, 2100);
+  assert.equal(f.logs[0][1].backend.total_ms, 1800);
+  assert.equal(f.calls.length, 1, 'displaying timing must not add a request');
+  clock.advance(90000); background.resolve(); await tick();
+  assert.equal(f.ctx.lastCheckoutTiming.totalMs, 2550, 'later refresh and printing time cannot change the finished attempt');
+  assert.equal(clock.reads, 4);
+});
+
+test('retry timing excludes the human pause and preserves the checkout key, timestamp, items and payment', async () => {
+  const clock = checkoutClock(); const f = checkoutHarness({ clock });
+  const payments = [{ method: 'cash', amount: 15000 }];
+  const failed = f.submit(payments, false);
+  const originalRequest = JSON.stringify(f.calls[0][1]);
+  clock.advance(500); f.gate.reject(new Error('Mock rejected request')); await failed;
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'unconfirmed');
+  assert.equal(f.ctx.lastCheckoutTiming.totalMs, 500);
+  assert.equal(f.ctx.cart.length, 1);
+  assert.equal(f.ctx.checkoutRequestKeyRef.current, 'same-checkout-key');
+  clock.advance(60000);
+  const retry = deferred();
+  f.ctx.base44.functions.invoke = (name, request) => { f.calls.push([name, request]); return retry.promise; };
+  const pending = f.submit(payments, false);
+  clock.advance(2400);
+  retry.resolve({ data: { sale: { id: 'original-sale', shop_id: 'branch', items: f.ctx.cart }, already_processed: true } });
+  await pending;
+  assert.equal(f.calls.length, 2);
+  assert.equal(JSON.stringify(f.calls[1][1]), originalRequest);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'rechecked');
+  assert.equal(f.ctx.lastCheckoutTiming.totalMs, 2400);
+  assert.equal(f.logs.at(-1)[1].server_ms, 2400);
+  assert.equal(f.ctx.cart.length, 0);
+  assert.equal(f.ctx.checkoutRequestKeyRef.current, '');
+});
+
+test('offline and transport-fallback timing confirms a queued sale only after local storage succeeds', async () => {
+  for (const fallback of [false, true]) {
+    const clock = checkoutClock(); const f = checkoutHarness({ clock }); const storage = deferred(); const saved = [];
+    const localSale = { id: 'local-sale', offline_pending: true, shop_id: 'branch', items: f.ctx.cart };
+    const queued = { request: { action: 'complete_sale', idempotency_key: 'same-checkout-key' }, local_sale: localSale };
+    f.ctx.buildPendingSale = () => queued;
+    f.ctx.isOnline = fallback;
+    f.ctx.isRetryableSyncError = () => true;
+    f.ctx.enqueueOfflineSale = async row => { await storage.promise; saved.push(row); };
+    const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+    if (fallback) { clock.advance(2000); f.gate.reject(new Error('Mock lost reply')); await tick(); }
+    assert.equal(f.timings.length, 0);
+    assert.equal(f.ctx.cart.length, 1);
+    assert.equal(f.receipts.length, 0);
+    assert.equal(f.ctx.checkoutRequestKeyRef.current, 'same-checkout-key');
+    await f.submit([{ method: 'cash', amount: 15000 }], true);
+    clock.advance(250); storage.resolve(); await pending;
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0], queued);
+    assert.equal(f.calls.length, fallback ? 1 : 0);
+    assert.equal(clock.reads, fallback ? 3 : 2);
+    assert.equal(f.ctx.lastCheckoutTiming.outcome, 'queued');
+    assert.equal(f.ctx.lastCheckoutTiming.totalMs, fallback ? 2250 : 250);
+    assert.equal(f.logs[0][1].total_ms, f.ctx.lastCheckoutTiming.totalMs);
+    assert.equal(f.logs[0][1].server_ms, null, 'a lost reply must not invent a confirmed server duration');
+    assert.equal(f.receipts.at(-1), localSale);
+    assert.equal(f.ctx.cart.length, 0);
+  }
+});
+
+test('queue failure and malformed online acknowledgment never display confirmed or queued success', async () => {
+  for (const mode of ['offline', 'fallback', 'malformed']) {
+    const clock = checkoutClock(); const f = checkoutHarness({ clock });
+    if (mode === 'malformed') {
+      const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+      clock.advance(700); f.gate.resolve({ data: { sale: {} } }); await pending;
+    } else {
+      f.ctx.isOnline = mode === 'fallback';
+      f.ctx.buildPendingSale = () => ({ local_sale: { id: 'local-sale', offline_pending: true } });
+      f.ctx.isRetryableSyncError = () => true;
+      const storage = deferred(); f.ctx.enqueueOfflineSale = () => storage.promise;
+      const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+      if (mode === 'fallback') { clock.advance(500); f.gate.reject(new Error('Mock lost reply')); await tick(); }
+      clock.advance(mode === 'fallback' ? 200 : 700); storage.reject(new Error('Quota exceeded')); await pending;
+    }
+    assert.equal(f.ctx.lastCheckoutTiming.outcome, 'unconfirmed');
+    assert.equal(f.ctx.lastCheckoutTiming.totalMs, 700);
+    assert.equal(f.ctx.cart.length, 1);
+    assert.equal(f.ctx.payOpen, true);
+    assert.equal(f.ctx.checkoutRequestKeyRef.current, 'same-checkout-key');
+    assert.equal(f.receipts.length, 0);
+    assert.equal(f.alerts.length, 1);
+    assert.equal(f.logs[0][1].completed, false);
+    assert.equal(f.calls.length, mode === 'offline' ? 0 : 1);
+  }
+});
+
+test('presentation failure after server confirmation preserves confirmed timing without queueing or charging again', async () => {
+  const clock = checkoutClock(); const f = checkoutHarness({ clock });
+  f.ctx.setReceiptPrintSale = sale => { if (sale) throw new Error('Mock receipt presentation failure'); };
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+  clock.advance(2400); f.gate.resolve({ data: { sale: { id: 'saved-sale', shop_id: 'branch', items: f.ctx.cart } } });
+  await pending;
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'confirmed');
+  assert.equal(f.ctx.lastCheckoutTiming.totalMs, 2400);
+  assert.equal(f.logs[0][1].completed, true);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.ctx.payOpen, false);
+  assert.equal(f.ctx.cart.length, 0);
+  assert.match(f.alerts[0], /Savdo saqlandi/);
+  await f.submit([{ method: 'cash', amount: 15000 }], true);
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.timings.length, 1);
+});
+
+test('invalid or blocked final submission does not start a measurement or request', async () => {
+  for (const flags of [{ cart: [] }, { stockChecking: true }, { discountLoading: true },
+    { checkoutReadyRef: { current: false } }, { saleSubmittingRef: { current: true } }]) {
+    const clock = checkoutClock(); const f = checkoutHarness({ clock }); Object.assign(f.ctx, flags);
+    await f.submit([{ method: 'cash', amount: 15000 }], true);
+    assert.equal(clock.reads, 0); assert.equal(f.calls.length, 0); assert.equal(f.timings.length, 0);
+  }
+});
+
+test('shared diagnostic captures the completed attempt without awaiting its upload or sending financial details', async () => {
+  const clock = checkoutClock(); const f = checkoutHarness({ clock }); const upload = deferred();
+  let diagnostic;
+  f.ctx.reportCheckoutTiming = event => { diagnostic = event; return upload.promise; };
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+  clock.advance(2740);
+  f.gate.resolve({ data: { sale: { id: 'verified-sale', shop_id: 'branch', items: f.ctx.cart } } });
+  await pending;
+  assert.equal(f.ctx.paying, false, 'sale completion cannot wait for diagnostic upload');
+  assert.equal(f.ctx.cart.length, 0);
+  assert.equal(f.receipts[0].id, 'verified-sale');
+  assert.equal(f.calls.length, 1);
+  assert.equal(clock.reads, 4);
+  assert.equal(diagnostic.total_ms, 2740);
+  assert.equal(diagnostic.total_ms, f.logs[0][1].total_ms);
+  assert.equal(diagnostic.api_round_trip_ms, 2740);
+  assert.equal(diagnostic.actor_id, 'owner'); assert.equal(diagnostic.shift_id, 'shift');
+  assert.equal(diagnostic.sale_id, 'verified-sale');
+  assert.equal(diagnostic.request_key, 'same-checkout-key', 'capture the original key before successful clearing');
+  assert.equal(diagnostic.outcome, 'confirmed');
+  assert.deepEqual(Object.keys(diagnostic).sort(), ['actor_id','api_round_trip_ms','client_completed_at','event_id','outcome','request_key','sale_id','shift_id','total_ms']);
+  upload.reject(new Error('Mock diagnostic outage')); await tick();
+  assert.equal(f.calls.length, 1); assert.equal(f.ctx.payOpen, false);
+  assert.equal(f.receipts.length, 1); assert.equal(f.alerts.length, 0);
+});
+
+test('synchronous diagnostic failure never changes confirmed checkout or starts a sale retry', async () => {
+  const f = checkoutHarness(); f.ctx.reportCheckoutTiming = () => { throw new Error('Mock blocked diagnostics'); };
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], false);
+  f.gate.resolve({ data: { sale: { id: 'sale', shop_id: 'branch', items: f.ctx.cart } } });
+  await pending;
+  assert.equal(f.ctx.cart.length, 0); assert.equal(f.ctx.paying, false);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'confirmed');
+  assert.equal(f.logs[0][1].completed, true);
+  assert.equal(f.calls.length, 1); assert.equal(f.alerts.length, 0);
+});
+
+function checkoutStatusFixture() {
+  const Status = component('src/components/pos/CheckoutTimingStatus.jsx', {
+    react: React, '@/lib/uzbekistan-time': { formatUzbekistanDateTime },
+  });
+  const source = read('src/pages/POS.jsx');
+  const ast = ts.createSourceFile('POS.jsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JSX);
+  let element;
+  const visit = node => {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'CheckoutTimingStatus') element = node.getText(ast);
+    ts.forEachChild(node, visit);
+  };
+  visit(ast); assert.ok(element, 'the real POS must render its checkout timing status');
+  const code = transformSync(`globalThis.ScopedStatus = ({ lastCheckoutTiming, shift, paying, user = { role: 'admin' } }) => (${element});`, { loader: 'jsx', jsx: 'transform' }).code;
+  const ctx = { React, CheckoutTimingStatus: Status }; vm.runInNewContext(code, ctx);
+  return props => renderToStaticMarkup(React.createElement(ctx.ScopedStatus, props));
+}
+
+test('real Kassa status displays localized seconds and distinct confirmed, replay, queued and unconfirmed results', () => {
+  const render = checkoutStatusFixture();
+  const copies = {
+    confirmed: [/Yakunlash:/, /Savdo saqlandi/],
+    rechecked: [/Qayta tekshirish:/, /Saqlangan savdo tasdiqlandi/],
+    queued: [/Qurilmaga saqlash:/, /Server tasdig‘i kutilmoqda/],
+    unconfirmed: [/Yakunlash tasdiqlanmadi:/, /Savdo holatini tekshiring/],
+  };
+  for (const [outcome, patterns] of Object.entries(copies)) {
+    const html = render({ shift: { id: 'shift' }, lastCheckoutTiming: { shiftId: 'shift', totalMs: 2400, outcome }, paying: false });
+    assert.match(html, /role="status"/); assert.match(html, /aria-live="polite"/);
+    assert.match(html, /2,4 soniya/); patterns.forEach(pattern => assert.match(html, pattern));
+    if (outcome === 'queued' || outcome === 'unconfirmed') assert.doesNotMatch(html, /Savdo saqlandi\./);
+  }
+});
+
+test('real Kassa timing is visible only to owner/admin and renders nothing for workers or unknown roles', () => {
+  const render = checkoutStatusFixture();
+  const props = { shift: { id: 'shift' }, paying: false,
+    lastCheckoutTiming: { shiftId: 'shift', totalMs: 2400, outcome: 'confirmed',
+      completedAt: '2026-10-15T10:00:00.000Z', persisted: false } };
+  assert.match(render({ ...props, user: { role: 'admin' } }), /2,4 soniya/);
+  for (const user of [null, {}, { role: 'manager' }, { role: 'cashier' }, { role: 'user' },
+    { role: 'staff' }, { role: 'admin ' }, { role: 'cashier', data: { role: 'admin' } }]) {
+    for (const lastCheckoutTiming of [null, props.lastCheckoutTiming]) {
+      for (const paying of [false, true]) {
+        assert.equal(render({ ...props, user, lastCheckoutTiming, paying }), '',
+          'workers must see no seconds, timestamp, placeholder, pending text or persistence warning');
+      }
+    }
+  }
+});
+
+test('real Kassa status hides old shift or pending attempt seconds, handles invalid metrics and stays accessible without timers', () => {
+  const render = checkoutStatusFixture();
+  const lastCheckoutTiming = { shiftId: 'old-shift', totalMs: 2400, outcome: 'confirmed' };
+  const placeholder = render({ shift: { id: 'new-shift' }, lastCheckoutTiming, paying: false });
+  assert.match(placeholder, /Yakunlashdan so‘ng vaqt shu yerda ko‘rinadi/);
+  assert.doesNotMatch(placeholder, /2,4 soniya|Savdo saqlandi/);
+  const pending = render({ shift: { id: 'old-shift' }, lastCheckoutTiming, paying: true });
+  assert.match(pending, /Yakunlash vaqti o‘lchanmoqda/); assert.doesNotMatch(pending, /2,4 soniya|Savdo saqlandi/);
+  for (const totalMs of [NaN, Infinity, undefined]) {
+    const html = render({ shift: { id: 'old-shift' }, lastCheckoutTiming: { ...lastCheckoutTiming, totalMs }, paying: false });
+    assert.doesNotMatch(html, /soniya|NaN|Infinity|Savdo saqlandi/);
+  }
+  const zero = render({ shift: { id: 'old-shift' }, lastCheckoutTiming: { ...lastCheckoutTiming, totalMs: -100 }, paying: false });
+  assert.match(zero, /0,0 soniya/);
+});
+
+test('remembered checkout shows its finish timestamp in Tashkent and explains an actual device-storage failure', () => {
+  const render = checkoutStatusFixture();
+  const completedAt = '2026-10-14T20:15:30.000Z';
+  const props = { shift: { id: 'shift' }, paying: false,
+    lastCheckoutTiming: { shiftId: 'shift', totalMs: 2400, outcome: 'confirmed', completedAt, persisted: true } };
+  const saved = render(props);
+  assert.match(saved, /2,4 soniya/);
+  assert.match(saved, /datetime="2026-10-14T20:15:30.000Z"/i);
+  assert.ok(saved.includes(formatUzbekistanDateTime(completedAt, { second: '2-digit' })));
+  assert.match(saved, /01:15:30/);
+  assert.doesNotMatch(saved, /qurilmaga saqlab bo‘lmadi/);
+  const unavailable = render({ ...props, lastCheckoutTiming: { ...props.lastCheckoutTiming, persisted: false } });
+  assert.match(unavailable, /Savdo saqlandi/);
+  assert.match(unavailable, /2,4 soniya/);
+  assert.match(unavailable, /Vaqt faqat shu oynada: qurilmaga saqlab bo‘lmadi/);
+});
+
+test('actual final checkout records its existing measured seconds once and restores the real Kassa status after reopening', async () => {
+  const rows = new Map(); let writes = 0; let observed;
+  const storage = { getItem: key => rows.get(key) ?? null,
+    setItem: (key, value) => { writes++; rows.set(key, value); } };
+  const useTiming = component('src/hooks/useCheckoutTiming.js', {
+    react: React, '@/lib/checkout-timing': {
+      ...checkoutTimingStorage,
+      readCheckoutTiming: scope => checkoutTimingStorage.readCheckoutTiming(scope, storage),
+      saveCheckoutTiming: (scope, value) => checkoutTimingStorage.saveCheckoutTiming(scope, value, storage),
+    },
+  });
+  function Probe() { observed = useTiming('owner', 'branch', 'shift'); return null; }
+  let renderer;
+  act(() => { renderer = TestRenderer.create(React.createElement(Probe)); });
+  const clock = checkoutClock(); const f = checkoutHarness({ clock });
+  f.ctx.recordCheckoutTiming = observed.recordTiming;
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], false);
+  assert.equal(writes, 0, 'starting a checkout must not save an unfinished measurement');
+  clock.advance(2400);
+  await act(async () => {
+    f.gate.resolve({ data: { sale: { id: 'sale', shop_id: 'branch', items: f.ctx.cart } } });
+    await pending;
+  });
+  assert.equal(writes, 1);
+  assert.equal(f.calls.length, 1, 'remembering timing must not add a backend request');
+  assert.equal(clock.reads, 4);
+  assert.equal(observed.timing.totalMs, f.logs[0][1].total_ms);
+  assert.equal(observed.timing.outcome, 'confirmed');
+  const completedAt = observed.timing.completedAt;
+  act(() => { renderer.unmount(); });
+  act(() => { renderer = TestRenderer.create(React.createElement(Probe)); });
+  try {
+    assert.equal(writes, 1, 'reopening only reads the remembered metric');
+    assert.equal(observed.timing.completedAt, completedAt);
+    assert.equal(observed.timing.persisted, true);
+    const html = checkoutStatusFixture()({ shift: { id: 'shift' }, lastCheckoutTiming: observed.timing, paying: false });
+    assert.match(html, /Yakunlash:/);
+    assert.match(html, /2,4 soniya/);
+    assert.match(html, /Savdo saqlandi/);
+    assert.ok(html.includes(formatUzbekistanDateTime(completedAt, { second: '2-digit' })));
+  } finally { act(() => { renderer.unmount(); }); }
 });

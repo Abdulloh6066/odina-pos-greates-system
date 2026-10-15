@@ -7,6 +7,7 @@ import { resolve, dirname } from 'node:path';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { matches } from './helpers/memory-backend.mjs';
 
 let clock = '2026-09-13T07:00:00.000Z';
 
@@ -228,25 +229,6 @@ function harness(db, options = {}) {
   const createCounts = {};
   const clone = (value) => value == null ? value : structuredClone(value);
 
-  const matchesValue = (row, key, expected) => {
-    const actual = row[key];
-    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if ('$exists' in expected) {
-        const exists = Object.prototype.hasOwnProperty.call(row, key);
-        if (exists !== Boolean(expected.$exists)) return false;
-      }
-      if ('$gte' in expected && !(actual >= expected.$gte)) return false;
-      if ('$lte' in expected && !(actual <= expected.$lte)) return false;
-      if ('$ne' in expected && actual === expected.$ne) return false;
-      if ('$nin' in expected && expected.$nin.includes(actual)) return false;
-      return true;
-    }
-    return actual === expected;
-  };
-
-  const matches = (row, query) =>
-    Object.entries(query || {}).every(([key, expected]) => matchesValue(row, key, expected));
-
   const entities = Object.fromEntries(Object.keys(db).map((name) => {
     const entity = {
       get: async (id) => clone(db[name].find((row) => row.id === id) || null),
@@ -277,6 +259,7 @@ function harness(db, options = {}) {
           for (const [key, value] of Object.entries(operation.$inc || {})) {
             row[key] = Number(row[key] || 0) + Number(value);
           }
+          for (const [key, value] of Object.entries(operation.$push || {})) (row[key] ??= []).push(clone(value));
           for (const key of Object.keys(operation.$unset || {})) {
             delete row[key];
           }
@@ -300,14 +283,14 @@ function harness(db, options = {}) {
 function loadHandler(client, { enableRecipeAccounting = true } = {}) {
   const cache = new Map();
   const context = vm.createContext({
-    Response, crypto: webcrypto, console, structuredClone, Date: makeClock(),
+    Response, crypto: webcrypto, TextEncoder, console, structuredClone, Date: makeClock(),
   });
   function loadModule(path) {
     if (cache.has(path)) return cache.get(path).exports;
     const module = { exports: {} };
     cache.set(path, module);
     let source = readFileSync(path, 'utf8');
-    if (path.endsWith('/customer-orders/entry.ts') && enableRecipeAccounting) {
+    if (path.replaceAll('\\', '/').endsWith('/customer-orders/entry.ts') && enableRecipeAccounting) {
       // Exercise the preserved recipe path separately from the production policy.
       source = source.replace('const ORDER_RECIPE_ACCOUNTING_ENABLED = false;',
         'const ORDER_RECIPE_ACCOUNTING_ENABLED = true;');

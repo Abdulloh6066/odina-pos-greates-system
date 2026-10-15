@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import OdinaSelect from "@/components/ui/odina-select";
 import {
   ArrowDownLeft,
@@ -17,6 +17,7 @@ import { useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { odinaAlert } from "@/lib/odina-dialog";
 import { formatUZS } from "@/lib/pos";
+import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from "@/lib/order-request-retry";
 import { formatUzbekistanDateTime } from "@/lib/uzbekistan-time";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -223,6 +224,7 @@ export default function Budget() {
       )}
 
       <AdjustmentDialog
+        actorId={user?.id}
         open={adjustOpen}
         balances={balanceMap}
         onClose={() => setAdjustOpen(false)}
@@ -232,44 +234,59 @@ export default function Budget() {
   );
 }
 
-function AdjustmentDialog({ open, balances, onClose, onSaved }) {
+function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
   const [direction, setDirection] = useState("in");
   const [account, setAccount] = useState("cash");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [ownerPin, setOwnerPin] = useState("");
   const [saving, setSaving] = useState(false);
+  const requestScope = orderRequestScope(actorId, "manual_adjustment");
+  const [retryPending, setRetryPending] = useState(() => Boolean(readOrderRequest(requestScope)));
+  const requestRef = useRef(readOrderRequest(requestScope));
 
   useEffect(() => {
-    if (open) {
-      setDirection("in");
-      setAccount("cash");
-      setAmount("");
-      setDescription("");
-      setOwnerPin("");
-    }
-  }, [open]);
+    if (!open) return;
+    const saved = readOrderRequest(requestScope);
+    requestRef.current = saved;
+    setRetryPending(Boolean(saved));
+    setDirection(saved?.direction || "in");
+    setAccount(saved?.account || "cash");
+    setAmount(saved ? String(saved.amount) : "");
+    setDescription(saved?.description || "");
+    setOwnerPin("");
+  }, [open, requestScope]);
 
   const value = Math.round(Number(amount) || 0);
   const available = Number(balances[account] || 0);
   const invalidWithdrawal = direction === "out" && value > available;
 
   const submit = async () => {
-    if (value <= 0 || description.trim().length < 3 || !/^\d{4,8}$/.test(ownerPin) || invalidWithdrawal) return;
+    if (!/^\d{4,8}$/.test(ownerPin) || (!retryPending && (value <= 0 || description.trim().length < 3 || invalidWithdrawal))) return;
+    if (saving) return;
+    const hadPending = retryPending;
     setSaving(true);
     try {
-      const result = await base44.functions.invoke("budget-ledger", {
-        action: "manual_adjustment",
-        direction,
-        account,
-        amount: value,
-        description: description.trim(),
-        owner_pin: ownerPin,
+      requestRef.current = retainOrderRequest(requestScope, requestRef.current || {
+        action: "manual_adjustment", direction, account, amount: value,
+        description: description.trim(), idempotency_key: crypto.randomUUID(),
       });
+      setRetryPending(true);
+      const result = await base44.functions.invoke("budget-ledger", { ...requestRef.current, owner_pin: ownerPin });
       const payload = result?.data || result;
-      if (!payload?.transaction) throw new Error(payload?.error || "Budget amali bajarilmadi.");
+      if (!payload?.transaction) throw Object.assign(new Error(payload?.error || "Budget amali bajarilmadi."), { data: payload });
+      clearOrderRequest(requestScope);
+      requestRef.current = null;
+      setRetryPending(false);
       onSaved();
     } catch (error) {
+      const failure = error?.response?.data || error?.data || {};
+      const status = Number(error?.response?.status || error?.status || 0);
+      if (failure.operation_reversed || (!hadPending && status >= 400 && status < 500 && !failure.operation_pending)) {
+        clearOrderRequest(requestScope);
+        requestRef.current = null;
+        setRetryPending(false);
+      }
       void odinaAlert("Budget amali bajarilmadi: " + errorText(error));
     } finally {
       setSaving(false);
@@ -285,13 +302,13 @@ function AdjustmentDialog({ open, balances, onClose, onSaved }) {
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button type="button" variant={direction === "in" ? "default" : "outline"} onClick={() => setDirection("in")} disabled={saving}>Kirim</Button>
-          <Button type="button" variant={direction === "out" ? "destructive" : "outline"} onClick={() => setDirection("out")} disabled={saving}>Chiqim</Button>
+          <Button type="button" variant={direction === "in" ? "default" : "outline"} onClick={() => setDirection("in")} disabled={saving || retryPending}>Kirim</Button>
+          <Button type="button" variant={direction === "out" ? "destructive" : "outline"} onClick={() => setDirection("out")} disabled={saving || retryPending}>Chiqim</Button>
         </div>
 
         <div>
           <Label className="text-xs mb-1.5 block">Pul hisobi</Label>
-          <OdinaSelect value={account} onChange={(event) => setAccount(event.target.value)} disabled={saving} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+          <OdinaSelect value={account} onChange={(event) => setAccount(event.target.value)} disabled={saving || retryPending} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
             {ACCOUNTS.map((item) => (
               <option key={item.id} value={item.id}>{item.label} · {formatUZS(balances[item.id] || 0)}</option>
             ))}
@@ -300,13 +317,13 @@ function AdjustmentDialog({ open, balances, onClose, onSaved }) {
 
         <div>
           <Label className="text-xs mb-1.5 block">Summa</Label>
-          <Input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" disabled={saving} />
+          <Input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" disabled={saving || retryPending} />
           {invalidWithdrawal && <p className="text-xs text-destructive mt-1">Tanlangan hisobda mablag‘ yetarli emas.</p>}
         </div>
 
         <div>
           <Label className="text-xs mb-1.5 block">Sabab / izoh</Label>
-          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Masalan: boshlang‘ich naqd mablag‘" rows={2} disabled={saving} />
+          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Masalan: boshlang‘ich naqd mablag‘" rows={2} disabled={saving || retryPending} />
         </div>
 
         <div>
@@ -322,14 +339,14 @@ function AdjustmentDialog({ open, balances, onClose, onSaved }) {
           />
         </div>
 
+        {retryPending && <p className="text-xs text-muted-foreground">Avvalgi so‘rov saqlandi. Qayta tekshirish aynan shu summa va izoh bilan amalga oshadi.</p>}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
-          <Button type="button" onClick={submit} disabled={saving || value <= 0 || description.trim().length < 3 || !/^\d{4,8}$/.test(ownerPin) || invalidWithdrawal}>
-            {saving ? "Saqlanmoqda…" : "Owner PIN bilan saqlash"}
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>{retryPending ? "Yopish" : "Bekor qilish"}</Button>
+          <Button type="button" onClick={submit} disabled={saving || !/^\d{4,8}$/.test(ownerPin) || (!retryPending && (value <= 0 || description.trim().length < 3 || invalidWithdrawal))}>
+            {saving ? "Saqlanmoqda…" : retryPending ? "Avvalgi amalni tekshirish" : "Owner PIN bilan saqlash"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

@@ -85,6 +85,45 @@
     "received_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "receipt_token": {
+      "type": "string"
+    },
+    "receipt_claim_token": {
+      "type": "string"
+    },
+    "receipt_claim_until": {
+      "type": "string"
+    },
+    "receipt_phase": {
+      "type": "string",
+      "enum": ["applying", "recovering", "recovered", "completed"]
+    },
+    "receipt_started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receipt_user_id": {
+      "type": "string"
+    },
+    "receipt_user_name": {
+      "type": "string"
+    },
+    "receipt_balance_before": {
+      "type": "number"
+    },
+    "receipt_balance_after": {
+      "type": "number"
+    },
+    "receipt_reversal_before": {
+      "type": "number"
+    },
+    "receipt_reversal_after": {
+      "type": "number"
+    },
+    "receipt_reversed_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [

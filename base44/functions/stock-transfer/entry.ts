@@ -57,16 +57,17 @@ const createMovement = async (
   data: {
     location: any;
     product: any;
-    type: "transfer_out" | "transfer_in";
+    type: "transfer_out" | "transfer_in" | "adjustment";
     change: number;
     before: number;
     after: number;
     transfer: any;
     user: any;
     now: string;
+    movementNumber?: string;
   },
 ) => service.entities.StockMovement.create({
-  movement_number: `ST-${data.now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+  movement_number: data.movementNumber || `ST-${data.now.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
   location_id: data.location.id,
   location_name: data.location.name,
   item_kind: "product",
@@ -79,13 +80,172 @@ const createMovement = async (
   balance_after: data.after,
   reason: data.type === "transfer_out"
     ? `${data.transfer.destination_location_name} do‘koniga transfer`
-    : `${data.transfer.source_location_name} omboridan transfer qabul qilindi`,
+    : data.type === "adjustment" ? "Transfer qabulini tiklash" : `${data.transfer.source_location_name} omboridan transfer qabul qilindi`,
   reference_id: data.transfer.id,
   reference_type: "stock_transfer",
   user_id: data.user.id,
   user_name: userLabel(data.user),
   created_at: data.now,
 });
+
+const receiptIncoming = (transfer: any) => {
+  const incoming = transfer.unit === "sheet" ? Number(transfer.received_quantity) : Number(transfer.quantity);
+  const factor = transfer.unit === "sheet" ? Number(transfer.conversion_factor) : 1;
+  if (!Number.isSafeInteger(incoming) || incoming <= 0 || !Number.isSafeInteger(factor)
+    || factor <= 0 || incoming !== Number(transfer.quantity) * factor) {
+    throw new Error("Transferning qabul miqdori noto‘g‘ri.");
+  }
+  return incoming;
+};
+const hasMarker = (stock: any, field: string, marker: string) => (stock?.[field] || []).includes(marker);
+const receiptFilter = (first: any, token: string, claimToken: string) => ({
+  ...(first.batch_id ? { batch_id: first.batch_id } : { id: first.id }),
+  status: "receiving", receipt_token: token, receipt_claim_token: claimToken,
+});
+const reloadReceiptRows = async (service: any, first: any) => first.batch_id
+  ? service.entities.StockTransfer.filter({ batch_id: first.batch_id }, "line_number", 50)
+  : [await service.entities.StockTransfer.get(first.id)];
+
+// Every write is followed by a durable check when its reply is uncertain.
+const setReceiptLine = async (service: any, transfer: any, token: string, claimToken: string, data: any) => {
+  try {
+    const result = await service.entities.StockTransfer.updateMany(
+      { id: transfer.id, status: "receiving", receipt_token: token, receipt_claim_token: claimToken },
+      { $set: data },
+    );
+    if (result?.success && Number(result.updated) === 1) return { ...transfer, ...data };
+  } catch { /* inspect the durable write */ }
+  const saved = await service.entities.StockTransfer.get(transfer.id);
+  if (saved?.status === "receiving" && saved.receipt_token === token && saved.receipt_claim_token === claimToken
+    && Object.entries(data).every(([field, value]) => saved[field] === value)) return saved;
+  throw new Error("Transferning tiklash ma’lumotlarini saqlab bo‘lmadi.");
+};
+
+const renewReceiptClaim = async (service: any, first: any, token: string, claimToken: string, count: number) => {
+  const until = new Date(Date.now() + 5 * 60_000).toISOString();
+  try {
+    const result = await service.entities.StockTransfer.updateMany(receiptFilter(first, token, claimToken),
+      { $set: { receipt_claim_until: until } });
+    if (result?.success && Number(result.updated) === count) return;
+  } catch { /* inspect the durable claim */ }
+  const rows = await reloadReceiptRows(service, first);
+  if (rows.length === count && rows.every((row: any) => row.status === "receiving"
+    && row.receipt_token === token && row.receipt_claim_token === claimToken && row.receipt_claim_until === until)) return;
+  throw new Error("Transfer boshqa qurilmada qayta ishlanmoqda.");
+};
+
+const ensureReceiptMovement = async (service: any, data: any, token: string, reversal = false) => {
+  const movementNumber = `ST-${reversal ? "REV" : "IN"}-${token}-${data.transfer.id}`;
+  const query = { reference_id: data.transfer.id, movement_number: movementNumber };
+  const find = async () => {
+    const found = await service.entities.StockMovement.filter(query, "id", 2);
+    if (found.length > 1) throw new Error("Transfer harakati takrorlangan. Egasi tekshirishi kerak.");
+    return found[0];
+  };
+  if (await find()) return;
+  try { await createMovement(service, { ...data, movementNumber }); }
+  catch (error) { if (!(await find())) throw error; }
+};
+
+// Marker and delta are committed together. A concurrent sale cannot erase the receipt.
+const applyReceiptStock = async (service: any, row: any, destination: any, user: any, now: string,
+  token: string, claimToken: string) => {
+  const marker = `${token}:${row.transfer.id}`;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const stock = await findStock(service, destination.id, row.product.id);
+    if (stock && stock.unit !== "piece") throw new Error("Do‘kon qoldiq birligi noto‘g‘ri.");
+    if (hasMarker(stock, "transfer_receipts_applied", marker)) return stock;
+    const before = cleanNumber(stock?.quantity || 0);
+    const after = cleanNumber(before + row.incoming);
+    row.transfer = await setReceiptLine(service, row.transfer, token, claimToken, {
+      receipt_balance_before: before, receipt_balance_after: after,
+    });
+    let failure: any;
+    try {
+      if (stock) {
+        const result = await service.entities.ProductStock.updateMany(
+          { id: stock.id, quantity: before, transfer_receipts_applied: { $ne: marker } },
+          { $inc: { quantity: row.incoming }, $push: { transfer_receipts_applied: marker }, $set: {
+            location_name: destination.name, product_name: row.transfer.product_name_snapshot || row.product.name,
+            unit: "piece", updated_at: now, updated_by: user.id, updated_by_name: userLabel(user),
+          } },
+        );
+        if (result?.success && Number(result.updated) === 1) return { ...stock, quantity: after };
+      } else {
+        const created = await service.entities.ProductStock.create({
+          location_id: destination.id, location_name: destination.name, product_id: row.product.id,
+          product_name: row.transfer.product_name_snapshot || row.product.name, unit: "piece", quantity: after,
+          low_stock_level: 0, updated_at: now, updated_by: user.id, updated_by_name: userLabel(user),
+          transfer_receipts_applied: [marker], transfer_receipts_reversed: [],
+        });
+        // Never choose arbitrarily between concurrent creations of the same stock row.
+        const saved = await findStock(service, destination.id, row.product.id);
+        if (saved?.id !== created.id) throw new Error("Ombor qoldig‘ini tekshirish kerak.");
+        return created;
+      }
+    } catch (error) { failure = error; }
+    const saved = await findStock(service, destination.id, row.product.id);
+    if (hasMarker(saved, "transfer_receipts_applied", marker)) return saved;
+    if (failure) throw failure;
+  }
+  throw new Error("Ombor qoldig‘i bir vaqtda o‘zgardi. Qayta urinib ko‘ring.");
+};
+
+const recoverReceipt = async (service: any, rows: any[], destination: any, products: any[],
+  user: any, token: string, claimToken: string) => {
+  const first = rows[0];
+  for (let index = 0; index < rows.length; index += 1) {
+    await renewReceiptClaim(service, first, token, claimToken, rows.length);
+    let transfer = await service.entities.StockTransfer.get(rows[index].id);
+    const marker = `${token}:${transfer.id}`;
+    const incoming = receiptIncoming(transfer);
+    let stock = await findStock(service, destination.id, transfer.product_id);
+    if (!hasMarker(stock, "transfer_receipts_applied", marker)) continue;
+    const originalUser = { id: transfer.receipt_user_id || user.id, full_name: transfer.receipt_user_name || userLabel(user) };
+    // Keep an immutable receipt/reversal pair rather than deleting historical movements.
+    await ensureReceiptMovement(service, { location: destination, product: products[index], type: "transfer_in",
+      change: incoming, before: transfer.receipt_balance_before, after: transfer.receipt_balance_after,
+      transfer, user: originalUser, now: transfer.receipt_started_at }, token);
+    if (!hasMarker(stock, "transfer_receipts_reversed", marker)) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        stock = await service.entities.ProductStock.get(stock.id);
+        if (hasMarker(stock, "transfer_receipts_reversed", marker)) break;
+        const before = cleanNumber(stock.quantity);
+        const after = cleanNumber(before - incoming);
+        transfer = await setReceiptLine(service, transfer, token, claimToken, {
+          receipt_reversal_before: before, receipt_reversal_after: after,
+          receipt_reversed_at: new Date().toISOString(),
+        });
+        try {
+          const result = await service.entities.ProductStock.updateMany(
+            { id: stock.id, quantity: before, transfer_receipts_applied: { $in: [marker] }, transfer_receipts_reversed: { $ne: marker } },
+            { $inc: { quantity: -incoming }, $push: { transfer_receipts_reversed: marker },
+              $set: { updated_at: transfer.receipt_reversed_at, updated_by: user.id, updated_by_name: userLabel(user) } },
+          );
+          if (result?.success && Number(result.updated) === 1) break;
+        } catch { /* confirm the operation marker below */ }
+        const saved = await service.entities.ProductStock.get(stock.id);
+        if (hasMarker(saved, "transfer_receipts_reversed", marker)) break;
+      }
+    }
+    stock = await service.entities.ProductStock.get(stock.id);
+    if (!hasMarker(stock, "transfer_receipts_reversed", marker)) throw new Error("Transfer qoldig‘ini tiklab bo‘lmadi.");
+    transfer = await service.entities.StockTransfer.get(transfer.id);
+    await ensureReceiptMovement(service, { location: destination, product: products[index], type: "adjustment",
+      change: -incoming, before: transfer.receipt_reversal_before, after: transfer.receipt_reversal_after,
+      transfer, user, now: transfer.receipt_reversed_at }, token, true);
+  }
+  await renewReceiptClaim(service, first, token, claimToken, rows.length);
+  try {
+    const result = await service.entities.StockTransfer.updateMany(receiptFilter(first, token, claimToken),
+      { $set: { status: "pending", receipt_phase: "recovered", receipt_claim_token: "", receipt_claim_until: "" } });
+    if (result?.success && Number(result.updated) === rows.length) return;
+  } catch { /* inspect the durable recovery */ }
+  const saved = await reloadReceiptRows(service, first);
+  if (saved.length === rows.length && saved.every((row: any) => row.status === "pending"
+    && row.receipt_token === token && row.receipt_phase === "recovered")) return;
+  throw new Error("Transfer tiklandi, ammo holatini tasdiqlab bo‘lmadi.");
+};
 
 export default async function(req) {
   const base44 = createClientFromRequest(req);
@@ -382,11 +542,6 @@ export default async function(req) {
       if (new Set(transferRows.map((transfer: any) => transfer.product_id)).size !== transferRows.length) {
         return Response.json({ error: "Transfer guruhida takroriy mahsulot topildi." }, { status: 409 });
       }
-      if (transferRows.some((transfer: any) => transfer.status !== "pending")) {
-        return Response.json({
-          error: "Bu transfer allaqachon qabul qilingan yoki qayta ishlanmoqda.",
-        }, { status: 409 });
-      }
       if (role !== "admin" && userShopId(user) !== first.destination_location_id) {
         return Response.json({
           error: "Faqat qabul qiluvchi do‘kon xodimi tasdiqlashi mumkin.",
@@ -403,6 +558,42 @@ export default async function(req) {
         return Response.json({ error: "Do‘kon yoki mahsulotlardan biri topilmadi." }, { status: 404 });
       }
 
+      // A failed recovery can be resumed only after its original handler released its claim.
+      // Old receiving records without operation markers require an owner inspection.
+      if (transferRows.some((transfer: any) => transfer.status !== "pending")) {
+        const previousToken = String(first.receipt_token || "");
+        const recoverable = previousToken && transferRows.every((transfer: any) =>
+          transfer.status === "receiving" && transfer.receipt_token === previousToken
+          && transfer.receipt_phase === "recovering" && !transfer.receipt_claim_token);
+        if (!recoverable) return Response.json({
+          error: "Bu transfer allaqachon qabul qilingan yoki qayta ishlanmoqda. Holatini yangilang.",
+        }, { status: 409 });
+        const recoveryClaim = crypto.randomUUID();
+        let acquired = false;
+        try {
+          const result = await service.entities.StockTransfer.updateMany(
+            { ...(batchId ? { batch_id: batchId } : { id: first.id }), status: "receiving",
+              receipt_token: previousToken, receipt_phase: "recovering", receipt_claim_token: "" },
+            { $set: { receipt_claim_token: recoveryClaim,
+              receipt_claim_until: new Date(Date.now() + 5 * 60_000).toISOString() } },
+          );
+          acquired = result?.success && Number(result.updated) === transferRows.length;
+        } catch { /* verify lost claim replies */ }
+        const claimedRows = await reloadReceiptRows(service, first);
+        acquired = claimedRows.length === transferRows.length && claimedRows.every((row: any) => row.status === "receiving"
+          && row.receipt_token === previousToken && row.receipt_claim_token === recoveryClaim);
+        if (!acquired) return Response.json({ error: "Transfer boshqa qurilmada tiklanmoqda." }, { status: 409 });
+        try {
+          await recoverReceipt(service, claimedRows, destination, products, user, previousToken, recoveryClaim);
+        } catch (error) {
+          // Release only our own recovery claim; a retry must finish recovery before applying new stock.
+          await service.entities.StockTransfer.updateMany(receiptFilter(first, previousToken, recoveryClaim),
+            { $set: { receipt_phase: "recovering", receipt_claim_token: "", receipt_claim_until: "" } }).catch(() => {});
+          throw error;
+        }
+        transferRows = await reloadReceiptRows(service, first);
+      }
+
       const destinationStocks = await Promise.all(
         transferRows.map((transfer: any) =>
           findStock(service, destination.id, transfer.product_id)
@@ -411,11 +602,8 @@ export default async function(req) {
       const prepared = transferRows.map((transfer: any, index: number) => {
         const existing = destinationStocks[index];
         const before = cleanNumber(existing?.quantity || 0);
-        const incoming = transfer.unit === "sheet" ? Number(transfer.received_quantity) : Number(transfer.quantity);
-        const factor = transfer.unit === "sheet" ? Number(transfer.conversion_factor) : 1;
-        if (!Number.isSafeInteger(incoming) || incoming <= 0 || !Number.isSafeInteger(factor)
-          || factor <= 0 || incoming !== Number(transfer.quantity) * factor
-          || (existing && existing.unit !== "piece")) {
+        const incoming = receiptIncoming(transfer);
+        if (existing && existing.unit !== "piece") {
           throw new Error("Transferning qabul miqdori yoki do‘kon qoldiq birligi noto‘g‘ri.");
         }
         return {
@@ -428,84 +616,63 @@ export default async function(req) {
         };
       });
 
-      // Atomically claim every line as "receiving" so concurrent devices can't double-receive.
+      const now = new Date().toISOString();
+      const receiptToken = crypto.randomUUID();
+      const claimToken = crypto.randomUUID();
+      // Every line carries the same durable operation and claim, including uncertain replies.
       const claimFilter = batchId
         ? { batch_id: batchId, status: "pending" }
         : { id: first.id, status: "pending" };
-      const claim = await service.entities.StockTransfer.updateMany(
-        claimFilter,
-        { $set: { status: "receiving" } },
-      );
-      const claimedCount = Number(claim?.updated || 0);
-      if (!claim?.success || claimedCount !== transferRows.length) {
-        if (claimedCount > 0) {
-          try {
-            await service.entities.StockTransfer.updateMany(
-              batchId ? { batch_id: batchId, status: "receiving" } : { id: first.id, status: "receiving" },
-              { $set: { status: "pending" } },
-            );
-          } catch {}
-        }
+      try {
+        await service.entities.StockTransfer.updateMany(claimFilter, { $set: {
+          status: "receiving", receipt_token: receiptToken, receipt_claim_token: claimToken,
+          receipt_claim_until: new Date(Date.now() + 5 * 60_000).toISOString(), receipt_phase: "applying",
+          receipt_started_at: now, receipt_user_id: user.id, receipt_user_name: userLabel(user),
+        } });
+      } catch { /* inspect the claim before any stock write */ }
+      const claimed = await reloadReceiptRows(service, first);
+      if (claimed.length !== transferRows.length || !claimed.every((row: any) =>
+        row.status === "receiving" && row.receipt_token === receiptToken && row.receipt_claim_token === claimToken)) {
+        // No stock was written. Release only lines claimed by this operation.
+        await service.entities.StockTransfer.updateMany(receiptFilter(first, receiptToken, claimToken),
+          { $set: { status: "pending", receipt_phase: "recovered", receipt_claim_token: "", receipt_claim_until: "" } }).catch(() => {});
         return Response.json({
           error: "Transfer boshqa qurilmada qayta ishlanmoqda.",
         }, { status: 409 });
       }
-
-      const now = new Date().toISOString();
-      const changedStocks: any[] = [];
-      const createdStocks: any[] = [];
-      const createdMovements: any[] = [];
+      prepared.forEach((row: any, index: number) => { row.transfer = claimed[index]; });
 
       try {
         for (const row of prepared) {
-          if (row.existing) {
-            await changeExistingStock(
-              service, row.existing, row.before, row.after, destination, row.product, user, now,
-            );
-            changedStocks.push(row);
-          } else {
-            const createdStock = await service.entities.ProductStock.create({
-              location_id: destination.id,
-              location_name: destination.name,
-              product_id: row.product.id,
-              product_name: row.transfer.product_name_snapshot || row.product.name,
-              unit: "piece",
-              quantity: row.after,
-              low_stock_level: 0,
-              updated_at: now,
-              updated_by: user.id,
-              updated_by_name: userLabel(user),
-            });
-            createdStocks.push({ ...row, createdStock });
-          }
-
-          const movement = await createMovement(service, {
+          await renewReceiptClaim(service, first, receiptToken, claimToken, prepared.length);
+          await applyReceiptStock(service, row, destination, user, now, receiptToken, claimToken);
+          await ensureReceiptMovement(service, {
             location: destination,
             product: row.product,
             type: "transfer_in",
             change: row.incoming,
-            before: row.before,
-            after: row.after,
+            before: row.transfer.receipt_balance_before,
+            after: row.transfer.receipt_balance_after,
             transfer: row.transfer,
             user,
             now,
-          });
-          createdMovements.push(movement);
+          }, receiptToken);
         }
 
-        const completionFilter = batchId
-          ? { batch_id: batchId, status: "receiving" }
-          : { id: first.id, status: "receiving" };
-        const completion = await service.entities.StockTransfer.updateMany(
-          completionFilter,
+        await renewReceiptClaim(service, first, receiptToken, claimToken, prepared.length);
+        try { await service.entities.StockTransfer.updateMany(
+          receiptFilter(first, receiptToken, claimToken),
           { $set: {
             status: "received",
             received_by: user.id,
             received_by_name: userLabel(user),
             received_at: now,
+            receipt_phase: "completed", receipt_claim_token: "", receipt_claim_until: "",
           } },
-        );
-        if (!completion?.success || Number(completion.updated || 0) !== transferRows.length) {
+        ); } catch { /* a saved completion must never be compensated */ }
+        const completed = await reloadReceiptRows(service, first);
+        if (completed.length !== transferRows.length || !completed.every((row: any) =>
+          row.status === "received" && row.receipt_token === receiptToken)) {
           throw new Error("Transfer holatini yakunlab bo‘lmadi.");
         }
 
@@ -522,41 +689,30 @@ export default async function(req) {
           });
         } catch {}
 
-        const completedTransfers = transferRows.map((transfer: any) => ({
-          ...transfer,
-          status: "received",
-          received_by: user.id,
-          received_by_name: userLabel(user),
-          received_at: now,
-        }));
+        const completedTransfers = completed;
         return Response.json({
           transfer: completedTransfers[0],
           transfers: completedTransfers,
           batch_id: batchId || null,
         });
       } catch (error) {
-        for (const movement of [...createdMovements].reverse()) {
-          try {
-            if (movement?.id) await service.entities.StockMovement.delete(movement.id);
-          } catch {}
-        }
-        for (const row of [...changedStocks].reverse()) {
-          try {
-            await service.entities.ProductStock.updateMany(
-              { id: row.existing.id, quantity: row.after },
-              { $set: { quantity: row.before } },
-            );
-          } catch {}
-        }
-        for (const row of [...createdStocks].reverse()) {
-          try {
-            if (row.createdStock?.id) await service.entities.ProductStock.delete(row.createdStock.id);
-          } catch {}
-        }
-        for (const transfer of transferRows) {
-          try {
-            await service.entities.StockTransfer.update(transfer.id, { status: "pending" });
-          } catch {}
+        const durable = await reloadReceiptRows(service, first);
+        if (durable.length === transferRows.length && durable.every((row: any) => row.status === "received"
+          && row.receipt_token === receiptToken)) return Response.json({
+          transfer: durable[0], transfers: durable, batch_id: batchId || null,
+        });
+        // Any completed line is a committed receipt; do not undo it on ambiguous partial completion.
+        if (durable.some((row: any) => row.status === "received")) throw new Error("Transfer yakuni to‘liq tasdiqlanmadi. Egasi tekshirishi kerak.");
+        try {
+          const recovery = await service.entities.StockTransfer.updateMany(receiptFilter(first, receiptToken, claimToken),
+            { $set: { receipt_phase: "recovering" } });
+          if (!recovery?.success || Number(recovery.updated) !== transferRows.length) throw new Error("Tiklash huquqini tasdiqlab bo‘lmadi.");
+          await recoverReceipt(service, durable, destination, products, user, receiptToken, claimToken);
+        } catch {
+          // Never expose pending until every operation marker and recovery movement is confirmed.
+          await service.entities.StockTransfer.updateMany(receiptFilter(first, receiptToken, claimToken),
+            { $set: { receipt_phase: "recovering", receipt_claim_token: "", receipt_claim_until: "" } }).catch(() => {});
+          throw new Error("Transferni tiklash tugamadi. Qoldiqni yana qo‘shishdan oldin tiklashni qayta boshlang.");
         }
         throw error;
       }

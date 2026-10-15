@@ -67,105 +67,15 @@ function fixture() {
     ActionHistory: [],
   };
 
-  let sequence = 0;
-  const clone = (value) => value == null ? value : structuredClone(value);
-  const matchesValue = (actual, expected) => {
-    if (expected && typeof expected === 'object' && !Array.isArray(expected)) {
-      if ('$gte' in expected && !(actual >= expected.$gte)) return false;
-      if ('$lte' in expected && !(actual <= expected.$lte)) return false;
-      return true;
-    }
-    return actual === expected;
-  };
-  const matches = (row, query) => Object.entries(query || {}).every(
-    ([key, value]) => matchesValue(row[key], value),
-  );
-
-  const entities = Object.fromEntries(Object.keys(db).map((name) => {
-    const entity = {
-      get: async (id) => clone(db[name].find((row) => row.id === id) || null),
-      list: async () => clone(db[name]),
-      filter: async (query) => clone(db[name].filter((row) => matches(row, query))),
-      create: async (data) => {
-        const row = { ...clone(data), id: name + '-' + ++sequence };
-        db[name].push(row);
-        return clone(row);
-      },
-      update: async (id, data) => {
-        const row = db[name].find((item) => item.id === id);
-        if (!row) throw new Error('Missing row ' + id);
-        Object.assign(row, clone(data));
-        return clone(row);
-      },
-      updateMany: async (query, operation) => {
-        const rows = db[name].filter((row) => matches(row, query));
-        for (const row of rows) {
-          Object.assign(row, clone(operation.$set || {}));
-          for (const [key, value] of Object.entries(operation.$inc || {})) {
-            row[key] = Number(row[key] || 0) + Number(value);
-          }
-        }
-        return { success: true, updated: rows.length };
-      },
-      delete: async (id) => {
-        db[name] = db[name].filter((row) => row.id !== id);
-      },
-    };
-    entity.bulkCreate = async (rows) => Promise.all(rows.map((row) => entity.create(row)));
-    return [name, entity];
-  }));
-
-  const client = {
-    asServiceRole: { entities },
-    auth: { me: async () => clone(db.User[0]) },
-  };
-  return { db, client };
+  return memoryBackend(db, { now: '2026-09-11T08:00:00.000Z', copySeed: false });
 }
 
 function loadHandler(client) {
-  const userHelpers = readFileSync('base44/shared/user-helpers.ts', 'utf8').replace(/export /g, '');
-  const managerScope = readFileSync('base44/shared/manager-request-scope.ts', 'utf8')
-    .replace(/^import .*;$/gm, '').replace(/export /g, '');
-  const sharedSrc = userHelpers + '\n' + managerScope + '\n'
-    + readFileSync('base44/shared/shift-close-helpers.ts', 'utf8')
-      .replace(/^export \{[^\n]*\} from [^\n]*;$/gm, '').replace(/export /g, '');
-  const sharedCode = ts.transpileModule(sharedSrc, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-
-  let source = readFileSync('base44/functions/complete-sale/entry.ts', 'utf8')
-    .replace(/^import .*manager-request-scope.*;$/gm, '')
-    .replace(/^import .*checkout-recipes.*;$/gm, '')
-    .replace(/^import .*checkout-reads.*;$/gm, '')
-    .replace(/^import .*burger-fries.*;$/gm, '')
-    .replace(/import \{\s*prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,\s*\} from "\.\.\/\.\.\/shared\/sale-ingredient-flow\.ts";/, '')
-    .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
-    .replace(/import \{[^}]*\} from "\.\.\/\.\.\/shared\/shift-close-helpers\.ts";/, '')
-    .replace('export default async function(req)', 'async function handler(req)');
-  // Load the real local cost helpers added to complete-sale, without importing the live SDK.
-  const costSource = readFileSync('base44/shared/cost-engine.ts', 'utf8').replace(/export /g, '');
-  source = source.replace(/import \{[^\n]+\} from "\.\.\/\.\.\/shared\/cost-engine\.ts";/, '');
-  const shopPricing = readFileSync('base44/shared/shop-pricing.ts', 'utf8').replace(/export /g, '');
-  source = source.replace(/import \{ priceForShop \} from "\.\.\/\.\.\/shared\/shop-pricing\.ts";/, '');
-  source = sharedCode + '\n' + costSource + '\n' + shopPricing + '\n' + source;
-  source += '\nglobalThis.testHandler = handler;';
-  const code = ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
-  const context = vm.createContext({
-    ...memoryBackend().load('base44/shared/sale-ingredient-flow.ts'),
-    ...memoryBackend().load('base44/shared/checkout-recipes.ts'),
-    ...memoryBackend().load('base44/shared/checkout-reads.ts'),
-    ...memoryBackend().load('base44/shared/burger-fries.js'),
-    client, Response, crypto: webcrypto, TextEncoder, console, structuredClone,
-  });
-  vm.runInContext(code, context);
-  return async (body) => {
-    const response = await context.testHandler({ json: async () => body });
-    return { status: response.status, data: await response.json() };
-  };
+  const runtime = memoryBackend({}, { now: '2026-09-11T08:00:00.000Z' });
+  runtime.client.auth = client.auth;
+  runtime.client.asServiceRole = client.asServiceRole;
+  return (body) => runtime.invoke('base44/functions/complete-sale/entry.ts', body);
 }
-
 const closeBody = () => ({
   action: 'close_shift',
   shift_id: 'shift',

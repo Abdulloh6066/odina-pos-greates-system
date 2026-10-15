@@ -130,6 +130,28 @@
     },
     "budget_settled_by_name": {
       "type": "string"
+    },
+    "order_payment_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "supplier_payment_operations_json": {
+      "type": "string"
+    },
+    "closing_operation_token": {
+      "type": "string"
+    },
+    "closing_payload_json": {
+      "type": "string"
+    },
+    "closing_review_required": {
+      "type": "boolean"
+    },
+    "order_payment_operations_json": {
+      "type": "string",
+      "description": "Backend pending order payment reservations and atomic shift accounting confirmations; shift closing checks the same journal."
     }
   },
   "required": [

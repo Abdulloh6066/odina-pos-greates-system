@@ -1,4 +1,4 @@
-// Offline-only regression for the real POS kitchen/service receipt UI.
+// Offline-only regression checks for the real POS kitchen/service receipt UI.
 // No live Base44 calls, sales, payments, stock changes or print invocations.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { transformSync } from 'esbuild';
-import * as lucide from 'lucide-react';
+import { Printer, AlertCircle, Loader2, UtensilsCrossed, X } from 'lucide-react';
 import { isStaffTicketEnabled } from '../src/lib/staff-order-ticket.js';
 
 const source = readFileSync('src/components/tables/StaffOrderTicketModal.jsx', 'utf8');
@@ -20,7 +20,8 @@ const Wrapper = ({ children }) => React.createElement('div', null, children);
 const context = {
   React, useEffect: React.useEffect, useState: React.useState,
   useRef: React.useRef, useCallback: React.useCallback,
-  ...lucide, isStaffTicketEnabled, base44: {}, createPortal: () => null,
+  Printer, AlertCircle, Loader2, UtensilsCrossed, X,
+  isStaffTicketEnabled, base44: {}, createPortal: () => null,
   formatUzbekistanDateTime: () => '2026-09-20 00:54',
   Dialog: Wrapper, DialogContent: Wrapper, DialogTitle: Wrapper,
   DialogDescription: Wrapper, Button: Wrapper,

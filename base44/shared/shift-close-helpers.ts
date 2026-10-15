@@ -1,14 +1,12 @@
+import { creditShiftBudget, reverseShiftBudget } from "./shift-settlement-recovery.ts";
+import { serviceTicketVersion, serviceTicketVersionQuery } from "./service-ticket-cycle.ts";
+export { finishServiceTicketCycleIfLastShift } from "./service-ticket-cycle.ts";
 // Shared helpers for shift-closing logic. Pure module: no SDK import, no Deno.serve.
 // Both complete-sale and shift-close-v2 import from here to avoid duplication.
 
 // Shop-wide sequential KITCHEN TICKET numbers are distinct from immutable Sale.sale_number
 // and CustomerOrder.order_number. The counter is atomically claimed on Shop so all cashiers
 // and all shifts in the same shop share it, regardless of date or device.
-const serviceTicketVersion = (shop: any) => Number.isSafeInteger(shop?.service_ticket_version)
-  && shop.service_ticket_version >= 0 ? shop.service_ticket_version : 0;
-const serviceTicketVersionQuery = (version: number) => version === 0
-  ? { $or: [{ service_ticket_version: 0 }, { service_ticket_version: { $exists: false } }] }
-  : { service_ticket_version: version };
 
 export async function allocateServiceTicketNumber(service: any, shopId: string, initialShop: any = null): Promise<number> {
   if (!shopId || !service?.entities?.Shop?.get || !service?.entities?.Shop?.updateMany) {
@@ -56,26 +54,6 @@ export async function allocateServiceTicketNumber(service: any, shopId: string, 
     if (claimed?.success && Number(claimed.updated || 0) === 1) return counter + 1;
   }
   throw httpError("Buyurtma raqami boshqa kassada o‘zgardi. Qayta urinib ko‘ring.", 409);
-}
-
-// Called ONLY after a shift is durably closed. A second still-open or closing
-// shift keeps the sequence alive. Leave the old counter as an audit clue;
-// the first request of the next cycle starts again at 1.
-export async function finishServiceTicketCycleIfLastShift(service: any, shopId: string): Promise<boolean> {
-  if (!shopId || !service?.entities?.Shop?.get || !service?.entities?.Shift?.filter) return false;
-  const shop = await service.entities.Shop.get(shopId).catch(() => null);
-  if (!shop || shop.service_ticket_cycle_active !== true) return false;
-  const version = serviceTicketVersion(shop);
-  const [opened, closing] = await Promise.all([
-    service.entities.Shift.filter({ shop_id: shopId, status: "open" }, "-opened_at", 1),
-    service.entities.Shift.filter({ shop_id: shopId, status: "closing" }, "-opened_at", 1),
-  ]);
-  if (opened?.length || closing?.length) return false;
-  const result = await service.entities.Shop.updateMany(
-    { id: shopId, service_ticket_cycle_active: true, ...serviceTicketVersionQuery(version) },
-    { $set: { service_ticket_cycle_active: false }, $inc: { service_ticket_version: 1 } },
-  );
-  return Boolean(result?.success && Number(result.updated || 0) === 1);
 }
 
 export const money = (value: unknown) => Math.round(Number(value) || 0);
@@ -259,58 +237,10 @@ export const BUDGET_ACCOUNT_LABELS: Record<string, string> = {
   bank: "Bank",
 };
 
-export async function creditBudgetBalance(service: any, account: string, amount: number, user: any, now: string) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const rows = await service.entities.BudgetBalance.filter({ account });
-    if ((rows || []).length > 1) {
-      throw httpError(`${BUDGET_ACCOUNT_LABELS[account]} uchun takroriy Budget balansi topildi.`, 409);
-    }
-
-    const current = rows?.[0];
-    if (!current) {
-      try {
-        const created = await service.entities.BudgetBalance.create({
-          account,
-          label: BUDGET_ACCOUNT_LABELS[account],
-          balance: amount,
-          updated_at: now,
-          updated_by_id: user.id,
-          updated_by_name: user.full_name || user.email,
-        });
-        return { record: created, before: 0, after: amount };
-      } catch (_) {
-        continue;
-      }
-    }
-
-    const before = money(current.balance);
-    const after = before + amount;
-    const update = await service.entities.BudgetBalance.updateMany(
-      { id: current.id, balance: Number(current.balance || 0) },
-      { $set: {
-        balance: after,
-        updated_at: now,
-        updated_by_id: user.id,
-        updated_by_name: user.full_name || user.email,
-      } },
-    );
-    if (update?.success && Number(update.updated || 0) === 1) {
-      return { record: { ...current, balance: after }, before, after };
-    }
-  }
-
-  throw httpError("Budget balansi bir vaqtda o‘zgardi. Yangilab qayta urinib ko‘ring.", 409);
+export async function creditBudgetBalance(service: any, account: string, amount: number, user: any, now: string, operationKey = `SM-${crypto.randomUUID()}`) {
+  return creditShiftBudget(service, account, amount, BUDGET_ACCOUNT_LABELS[account], user, now, operationKey);
 }
 
 export async function rollbackBudgetBalance(service: any, change: any, user: any) {
-  if (!change?.record?.id) return;
-  await service.entities.BudgetBalance.updateMany(
-    { id: change.record.id, balance: change.after },
-    { $set: {
-      balance: change.before,
-      updated_at: new Date().toISOString(),
-      updated_by_id: user.id,
-      updated_by_name: user.full_name || user.email,
-    } },
-  ).catch(() => {});
+  return reverseShiftBudget(service, change, user);
 }

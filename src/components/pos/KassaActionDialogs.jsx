@@ -50,7 +50,7 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
   );
 }
 
-export function CashWithdrawalDialog({ open, shift, user, recipients = [], supplierDebts = {}, onClose, onConfirm, loading, dataLoading = false, dataError = '', onRetryData }) {
+export function CashWithdrawalDialog({ open, shift, user, recipients = [], supplierDebts = {}, pendingSupplierPayment = null, onClose, onConfirm, loading, dataLoading = false, dataError = '', onRetryData }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('shop_expense');
@@ -61,26 +61,29 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
 
   useEffect(() => {
     if (open) {
-      setAmount('');
-      setReason('');
-      setExpenseCategory('shop_expense');
-      setRecipientId('');
+      setAmount(pendingSupplierPayment?.payload ? String(pendingSupplierPayment.payload.amount) : '');
+      setReason(pendingSupplierPayment?.payload?.notes || '');
+      setExpenseCategory(pendingSupplierPayment ? 'goods_payment' : 'shop_expense');
+      setRecipientId(pendingSupplierPayment?.payload?.supplier_id || '');
       setOwnerChoice('Abdulloh');
       setOtherOwner('');
       setOwnerPin('');
     }
-  }, [open]);
+  }, [open, pendingSupplierPayment?.key]);
 
+  const retryPending = Boolean(pendingSupplierPayment?.payload);
+  const retryShiftMatches = !retryPending || pendingSupplierPayment.payload.shift_id === shift?.id;
   const recipientRequired = expenseCategory === 'goods_payment';
-  const debtRecipients = recipients.filter((recipient) => Number(supplierDebts[recipient.id] || 0) > 0);
+  const debtRecipients = recipients.filter((recipient) => Number(supplierDebts[recipient.id] || 0) > 0 || (retryPending && recipient.id === pendingSupplierPayment.payload.supplier_id));
   const selectedDebt = Number(supplierDebts[recipientId] || 0);
   const ownerPinRequired = recipientRequired && user?.role === 'cashier';
   const ownerName = ownerChoice === 'other' ? otherOwner.trim() : 'Abdulloh';
   const ownerRequired = expenseCategory === 'owner_withdrawal';
   const valid = Number(amount) > 0
-    && Number(amount) <= Number(shift?.expected_cash || 0)
+    && retryShiftMatches
+    && (retryPending || Number(amount) <= Number(shift?.expected_cash || 0))
     && reason.trim()
-    && (!recipientRequired || (!dataLoading && !dataError && recipientId && Number(amount) <= selectedDebt))
+    && (!recipientRequired || (recipientId && (retryPending || (!dataLoading && !dataError && Number(amount) <= selectedDebt))))
     && (!ownerPinRequired || /^\d{4,8}$/.test(ownerPin))
     && (!ownerRequired || ownerName);
   const employeeName = user?.full_name || user?.email || 'Joriy Kassa xodimi';
@@ -112,6 +115,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
             <Label className="text-xs mb-1.5 block">Chiqim turi</Label>
             <OdinaSelect
               value={expenseCategory}
+              disabled={loading || retryPending}
               onChange={(event) => {
                 setExpenseCategory(event.target.value);
                 setRecipientId('');
@@ -128,7 +132,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
           {recipientRequired && (
             <div>
               <Label className="text-xs mb-1.5 block">Kompaniya / yetkazib beruvchi</Label>
-              <OdinaSelect disabled={dataLoading || Boolean(dataError)} value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
+              <OdinaSelect disabled={loading || retryPending || dataLoading || Boolean(dataError)} value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm">
                 <option value="">Ro‘yxatdan tanlang</option>
                 {debtRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.name} · qarz {formatUZS(supplierDebts[recipient.id])}</option>)}
               </OdinaSelect>
@@ -173,21 +177,22 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
 
           <div>
             <Label className="text-xs mb-1.5 block">Miqdor</Label>
-            <Input autoFocus type="number" min="1" max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
+            <Input disabled={loading || retryPending} autoFocus type="number" min="1" max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Izoh / sabab</Label>
-            <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Pul nima uchun berildi?" rows={2} />
+            <Textarea disabled={loading || retryPending} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Pul nima uchun berildi?" rows={2} />
           </div>
           <div className="rounded-xl bg-muted/60 px-3 py-2.5">
             <p className="text-xs text-muted-foreground">Operatsiyani bajarayotgan xodim</p>
             <p className="text-sm font-medium mt-0.5">{employeeName}</p>
           </div>
         </div>
+        {retryPending && <p className="text-xs text-muted-foreground">Avvalgi qarz to‘lovi saqlandi. {retryShiftMatches ? 'Natijani shu summa va izoh bilan qayta tekshiring.' : 'To‘lov boshqa smenada boshlangan; egasi tarixni tekshirishi kerak.'}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
+          <Button variant="outline" onClick={onClose} disabled={loading}>{retryPending ? 'Yopish' : 'Bekor qilish'}</Button>
           <Button onClick={submit} disabled={loading || !valid} className="min-h-11 bg-primary text-primary-foreground hover:bg-primary-strong">
-            {loading ? 'Saqlanmoqda…' : 'Pul olishni saqlash'}
+            {loading ? 'Saqlanmoqda…' : retryPending ? 'Avvalgi to‘lovni tekshirish' : 'Pul olishni saqlash'}
           </Button>
         </DialogFooter>
       </DialogContent>

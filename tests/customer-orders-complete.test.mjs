@@ -7,6 +7,7 @@ import { resolve, dirname } from 'node:path';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { matches } from './helpers/memory-backend.mjs';
 
 let clock = '2026-09-10T10:00:00.000Z';
 function makeClock() {
@@ -61,15 +62,6 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
 function harness(db) {
   let sequence = 0;
   const clone = (v) => v == null ? v : structuredClone(v);
-  const matchesValue = (a, e) => {
-    if (e && typeof e === 'object' && !Array.isArray(e)) {
-      if ('$gte' in e && !(a >= e.$gte)) return false;
-      if ('$lte' in e && !(a <= e.$lte)) return false;
-      return true;
-    }
-    return a === e;
-  };
-  const matches = (row, q) => Object.entries(q || {}).every(([k, v]) => matchesValue(row[k], v));
   const entities = Object.fromEntries(Object.keys(db).map((name) => {
     const entity = {
       get: async (id) => clone(db[name].find((r) => r.id === id) || null),
@@ -91,6 +83,7 @@ function harness(db) {
         for (const row of rows) {
           Object.assign(row, clone(op.$set || {}));
           for (const [k, v] of Object.entries(op.$inc || {})) row[k] = Number(row[k] || 0) + Number(v);
+          for (const [k, v] of Object.entries(op.$push || {})) (row[k] ??= []).push(clone(v));
         }
         return { success: true, updated: rows.length };
       },
@@ -109,7 +102,7 @@ function harness(db) {
 function loadHandler(client) {
   const cache = new Map();
   const context = vm.createContext({
-    URL, Response, crypto: webcrypto, console, structuredClone, Date: makeClock(),
+    URL, Response, crypto: webcrypto, TextEncoder, console, structuredClone, Date: makeClock(),
   });
   function load(path) {
     path = resolve(path);

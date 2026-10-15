@@ -71,6 +71,10 @@
     },
     "cancellation_reason": {
       "type": "string"
+    },
+    "payment_operations_json": {
+      "type": "string",
+      "description": "Backend-only markers for applied and compensated supplier payments."
     }
   },
   "required": [

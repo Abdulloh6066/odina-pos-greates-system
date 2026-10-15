@@ -8,7 +8,7 @@ import { transformSync } from 'esbuild';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as icons from 'lucide-react';
+import { ArrowUpRight, Eye, Minus, Plus, Printer, ReceiptText, RotateCcw, Search, ShoppingBag, Ticket, Trash2, Truck, X } from 'lucide-react';
 import * as fries from '../src/lib/burger-fries.js';
 import { staffTicketFromSale } from '../src/lib/staff-order-ticket.js';
 import { buildPendingSale, syncPendingSales } from '../src/lib/offline-sales.js';
@@ -144,10 +144,23 @@ const Wrap = ({ children }) => React.createElement('div', null, children);
 const Button = ({ children, onClick, disabled, ...props }) => React.createElement('button',
   { onClick, disabled, 'aria-label': props['aria-label'], 'aria-pressed': props['aria-pressed'], className: props.className, type: props.type }, children);
 const Input = props => React.createElement('input', props);
+// The sales history page reads through the paginated history hook; this stub keeps the
+// delivery test focused on the marker, the search and reprinting one saved sale.
+const useHistoryRows = entity => {
+  const [rows, setRows] = React.useState([]);
+  React.useEffect(() => {
+    let live = true;
+    Promise.resolve(entity.filter({}, '-created_date', 100, 0))
+      .then(page => { if (live) setRows(Array.isArray(page) ? page : page?.items || []); });
+    return () => { live = false; };
+  }, [entity]);
+  return { rows, loading: false, loadingMore: false, error: '', hasMore: false, reload: () => {}, loadMore: () => {} };
+};
 function component(path, mocks = {}, globals = {}) {
   const mod = { exports: {} };
   const code = transformSync(readFileSync(path, 'utf8'), { loader: 'jsx', format: 'cjs', target: 'es2022' }).code;
-  const defaults = { react: React, 'lucide-react': icons,
+  const defaults = { react: React,
+    'lucide-react': { ArrowUpRight, Eye, Minus, Plus, Printer, ReceiptText, RotateCcw, Search, ShoppingBag, Ticket, Trash2, Truck, X },
     '@/components/ui/button': { Button }, '@/components/ui/input': { Input },
     '@/lib/pos': { formatUZS, formatNum: String, saleOccurredAt: sale => sale.sold_at, saleBusinessDate: sale => sale.business_date },
     '@/lib/burger-fries': fries,
@@ -222,7 +235,7 @@ test('sales history shows/searches the delivery marker and reprints the same sav
   const History = component('src/pages/SalesHistory.jsx', {
     'react-router-dom': { useOutletContext: () => ({ user: { id: 'owner', role: 'admin' } }) },
     '@/api/base44Client': { base44: { entities: {
-      Sale: { list: async () => { saleReads++; return [sale, { ...sale, id: 'ordinary-sale', is_delivery: false }]; } },
+      Sale: { filter: async () => { saleReads++; return [sale, { ...sale, id: 'ordinary-sale', is_delivery: false }]; } },
       Settings: { list: async () => { settingsReads++; return [{ shop_name: 'Odina Tort' }]; } },
     }, functions: { invoke: () => { throw Error('Reprinting must not write a new sale'); } } } },
     '@/lib/odina-dialog': { odinaAlert: message => { throw Error(message); } },
@@ -231,6 +244,8 @@ test('sales history shows/searches the delivery marker and reprints the same sav
     '@/components/tables/StaffOrderTicketModal': () => null,
     '@/lib/staff-order-ticket': { isStaffTicketEnabled: () => false },
     '@/components/pos/Receipt': props => { receiptProps = props; return null; },
+    '@/lib/history-pagination': { salesHistoryQuery: () => ({}) },
+    '@/hooks/useEntityHistory': { useEntityHistory: useHistoryRows },
   });
   let renderer;
   await act(async () => { renderer = TestRenderer.create(React.createElement(History)); await tick(); });

@@ -1,0 +1,15 @@
+{
+  "applied": false,
+  "reason": "Base44 existing-entity permissions apply to live access immediately. User requested preview only; activate separately when explicitly approved.",
+  "entities": {
+    "CustomerOrder": {
+      "create": false
+    },
+    "CustomerOrderItem": {
+      "create": false
+    },
+    "OrderPayment": {
+      "create": false
+    }
+  }
+}

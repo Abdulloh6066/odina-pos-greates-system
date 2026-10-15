@@ -115,7 +115,7 @@ test('a stock shortage still blocks checkout before any writes', async () => {
 
 test('unavailable ingredient prices retain the existing estimate fallback', async () => {
   const f = checkoutFixture(1);
-  f.entities.SupplierReceiptItem.list = async () => { throw new Error('Mock receipt lookup failure'); };
+  f.entities.SupplierReceiptItem.filter = async () => { throw new Error('Mock receipt lookup failure'); };
   const result = await f.invoke(file, f.request);
   assert.equal(result.status, 200);
   assert.equal(f.db.SaleItem[0].unit_cost_at_sale, 0);

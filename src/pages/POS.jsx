@@ -2,9 +2,11 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
+import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from '@/lib/order-request-retry';
 import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift, openPosShift, invokePosRead } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
@@ -13,6 +15,10 @@ import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductGrid from '@/components/pos/ProductGrid';
 import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
+import CheckoutTimingStatus from '@/components/pos/CheckoutTimingStatus';
+import CheckoutTimingHistory from '@/components/pos/CheckoutTimingHistory';
+import useCheckoutTiming from '@/hooks/useCheckoutTiming';
+import { createCheckoutTimingEventId, reportCheckoutTiming, flushCheckoutTimings } from '@/lib/checkout-timing-outbox';
 import useStableEvent from '@/hooks/use-stable-event';
 import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
@@ -104,7 +110,29 @@ export default function POS() {
   const checkoutCancelledRef = useRef(false);
   const checkoutReadyRef = useRef(false);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
+  const [checkoutTimingHistoryOpen, setCheckoutTimingHistoryOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const { timing: lastCheckoutTiming, recordTiming: recordCheckoutTiming } = useCheckoutTiming(user?.id, shift?.shop_id, shift?.id);
+  const timingUserRef = useRef(user?.id || '');
+  timingUserRef.current = user?.id || '';
+  useEffect(() => {
+    const actorId = user?.id || '';
+    timingUserRef.current = actorId;
+    if (!actorId) return;
+    const flush = async () => {
+      try {
+        let result;
+        do {
+          result = await flushCheckoutTimings({ userId: actorId,
+            send: body => base44.functions.invoke('checkout-timing', body),
+            isCurrentUser: () => timingUserRef.current === actorId });
+        } while (result?.hasMore && timingUserRef.current === actorId);
+      } catch { console.warn('Checkout timing history upload is pending.'); }
+    };
+    void flush();
+    window.addEventListener('online', flush);
+    return () => { timingUserRef.current = ''; window.removeEventListener('online', flush); };
+  }, [user?.id]);
   const saleSubmittingRef = useRef(false);
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
@@ -1321,6 +1349,8 @@ export default function POS() {
     const checkoutTimingStarted = performance.now();
     let checkoutServerMs = null;
     let checkoutBackendTiming = null;
+    let checkoutOutcome = 'unconfirmed';
+    let checkoutSaleId = '';
     let saleCommitted = false;
     setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
@@ -1360,6 +1390,7 @@ export default function POS() {
         }
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
+        checkoutOutcome = 'queued';
         finishQueuedSale(pendingRecord, printReceipt);
         return;
       }
@@ -1393,13 +1424,16 @@ export default function POS() {
         const payload = result?.data || result;
         checkoutBackendTiming = payload?.backend_timing || null;
         if (!payload?.sale?.id) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
+        checkoutSaleId = payload.sale.id;
         saleCommitted = true;
+        checkoutOutcome = payload.already_processed ? 'rechecked' : 'confirmed';
         applyCompletedSale(payload, printReceipt);
       } catch (error) {
         reportRequestError(error);
         if (saleCommitted || !pendingRecord || !isRetryableSyncError(error)) throw error;
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
+        checkoutOutcome = 'queued';
         finishQueuedSale(pendingRecord, printReceipt);
       }
     } catch (error) {
@@ -1418,10 +1452,25 @@ export default function POS() {
     } finally {
       saleSubmittingRef.current = false;
       setPaying(false);
+      const checkoutTotalMs = Math.round(performance.now() - checkoutTimingStarted);
+      recordCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome });
+      // Diagnostics are separate from financial completion and never delay or retry a sale.
+      try {
+        void reportCheckoutTiming({ event_id: createCheckoutTimingEventId(), actor_id: user?.id || '',
+          shift_id: shift?.id || '', request_key: idempotencyKey,
+          ...(checkoutSaleId ? { sale_id: checkoutSaleId } : {}), total_ms: checkoutTotalMs,
+          ...(checkoutServerMs === null ? {} : { api_round_trip_ms: checkoutServerMs }),
+          outcome: checkoutOutcome, client_completed_at: new Date().toISOString() }, {
+          send: body => base44.functions.invoke('checkout-timing', body),
+          isCurrentUser: () => timingUserRef.current === user?.id,
+        }).then(result => {
+          if (result?.failed || (result?.error && !(result?.sent > 0))) console.warn('Checkout timing history upload is pending.');
+        }).catch(() => console.warn('Checkout timing history upload is pending.'));
+      } catch { console.warn('Checkout timing history upload is pending.'); }
       console.info('[Odina checkout timing]', JSON.stringify({
         server_ms: checkoutServerMs,
         backend: checkoutBackendTiming,
-        total_ms: Math.round(performance.now() - checkoutTimingStarted),
+        total_ms: checkoutTotalMs,
         completed: saleCommitted,
         print_receipt: printReceipt,
       }));
@@ -1521,6 +1570,10 @@ export default function POS() {
       setShift(null);
       setCloseShiftOpen(false);
       setShiftToClose(null);
+      const detailsWarning = payload.details_warning || (payload.stock_report?.complete === false
+        ? 'Smena yopildi. Yopilishdagi mahsulot qoldig‘i tafsilotlari yuklanmadi; Smenalar tarixidan qayta tekshiring.'
+        : '');
+      if (detailsWarning) toast({ title: 'Smena yopildi', description: detailsWarning });
     } catch (e) {
       const message = e?.response?.data?.error || e?.data?.error || e?.message || String(e);
       if (e?.response?.status === 409) {
@@ -1542,23 +1595,28 @@ export default function POS() {
       return;
     }
     const isDebtPayment = expense_category === 'goods_payment';
+    const debtRequestScope = orderRequestScope(user?.id, 'pay_debt');
+    if (isDebtPayment && !cashWithdrawalRequestRef.current) cashWithdrawalRequestRef.current = readOrderRequest(debtRequestScope);
+    const hadPendingDebt = isDebtPayment && Boolean(cashWithdrawalRequestRef.current);
     const fingerprint = JSON.stringify([shift.id, amount, reason, expense_category, recipient_id || '', recipient_name || '']);
     if (cashWithdrawalRequestRef.current && cashWithdrawalRequestRef.current.fingerprint !== fingerprint) {
       void odinaAlert('Avvalgi pul operatsiyasi natijasini tekshiring. Uni boshqa summa bilan takrorlamang; avvalgi summa va izoh bilan qayta tekshiring.');
       return;
     }
-    if (!isDebtPayment && !cashWithdrawalRequestRef.current) {
+    if (!cashWithdrawalRequestRef.current) {
       cashWithdrawalRequestRef.current = { key: createSaleIdempotencyKey(), fingerprint };
+    }
+    if (isDebtPayment && !cashWithdrawalRequestRef.current.payload) {
+      cashWithdrawalRequestRef.current.payload = { action: 'pay_debt', shift_id: shift.id,
+        supplier_id: recipient_id, amount, notes: reason };
     }
     cashWithdrawalSubmittingRef.current = true;
     setCashWithdrawalLoading(true);
     try {
+      if (isDebtPayment) cashWithdrawalRequestRef.current = retainOrderRequest(debtRequestScope, cashWithdrawalRequestRef.current);
       const result = await base44.functions.invoke(isDebtPayment ? 'supplier-ledger' : 'complete-sale', isDebtPayment ? {
-        action: 'pay_debt',
-        shift_id: shift.id,
-        supplier_id: recipient_id,
-        amount,
-        notes: reason,
+        ...cashWithdrawalRequestRef.current.payload,
+        idempotency_key: cashWithdrawalRequestRef.current.key,
         owner_pin,
       } : {
         action: 'cash_withdrawal',
@@ -1576,14 +1634,19 @@ export default function POS() {
       if (expense_category === 'goods_payment') {
         setSupplierDebts((current) => ({
           ...current,
-          [recipient_id]: Math.max(0, Number(current[recipient_id] || 0) - Number(amount || 0)),
+          [recipient_id]: Math.max(0, Number(payload.remaining_debt || 0)),
         }));
       }
+      if (isDebtPayment) clearOrderRequest(debtRequestScope);
       cashWithdrawalRequestRef.current = null;
       setCashWithdrawalOpen(false);
     } catch (e) {
       const pending = e?.response?.data?.operation_pending || e?.data?.operation_pending;
-      if (!pending && !isRetryableSyncError(e)) cashWithdrawalRequestRef.current = null;
+      const reversed = e?.response?.data?.operation_reversed || e?.data?.operation_reversed;
+      if (reversed || (!pending && !isRetryableSyncError(e) && (!isDebtPayment || !hadPendingDebt))) {
+        if (isDebtPayment) clearOrderRequest(debtRequestScope);
+        cashWithdrawalRequestRef.current = null;
+      }
       void odinaAlert('Pul olish natijasini tekshiring: ' + (e?.response?.data?.error || e?.data?.error || e?.message || e));
     } finally {
       cashWithdrawalSubmittingRef.current = false;
@@ -1664,6 +1727,9 @@ export default function POS() {
         )}
       </div>
 
+      <CheckoutTimingStatus userRole={user?.role} pending={paying}
+        onOpenHistory={() => setCheckoutTimingHistoryOpen(true)}
+        timing={lastCheckoutTiming?.shiftId === shift?.id ? lastCheckoutTiming : null} />
 
       {!selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
@@ -1973,6 +2039,8 @@ export default function POS() {
           </div>
         </DialogContent>
       </Dialog>
+      <CheckoutTimingHistory key={user?.id || 'signed-out'} open={checkoutTimingHistoryOpen} onOpenChange={setCheckoutTimingHistoryOpen}
+        userRole={user?.role} shops={shops} />
       <ShiftReport shift={shiftReport} onAfterPrint={() => setShiftReport(null)} />
       <Receipt
         sale={receiptPrintSale}
@@ -1999,6 +2067,7 @@ export default function POS() {
         user={user}
         recipients={cashRecipients}
         supplierDebts={supplierDebts}
+        pendingSupplierPayment={readOrderRequest(orderRequestScope(user?.id, 'pay_debt'))}
         dataLoading={cashDataLoading}
         dataError={cashDataError}
         onRetryData={() => void loadCashData()}
@@ -2076,4 +2145,3 @@ function Chip({ active, onClick, children }) {
     </button>
   );
 }
-

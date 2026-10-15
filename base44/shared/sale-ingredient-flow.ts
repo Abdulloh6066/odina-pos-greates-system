@@ -203,66 +203,74 @@ export async function applySaleIngredientDeduction(
     }
   }
 
-  for (const plan of plans) {
-    const req = plan.requirement;
-    const stock = plan.stock;
-    let stockRecord: any = stock?.id ? { id: stock.id } : null;
+  // Distinct ingredients are already aggregated in the preparation phase.
+  // Each stock mutation precedes its movement, with at most four ingredient
+  // chains in flight. Settle the full batch before throwing so the caller's
+  // rollback journals include late successful sibling writes.
+  for (let start = 0; start < plans.length; start += 4) {
+    const results = await Promise.allSettled(plans.slice(start, start + 4).map(async (plan) => {
+      const req = plan.requirement;
+      const stock = plan.stock;
+      let stockRecord: any = stock?.id ? { id: stock.id } : null;
 
-    if (stock?.id) {
-      const update = await service.entities.IngredientStock.updateMany(
-        { id: stock.id, quantity: plan.before },
-        { $set: {
-          quantity: plan.after,
+      if (stock?.id) {
+        const update = await service.entities.IngredientStock.updateMany(
+          { id: stock.id, quantity: plan.before },
+          { $set: {
+            quantity: plan.after,
+            ingredient_name: req.ingredient_name,
+            unit: plan.unit,
+            location_name: shopName,
+            updated_at: now,
+            updated_by: userId,
+            updated_by_name: userName,
+          } },
+        );
+        if (!update?.success || Number(update.updated || 0) !== 1) {
+          throw httpError(`${req.ingredient_name} qoldig‘i boshqa qurilmada o‘zgardi. Yangilang va qayta urinib ko‘ring.`, 409);
+        }
+      } else {
+        stockRecord = await service.entities.IngredientStock.create({
+          location_id: shopId,
+          location_name: shopName,
+          ingredient_id: req.ingredient_id,
           ingredient_name: req.ingredient_name,
           unit: plan.unit,
-          location_name: shopName,
+          quantity: plan.after,
+          low_stock_level: 0,
           updated_at: now,
           updated_by: userId,
           updated_by_name: userName,
-        } },
-      );
-      if (!update?.success || Number(update.updated || 0) !== 1) {
-        throw httpError(`${req.ingredient_name} qoldig‘i boshqa qurilmada o‘zgardi. Yangilang va qayta urinib ko‘ring.`, 409);
+        });
       }
-    } else {
-      stockRecord = await service.entities.IngredientStock.create({
+      applied.push({ stockId: stockRecord.id, quantity: req.total_required, before: plan.before, after: plan.after });
+
+      const reason = saleIngredientReason(ingredientSources.get(req.ingredient_id) || []);
+      const movement = await service.entities.StockMovement.create({
+        movement_number: movementNumber(now),
         location_id: shopId,
         location_name: shopName,
-        ingredient_id: req.ingredient_id,
-        ingredient_name: req.ingredient_name,
+        item_kind: "ingredient",
+        item_id: req.ingredient_id,
+        item_name: req.ingredient_name,
         unit: plan.unit,
-        quantity: plan.after,
-        low_stock_level: 0,
-        updated_at: now,
-        updated_by: userId,
-        updated_by_name: userName,
+        movement_type: "sale",
+        quantity_change: -req.total_required,
+        balance_before: plan.before,
+        balance_after: plan.after,
+        reason,
+        reference_id: saleId,
+        reference_type: "sale",
+        order_id: undefined,
+        order_number_snapshot: saleNumber,
+        user_id: userId,
+        user_name: userName,
+        created_at: now,
       });
-    }
-    applied.push({ stockId: stockRecord.id, quantity: req.total_required, before: plan.before, after: plan.after });
-
-    const reason = saleIngredientReason(ingredientSources.get(req.ingredient_id) || []);
-    const movement = await service.entities.StockMovement.create({
-      movement_number: movementNumber(now),
-      location_id: shopId,
-      location_name: shopName,
-      item_kind: "ingredient",
-      item_id: req.ingredient_id,
-      item_name: req.ingredient_name,
-      unit: plan.unit,
-      movement_type: "sale",
-      quantity_change: -req.total_required,
-      balance_before: plan.before,
-      balance_after: plan.after,
-      reason,
-      reference_id: saleId,
-      reference_type: "sale",
-      order_id: undefined,
-      order_number_snapshot: saleNumber,
-      user_id: userId,
-      user_name: userName,
-      created_at: now,
-    });
-    movements.push(movement);
+      movements.push(movement);
+    }));
+    const failed = results.find(result => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
   }
 
   return { movements, applied };

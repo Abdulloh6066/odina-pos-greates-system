@@ -4,6 +4,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { BACKUP_ENTITIES, collectBusinessBackup } from '../src/lib/read-only-backup.js';
 import { buildPendingSale } from '../src/lib/offline-sales.js';
+import { memoryBackend } from './helpers/memory-backend.mjs';
 
 const read = (path) => readFileSync(path, 'utf8');
 
@@ -66,13 +67,29 @@ test('front end, offline queue and server all require exact payment totals inclu
   assert.equal(buildPendingSale({ ...request, payments: [{ method: 'cash', amount: 10000 }] }).local_sale.total, 10000);
 });
 
-test('stock counts are per shop, physical counts require owner approval before changing product stock', () => {
-  const backend = read('base44/functions/stock-count/entry.ts');
-  assert.match(backend, /counts = counts\.filter\(\(c: any\) => c\.location_id === shopId\)/);
-  assert.match(backend, /if \(!canApprove\(role\)\)/);
-  assert.match(backend, /action === "approve_count"/);
-  const ui = read('src/components/warehouse/StockCountPanel.jsx');
-  assert.match(ui, /Qoldiq faqat egasi tasdiqlagach o‘zgartiriladi/);
+test('stock count approval denies cashiers and managers outside their assigned shop', async () => {
+  for (const [role, shopId] of [['cashier', 'shop'], ['manager', 'other-shop']]) {
+    const f = memoryBackend({
+      User: [{ id: 'staff', role, shop_id: shopId, active: true }],
+      Shop: [{ id: 'shop', name: 'Do‘kon', active: true, location_type: 'shop' },
+        { id: 'other-shop', name: 'Boshqa do‘kon', active: true, location_type: 'shop' }],
+      StockCount: [{ id: 'count', location_id: 'shop', status: 'submitted' }],
+      ProductStock: [{ id: 'stock', location_id: 'shop', product_id: 'product', quantity: 10 }],
+    });
+    const before = structuredClone(f.db.ProductStock);
+    const result = await f.invoke('base44/functions/stock-count/entry.ts', { action: 'approve_count', count_id: 'count' });
+    assert.equal(result.status, 403, JSON.stringify(result));
+    assert.deepEqual(f.db.ProductStock, before);
+    assert.ok(!f.calls.some(([, action]) => action === 'update' || action === 'updateMany' || action === 'create'));
+  }
+  const f = memoryBackend({
+    User: [{ id: 'manager', role: 'manager', shop_id: 'shop', active: true }],
+    Shop: [{ id: 'shop', name: 'Do‘kon', active: true, location_type: 'shop' }],
+    StockCount: [{ id: 'mine', location_id: 'shop', status: 'draft' }, { id: 'other', location_id: 'other-shop', status: 'draft' }],
+  });
+  const visible = await f.invoke('base44/functions/stock-count/entry.ts', { action: 'list_counts' });
+  assert.equal(visible.status, 200);
+  assert.deepEqual(visible.data.counts.map(row => row.id), ['mine']);
 });
 
 test('receipt remains 80mm and includes wishes and per-shop snapshotted contacts', () => {

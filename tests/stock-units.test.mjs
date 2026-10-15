@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { matches as matchesQuery } from './helpers/memory-backend.mjs';
 
 function fixture() {
   const db = {
@@ -32,7 +33,7 @@ function fixture() {
   let sequence = 0;
   let actor = 'admin';
   const clone = (v) => v == null ? v : structuredClone(v);
-  const matches = (row, query) => Object.entries(query).every(([key, value]) => row[key] === value);
+  const matches = matchesQuery;
   const entities = Object.fromEntries(Object.keys(db).map((name) => {
     const entity = {
       get: async (id) => clone(db[name].find((row) => row.id === id) || null),
@@ -52,6 +53,7 @@ function fixture() {
         for (const row of rows) {
           Object.assign(row, clone(operation.$set || {}));
           for (const [key, value] of Object.entries(operation.$inc || {})) row[key] = Number(row[key] || 0) + value;
+          for (const [key, value] of Object.entries(operation.$push || {})) (row[key] ??= []).push(clone(value));
         }
         return { success: true, updated: rows.length };
       },

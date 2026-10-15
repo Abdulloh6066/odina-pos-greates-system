@@ -13,7 +13,7 @@
     },
     "product_id": {
       "type": "string",
-      "description": "Katalog mahsuloti IDsi; oddiy buyurtmada bo\u2018sh."
+      "description": "Katalog mahsuloti IDsi; oddiy buyurtmada bo‘sh."
     },
     "item_type": {
       "type": "string",

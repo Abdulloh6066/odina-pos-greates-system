@@ -1,4 +1,5 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { resolveAppUser } from "../../shared/user-helpers.ts";
 
 // Expiry uses the server clock, through the selected day's end in Uzbekistan.
 function isDiscountExpired(discount: any, now = Date.now()) {
@@ -14,8 +15,9 @@ function isDiscountExpired(discount: any, now = Date.now()) {
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   try {
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const authenticatedUser = await base44.auth.me();
+    if (!authenticatedUser) return Response.json({ error: "Authentication required." }, { status: 401 });
+    const user = await resolveAppUser(base44.asServiceRole, authenticatedUser);
     if (!["admin", "cashier"].includes(user.role)) return Response.json({ error: "Not allowed." }, { status: 403 });
     const body = await req.json();
     const code = String(body?.code || "").trim().toUpperCase();
@@ -30,6 +32,6 @@ Deno.serve(async (req) => {
     }
     return Response.json({ code: discount.code, percentage: Number(discount.percentage) });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Could not validate code." }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : "Could not validate code." }, { status: Number((error as any)?.status || 500) });
   }
 });

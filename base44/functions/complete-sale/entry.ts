@@ -1,4 +1,6 @@
+import { pendingFinancialCloseGuard } from "../../shared/shift-pending-financial.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
+import { savedShiftCloseResponse, reconcileShiftCloseFailure } from "../../shared/shift-settlement-recovery.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { createCheckoutReadTracker, isTransientCheckoutError } from "../../shared/checkout-reads.ts";
 
@@ -31,13 +33,13 @@ import {
   money, stockNumber, httpError, APP_ROLES, userRole, userShopId,
   resolveAppUser, SHIFT_STOCK_ROW_LIMIT, stockMovementTime,
   buildShiftStockReport, cleanupShiftStockSnapshots,
-  BUDGET_ACCOUNT_LABELS, creditBudgetBalance, rollbackBudgetBalance,
+  BUDGET_ACCOUNT_LABELS, creditBudgetBalance,
   allocateServiceTicketNumber, finishServiceTicketCycleIfLastShift,
 } from "../../shared/shift-close-helpers.ts";
 import { loadIngredientCosts, recipeCostFromMap, costPerPiece, num } from "../../shared/cost-engine.ts";
 import { createCheckoutRecipeLoader, type CheckoutRecipeLoader } from "../../shared/checkout-recipes.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
-import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries } from "../../shared/burger-fries.js";
+import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries, FRIES_INGREDIENT_ID } from "../../shared/burger-fries.js";
 import {
   prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
 } from "../../shared/sale-ingredient-flow.ts";
@@ -89,30 +91,35 @@ async function loadSaleCostSnapshots(service: any, normalizedItems: any[], produ
   if (!recipesByProduct.size) return unitCostByProduct;
   try {
     const costProductIds = productIds.filter(id => recipesByProduct.has(id));
-    // Read raw cards while purchase prices load; the same per-request recipe
-    // loader remains authoritative for both costing and ingredient deductions.
-    const [ingredientCosts, cardsByProduct] = await Promise.all([
-      loadIngredientCosts(service),
-      (async () => {
-        const cards = new Map<string, any>();
-        for (let start = 0; start < costProductIds.length; start += 4) {
-          const batch = costProductIds.slice(start, start + 4);
-          const results = await Promise.allSettled(batch.map(async (productId) => {
-            const recipe = recipesByProduct.get(productId);
-            const [rawItems, product] = await Promise.all([
-              recipeLoader.itemsForRecipe(recipe.id),
-              productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
-            ]);
-            return { recipe, rawItems, product };
-          }));
-          for (const [index, result] of results.entries()) {
-            if (result.status === "fulfilled") cards.set(batch[index], result.value);
-            else console.warn("Cost snapshot skipped:", result.reason);
-          }
+    // Resolve the basket cards first so supplier reads are scoped to exactly
+    // their ingredients. The request-local recipe cache is shared with stock.
+    const cardsByProduct = await (async () => {
+      const cards = new Map<string, any>();
+      for (let start = 0; start < costProductIds.length; start += 4) {
+        const batch = costProductIds.slice(start, start + 4);
+        const results = await Promise.allSettled(batch.map(async (productId) => {
+          const recipe = recipesByProduct.get(productId);
+          const [rawItems, product] = await Promise.all([
+            recipeLoader.itemsForRecipe(recipe.id),
+            productsAtSale.get(productId) || service.entities.Product.get(productId).catch(() => null),
+          ]);
+          return { recipe, rawItems, product };
+        }));
+        for (const [index, result] of results.entries()) {
+          if (result.status === "fulfilled") cards.set(batch[index], result.value);
+          else console.warn("Cost snapshot skipped:", result.reason);
         }
-        return cards;
-      })(),
-    ]);
+      }
+      return cards;
+    })();
+    const ingredientIds = new Set<string>();
+    for (const { rawItems } of cardsByProduct.values()) {
+      for (const row of rawItems) if (row.ingredient_id) ingredientIds.add(String(row.ingredient_id));
+    }
+    if (normalizedItems.some(item => item.fries_option === "with" && cardsByProduct.has(item.product_id))) {
+      ingredientIds.add(FRIES_INGREDIENT_ID);
+    }
+    const ingredientCosts = await loadIngredientCosts(service, [...ingredientIds]);
     const baseCostByProduct = new Map<string, any>();
     for (const [productId, { recipe, rawItems, product }] of cardsByProduct) {
       const { batchCost, missing, hasAllPrices } = recipeCostFromMap(rawItems, ingredientCosts, takeaway);
@@ -580,25 +587,57 @@ export default async function(req) {
         }, { status: 400 });
       }
 
-      const closingShift = await service.entities.Shift.get(shiftId);
-      if (!closingShift || closingShift.status !== "open") {
-        return Response.json({ error: "Smena ochiq emas yoki allaqachon yopilgan." }, { status: 409 });
-      }
+      let closingShift = await service.entities.Shift.get(shiftId);
+      if (!closingShift) return Response.json({ error: "Smena topilmadi." }, { status: 404 });
       if (closingShift.user_id !== user.id) {
         return Response.json({ error: "Bu smena boshqa xodimga tegishli." }, { status: 403 });
       }
-      const claim = await service.entities.Shift.updateMany(
-        { id: closingShift.id, user_id: user.id, status: "open" },
-        { $set: { status: "closing" } },
-      );
+      if (closingShift.status === "closed" && closingShift.budget_settled === true) {
+        if (money(closingShift.actual_cash) !== actualCash
+          || money(closingShift.budget_cash_submitted) !== budgetCashSubmitted
+          || money(closingShift.cash_left_for_next_shift) !== cashLeftForNextShift) {
+          return Response.json({ error: "Yopilgan smenaning saqlangan summalari o‘zgartirilmaydi." }, { status: 409 });
+        }
+        return savedShiftCloseResponse(service, closingShift, COMPLETE_SALE_RUNTIME_VERSION);
+      }
+      if (closingShift.status !== "open") {
+        return Response.json({ error: "Smena yopilmoqda yoki topshirig‘i egasi tomonidan tekshirilishi kerak.",
+          review_required: closingShift.closing_review_required === true }, { status: 409 });
+      }
+      const financialClosePredicate = pendingFinancialCloseGuard(closingShift);
+    const closedAt = new Date().toISOString();
+      const settlementReference = `SM-${closedAt.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+      let claim;
+      try {
+        claim = await service.entities.Shift.updateMany(
+          { id: closingShift.id, user_id: user.id, status: "open", expected_cash: Number(closingShift.expected_cash || 0), ...financialClosePredicate },
+          { $set: { status: "closing", closing_operation_token: settlementReference,
+            closing_payload_json: JSON.stringify({ actualCash, budgetCashSubmitted, cashLeftForNextShift }),
+            closing_review_required: false } },
+        );
+      } catch (claimError) {
+        const saved = await service.entities.Shift.get(closingShift.id).catch(() => null);
+        if (saved?.status === "closing" && saved.closing_operation_token === settlementReference) {
+          claim = { success: true, updated: 1 };
+        } else {
+          return reconcileShiftCloseFailure(service, closingShift.id, user.id, settlementReference, COMPLETE_SALE_RUNTIME_VERSION, claimError);
+        }
+      }
       if (!claim?.success || Number(claim.updated || 0) !== 1) {
         return Response.json({ error: "Smena bir vaqtda o‘zgardi yoki allaqachon yopilmoqda." }, { status: 409 });
       }
 
+      try {
+        const claimed = await service.entities.Shift.get(closingShift.id);
+        if (!claimed || claimed.status !== "closing" || claimed.user_id !== user.id
+          || claimed.closing_operation_token !== settlementReference) throw httpError("Smena topshirig‘i egasi o‘zgardi.", 409);
+        closingShift = claimed;
+      } catch (readError) {
+        return reconcileShiftCloseFailure(service, closingShift.id, user.id, settlementReference, COMPLETE_SALE_RUNTIME_VERSION, readError);
+      }
+
       const expected = money(closingShift.expected_cash);
-      const closedAt = new Date().toISOString();
       const userName = user.full_name || user.email || "Noma’lum xodim";
-      const settlementReference = `SM-${closedAt.slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
       const deposits = [
         { account: "cash", amount: budgetCashSubmitted },
         { account: "uzcard", amount: Math.max(0, money(closingShift.uzcard_sales)) },
@@ -606,7 +645,6 @@ export default async function(req) {
         { account: "online", amount: Math.max(0, money(closingShift.online_sales)) },
         { account: "bank", amount: Math.max(0, money(closingShift.bank_transfer_sales)) },
       ].filter((deposit) => deposit.amount > 0);
-      const balanceChanges: any[] = [];
       const budgetTransactions: any[] = [];
       let stockReport: any = null;
       let stockSnapshotPayloads: any[] = [];
@@ -671,8 +709,8 @@ export default async function(req) {
             deposit.amount,
             user,
             closedAt,
+            `${settlementReference}-${deposit.account}`,
           );
-          balanceChanges.push(balanceChange);
           const transaction = await service.entities.BudgetTransaction.create({
             transaction_number: `${settlementReference}-${deposit.account.toUpperCase()}`,
             type: "shift_deposit",
@@ -691,12 +729,20 @@ export default async function(req) {
             performed_by_name: userName,
             created_at: closedAt,
             status: "completed",
+          }).catch(async (ledgerError: any) => {
+            const saved = await service.entities.BudgetTransaction.filter({
+              transaction_number: `${settlementReference}-${deposit.account.toUpperCase()}`,
+              shift_id: closingShift.id,
+            }, "id", 2);
+            if (saved.length === 1 && saved[0].account === deposit.account
+              && Number(saved[0].amount) === deposit.amount && saved[0].performed_by_id === user.id) return saved[0];
+            throw ledgerError;
           });
           budgetTransactions.push(transaction);
         }
 
         const finalized = await service.entities.Shift.updateMany(
-          { id: closingShift.id, status: "closing" },
+          { id: closingShift.id, user_id: user.id, status: "closing", closing_operation_token: settlementReference },
           { $set: {
             status: "closed",
             closed_at: closedAt,
@@ -758,18 +804,7 @@ export default async function(req) {
           print_report_required: true,
         });
       } catch (error) {
-        await cleanupShiftStockSnapshots(service, closingShift.id);
-        for (const transaction of [...budgetTransactions].reverse()) {
-          await service.entities.BudgetTransaction.delete(transaction.id).catch(() => {});
-        }
-        for (const balanceChange of [...balanceChanges].reverse()) {
-          await rollbackBudgetBalance(service, balanceChange, user);
-        }
-        await service.entities.Shift.updateMany(
-          { id: closingShift.id, status: "closing" },
-          { $set: { status: "open" } },
-        ).catch(() => {});
-        throw error;
+        return reconcileShiftCloseFailure(service, closingShift.id, user.id, settlementReference, COMPLETE_SALE_RUNTIME_VERSION, error);
       }
     }
 

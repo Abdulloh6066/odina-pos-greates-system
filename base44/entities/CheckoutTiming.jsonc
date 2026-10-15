@@ -1,0 +1,105 @@
+{
+  "name": "CheckoutTiming",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "actor_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "actor_name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "shop_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "shop_name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "shift_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "sale_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "sale_number": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "request_key": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "total_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "api_round_trip_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "rechecked",
+        "queued",
+        "unconfirmed"
+      ]
+    },
+    "client_completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "browser"
+      ]
+    }
+  },
+  "required": [
+    "event_id",
+    "actor_id",
+    "actor_name",
+    "shop_id",
+    "shop_name",
+    "shift_id",
+    "request_key",
+    "total_ms",
+    "outcome",
+    "client_completed_at",
+    "received_at",
+    "source"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}
