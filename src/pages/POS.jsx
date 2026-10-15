@@ -1189,6 +1189,7 @@ export default function POS() {
       const result = await invokePosRead(base44, {
         action: 'check_stock',
         shift_id: shift.id,
+        is_delivery: isDelivery,
         ...(savedTakeaway ? { takeaway_order_id: savedTakeaway.id, takeaway_order_revision: savedTakeaway.revision } : {}),
         ...(selectedTable ? { table_shop_id: selectedTable.shopId,
           table_number: selectedTable.number,

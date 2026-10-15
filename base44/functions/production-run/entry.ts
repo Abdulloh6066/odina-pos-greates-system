@@ -71,6 +71,12 @@ export default async function(req) {
         return Response.json({ error: "Tayyor holda xarid qilinadigan mahsulotga ishlab chiqarish retsepti kerak emas." }, { status: 400 });
       }
 
+      const previousRecipes = await service.entities.Recipe.filter({ product_id: product.id });
+      // Older recipe editors omit the condition: preserve it from the active version.
+      const activeIds = (previousRecipes || []).filter((row: any) => row.active === true).map((row: any) => row.id);
+      const previousItems = activeIds.length && requestedItems.some((row: any) => row.takeaway_only === undefined)
+        ? await service.entities.RecipeItem.filter({ recipe_id: { $in: activeIds } }, "position", 5000) : [];
+      const oldConditions = new Map(previousItems.map((row: any) => [row.ingredient_id, row.takeaway_only === true]));
       const seen = new Set<string>();
       const normalizedItems = [];
       for (let index = 0; index < requestedItems.length; index += 1) {
@@ -94,8 +100,18 @@ export default async function(req) {
           || !Number.isSafeInteger(Number(requested.quantity) / outputQuantity))) {
           return Response.json({ error: "Qavatlar faqat markaziy mahsulot uchun, har bir natijaga butun list sonida kiritiladi." }, { status: 400 });
         }
+        if (requested?.takeaway_only !== undefined && typeof requested.takeaway_only !== "boolean") {
+          return Response.json({ error: "Qadoqlash sharti noto‘g‘ri." }, { status: 400 });
+        }
+        const takeawayOnly = requested?.takeaway_only === undefined
+          ? oldConditions.get(ingredient.id) === true : requested.takeaway_only;
+        if (takeawayOnly && (ingredient.category !== "packaging" || ingredient.base_unit !== "piece"
+          || product.source_type !== "shop_prepared")) {
+          return Response.json({ error: "Dostavka / Soboy sharti faqat do‘konda tayyorlanadigan mahsulotning dona qadoqlashiga qo‘yiladi." }, { status: 400 });
+        }
         normalizedItems.push({
           ingredient_id: ingredient.id,
+          takeaway_only: takeawayOnly,
           ingredient_name_snapshot: ingredient.name,
           quantity,
           unit: ingredient.base_unit,
@@ -103,7 +119,6 @@ export default async function(req) {
         });
       }
 
-      const previousRecipes = await service.entities.Recipe.filter({ product_id: product.id });
       const nextVersion = Math.max(0, ...(previousRecipes || []).map((row: any) => Number(row.version || 0))) + 1;
       const activePrevious = (previousRecipes || []).filter((row: any) => row.active === true);
       const now = new Date().toISOString();
@@ -306,7 +321,8 @@ export default async function(req) {
         return Response.json({ error: "Retsept natija miqdori noto‘g‘ri." }, { status: 409 });
       }
 
-      const recipeItems = await service.entities.RecipeItem.filter({ recipe_id: recipe.id });
+      const recipeItems = (await service.entities.RecipeItem.filter({ recipe_id: recipe.id }))
+        .filter((item: any) => item.takeaway_only !== true);
       if (!recipeItems?.length) {
         return Response.json({ error: "Faol retseptda masalliqlar yo‘q." }, { status: 409 });
       }
