@@ -214,7 +214,7 @@ function checkout({ pending = [], syncing = false, online = true, ...flags } = {
     createSaleIdempotencyKey: () => `pos-checkout-record-${saved.length}`, reportRequestSuccess: () => {}, reportRequestError: () => {},
     setStockChecking: value => { ctx.stockChecking = value; }, setCheckoutOffline: value => { ctx.checkoutOffline = value; },
     setPayOpen: value => { ctx.payOpen = value; }, setOpenShiftOpen: () => {}, setMobileCartOpen: () => {}, setPaying: value => { ctx.paying = value; },
-    setLastCheckoutTiming: value => { ctx.lastCheckoutTiming = value; },
+    recordCheckoutTiming: value => { ctx.lastCheckoutTiming = { ...value, shiftId: ctx.shift.id }; },
     syncOfflineSales: () => { throw new Error('Foreground must not wait for queue drain'); }, syncErrorMessage: error => error.message,
     base44: { functions: { invoke: (_, body) => { requests.push(body); throw new Error('Unexpected request'); } } },
     buildPendingSale: offline.buildPendingSale, isRetryableSyncError: offline.isRetryableSyncError, friesOptionFields: () => ({}),
