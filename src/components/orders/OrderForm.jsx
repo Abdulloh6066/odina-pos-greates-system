@@ -14,6 +14,7 @@ import { priceForShop } from '@/lib/shop-pricing';
 import ReferenceImageField from '@/components/orders/ReferenceImageField';
 import { useToast } from '@/components/ui/use-toast';
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest, orderRequestDefinitelyRejected } from '@/lib/order-request-retry';
+import { startOrderActionTiming } from '@/lib/order-action-timing';
 
 const WEDDING_PCS = 40;
 
@@ -222,6 +223,8 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const submit = async () => {
     if (submitting) return;
     if (!pendingRef.current && !valid) { toast({ title: 'Barcha majburiy maydonlarni to‘ldiring', variant: 'destructive' }); return; }
+    const checkingSavedRequest = Boolean(pendingRef.current);
+    const elapsedSeconds = startOrderActionTiming();
     setSubmitting(true);
     try {
       let payload = pendingRef.current;
@@ -255,8 +258,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
       const res = await base44.functions.invoke('customer-orders', payload);
       const data = res?.data || res;
       if (data?.order) {
+        const seconds = elapsedSeconds();
         clearOrderRequest(requestScope); pendingRef.current = null; setPending(null);
-        toast({ title: 'Buyurtma yaratildi', description: displayOrderNumber(data.order) });
+        toast({ title: 'Buyurtma yaratildi', description: `${displayOrderNumber(data.order)} · ${checkingSavedRequest || data.already_exists ? 'Qayta tekshirish' : 'Saqlash'}: ${seconds} soniya` });
         onCreated(data.order, data.items || []);
         reset();
       } else {
