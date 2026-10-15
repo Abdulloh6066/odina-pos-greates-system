@@ -1,9 +1,9 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
-import { ReceiptText, Search, Eye, RotateCcw } from 'lucide-react';
+import { ReceiptText, Search, Eye, RotateCcw, Truck, Printer } from 'lucide-react';
 import { formatUZS, formatNum, saleBusinessDate, saleOccurredAt } from '@/lib/pos';
 import { formatUzbekistan, formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
@@ -13,8 +13,9 @@ import { Button } from '@/components/ui/button';
 import { RefundDialog } from '@/components/pos/KassaActionDialogs';
 import StaffOrderTicketModal from '@/components/tables/StaffOrderTicketModal';
 import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
+import Receipt from '@/components/pos/Receipt';
 
-export default function SalesHistory({ embedded = false }) {
+export default function SalesHistory({ embedded = false, settings = null }) {
   const { user } = useOutletContext();
   const role = user?.role || 'cashier';
   const [sales, setSales] = useState([]);
@@ -26,6 +27,32 @@ export default function SalesHistory({ embedded = false }) {
   const [staffTicketSale, setStaffTicketSale] = useState(null);
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundLoading, setRefundLoading] = useState(false);
+  const [receiptPrintSale, setReceiptPrintSale] = useState(null);
+  const [receiptSettings, setReceiptSettings] = useState(null);
+  const [printLoading, setPrintLoading] = useState(false);
+  const printBusyRef = useRef(false);
+
+  const finishReceiptPrint = () => {
+    setReceiptPrintSale(null);
+    setPrintLoading(false);
+    printBusyRef.current = false;
+  };
+  const printReceipt = async (sale) => {
+    if (printBusyRef.current) return;
+    printBusyRef.current = true;
+    setPrintLoading(true);
+    try {
+      // Reprints use the original sale snapshot; settings load only on demand.
+      if (!settings && !receiptSettings) {
+        const rows = await base44.entities.Settings.list('-created_date', 1);
+        setReceiptSettings(rows?.[0] || {});
+      }
+      setReceiptPrintSale(sale);
+    } catch (error) {
+      finishReceiptPrint();
+      void odinaAlert(error?.message || 'Chekni ochib bo‘lmadi. Qayta urinib ko‘ring.');
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -47,7 +74,7 @@ export default function SalesHistory({ embedded = false }) {
     if (filterDate) list = list.filter((s) => saleBusinessDate(s) === filterDate);
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((s) => (s.user_name || '').toLowerCase().includes(q) || (s.payment_methods_summary || '').toLowerCase().includes(q));
+      list = list.filter((s) => (s.user_name || '').toLowerCase().includes(q) || (s.payment_methods_summary || '').toLowerCase().includes(q) || (s.is_delivery === true && 'dostavka'.includes(q)));
     }
     return [...list].sort(
       (left, right) => new Date(saleOccurredAt(right)).getTime() - new Date(saleOccurredAt(left)).getTime(),
@@ -99,11 +126,11 @@ export default function SalesHistory({ embedded = false }) {
       </div>}
 
       <div className="odina-operations-toolbar odina-panel mb-5 rounded-2xl bg-card border border-border p-4 sm:p-5">
-        <div className="odina-toolbar-heading"><h2>Savdolarni saralash</h2><p>Kassir, to‘lov usuli yoki sana bo‘yicha izlang.</p></div>
+        <div className="odina-toolbar-heading"><h2>Savdolarni saralash</h2><p>Kassir, to‘lov usuli, dostavka yoki sana bo‘yicha izlang.</p></div>
         <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input aria-label="Kassir yoki to‘lov usuli bo‘yicha qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Kassir yoki to‘lov usuli bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
+          <Input aria-label="Kassir, to‘lov yoki dostavka bo‘yicha qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Kassir, to‘lov yoki dostavka bo‘yicha qidirish…" className="pl-9 h-11 rounded-xl" />
         </div>
         <Input aria-label="Savdo sanasi" type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="sm:w-48 h-11 rounded-xl" />
         </div>
@@ -129,6 +156,7 @@ export default function SalesHistory({ embedded = false }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`font-semibold ${s.status === 'refunded' ? 'line-through text-muted-foreground' : ''}`}>{formatUZS(s.total)}</span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{s.payment_methods_summary}</span>
+                  {s.is_delivery === true && <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/15 text-brand-ink"><Truck className="w-3.5 h-3.5" aria-hidden="true" /> Dostavka</span>}
                   {s.status === 'refunded' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-destructive">Qaytarilgan</span>}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
@@ -147,7 +175,8 @@ export default function SalesHistory({ embedded = false }) {
         </div>
       )}
 
-      <SaleDetailDialog sale={selected} canRefund={['admin', 'manager'].includes(role)} onRefund={refundSale}
+      <Receipt sale={receiptPrintSale} settings={settings || receiptSettings} print={!!receiptPrintSale} onAfterPrint={finishReceiptPrint} />
+      <SaleDetailDialog sale={selected} onPrint={printReceipt} printLoading={printLoading} canRefund={['admin', 'manager'].includes(role)} onRefund={refundSale}
         onStaffTicket={(sale) => { setSelected(null); setStaffTicketSale(sale); }} onClose={() => setSelected(null)} />
       <StaffOrderTicketModal open={!!staffTicketSale} mode="sale" order={staffTicketSale} forceReprint
         onClose={() => { setSelected(staffTicketSale); setStaffTicketSale(null); }} />
@@ -162,13 +191,14 @@ export default function SalesHistory({ embedded = false }) {
   );
 }
 
-function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose }) {
+function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose, onPrint, printLoading }) {
   if (!sale) return null;
   return (
     <Dialog open={!!sale} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Savdo tafsilotlari</DialogTitle>
+          {sale.is_delivery === true && <p className="flex items-center gap-2 text-sm font-semibold text-brand-ink"><Truck className="w-4 h-4" aria-hidden="true" /> Dostavka</p>}
         </DialogHeader>
         <div className="text-xs text-muted-foreground mb-3">
           {formatUzbekistanDateTime(saleOccurredAt(sale), { second: '2-digit' })}
@@ -197,6 +227,9 @@ function SaleDetailDialog({ sale, canRefund, onRefund, onStaffTicket, onClose })
           </div>
         )}
         <div className="flex flex-wrap gap-2 mt-4">
+          <Button variant="outline" onClick={() => onPrint(sale)} disabled={printLoading} className="min-h-11 flex-1">
+            <Printer className="w-4 h-4 mr-1.5" /> {printLoading ? 'Chek ochilmoqda…' : 'Chekni chiqarish'}
+          </Button>
           {isStaffTicketEnabled(sale.shop_id) && sale.status !== 'refunded' && sale.items?.length > 0 && (
             <Button variant="outline" onClick={() => onStaffTicket(sale)} className="min-h-11 flex-1">
               <ReceiptText className="w-4 h-4 mr-1.5" /> Xizmat cheki

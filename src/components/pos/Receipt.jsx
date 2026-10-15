@@ -37,6 +37,7 @@ export default function Receipt({ sale, settings, print, onAfterPrint }) {
             <img src={odinaMark} alt="Odina" width="72" height="72" style={{ display: 'block', margin: '0 auto 6px', objectFit: 'contain', filter: 'grayscale(1) contrast(2)' }} />
             <div className="font-display text-[19.8px] font-bold">{settings?.shop_name || 'Odina Shop'}</div>
             <div className="text-[12.1px] text-muted-foreground">{sale.shop_name || ''}</div>
+            {sale.is_delivery === true && <div className="border-2 border-current rounded px-2 py-1 my-2 text-[16px] font-bold tracking-wide">DOSTAVKA</div>}
             {Number.isInteger(sale.table_number_snapshot) && sale.table_number_snapshot > 0 && (
               <div className="text-[13.2px] font-bold">Stol: {sale.table_number_snapshot}</div>
             )}

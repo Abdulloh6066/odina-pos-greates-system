@@ -200,7 +200,7 @@ function checkout({ pending = [], syncing = false, online = true, ...flags } = {
   const ctx = { selectedTable: null, takeawayOrder: null, takeawayRequestIdRef: { current: '' }, tableSelectionError: '', tableShop: null,
     shift: { id: 'shift', shop_id: 'shop' }, user: { id: 'cashier' }, shiftReadState: 'ready',
     cart: [{ product_id: 'cake', product_name: 'Cake', price: 1000, quantity: 1, subtotal: 1000 }], subtotal: 1000, total: 1000,
-    payOpen: false, paying: false, discountPct: 0, stockChecking: false, offlineSyncing: syncing, tableLocked: false,
+    payOpen: false, paying: false, isDelivery: false, discountPct: 0, stockChecking: false, offlineSyncing: syncing, tableLocked: false,
     discountCode: '', roundingTarget: null, adjustmentMode: null, discountOwnerPin: '', discountLoading: false,
     isOnline: online, navigator: { onLine: online }, offlineSales: pending, offlineSyncError: '', queueAuthorizationError: false,
     productsById: { cake: { track_stock: false } }, stockByProduct: {}, settings: { allow_negative_stock: false },

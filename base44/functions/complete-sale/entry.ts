@@ -362,6 +362,7 @@ function canonicalSaleRequest(body: any) {
           table_order_id: String(body?.table_order_id || ""), table_order_revision: body?.table_order_revision } : {}),
     ...(body?.takeaway_order_id ? { takeaway_order_id: String(body.takeaway_order_id),
       takeaway_order_revision: body.takeaway_order_revision } : {}),
+    ...(body?.is_delivery === true ? { is_delivery: true } : {}),
     items,
     discount_code: String(body?.discount_code || "").trim().toUpperCase(),
     ...(body?.rounding_total !== undefined && body?.rounding_total !== null
@@ -1264,6 +1265,10 @@ export default async function(req) {
     if (action !== "complete_sale") {
       return Response.json({ error: "Unknown Kassa action." }, { status: 400 });
     }
+    if (body?.is_delivery !== undefined && typeof body.is_delivery !== "boolean") {
+      return Response.json({ error: "Dostavka belgisi noto‘g‘ri." }, { status: 400 });
+    }
+    const isDelivery = body?.is_delivery === true;
     const shiftId = String(body?.shift_id || "");
     const requestedItems = Array.isArray(body?.items) ? body.items : [];
     const requestedPayments = Array.isArray(body?.payments) ? body.payments : [];
@@ -1296,6 +1301,7 @@ export default async function(req) {
         if (
           existingSale.user_id !== user.id
           || existingSale.shift_id !== shiftId
+          || (existingSale.is_delivery === true) !== isDelivery
           || (existingSale.request_fingerprint && existingSale.request_fingerprint !== requestFingerprint)
         ) {
           return Response.json({
@@ -1350,6 +1356,9 @@ export default async function(req) {
     // solely by this completed-sale path, not when a table is selected.
     const hasTable = body?.table_number !== undefined && body?.table_number !== null;
     const hasTakeaway = Boolean(body?.takeaway_order_id);
+    if (hasTable && isDelivery) {
+      return Response.json({ error: "Stol buyurtmasini dostavka deb belgilab bo‘lmaydi." }, { status: 400 });
+    }
     if (hasTakeaway && (hasTable || body?.table_order_id || body?.table_shop_id)) {
       return Response.json({ error: "Buyurtma turi noto‘g‘ri." }, { status: 400 });
     }
@@ -1401,6 +1410,9 @@ export default async function(req) {
       if (!tableOrder || !orderId || orderId !== tableOrder.id
         || !Number.isInteger(revision) || revision !== tableOrder.revision) {
         return Response.json({ error: "Stol buyurtmasi eski yoki saqlanmagan. Stolni yangilang va qayta tekshiring." }, { status: 409 });
+      }
+      if (hasTakeaway && (tableOrder.is_delivery === true) !== isDelivery) {
+        return Response.json({ error: "Dostavka belgisi saqlangan buyurtmadan farq qiladi. Avval buyurtmani saqlang." }, { status: 409 });
       }
       if (tableOrder.state !== "occupied") {
         return Response.json({ error: "Bu stol bo‘yicha to‘lov allaqachon boshlangan. Savdolar tarixini tekshiring." }, { status: 409 });
@@ -1662,6 +1674,7 @@ export default async function(req) {
     sale = await service.entities.Sale.create({
       sale_number: saleNumber,
       service_ticket_number: serviceTicketNumber,
+      is_delivery: isDelivery,
       idempotency_key: idempotencyKey || undefined,
       request_fingerprint: requestFingerprint || undefined,
       sold_at: soldAt,
