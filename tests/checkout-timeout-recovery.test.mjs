@@ -137,18 +137,27 @@ test('shift recovery does not adopt another shop, hide denied access, or retry a
   }
 });
 
-test('purchase prices and recipe items load together while immutable sale costs stay exact', { timeout: 5000 }, async () => {
-  const f = checkoutFixture(1), gate = deferred(), reached = deferred(); let started = 0;
-  for (const [entity, method] of [['RecipeItem', 'filter'], ['SupplierReceiptItem', 'list']]) {
-    const original = f.entities[entity][method];
-    f.entities[entity][method] = async (...args) => {
-      if (++started === 2) reached.resolve();
-      await gate.promise; return original(...args);
-    };
-  }
+test('purchase prices wait for basket ingredient IDs and immutable sale costs stay exact', { timeout: 5000 }, async () => {
+  const f = checkoutFixture(1), cards = deferred(), prices = deferred();
+  const cardRead = deferred(), priceRead = deferred();
+  const items = f.entities.RecipeItem.filter, costs = f.entities.SupplierReceiptItem.filter;
+  let priceReads = 0, cardFinished = false;
+  f.entities.RecipeItem.filter = async (...args) => {
+    cardRead.resolve(); await cards.promise;
+    const result = await items(...args); cardFinished = true; return result;
+  };
+  f.entities.SupplierReceiptItem.filter = async (...args) => {
+    assert.equal(cardFinished, true);
+    assert.deepEqual([...args[0].ingredient_id.$in], ['sugar']);
+    priceReads++; priceRead.resolve(); await prices.promise; return costs(...args);
+  };
   const pending = f.invoke(entry, f.request);
-  try { await reached.promise; assert.equal(f.calls.length, 0); }
-  finally { gate.resolve(); }
+  try {
+    await cardRead.promise;
+    assert.equal(priceReads, 0); assert.equal(f.calls.length, 0);
+    cards.resolve(); await priceRead.promise;
+    assert.equal(priceReads, 1); assert.equal(f.calls.length, 0);
+  } finally { cards.resolve(); prices.resolve(); }
   assert.equal((await pending).status, 200);
   assert.equal(f.db.SaleItem[0].unit_cost_at_sale, 500);
   assert.equal(f.db.SaleItem[0].cost_is_estimate, false);
