@@ -9,6 +9,8 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { mergePosStockEvent } from '../src/lib/pos-stock-events.js';
+import { formatUzbekistanDateTime } from '../src/lib/uzbekistan-time.js';
+import * as checkoutTimingStorage from '../src/lib/checkout-timing.js';
 
 const read = path => readFileSync(path, 'utf8');
 const deferred = () => {
@@ -331,7 +333,7 @@ function checkoutHarness({ clock = performance } = {}) {
     } } },
     setMobileCartOpen: () => {}, setPayOpen: value => { ctx.payOpen = value; },
     setPaying: value => { ctx.paying = value; }, setCheckoutOffline: value => { ctx.checkoutOffline = value; },
-    setLastCheckoutTiming: value => { ctx.lastCheckoutTiming = value; timings.push(value); },
+    recordCheckoutTiming: value => { ctx.lastCheckoutTiming = { ...value, shiftId: ctx.shift.id }; timings.push(value); },
     setShift: value => { ctx.shift = value; },
     productStock: [{ id: 'stock', product_id: 'cake', location_id: 'branch', quantity: 3 }],
     setProductStock: update => { ctx.productStock = update(ctx.productStock); },
@@ -529,7 +531,9 @@ test('invalid or blocked final submission does not start a measurement or reques
 });
 
 function checkoutStatusFixture() {
-  const Status = component('src/components/pos/CheckoutTimingStatus.jsx', { react: React });
+  const Status = component('src/components/pos/CheckoutTimingStatus.jsx', {
+    react: React, '@/lib/uzbekistan-time': { formatUzbekistanDateTime },
+  });
   const source = read('src/pages/POS.jsx');
   const ast = ts.createSourceFile('POS.jsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JSX);
   let element;
@@ -573,4 +577,64 @@ test('real Kassa status hides old shift or pending attempt seconds, handles inva
   }
   const zero = render({ shift: { id: 'old-shift' }, lastCheckoutTiming: { ...lastCheckoutTiming, totalMs: -100 }, paying: false });
   assert.match(zero, /0,0 soniya/);
+});
+
+test('remembered checkout shows its finish timestamp in Tashkent and explains an actual device-storage failure', () => {
+  const render = checkoutStatusFixture();
+  const completedAt = '2026-10-14T20:15:30.000Z';
+  const props = { shift: { id: 'shift' }, paying: false,
+    lastCheckoutTiming: { shiftId: 'shift', totalMs: 2400, outcome: 'confirmed', completedAt, persisted: true } };
+  const saved = render(props);
+  assert.match(saved, /2,4 soniya/);
+  assert.match(saved, /datetime="2026-10-14T20:15:30.000Z"/i);
+  assert.ok(saved.includes(formatUzbekistanDateTime(completedAt, { second: '2-digit' })));
+  assert.match(saved, /01:15:30/);
+  assert.doesNotMatch(saved, /qurilmaga saqlab bo‘lmadi/);
+  const unavailable = render({ ...props, lastCheckoutTiming: { ...props.lastCheckoutTiming, persisted: false } });
+  assert.match(unavailable, /Savdo saqlandi/);
+  assert.match(unavailable, /2,4 soniya/);
+  assert.match(unavailable, /Vaqt faqat shu oynada: qurilmaga saqlab bo‘lmadi/);
+});
+
+test('actual final checkout records its existing measured seconds once and restores the real Kassa status after reopening', async () => {
+  const rows = new Map(); let writes = 0; let observed;
+  const storage = { getItem: key => rows.get(key) ?? null,
+    setItem: (key, value) => { writes++; rows.set(key, value); } };
+  const useTiming = component('src/hooks/useCheckoutTiming.js', {
+    react: React, '@/lib/checkout-timing': {
+      ...checkoutTimingStorage,
+      readCheckoutTiming: scope => checkoutTimingStorage.readCheckoutTiming(scope, storage),
+      saveCheckoutTiming: (scope, value) => checkoutTimingStorage.saveCheckoutTiming(scope, value, storage),
+    },
+  });
+  function Probe() { observed = useTiming('owner', 'branch', 'shift'); return null; }
+  let renderer;
+  act(() => { renderer = TestRenderer.create(React.createElement(Probe)); });
+  const clock = checkoutClock(); const f = checkoutHarness({ clock });
+  f.ctx.recordCheckoutTiming = observed.recordTiming;
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], false);
+  assert.equal(writes, 0, 'starting a checkout must not save an unfinished measurement');
+  clock.advance(2400);
+  await act(async () => {
+    f.gate.resolve({ data: { sale: { id: 'sale', shop_id: 'branch', items: f.ctx.cart } } });
+    await pending;
+  });
+  assert.equal(writes, 1);
+  assert.equal(f.calls.length, 1, 'remembering timing must not add a backend request');
+  assert.equal(clock.reads, 4);
+  assert.equal(observed.timing.totalMs, f.logs[0][1].total_ms);
+  assert.equal(observed.timing.outcome, 'confirmed');
+  const completedAt = observed.timing.completedAt;
+  act(() => { renderer.unmount(); });
+  act(() => { renderer = TestRenderer.create(React.createElement(Probe)); });
+  try {
+    assert.equal(writes, 1, 'reopening only reads the remembered metric');
+    assert.equal(observed.timing.completedAt, completedAt);
+    assert.equal(observed.timing.persisted, true);
+    const html = checkoutStatusFixture()({ shift: { id: 'shift' }, lastCheckoutTiming: observed.timing, paying: false });
+    assert.match(html, /Yakunlash:/);
+    assert.match(html, /2,4 soniya/);
+    assert.match(html, /Savdo saqlandi/);
+    assert.ok(html.includes(formatUzbekistanDateTime(completedAt, { second: '2-digit' })));
+  } finally { act(() => { renderer.unmount(); }); }
 });
