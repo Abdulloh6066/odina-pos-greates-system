@@ -542,7 +542,7 @@ function checkoutStatusFixture() {
     ts.forEachChild(node, visit);
   };
   visit(ast); assert.ok(element, 'the real POS must render its checkout timing status');
-  const code = transformSync(`globalThis.ScopedStatus = ({ lastCheckoutTiming, shift, paying }) => (${element});`, { loader: 'jsx', jsx: 'transform' }).code;
+  const code = transformSync(`globalThis.ScopedStatus = ({ lastCheckoutTiming, shift, paying, user = { role: 'admin' } }) => (${element});`, { loader: 'jsx', jsx: 'transform' }).code;
   const ctx = { React, CheckoutTimingStatus: Status }; vm.runInNewContext(code, ctx);
   return props => renderToStaticMarkup(React.createElement(ctx.ScopedStatus, props));
 }
@@ -560,6 +560,23 @@ test('real Kassa status displays localized seconds and distinct confirmed, repla
     assert.match(html, /role="status"/); assert.match(html, /aria-live="polite"/);
     assert.match(html, /2,4 soniya/); patterns.forEach(pattern => assert.match(html, pattern));
     if (outcome === 'queued' || outcome === 'unconfirmed') assert.doesNotMatch(html, /Savdo saqlandi\./);
+  }
+});
+
+test('real Kassa timing is visible only to owner/admin and renders nothing for workers or unknown roles', () => {
+  const render = checkoutStatusFixture();
+  const props = { shift: { id: 'shift' }, paying: false,
+    lastCheckoutTiming: { shiftId: 'shift', totalMs: 2400, outcome: 'confirmed',
+      completedAt: '2026-10-15T10:00:00.000Z', persisted: false } };
+  assert.match(render({ ...props, user: { role: 'admin' } }), /2,4 soniya/);
+  for (const user of [null, {}, { role: 'manager' }, { role: 'cashier' }, { role: 'user' },
+    { role: 'staff' }, { role: 'admin ' }, { role: 'cashier', data: { role: 'admin' } }]) {
+    for (const lastCheckoutTiming of [null, props.lastCheckoutTiming]) {
+      for (const paying of [false, true]) {
+        assert.equal(render({ ...props, user, lastCheckoutTiming, paying }), '',
+          'workers must see no seconds, timestamp, placeholder, pending text or persistence warning');
+      }
+    }
   }
 });
 
