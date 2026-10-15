@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
-export default function CheckoutTimingStatus({ timing, pending, userRole }) {
+export default function CheckoutTimingStatus({ timing, pending, userRole, onOpenHistory }) {
   if (userRole !== 'admin') return null;
   const outcomes = {
     confirmed: ['Yakunlash', 'Savdo saqlandi.'],
@@ -26,6 +26,10 @@ export default function CheckoutTimingStatus({ timing, pending, userRole }) {
       </> : <span className="text-muted-foreground">
         {pending ? 'Yakunlash vaqti o‘lchanmoqda…' : 'Yakunlashdan so‘ng vaqt shu yerda ko‘rinadi.'}
       </span>}
+      {onOpenHistory && <button type="button" onClick={onOpenHistory}
+        className="ml-auto min-h-9 rounded-lg border border-border px-3 py-1.5 font-medium touch-manipulation hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-olive">
+        Xodimlar vaqti
+      </button>}
     </div>
   );
 }
