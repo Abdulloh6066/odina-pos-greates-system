@@ -308,7 +308,7 @@ test('supplier-payment UI distinguishes loading and errors from a genuinely empt
 });
 
 function checkoutHarness({ clock = performance } = {}) {
-  const gate = deferred(); const calls = []; const alerts = []; const receipts = []; const timings = []; const logs = [];
+  const gate = deferred(); const calls = []; const alerts = []; const receipts = []; const timings = []; const logs = []; const diagnostics = [];
   const ctx = {
     saleSubmittingRef: { current: false }, checkoutReadyRef: { current: true },
     checkoutCancelledRef: { current: false }, checkoutRequestKeyRef: { current: 'same-checkout-key' },
@@ -321,7 +321,7 @@ function checkoutHarness({ clock = performance } = {}) {
     discountOwnerPin: '', subtotal: 15000, shift: { id: 'shift', shop_id: 'branch' },
     user: { id: 'owner', shop_id: 'branch' }, shops: [{ id: 'branch' }],
     performance: clock, navigator: { onLine: true }, console: {
-      info: (label, value) => { logs.push([label, JSON.parse(value)]); }, error: () => {},
+      info: (label, value) => { logs.push([label, JSON.parse(value)]); }, error: () => {}, warn: () => {},
     },
     createSaleIdempotencyKey: () => 'unexpected-new-key', buildPendingSale: () => null,
     friesOptionFields: () => ({}), isRetryableSyncError: () => false,
@@ -334,6 +334,9 @@ function checkoutHarness({ clock = performance } = {}) {
     setMobileCartOpen: () => {}, setPayOpen: value => { ctx.payOpen = value; },
     setPaying: value => { ctx.paying = value; }, setCheckoutOffline: value => { ctx.checkoutOffline = value; },
     recordCheckoutTiming: value => { ctx.lastCheckoutTiming = { ...value, shiftId: ctx.shift.id }; timings.push(value); },
+    timingUserRef: { current: 'owner' },
+    createCheckoutTimingEventId: () => `diagnostic-attempt-${diagnostics.length + 1}`,
+    reportCheckoutTiming: event => { diagnostics.push(event); return Promise.resolve({}); },
     setShift: value => { ctx.shift = value; },
     productStock: [{ id: 'stock', product_id: 'cake', location_id: 'branch', quantity: 3 }],
     setProductStock: update => { ctx.productStock = update(ctx.productStock); },
@@ -347,7 +350,7 @@ function checkoutHarness({ clock = performance } = {}) {
   const source = read('src/pages/POS.jsx');
   const names = ['finishSalePresentation', 'presentCompletedSale', 'finishQueuedSale', 'applyCompletedSale', 'completeSale'];
   vm.runInNewContext(names.map(name => declaration(source, name)).join('\n') + '\nglobalThis.submit = completeSale;', ctx);
-  return { ctx, gate, calls, alerts, receipts, timings, logs, submit: ctx.submit };
+  return { ctx, gate, calls, alerts, receipts, timings, logs, diagnostics, submit: ctx.submit };
 }
 
 test('payment cannot clear cart or print before acknowledgment and cannot submit twice while pending', { timeout: 5000 }, async () => {
@@ -528,6 +531,43 @@ test('invalid or blocked final submission does not start a measurement or reques
     await f.submit([{ method: 'cash', amount: 15000 }], true);
     assert.equal(clock.reads, 0); assert.equal(f.calls.length, 0); assert.equal(f.timings.length, 0);
   }
+});
+
+test('shared diagnostic captures the completed attempt without awaiting its upload or sending financial details', async () => {
+  const clock = checkoutClock(); const f = checkoutHarness({ clock }); const upload = deferred();
+  let diagnostic;
+  f.ctx.reportCheckoutTiming = event => { diagnostic = event; return upload.promise; };
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], true);
+  clock.advance(2740);
+  f.gate.resolve({ data: { sale: { id: 'verified-sale', shop_id: 'branch', items: f.ctx.cart } } });
+  await pending;
+  assert.equal(f.ctx.paying, false, 'sale completion cannot wait for diagnostic upload');
+  assert.equal(f.ctx.cart.length, 0);
+  assert.equal(f.receipts[0].id, 'verified-sale');
+  assert.equal(f.calls.length, 1);
+  assert.equal(clock.reads, 4);
+  assert.equal(diagnostic.total_ms, 2740);
+  assert.equal(diagnostic.total_ms, f.logs[0][1].total_ms);
+  assert.equal(diagnostic.api_round_trip_ms, 2740);
+  assert.equal(diagnostic.actor_id, 'owner'); assert.equal(diagnostic.shift_id, 'shift');
+  assert.equal(diagnostic.sale_id, 'verified-sale');
+  assert.equal(diagnostic.request_key, 'same-checkout-key', 'capture the original key before successful clearing');
+  assert.equal(diagnostic.outcome, 'confirmed');
+  assert.deepEqual(Object.keys(diagnostic).sort(), ['actor_id','api_round_trip_ms','client_completed_at','event_id','outcome','request_key','sale_id','shift_id','total_ms']);
+  upload.reject(new Error('Mock diagnostic outage')); await tick();
+  assert.equal(f.calls.length, 1); assert.equal(f.ctx.payOpen, false);
+  assert.equal(f.receipts.length, 1); assert.equal(f.alerts.length, 0);
+});
+
+test('synchronous diagnostic failure never changes confirmed checkout or starts a sale retry', async () => {
+  const f = checkoutHarness(); f.ctx.reportCheckoutTiming = () => { throw new Error('Mock blocked diagnostics'); };
+  const pending = f.submit([{ method: 'cash', amount: 15000 }], false);
+  f.gate.resolve({ data: { sale: { id: 'sale', shop_id: 'branch', items: f.ctx.cart } } });
+  await pending;
+  assert.equal(f.ctx.cart.length, 0); assert.equal(f.ctx.paying, false);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'confirmed');
+  assert.equal(f.logs[0][1].completed, true);
+  assert.equal(f.calls.length, 1); assert.equal(f.alerts.length, 0);
 });
 
 function checkoutStatusFixture() {
