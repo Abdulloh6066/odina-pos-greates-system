@@ -10,6 +10,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as icons from 'lucide-react';
 import * as fries from '../src/lib/burger-fries.js';
+import { staffTicketFromSale } from '../src/lib/staff-order-ticket.js';
 import { buildPendingSale, syncPendingSales } from '../src/lib/offline-sales.js';
 import { memoryBackend } from './helpers/memory-backend.mjs';
 
@@ -191,6 +192,13 @@ test('cart delivery toggle is accessible, locks during checkout and the actual n
   vm.runInNewContext(declaration('resetCart') + '\nresetCart();', ctx);
   assert.equal(ctx.isDelivery, false); assert.equal(ctx.takeawayRequestIdRef.current, '');
 });
+test('service-ticket adapter preserves delivery and defaults historical sales to ordinary', () => {
+  const sale = { id: 'sale', is_delivery: true, items: [{ product_name: 'Kapuchino', quantity: 2 }] };
+  assert.equal(staffTicketFromSale(sale).is_delivery, true);
+  assert.equal(staffTicketFromSale({ ...sale, is_delivery: undefined }).is_delivery, false);
+  assert.equal(staffTicketFromSale(sale).items[0].quantity, 2);
+});
+
 test('financial receipt prints a clear delivery marker from the saved snapshot and keeps ordinary receipts unchanged', () => {
   const Receipt = component('src/components/pos/Receipt.jsx', {
     'react-dom': { createPortal: content => content },
