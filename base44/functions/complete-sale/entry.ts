@@ -15,7 +15,7 @@ function isDiscountExpired(discount: any, now = Date.now()) {
 }
 
 
-const COMPLETE_SALE_RUNTIME_VERSION = "checkout-latency-v2-2026-10-14";
+const COMPLETE_SALE_RUNTIME_VERSION = "checkout-latency-v3-2026-10-16";
 
 const PAYMENT_METHODS = new Set([
   "cash",
@@ -1324,12 +1324,23 @@ export default async function(req) {
       ? await saleRequestFingerprint(body)
       : "";
 
+    let requestedShiftRead: PromiseSettledResult<any> | null = null;
     if (idempotencyKey) {
-      const existingMatches = await service.entities.Sale.filter(
-        { idempotency_key: idempotencyKey },
-        "-created_date",
-        2,
-      );
+      // Both reads are authoritative and independent after role/scope checks.
+      // Defer a failed Shift read until its original validation position: a
+      // mismatched/duplicate sale key must still win, and legacy retries still
+      // tolerate an unavailable Shift instead of becoming a second checkout.
+      const [saleRead, shiftRead] = await Promise.allSettled([
+        service.entities.Sale.filter(
+          { idempotency_key: idempotencyKey },
+          "-created_date",
+          2,
+        ),
+        shiftId ? service.entities.Shift.get(shiftId) : Promise.resolve(null),
+      ]);
+      requestedShiftRead = shiftRead;
+      if (saleRead.status === "rejected") throw saleRead.reason;
+      const existingMatches = saleRead.value;
       if ((existingMatches || []).length > 1) {
         return Response.json({
           error: "Bu savdo kaliti bo‘yicha takroriy server yozuvlari topildi. OWNER tekshirishi kerak.",
@@ -1347,7 +1358,7 @@ export default async function(req) {
             error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan.",
           }, { status: 409 });
         }
-        const existingShift = await service.entities.Shift.get(existingSale.shift_id).catch(() => null);
+        const existingShift = shiftRead.status === "fulfilled" ? shiftRead.value : null;
         // Queue retries must not discard a sale while its original request is
         // still saving. This marker is added in the EXISTING final shift write;
         // it adds no request or wait to the normal cashier checkout path.
@@ -1376,7 +1387,9 @@ export default async function(req) {
       return Response.json({ error: "Smena va mahsulotlar majburiy." }, { status: 400 });
     }
 
-    const shift = await service.entities.Shift.get(shiftId);
+    if (requestedShiftRead?.status === "rejected") throw requestedShiftRead.reason;
+    const shift = requestedShiftRead?.status === "fulfilled"
+      ? requestedShiftRead.value : await service.entities.Shift.get(shiftId);
     if (!shift || shift.status !== "open") {
       return Response.json({ error: "The shift is not open." }, { status: 409 });
     }
@@ -1414,7 +1427,7 @@ export default async function(req) {
     // Snapshot them at sale time so changing a shop's Instagram/phone/address
     // never rewrites details on an already completed sale.
     const productsAtSale = new Map<string, any>();
-    const [receiptShop, ordinaryItems, allowNegativeStock] = await Promise.all([
+    const [receiptShop, ordinaryItems, allowNegativeStock, discountRead] = await Promise.all([
       (async () => {
         if (!service.entities.Shop?.get) return null;
         try { return await service.entities.Shop.get(shift.shop_id); }
@@ -1426,6 +1439,14 @@ export default async function(req) {
         ? normalizeSaleItems(service, requestedItems, shift.shop_id, null, productsAtSale)
         : Promise.resolve(null),
       stockPolicy(service),
+      // Read coupons alongside other preflight data, but surface lookup errors
+      // only after the same stock/ingredient validations as before.
+      requestedDiscountCode
+        ? Promise.allSettled([service.entities.DiscountCode.filter({
+          code: requestedDiscountCode,
+          active: true,
+        })]).then(([result]) => result)
+        : Promise.resolve(null),
     ]);
 
     if (hasTable && (!receiptShop || receiptShop.active === false
@@ -1500,10 +1521,8 @@ export default async function(req) {
     let discountPercentage = 0;
 
     if (requestedDiscountCode) {
-      const matches = await service.entities.DiscountCode.filter({
-        code: requestedDiscountCode,
-        active: true,
-      });
+      if (discountRead?.status === "rejected") throw discountRead.reason;
+      const matches = discountRead?.status === "fulfilled" ? discountRead.value : [];
       const discount = matches?.[0];
       if (!discount) {
         return Response.json({ error: "Discount code is invalid or inactive." }, { status: 409 });
@@ -1777,8 +1796,10 @@ export default async function(req) {
       };
     });
 
-    // All rows refer to the already-created sale; the final shift confirmation
-    // waits for every task. Successful records remain tracked for rollback.
+    // All rows refer to the already-created sale. Ingredient CAS writes touch
+    // different stock records and keep caller-owned partial-write journals, so
+    // they can overlap the financial rows. Settle ALL tasks before compensation
+    // or the final shift confirmation; never detach a required ledger write.
     await settleCheckoutWrites([
       async () => { saleItems = await service.entities.SaleItem.bulkCreate(itemPayloads); },
       async () => {
@@ -1825,14 +1846,15 @@ export default async function(req) {
           }));
         }
       },
+      async () => {
+        await applySaleIngredientDeduction(service, {
+          shopId: shift.shop_id, shopName: shift.shop_name,
+          saleId: sale.id, saleNumber, userId: user.id, userName: user.full_name || user.email,
+          now: soldAt, plans: ingredientPrep.plans, lines: ingredientPrep.lines,
+          applied: ingredientChanges, movements: ingredientMovementRecords,
+        });
+      },
     ]);
-
-    await applySaleIngredientDeduction(service, {
-      shopId: shift.shop_id, shopName: shift.shop_name,
-      saleId: sale.id, saleNumber, userId: user.id, userName: user.full_name || user.email,
-      now: soldAt, plans: ingredientPrep.plans, lines: ingredientPrep.lines,
-      applied: ingredientChanges, movements: ingredientMovementRecords,
-    });
 
     if (claimedDiscount) {
       if (claimedDiscount.single_use !== false) {
@@ -1906,24 +1928,31 @@ export default async function(req) {
     // A failure to update the floor plan must not roll back already committed
     // money. Keep the table locked and reconcile via the same sale request key.
     let tableReleased = true;
-    if (tablePaymentLock) {
-      try {
-        tableReleased = await changeLockedTable(service, tablePaymentLock.shopId,
-          tablePaymentLock.orderId, tablePaymentLock.checkoutKey, true);
-      } catch { tableReleased = false; }
-      if (!tableReleased) console.error("Paid table still locked; retry the SAME sale key to reconcile.");
-    }
-
-    try {
-      await service.entities.ActionHistory.create({
-        user_id: user.id,
-        user_name: user.full_name || user.email,
-        action: "sale_completed",
-        details: `${saleNumber}. Total ${total} UZS via ${paymentSummary}. ${normalizedItems.length} lines.`,
-      });
-    } catch {
-      // Audit logging must not invalidate a completed financial transaction.
-    }
+    // These post-commit records are independent. Await both before replying,
+    // retaining their existing fail-closed table and best-effort audit behavior.
+    await Promise.all([
+      (async () => {
+        if (tablePaymentLock) {
+          try {
+            tableReleased = await changeLockedTable(service, tablePaymentLock.shopId,
+              tablePaymentLock.orderId, tablePaymentLock.checkoutKey, true);
+          } catch { tableReleased = false; }
+          if (!tableReleased) console.error("Paid table still locked; retry the SAME sale key to reconcile.");
+        }
+      })(),
+      (async () => {
+        try {
+          await service.entities.ActionHistory.create({
+            user_id: user.id,
+            user_name: user.full_name || user.email,
+            action: "sale_completed",
+            details: `${saleNumber}. Total ${total} UZS via ${paymentSummary}. ${normalizedItems.length} lines.`,
+          });
+        } catch {
+          // Audit logging must not invalidate a completed financial transaction.
+        }
+      })(),
+    ]);
 
     return Response.json({
       sale,

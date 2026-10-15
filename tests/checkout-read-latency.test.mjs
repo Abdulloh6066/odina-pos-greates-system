@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBackend } from './helpers/memory-backend.mjs';
+import { createCheckoutReadTracker } from '../base44/shared/checkout-reads.ts';
 
 const file = 'base44/functions/complete-sale/entry.ts';
 export function checkoutFixture(count = 5) {
@@ -121,4 +122,129 @@ test('unavailable ingredient prices retain the existing estimate fallback', asyn
   assert.equal(f.db.SaleItem[0].unit_cost_at_sale, 0);
   assert.equal(f.db.SaleItem[0].cost_is_estimate, true);
   assert.equal(f.db.Shift[0].expected_cash, 1000);
+});
+
+test('Shop metadata reuse stays request-local while Ingredient reads remain fresh after settling', async () => {
+  const records = { Shop: { id: 'shop', active: true }, Ingredient: { id: 'milk', base_unit: 'ml' } };
+  const reads = { Shop: 0, Ingredient: 0 };
+  const service = { entities: Object.fromEntries(Object.keys(records).map(entity => [entity, {
+    get: async () => { reads[entity]++; return structuredClone(records[entity]); },
+  }])) };
+  const first = createCheckoutReadTracker(service);
+  await Promise.all([first.service.entities.Shop.get('shop'), first.service.entities.Shop.get('shop')]);
+  await first.service.entities.Shop.get('shop');
+  await Promise.all([first.service.entities.Ingredient.get('milk'), first.service.entities.Ingredient.get('milk')]);
+  assert.deepEqual(reads, { Shop: 1, Ingredient: 1 });
+  records.Shop.active = false; records.Ingredient.base_unit = 'piece';
+  assert.equal((await first.service.entities.Ingredient.get('milk')).base_unit, 'piece');
+  const second = createCheckoutReadTracker(service);
+  assert.equal((await second.service.entities.Shop.get('shop')).active, false);
+  assert.equal((await second.service.entities.Ingredient.get('milk')).base_unit, 'piece');
+  assert.deepEqual(reads, { Shop: 2, Ingredient: 3 });
+});
+
+test('identical pending stock reads coalesce by full query while settled reads stay fresh and shop scoped', async () => {
+  const gate = deferred(); let reads = 0; let quantity = 10;
+  const tracker = createCheckoutReadTracker({ entities: { IngredientStock: {
+    filter: async query => { reads++; await gate.promise; return [{ location_id: query.location_id, quantity }]; },
+  } } });
+  const stock = tracker.service.entities.IngredientStock;
+  const first = stock.filter({ location_id: 'shop-a', ingredient_id: 'milk' }, 'id', 500, 0);
+  const same = stock.filter({ ingredient_id: 'milk', location_id: 'shop-a' }, 'id', 500, 0);
+  const other = stock.filter({ location_id: 'shop-b', ingredient_id: 'milk' }, 'id', 500, 0);
+  assert.equal(reads, 2);
+  gate.resolve();
+  assert.deepEqual(await first, await same);
+  assert.equal((await other)[0].location_id, 'shop-b');
+  quantity = 3;
+  assert.equal((await stock.filter({ location_id: 'shop-a', ingredient_id: 'milk' }, 'id', 500, 0))[0].quantity, 3);
+  assert.equal(reads, 3, 'stock is never retained after its pending read settles');
+  assert.equal(tracker.snapshot().cached_reads, 1);
+});
+
+test('read argument types and list pagination never share a pending result', async () => {
+  const gate = deferred(); let reads = 0;
+  const tracker = createCheckoutReadTracker({ entities: { StockMovement: {
+    list: async (...args) => { reads++; await gate.promise; return args; },
+  } } });
+  const list = tracker.service.entities.StockMovement.list;
+  const pending = [list('id', 500, 0), list('id', 500, 500), list(undefined, 500, 0), list(null, 500, 0)];
+  assert.equal(reads, 4);
+  gate.resolve();
+  assert.deepEqual(await Promise.all(pending), [
+    ['id', 500, 0], ['id', 500, 500], [undefined, 500, 0], [null, 500, 0],
+  ]);
+});
+
+test('reads bypass reuse until every concurrent write settles, including an uncertain write', async () => {
+  const firstWrite = deferred(), secondWrite = deferred(); let value = 0, reads = 0, writes = 0;
+  const tracker = createCheckoutReadTracker({ entities: { Shop: {
+    get: async () => { reads++; return { value }; },
+    update: async (_id, next) => {
+      writes++;
+      await (next === 1 ? firstWrite : secondWrite).promise;
+      value = next;
+      if (next === 1) throw new Error('Response lost after committed update');
+      return { value };
+    },
+  } } });
+  const shop = tracker.service.entities.Shop;
+  await shop.get('shop'); await shop.get('shop'); assert.equal(reads, 1);
+  const one = shop.update('shop', 1);
+  const two = shop.update('shop', 2);
+  const settledWrites = Promise.allSettled([one, two]);
+  const rejected = assert.rejects(one, /Response lost/);
+  await Promise.all([shop.get('shop'), shop.get('shop')]); assert.equal(reads, 3);
+  firstWrite.resolve(); await rejected;
+  await Promise.all([shop.get('shop'), shop.get('shop')]); assert.equal(reads, 5);
+  secondWrite.resolve();
+  assert.deepEqual((await settledWrites).map(row => row.status), ['rejected', 'fulfilled']);
+  assert.equal((await shop.get('shop')).value, 2);
+  await shop.get('shop'); assert.equal(reads, 6); assert.equal(writes, 2);
+});
+
+test('a failed pending read is evicted and a synchronous mutation failure also invalidates metadata', async () => {
+  const gate = deferred(); let attempts = 0, reads = 0;
+  const tracker = createCheckoutReadTracker({ entities: {
+    Recipe: { filter: async () => {
+      attempts++; await gate.promise;
+      if (attempts === 1) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      return [{ id: 'fresh' }];
+    } },
+    Shop: {
+      get: async () => { reads++; return { id: 'shop' }; },
+      update: () => { throw new Error('Synchronous failure'); },
+    },
+  } });
+  const recipe = tracker.service.entities.Recipe;
+  const one = recipe.filter({ active: true }), two = recipe.filter({ active: true });
+  const settled = Promise.allSettled([one, two]);
+  gate.resolve();
+  assert.ok((await settled).every(row => row.status === 'rejected'));
+  assert.equal(attempts, 1, 'denied reads are not retried');
+  assert.equal((await recipe.filter({ active: true }))[0].id, 'fresh');
+  const shop = tracker.service.entities.Shop;
+  await shop.get('shop'); await shop.get('shop'); assert.equal(reads, 1);
+  assert.throws(() => tracker.service.entities.Shop.update('shop', {}), /Synchronous failure/);
+  await shop.get('shop'); assert.equal(reads, 2);
+});
+
+test('a read started before a mutation cannot repopulate the cache after a newer read', async () => {
+  const oldRead = deferred(); let value = 0, reads = 0;
+  const tracker = createCheckoutReadTracker({ entities: { Shop: {
+    get: async () => {
+      const snapshot = { value }; reads++;
+      if (reads === 1) await oldRead.promise;
+      return snapshot;
+    },
+    update: async (_id, next) => { value = next; return { value }; },
+  } } });
+  const shop = tracker.service.entities.Shop;
+  const before = shop.get('shop');
+  await shop.update('shop', 1);
+  assert.equal((await shop.get('shop')).value, 1);
+  oldRead.resolve();
+  assert.equal((await before).value, 0, 'the existing caller may finish its own old read');
+  assert.equal((await shop.get('shop')).value, 1, 'old completion never replaces the post-write result');
+  assert.equal(reads, 2);
 });

@@ -205,6 +205,8 @@ function checkout({ pending = [], syncing = false, online = true, ...flags } = {
     isOnline: online, navigator: { onLine: online }, offlineSales: pending, offlineSyncError: '', queueAuthorizationError: false,
     productsById: { cake: { track_stock: false } }, stockByProduct: {}, settings: { allow_negative_stock: false },
     checkoutCancelledRef: { current: false }, checkoutReadyRef: { current: false }, checkoutRequestKeyRef: { current: '' }, checkoutRecordedAtRef: { current: '' },
+    checkoutAttemptRef: { current: null }, checkoutSessionRef: { current: {} }, stockUserRef: { current: 'cashier' }, setCheckoutRetryPending: () => {},
+    startSaleRequest: offline.startSaleRequest, waitForSaleResponse: offline.waitForSaleResponse, releaseSaleRequest: offline.releaseSaleRequest,
     saleSubmittingRef: { current: false }, tableCartDirty: false, tableOrder: null, takeawayDirty: false, checkoutOffline: false,
     shops: [{ id: 'shop' }], performance, console: { info: () => {}, error: () => {}, warn: () => {} },
     timingUserRef: { current: 'cashier' }, createCheckoutTimingEventId: () => 'diagnostic-attempt-1234',
@@ -296,3 +298,4 @@ test('unknown local storage state cannot be mistaken for an empty queue when clo
   await ctx.api.requestCloseShift(); await ctx.api.closeShift({ actual_cash: 0 });
   assert.equal(calls.length, 0); assert.equal(alerts.length, 2);
 });
+

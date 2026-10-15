@@ -26,7 +26,7 @@ function savedReceiptPreference() {
   }
 }
 
-export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false, checking = false, isDelivery = false }) {
+export default function PaymentModal({ open, total, onClose, onConfirm, loading, offline = false, fullDiscount = false, discountControls = null, discountPending = false, checking = false, isDelivery = false, attemptKey = '', retryPending = false }) {
   const [payments, setPayments] = useState([]);
   const [error, setError] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
@@ -37,10 +37,10 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
     try { window.localStorage.setItem(RECEIPT_PRINT_KEY, enabled ? 'on' : 'off'); } catch { /* Keep the choice for this page when storage is unavailable. */ }
   };
 
-  const previous = useRef({ open: false, total });
+  const previous = useRef({ open: false, total, attemptKey: null });
   useEffect(() => {
     const before = previous.current;
-    if (open && !before.open) {
+    if (open && !before.open && (!attemptKey || attemptKey !== before.attemptKey)) {
       setPayments([]);
       setError('');
       setShowMethodPicker(total > 0);
@@ -56,8 +56,8 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
       });
       setError('');
     }
-    previous.current = { open, total };
-  }, [open, total]);
+    previous.current = { open, total, attemptKey: open ? attemptKey : before.attemptKey };
+  }, [open, total, attemptKey]);
 
   const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const remaining = Math.max(0, total - paid);
@@ -157,6 +157,9 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
             Savdo avval shu qurilmaga saqlanadi, keyin serverga navbat bilan yuboriladi.
           </div>
         )}
+        {retryPending && <p role="status" className="text-sm text-amber-900">
+          Avvalgi to‘lov natijasi tekshiriladi. Mahsulot va to‘lov usullari o‘zgarmaydi; qayta pul olmang.
+        </p>}
 
         <div className={total <= 0 ? 'hidden' : 'space-y-2.5'}>
           {payments.length > 0 && <div className={`odina-payment-column-labels ${payments.length > 1 ? 'odina-payment-split-labels' : ''}`} aria-hidden="true"><span>To‘lov usuli</span><span>Summa (UZS)</span></div>}
@@ -164,6 +167,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
             <div key={idx} className="odina-payment-row flex gap-2 items-center">
               <OdinaSelect
                 value={p.method}
+                disabled={retryPending}
                 aria-label={`To‘lov usuli ${idx + 1}`}
                 onChange={(e) => updatePayment(idx, 'method', e.target.value)}
                 className="h-10 rounded-lg border border-input bg-card px-2 text-sm font-medium flex-1 min-w-0"
@@ -180,12 +184,13 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
                 min={0}
                 aria-label={`To‘lov summasi ${idx + 1}`}
                 value={p.amount}
+                disabled={retryPending}
                 onChange={(e) => updatePayment(idx, 'amount', e.target.value)}
                 className="w-32 h-10 text-right font-medium"
                 placeholder="0"
               />
               {payments.length > 1 && (
-                <button type="button" aria-label="To‘lov usulini olib tashlash" onClick={() => removeRow(idx)} className="odina-payment-remove w-9 h-10 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0">
+                <button type="button" disabled={retryPending} aria-label="To‘lov usulini olib tashlash" onClick={() => removeRow(idx)} className="odina-payment-remove w-9 h-10 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -198,7 +203,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
             <button
               type="button"
               onClick={() => setShowMethodPicker((prev) => !prev)}
-              disabled={availableMethods.length === 0}
+              disabled={retryPending || availableMethods.length === 0}
               className="min-h-11 rounded-xl px-2 -ml-2 text-brand-ink font-medium flex items-center gap-1.5 disabled:opacity-40"
               aria-expanded={showMethodPicker}
             >
@@ -241,6 +246,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
                     <button
                       key={method.id}
                       type="button"
+                      disabled={retryPending}
                       onClick={() => addPaymentMethod(method.id)}
                       className="odina-payment-method min-h-14 rounded-xl border border-border bg-card px-3 py-2.5 flex items-center gap-2.5 text-left font-semibold text-sm hover:bg-primary/10 hover:border-primary/40 transition-colors"
                     >
@@ -271,7 +277,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
             />
             <span className="w-7 text-xs font-bold text-muted-foreground">{printReceipt ? 'Ha' : 'Yo‘q'}</span>
           </div>
-          <Button variant="outline" onClick={onClose} disabled={loading} className="min-h-11 whitespace-nowrap">
+          <Button variant="outline" onClick={onClose} disabled={loading || retryPending} className="min-h-11 whitespace-nowrap">
             Bekor qilish
           </Button>
           <Button

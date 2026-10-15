@@ -22,7 +22,7 @@ const closed = { id: 'shift', status: 'closed', shop_name: 'Do‘kon', user_name
 function harness(payload) {
   const state = {}, warnings = [], alerts = [], calls = [];
   const context = {
-    closingShiftRef: { current: false }, shiftToClose: { id: 'shift' },
+    closingShiftRef: { current: false }, shiftMutationRef: { current: 0 }, shiftToClose: { id: 'shift' },
     isOnline: true, offlineStorageError: '', offlineSales: [],
     base44: { functions: { invoke: async (name, request) => { calls.push({ name, request }); return { data: payload }; } } },
     toast: warning => warnings.push(warning), odinaAlert: async message => alerts.push(message), loadAll: async () => {},

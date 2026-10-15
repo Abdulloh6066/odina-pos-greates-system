@@ -9,6 +9,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { mergePosStockEvent } from '../src/lib/pos-stock-events.js';
+import { startSaleRequest, waitForSaleResponse, releaseSaleRequest } from '../src/lib/offline-sales.js';
 import { formatUzbekistanDateTime } from '../src/lib/uzbekistan-time.js';
 import * as checkoutTimingStorage from '../src/lib/checkout-timing.js';
 
@@ -70,7 +71,7 @@ function loadingHarness({ productPromise = Promise.resolve([{ id: 'cake', name: 
     setLoadingData: value => { state.loading = value; },
     setCategories: value => { state.categories = value; },
     setProducts: value => { state.products = value; },
-    setProductStock: value => { state.stock = value; },
+    setProductStock: value => { state.stock = typeof value === 'function' ? value(state.stock || []) : value; },
     setShops: value => { state.shops = value; },
     setSettings: value => { state.settings = value; },
     setCashRecipients: value => { state.recipients = value; },
@@ -79,6 +80,7 @@ function loadingHarness({ productPromise = Promise.resolve([{ id: 'cake', name: 
     setCashDataLoading: value => { state.cashLoading = value; },
     setCashDataError: value => { state.cashError = value; },
     loadGenerationRef: { current: 0 }, wasteAlertGenerationRef: { current: 0 },
+    stockReadGenerationRef: { current: 0 }, mergeUnreservedStock: (_current, rows) => rows,
     user: { id: 'owner', role: 'admin' },
   };
   const code = ['loadCashData', 'loadWasteAlerts'].map(name => declaration(source, name, true)).join('\n')
@@ -311,6 +313,13 @@ function checkoutHarness({ clock = performance } = {}) {
   const gate = deferred(); const calls = []; const alerts = []; const receipts = []; const timings = []; const logs = []; const diagnostics = [];
   const ctx = {
     saleSubmittingRef: { current: false }, checkoutReadyRef: { current: true },
+    checkoutAttemptRef: { current: null }, checkoutSessionRef: { current: {} }, reconciledSaleKeysRef: { current: new Set() },
+    stockReadGenerationRef: { current: 0 }, confirmedStockRef: { current: new Map() },
+    confirmedStockReadsRef: { current: new Map() }, latestStockSaleRef: { current: new Map() },
+    shiftMutationRef: { current: 0 }, setShiftReadState: () => {},
+    stockUserRef: { current: 'owner' }, useStableEvent: callback => callback,
+    startSaleRequest, waitForSaleResponse, releaseSaleRequest, setCheckoutRetryPending: () => {},
+    setConfirmedStockReservations: () => {},
     checkoutCancelledRef: { current: false }, checkoutRequestKeyRef: { current: 'same-checkout-key' },
     checkoutRecordedAtRef: { current: '2026-10-13T02:00:00+05:00' }, takeawayRequestIdRef: { current: '' },
     cart: [{ product_id: 'cake', product_name: 'Tort', quantity: 1, subtotal: 15000, price: 15000 }],
@@ -337,7 +346,7 @@ function checkoutHarness({ clock = performance } = {}) {
     timingUserRef: { current: 'owner' },
     createCheckoutTimingEventId: () => `diagnostic-attempt-${diagnostics.length + 1}`,
     reportCheckoutTiming: event => { diagnostics.push(event); return Promise.resolve({}); },
-    setShift: value => { ctx.shift = value; },
+    setShift: value => { ctx.shift = typeof value === 'function' ? value(ctx.shift) : value; },
     productStock: [{ id: 'stock', product_id: 'cake', location_id: 'branch', quantity: 3 }],
     setProductStock: update => { ctx.productStock = update(ctx.productStock); },
     resetCart: () => { ctx.cart = []; }, setTableOrder: value => { ctx.tableOrder = value; },
@@ -348,7 +357,7 @@ function checkoutHarness({ clock = performance } = {}) {
     enqueueOfflineSale: () => { throw new Error('Unexpected offline queue'); },
   };
   const source = read('src/pages/POS.jsx');
-  const names = ['finishSalePresentation', 'presentCompletedSale', 'finishQueuedSale', 'applyCompletedSale', 'completeSale'];
+  const names = ['finishSalePresentation', 'presentCompletedSale', 'finishQueuedSale', 'refreshConfirmedStock', 'reconcileCompletedSale', 'applyCompletedSale', 'completeSale'];
   vm.runInNewContext(names.map(name => declaration(source, name)).join('\n') + '\nglobalThis.submit = completeSale;', ctx);
   return { ctx, gate, calls, alerts, receipts, timings, logs, diagnostics, submit: ctx.submit };
 }

@@ -46,6 +46,9 @@ import {
   createSaleIdempotencyKey,
   isRetryableSyncError,
   syncErrorMessage,
+  startSaleRequest,
+  waitForSaleResponse,
+  releaseSaleRequest,
 } from '@/lib/offline-sales';
 
 // Temporary business choice: sell through without the negative-stock confirmation.
@@ -87,6 +90,8 @@ export default function POS() {
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
   const [shiftReadState, setShiftReadState] = useState('loading');
+  const shiftMutationRef = useRef(0);
+  const shiftReadGenerationRef = useRef(0);
   const [settings, setSettings] = useState(null);
   const [cashRecipients, setCashRecipients] = useState([]);
   const [supplierDebts, setSupplierDebts] = useState({});
@@ -137,6 +142,18 @@ export default function POS() {
   const [checkoutOffline, setCheckoutOffline] = useState(false);
   const checkoutRequestKeyRef = useRef('');
   const checkoutRecordedAtRef = useRef('');
+  const checkoutAttemptRef = useRef(null);
+  const checkoutSessionRef = useRef({ userId: user?.id });
+  if (checkoutSessionRef.current.userId !== user?.id) checkoutSessionRef.current = { userId: user?.id };
+  const reconciledSaleKeysRef = useRef(new Set());
+  const stockReadGenerationRef = useRef(0);
+  const confirmedStockRef = useRef(new Map());
+  const confirmedStockReadsRef = useRef(new Map());
+  const latestStockSaleRef = useRef(new Map());
+  const stockUserRef = useRef(user?.id);
+  stockUserRef.current = user?.id;
+  const [confirmedStockReservations, setConfirmedStockReservations] = useState([]);
+  const [checkoutRetryPending, setCheckoutRetryPending] = useState(false);
   const [receiptPrintSale, setReceiptPrintSale] = useState(null);
   const [shiftReport, setShiftReport] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
@@ -278,7 +295,7 @@ export default function POS() {
       return !saved || saved.quantity !== row.quantity || saved.price !== row.price;
     })
   );
-  const tableLocked = takeawaySaving || takeawayOrder?.state === 'paying'
+  const tableLocked = checkoutRetryPending || takeawaySaving || takeawayOrder?.state === 'paying'
     || (Boolean(selectedTable) && (tableOrderLoading || savingTable
     || Boolean(tableOrderError) || tableOrder?.state === 'paying'));
   // A browser refresh or tab close must warn about edits not yet acknowledged
@@ -514,16 +531,24 @@ export default function POS() {
   };
 
   const loadCurrentShift = async () => {
+    const generation = ++shiftReadGenerationRef.current;
+    const mutation = shiftMutationRef.current;
+    const ownerId = user?.id;
+    const session = checkoutSessionRef.current;
     setShiftReadState('loading');
     try {
       const currentShift = await fetchCurrentPosShift(base44);
+      if (checkoutSessionRef.current !== session || stockUserRef.current !== ownerId || generation !== shiftReadGenerationRef.current
+        || mutation !== shiftMutationRef.current) {
+        throw new Error('Smena ma’lumoti yangilandi. Tekshiruvni qayta bajaring.');
+      }
       setShift(currentShift);
       setShiftReadState('ready');
       return currentShift;
     } catch (error) {
-      // Preserve an already loaded shift for offline sales; never present an
-      // unsuccessful initial check as permission to open a second shift.
-      setShiftReadState('error');
+      // A stale read cannot undo a confirmed sale, withdrawal or shift close.
+      if (checkoutSessionRef.current === session && stockUserRef.current === ownerId && generation === shiftReadGenerationRef.current
+        && mutation === shiftMutationRef.current) setShiftReadState('error');
       throw error;
     }
   };
@@ -559,6 +584,7 @@ export default function POS() {
 
   const loadAll = async ({ showLoading = true } = {}) => {
     const generation = ++loadGenerationRef.current;
+    const stockGeneration = stockReadGenerationRef.current;
     if (showLoading) setLoadingData(true);
     try {
       const [cats, prods, shopList, settingsList, , stockList] = await Promise.all([
@@ -607,7 +633,9 @@ export default function POS() {
           }),
       );
       setProducts((prods || []).filter((p) => p.active && p.archived !== true));
-      setProductStock(stockList || []);
+      if (stockGeneration === stockReadGenerationRef.current) {
+        setProductStock((current) => mergeUnreservedStock(current, stockList || []));
+      }
       setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
       setSettings(settingsList?.[0] || null);
       // Auxiliary data never holds the product grid behind a loading screen.
@@ -632,9 +660,10 @@ export default function POS() {
     enqueue: enqueueOfflineSale,
     syncNow: syncOfflineSales,
   } = useOfflineSaleQueue(user?.id, () => loadAll({ showLoading: false }).catch(() => {}), (currentShift) => {
+    shiftMutationRef.current++;
     setShift(currentShift);
     setShiftReadState('ready');
-  });
+  }, (payload, key, record) => reconcileCompletedSale(payload, key, record));
   const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
     takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
 
@@ -647,7 +676,8 @@ export default function POS() {
     if (!user) return undefined;
 
     const unsubscribe = base44.entities.ProductStock.subscribe((event) => {
-      setProductStock((current) => mergePosStockEvent(current, event));
+      stockReadGenerationRef.current++;
+      setProductStock((current) => mergeUnreservedStock(current, mergePosStockEvent(current, event)));
     });
 
     return () => unsubscribe?.();
@@ -1049,7 +1079,7 @@ export default function POS() {
   }, [catalogProducts, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id, shopProductOrder]);
 
   const queuedForCurrentShift = useMemo(
-    () => offlineSales.filter((record) => record.shift_id === shift?.id),
+    () => offlineSales.filter((record) => record.shift_id === shift?.id && record.status !== 'confirmed'),
     [offlineSales, shift?.id],
   );
   const queuedShiftTotal = useMemo(
@@ -1058,13 +1088,13 @@ export default function POS() {
   );
   const queuedQuantityByProduct = useMemo(() => {
     const quantities = {};
-    for (const record of queuedForCurrentShift) {
+    for (const record of [...queuedForCurrentShift, ...confirmedStockReservations.filter((row) => row.shift_id === shift?.id)]) {
       for (const item of record.request?.items || []) {
         quantities[item.product_id] = Number(quantities[item.product_id] || 0) + Number(item.quantity || 0);
       }
     }
     return quantities;
-  }, [queuedForCurrentShift]);
+  }, [queuedForCurrentShift, confirmedStockReservations, shift?.id]);
   const productsById = useMemo(
     () => Object.fromEntries(products.map((product) => [product.id, product])),
     [products],
@@ -1113,8 +1143,10 @@ export default function POS() {
   const openPayment = (offline) => {
     if (checkoutCancelledRef.current) return;
     checkoutReadyRef.current = true;
-    checkoutRequestKeyRef.current = createSaleIdempotencyKey();
-    checkoutRecordedAtRef.current = new Date().toISOString();
+    if (!checkoutAttemptRef.current?.uncertain) {
+      checkoutRequestKeyRef.current = createSaleIdempotencyKey();
+      checkoutRecordedAtRef.current = new Date().toISOString();
+    }
     setCheckoutOffline(offline);
     setPayOpen(true);
   };
@@ -1169,7 +1201,7 @@ export default function POS() {
       }
       return;
     }
-    if (!cart.length || payOpen || stockChecking || (offlineSyncing && !queueEligible) || tableLocked) return;
+    if (!cart.length || payOpen || paying || saleSubmittingRef.current || stockChecking || (offlineSyncing && !queueEligible) || tableLocked) return;
     if (queueAuthorizationError) {
       await odinaAlert('Server seansi tasdiqlanmadi. Tizimga qayta kiring; saqlangan savdolar qurilmada qoladi.');
       return;
@@ -1196,7 +1228,7 @@ export default function POS() {
         return;
       }
 
-      if (offlineSales.length || offlineSyncing) {
+      if (offlineSales.some((record) => record.status !== 'confirmed') || offlineSyncing) {
         // New ordinary sales join the durable queue; background synchronization
         // never holds the next cashier payment behind the previous receipt.
         if (queueEligible) {
@@ -1251,12 +1283,18 @@ export default function POS() {
   };
 
   const closePayment = () => {
+    if (saleSubmittingRef.current || checkoutAttemptRef.current?.uncertain) {
+      void odinaAlert('Avvalgi to‘lov natijasi hali tasdiqlanmagan. Qayta pul olmang; shu to‘lovni yana tasdiqlab tekshiring.');
+      return;
+    }
     checkoutCancelledRef.current = true;
     checkoutReadyRef.current = false;
     setPayOpen(false);
     if (paying) return;
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
+    checkoutAttemptRef.current = null;
+    setCheckoutRetryPending(false);
     setCheckoutOffline(false);
   };
 
@@ -1286,7 +1324,7 @@ export default function POS() {
     if (isStaffTicketEnabled(sale?.shop_id || shift?.shop_id || user?.shop_id)
       && sale?.items?.length && !sale?.table_number_snapshot && !sale?.table_order_id_snapshot) {
       setStaffTicket({ mode: 'sale', order: sale, autoPrint: true });
-    } else if (selectedTable && !sale?.offline_pending) {
+    } else if (selectedTable && !sale?.offline_pending && !sale?.table_release_pending) {
       navigate(posHomePath, { replace: true });
       setTablePickerOpen(true);
     }
@@ -1304,40 +1342,164 @@ export default function POS() {
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
+    checkoutAttemptRef.current = null;
+    setCheckoutRetryPending(false);
     resetCart();
     presentCompletedSale(record.local_sale, printReceipt);
   };
 
-  const applyCompletedSale = (payload, printReceipt) => {
-    if (payload.shift) setShift(payload.shift);
-    if (payload.stock_updates?.length) {
+  // Keep the previous stock base while a confirmed sale still has a local
+  // reservation. Publishing a newer general snapshot here would subtract twice.
+  const mergeUnreservedStock = (current, incoming) => {
+    const held = new Set([...confirmedStockRef.current.values()].flatMap((record) =>
+      (record.request?.items || []).map((item) => `${record.shop_id}:${item.product_id}`)));
+    if (!held.size) return incoming;
+    return [...incoming.filter((row) => !held.has(`${row.location_id}:${row.product_id}`)),
+      ...current.filter((row) => held.has(`${row.location_id}:${row.product_id}`))];
+  };
+
+  const refreshConfirmedStock = (shopId) => {
+    const existing = confirmedStockReadsRef.current.get(shopId);
+    if (existing) return existing.promise;
+    const ownerId = user?.id;
+    const session = checkoutSessionRef.current;
+    const job = { version: 0, promise: null };
+    confirmedStockReadsRef.current.set(shopId, job);
+    job.promise = (async () => {
+      for (let pass = 0; pass < 4; pass++) {
+        const version = job.version;
+        const holds = [...confirmedStockRef.current.values()].filter((row) => row.shop_id === shopId);
+        const productIds = [...new Set(holds.flatMap((row) => [
+          ...(row.request?.items || []).map((item) => item.product_id),
+          ...(row.stock_updates || []).map((item) => item.product_id),
+        ]))];
+        const generation = ++stockReadGenerationRef.current;
+        const outcome = await waitForSaleResponse({ promise: base44.entities.ProductStock.filter({
+          location_id: shopId, product_id: { $in: productIds },
+        }, '-updated_at', 500) }, { timeoutMs: 10000 });
+        if (checkoutSessionRef.current !== session || stockUserRef.current !== ownerId) throw new Error('Kassir seansi o‘zgardi.');
+        if (outcome.pending) throw new Error('Qoldiqni tekshirish kutilmoqda.');
+        if (generation !== stockReadGenerationRef.current || version !== job.version) continue;
+        // Close the coalescing job before publishing so a later acknowledgment
+        // must start a fresh read rather than join a response already received.
+        confirmedStockReadsRef.current.delete(shopId);
+        const scoped = (outcome.response || []).filter((row) => row.location_id === shopId && productIds.includes(row.product_id));
+        setProductStock((current) => [...current.filter((row) =>
+          row.location_id !== shopId || !productIds.includes(row.product_id)), ...scoped]);
+        for (const hold of holds) {
+          confirmedStockRef.current.delete(hold.id);
+          reconciledSaleKeysRef.current.add(hold.id);
+          const order = String(hold.request?.recorded_at || '');
+          const previous = latestStockSaleRef.current.get(shopId);
+          if (!previous || order > previous.order) latestStockSaleRef.current.set(shopId, { order, key: hold.id });
+        }
+        setConfirmedStockReservations([...confirmedStockRef.current.values()]);
+        return;
+      }
+      throw new Error('Qoldiq yangilanmoqda. Tekshiruv qayta bajariladi.');
+    })().finally(() => {
+      if (confirmedStockReadsRef.current.get(shopId) === job) confirmedStockReadsRef.current.delete(shopId);
+    });
+    return job.promise;
+  };
+
+  const reconcileCompletedSale = useStableEvent((payload, key, record) => {
+    const saleKey = key || payload.sale?.idempotency_key || payload.sale?.id;
+    if (!saleKey || reconciledSaleKeysRef.current.has(saleKey)) return;
+    // A delayed queue response cannot reopen a shift or replace newer totals.
+    if (payload.shift) {
+      shiftMutationRef.current++;
+      setShift((current) => current?.id === payload.shift.id
+        && Number(payload.shift.order_count || 0) > Number(current.order_count || 0) ? payload.shift : current);
+      setShiftReadState('ready');
+    }
+    const request = record?.request || checkoutAttemptRef.current?.request || {};
+    const saleShopId = record?.shop_id || payload.sale?.shop_id || shift?.shop_id;
+    const order = String(request.recorded_at || payload.sale?.sold_at || '');
+    const previous = latestStockSaleRef.current.get(saleShopId);
+    const hasHeldStock = [...confirmedStockRef.current.values()].some((row) => row.shop_id === saleShopId);
+    const freshSnapshot = !record && order && payload.stock_updates?.length && !hasHeldStock
+      && (!payload.shift || Number(payload.shift.order_count || 0) >= Number(shift?.order_count || 0))
+      && (!previous || order > previous.order || previous.key === saleKey);
+    if (freshSnapshot) {
+      stockReadGenerationRef.current++;
+      latestStockSaleRef.current.set(saleShopId, { order, key: saleKey });
       const updatedByProduct = Object.fromEntries(payload.stock_updates.map((item) => [item.product_id, item.quantity]));
-      const saleShopId = payload.sale?.shop_id || shift.shop_id;
       setProductStock((current) => {
-        const existingIds = new Set(current.map((stock) => `${stock.location_id}:${stock.product_id}`));
-        const changed = current.map((stock) => (
-          stock.location_id === saleShopId && Object.prototype.hasOwnProperty.call(updatedByProduct, stock.product_id)
-            ? { ...stock, quantity: updatedByProduct[stock.product_id] }
-            : stock
-        ));
+        const changed = current.map((stock) => stock.location_id === saleShopId
+          && Object.prototype.hasOwnProperty.call(updatedByProduct, stock.product_id)
+          ? { ...stock, quantity: updatedByProduct[stock.product_id] } : stock);
         for (const item of payload.stock_updates) {
-          const key = `${saleShopId}:${item.product_id}`;
-          if (!existingIds.has(key)) {
+          if (!changed.some((stock) => stock.location_id === saleShopId && stock.product_id === item.product_id)) {
             changed.push({ location_id: saleShopId, product_id: item.product_id, quantity: item.quantity });
           }
         }
         return changed;
       });
+      reconciledSaleKeysRef.current.add(saleKey);
+      return;
     }
+    // Idempotent replays may omit stock_updates. Retain the queued deduction
+    // until a scoped authoritative read, never replace stock with an older ack.
+    if (!confirmedStockRef.current.has(saleKey)) {
+      stockReadGenerationRef.current++;
+      const running = confirmedStockReadsRef.current.get(saleShopId);
+      if (running) running.version++;
+      confirmedStockRef.current.set(saleKey, { id: saleKey, shift_id: request.shift_id,
+        shop_id: saleShopId, request, stock_updates: payload.stock_updates || [] });
+      setConfirmedStockReservations([...confirmedStockRef.current.values()]);
+    }
+    return refreshConfirmedStock(saleShopId);
+  });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!isOnline) return;
+      const shopsToRefresh = new Set([...confirmedStockRef.current.values()].map((row) => row.shop_id));
+      for (const shopId of shopsToRefresh) {
+        if (!confirmedStockReadsRef.current.has(shopId)) void refreshConfirmedStock(shopId).catch(() => {});
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [isOnline, user?.id]);
+
+  useEffect(() => {
+    // A different signed-in cashier starts with independent presentation/locks.
+    // The old closure and user-scoped flight retain its immutable request.
+    checkoutAttemptRef.current = null;
+    checkoutRequestKeyRef.current = '';
+    checkoutRecordedAtRef.current = '';
+    checkoutReadyRef.current = false;
+    saleSubmittingRef.current = false;
+    setCheckoutRetryPending(false);
+    setPayOpen(false);
+    setPaying(false);
+    setConfirmedStockReservations([]);
+    return () => {
+      stockReadGenerationRef.current++;
+      confirmedStockRef.current.clear();
+      confirmedStockReadsRef.current.clear();
+      latestStockSaleRef.current.clear();
+      reconciledSaleKeysRef.current.clear();
+    };
+  }, [user?.id]);
+
+  const applyCompletedSale = (payload, printReceipt) => {
+    const reconciliation = reconcileCompletedSale(payload, checkoutRequestKeyRef.current);
+    void Promise.resolve(reconciliation).catch(() => {});
     setPayOpen(false);
     setCheckoutOffline(false);
     checkoutRequestKeyRef.current = '';
     checkoutRecordedAtRef.current = '';
+    checkoutAttemptRef.current = null;
+    setCheckoutRetryPending(false);
     resetCart();
-    setTableOrder(null);
+    if (!selectedTable || payload.table_released === true) setTableOrder(null);
     setTakeawayOrder(null);
-    presentCompletedSale(payload.sale, printReceipt);
-    if (payload.table_released === false) {
+    const sale = selectedTable && payload.table_released !== true
+      ? { ...payload.sale, table_release_pending: true } : payload.sale;
+    presentCompletedSale(sale, printReceipt);
+    if (selectedTable && payload.table_released !== true) {
       void odinaAlert('Savdo yozildi, lekin ochiq buyurtmani yopish tasdiqlanmadi. Qayta pul olmang! Ochiq buyurtmalar yoki Stollar ichida «To‘lovni tekshirish» orqali yakunlang.');
     }
     void loadWasteAlerts();
@@ -1352,16 +1514,19 @@ export default function POS() {
     let checkoutOutcome = 'unconfirmed';
     let checkoutSaleId = '';
     let saleCommitted = false;
+    const checkoutSession = checkoutSessionRef.current;
     setMobileCartOpen(false);
     // Close the payment dialog before the async request so a cleared cart can
     // never leave a stale 0 UZS payment window on screen after a successful sale.
     setPayOpen(false);
     setPaying(true);
-    const idempotencyKey = checkoutRequestKeyRef.current || createSaleIdempotencyKey();
+    const idempotencyKey = checkoutAttemptRef.current?.key || checkoutRequestKeyRef.current || createSaleIdempotencyKey();
     checkoutRequestKeyRef.current = idempotencyKey;
-    const recordedAt = checkoutRecordedAtRef.current || new Date().toISOString();
+    const recordedAt = checkoutAttemptRef.current?.request.recorded_at || checkoutRecordedAtRef.current || new Date().toISOString();
     checkoutRecordedAtRef.current = recordedAt;
-    let pendingRecord = null;
+    let attempt = checkoutAttemptRef.current;
+    let pendingRecord = attempt?.pendingRecord || null;
+    let storingPending = false;
 
     try {
       if (selectedTable && (tableCartDirty || !tableOrder?.id || tableOrder.state !== 'occupied')) {
@@ -1370,7 +1535,7 @@ export default function POS() {
       if (takeawayOrder && (takeawayDirty || takeawayOrder.state !== 'occupied')) {
         throw new Error('Buyurtmani saqlang va to‘lovni qayta oching.');
       }
-      if (queueEligible) {
+      if (!attempt && queueEligible && !discountOwnerPin && discountPct === 0) {
         pendingRecord = buildPendingSale({
           idempotencyKey,
           recordedAt,
@@ -1383,77 +1548,137 @@ export default function POS() {
         });
       }
 
+      if (!attempt) {
+        const request = pendingRecord?.request || {
+          action: 'complete_sale',
+          shift_id: shift.id,
+          is_delivery: isDelivery,
+          ...(takeawayOrder ? { takeaway_order_id: takeawayOrder.id, takeaway_order_revision: takeawayOrder.revision } : {}),
+          ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number,
+            table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
+          items: cart.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            ...friesOptionFields(item),
+          })),
+          discount_code: discountCode || undefined,
+          rounding_total: adjustmentMode === 'rounding' ? roundingTarget : undefined,
+          manual_discount_amount: adjustmentMode === 'manual' ? subtotal - roundingTarget : undefined,
+          owner_pin: discountPct === 100 && discountOwnerPin ? discountOwnerPin : undefined,
+          payments,
+          idempotency_key: idempotencyKey,
+          recorded_at: recordedAt,
+        };
+        attempt = { key: idempotencyKey, request: JSON.parse(JSON.stringify(request)), pendingRecord,
+          uncertain: false, onlineStarted: false, flight: null };
+        checkoutAttemptRef.current = attempt;
+      } else if (attempt.key !== idempotencyKey) {
+        throw new Error('Avvalgi to‘lovning so‘rov kaliti o‘zgarmasligi kerak. Qayta pul olmang.');
+      }
+
       if (checkoutOffline || !isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
         if (selectedTable || takeawayOrder || takeawayRequestIdRef.current) throw new Error('Saqlangan buyurtmani internet orqali to‘lash kerak. Savat saqlanib turadi.');
         if (!pendingRecord) {
           throw new Error('Chegirmali savdoni offline saqlab bo‘lmaydi. Internetni kuting.');
         }
+        storingPending = true;
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
         checkoutOutcome = 'queued';
+        if (checkoutSessionRef.current !== checkoutSession) return;
         finishQueuedSale(pendingRecord, printReceipt);
         return;
       }
 
-      const request = pendingRecord?.request || {
-        action: 'complete_sale',
-        shift_id: shift.id,
-        is_delivery: isDelivery,
-        ...(takeawayOrder ? { takeaway_order_id: takeawayOrder.id, takeaway_order_revision: takeawayOrder.revision } : {}),
-        ...(selectedTable ? { table_shop_id: selectedTable.shopId, table_number: selectedTable.number,
-          table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
-        items: cart.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          ...friesOptionFields(item),
-        })),
-        discount_code: discountCode || undefined,
-        rounding_total: adjustmentMode === 'rounding' ? roundingTarget : undefined,
-        manual_discount_amount: adjustmentMode === 'manual' ? subtotal - roundingTarget : undefined,
-        owner_pin: discountPct === 100 && discountOwnerPin ? discountOwnerPin : undefined,
-        payments,
-        idempotency_key: idempotencyKey,
-        recorded_at: recordedAt,
-      };
-
       try {
         const serverTimingStarted = performance.now();
-        const result = await base44.functions.invoke('complete-sale', request);
-        reportRequestSuccess();
+        const flight = attempt.flight && attempt.flight.status !== 'rejected' ? attempt.flight
+          : startSaleRequest(attempt.request,
+            (request) => base44.functions.invoke('complete-sale', request), { userId: user.id });
+        attempt.flight = flight;
+        attempt.onlineStarted = true;
+        const outcome = await waitForSaleResponse(flight);
+        if (outcome.pending) {
+          attempt.uncertain = true;
+          if (!pendingRecord) {
+            throw Object.assign(new Error('To‘lov natijasi kutilmoqda. Shu to‘lovni qayta tekshiring; qayta pul olmang.'), { code: 'ETIMEDOUT' });
+          }
+          storingPending = true;
+          // Without durable storage the catch below preserves the frozen
+          // attempt promptly; it never waits indefinitely for the original write.
+          await enqueueOfflineSale(pendingRecord);
+          saleCommitted = true;
+          checkoutOutcome = 'queued';
+          if (checkoutSessionRef.current !== checkoutSession) return;
+          finishQueuedSale(pendingRecord, printReceipt);
+          return;
+        }
+        const result = outcome.response;
+        if (checkoutSessionRef.current === checkoutSession) reportRequestSuccess();
         checkoutServerMs = Math.round(performance.now() - serverTimingStarted);
         const payload = result?.data || result;
         checkoutBackendTiming = payload?.backend_timing || null;
-        if (!payload?.sale?.id) throw new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.');
+        if (!payload?.sale?.id) {
+          releaseSaleRequest(idempotencyKey, flight);
+          throw Object.assign(new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.'), { status: 502 });
+        }
         checkoutSaleId = payload.sale.id;
         saleCommitted = true;
         checkoutOutcome = payload.already_processed ? 'rechecked' : 'confirmed';
+        releaseSaleRequest(idempotencyKey, flight);
+        if (checkoutSessionRef.current !== checkoutSession) return;
         applyCompletedSale(payload, printReceipt);
       } catch (error) {
-        reportRequestError(error);
-        if (saleCommitted || !pendingRecord || !isRetryableSyncError(error)) throw error;
+        if (checkoutSessionRef.current === checkoutSession) reportRequestError(error);
+        if (saleCommitted || storingPending || !pendingRecord || !isRetryableSyncError(error)) throw error;
+        attempt.uncertain = true;
+        storingPending = true;
         await enqueueOfflineSale(pendingRecord);
         saleCommitted = true;
         checkoutOutcome = 'queued';
+        if (checkoutSessionRef.current !== checkoutSession) return;
         finishQueuedSale(pendingRecord, printReceipt);
       }
     } catch (error) {
+      if (checkoutSessionRef.current !== checkoutSession) return;
+      // A storage failure can race a confirmed original response. Acknowledge
+      // that one sale, without another SDK invocation or another request key.
+      const latePayload = attempt?.flight?.status === 'fulfilled'
+        ? (attempt.flight.response?.data || attempt.flight.response) : null;
+      if (!saleCommitted && latePayload?.sale?.id) {
+        checkoutSaleId = latePayload.sale.id;
+        checkoutOutcome = latePayload.already_processed ? 'rechecked' : 'confirmed';
+        checkoutBackendTiming = latePayload.backend_timing || null;
+        saleCommitted = true;
+        releaseSaleRequest(idempotencyKey, attempt.flight);
+        try { applyCompletedSale(latePayload, printReceipt); return; } catch (presentationError) { error = presentationError; }
+      }
       if (saleCommitted) {
         setPayOpen(false);
         console.error('Completed sale presentation failed:', error);
         void odinaAlert('Savdo saqlandi. Chek oynasini ochishda xato yuz berdi. Qayta pul olmang; Savdolar tarixidan tekshiring.');
         return;
       }
+      const uncertain = Boolean(attempt?.onlineStarted && (attempt.uncertain || isRetryableSyncError(error)));
+      if (attempt) attempt.uncertain = uncertain;
+      if (!uncertain) {
+        checkoutAttemptRef.current = null;
+        releaseSaleRequest(idempotencyKey, attempt?.flight);
+      }
+      setCheckoutRetryPending(uncertain);
       setPayOpen(true);
       const message = syncErrorMessage(error);
-      const discountHint = (discountCode || roundingTarget !== null || selectedTable || takeawayOrder) && isRetryableSyncError(error)
+      const discountHint = uncertain
         ? ' Natija noaniq bo‘lishi mumkin. To‘lov oynasi qayta ochildi; avval Savdolar tarixini tekshiring, keyin kerak bo‘lsa shu tugmani yana bosing.'
         : '';
       void odinaAlert(`Savdoni yakunlab bo‘lmadi: ${message}${discountHint}`);
     } finally {
-      saleSubmittingRef.current = false;
-      setPaying(false);
+      if (checkoutSessionRef.current === checkoutSession) {
+        saleSubmittingRef.current = false;
+        setPaying(false);
+      }
       const checkoutTotalMs = Math.round(performance.now() - checkoutTimingStarted);
-      recordCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome });
+      if (checkoutSessionRef.current === checkoutSession) recordCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome });
       // Diagnostics are separate from financial completion and never delay or retry a sale.
       try {
         void reportCheckoutTiming({ event_id: createCheckoutTimingEventId(), actor_id: user?.id || '',
@@ -1462,7 +1687,7 @@ export default function POS() {
           ...(checkoutServerMs === null ? {} : { api_round_trip_ms: checkoutServerMs }),
           outcome: checkoutOutcome, client_completed_at: new Date().toISOString() }, {
           send: body => base44.functions.invoke('checkout-timing', body),
-          isCurrentUser: () => timingUserRef.current === user?.id,
+          isCurrentUser: () => checkoutSessionRef.current === checkoutSession && timingUserRef.current === user?.id,
         }).then(result => {
           if (result?.failed || (result?.error && !(result?.sent > 0))) console.warn('Checkout timing history upload is pending.');
         }).catch(() => console.warn('Checkout timing history upload is pending.'));
@@ -1489,6 +1714,7 @@ export default function POS() {
     setShiftLoading(true);
     try {
       const currentShift = await openPosShift(base44, { shopId: shop?.id, startingCash: starting_cash });
+      shiftMutationRef.current++;
       setShift(currentShift);
       setShiftReadState('ready');
       setOpenShiftOpen(false);
@@ -1550,7 +1776,7 @@ export default function POS() {
       void odinaAlert('Smena ma’lumoti yangilandi. Qayta ochib, yopishni tasdiqlang.');
       return;
     }
-    if (!isOnline || offlineStorageError || offlineSales.some((record) => record.shift_id === shiftId)) {
+    if (!isOnline || offlineStorageError || offlineSales.some((record) => record.shift_id === shiftId && record.status !== 'confirmed')) {
       void odinaAlert('Smenani yopishdan oldin offline savdolarni serverga yuboring.');
       return;
     }
@@ -1567,6 +1793,7 @@ export default function POS() {
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani yopib bo‘lmadi.');
       setShiftReport(payload.shift);
+      shiftMutationRef.current++;
       setShift(null);
       setCloseShiftOpen(false);
       setShiftToClose(null);
@@ -1630,6 +1857,7 @@ export default function POS() {
       });
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Pul olishni saqlab bo‘lmadi.');
+      shiftMutationRef.current++;
       setShift(payload.shift);
       if (expense_category === 'goods_payment') {
         setSupplierDebts((current) => ({
@@ -1750,7 +1978,7 @@ export default function POS() {
       <OfflineSalesBanner
         browserOnline={browserOnline} connectionPaused={connectionPaused}
         isOnline={isOnline}
-        records={offlineSales}
+        records={offlineSales.filter((record) => record.status !== 'confirmed')}
         syncing={offlineSyncing}
         storageError={offlineStorageError}
         syncError={offlineSyncError}
@@ -2009,10 +2237,12 @@ export default function POS() {
         open={payOpen && cart.length > 0 && !paying}
         total={total}
         isDelivery={isDelivery}
+        attemptKey={checkoutRequestKeyRef.current}
+        retryPending={checkoutRetryPending}
         checking={stockChecking}
         discountPending={discountLoading}
         discountControls={
-          <fieldset disabled={paying || stockChecking || discountLoading} className="min-w-0 space-y-2.5 disabled:opacity-60">
+          <fieldset disabled={paying || stockChecking || discountLoading || checkoutRetryPending} className="min-w-0 space-y-2.5 disabled:opacity-60">
             <DiscountRow discountCode={discountCode} discount={couponDiscount}
               onApplyDiscount={applyDiscount} onRemoveDiscount={removeDiscount} discountError={discountError} />
             <RoundingRow subtotal={subtotal} discountCode={discountCode}

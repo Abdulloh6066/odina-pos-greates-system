@@ -10,17 +10,44 @@ export function isTransientCheckoutError(error: any): boolean {
   return /timed?\s*out|timeout|ECONNRESET|ECONNREFUSED|ETIMEDOUT|server selection|connection pool|network|socket/i.test(message);
 }
 
+// Match only identical, plain SDK arguments. Keep types and array ordering;
+// unsupported/circular arguments simply bypass request-local deduplication.
+function checkoutReadKey(entityName: string, method: string, args: any[]): string {
+  const seen = new Set<any>();
+  const encode = (value: any): any => {
+    if (value === null) return ["null"];
+    const type = typeof value;
+    if (type === "undefined") return [type];
+    if (type === "string" || type === "boolean") return [type, value];
+    if (type === "number" && Number.isFinite(value)) return [type, value];
+    if (type !== "object" || seen.has(value)
+      || (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype
+        && Object.getPrototypeOf(value) !== null)) throw new Error("Uncacheable read arguments");
+    seen.add(value);
+    const encoded = Array.isArray(value)
+      ? ["array", value.map(encode)]
+      : ["object", Object.keys(value).sort().map(key => [key, encode(value[key])])];
+    seen.delete(value);
+    return encoded;
+  };
+  try { return JSON.stringify([entityName, method, encode(args)]); }
+  catch { return ""; }
+}
+
 export function createCheckoutReadTracker(originalService: any) {
   const started = checkoutClock();
   const reads = new Set(["get", "filter", "list"]);
   const writes = new Set(["create", "bulkCreate", "update", "updateMany", "delete", "deleteMany"]);
   const validationEntities = new Set(["User", "Shop", "Shift", "Product"]);
   const cache = new Map<string, Promise<any>>();
+  const inFlight = new Map<string, Promise<any>>();
   const entities = new Map<string, any>();
   const operations: any[] = [];
   let cachedReads = 0;
   let retriesLeft = 2;
   let retries = 0;
+  let mutationsInFlight = 0;
+  const clearReads = () => { cache.clear(); inFlight.clear(); };
 
   const entityProxy = new Proxy(originalService.entities, {
     get(target, entityName: string) {
@@ -32,15 +59,22 @@ export function createCheckoutReadTracker(originalService: any) {
           const original = record[method];
           if (typeof original !== "function" || (!reads.has(method) && !writes.has(method))) return original;
           return (...args: any[]) => {
-            // Every mutation clears the preflight cache, including failed or
-            // uncertain writes. Reconciliation always reads the current database.
+            // No cached/in-flight result can cross a mutation boundary, including
+            // failed or uncertain writes. Reads during a write also bypass reuse.
             if (writes.has(method)) {
-              cache.clear();
-              return original.apply(record, args);
+              clearReads();
+              mutationsInFlight++;
+              try {
+                return Promise.resolve(original.apply(record, args)).finally(() => {
+                  mutationsInFlight--; clearReads();
+                });
+              } catch (error) {
+                mutationsInFlight--; clearReads(); throw error;
+              }
             }
-            const key = method === "get" && validationEntities.has(entityName)
-              ? entityName + ":" + String(args[0]) : "";
-            if (key && cache.has(key)) { cachedReads++; return cache.get(key); }
+            const key = mutationsInFlight === 0 ? checkoutReadKey(entityName, method, args) : "";
+            const reusable = key && (cache.get(key) || inFlight.get(key));
+            if (reusable) { cachedReads++; return reusable; }
             const run = async () => {
               const readStarted = checkoutClock();
               let attempts = 0;
@@ -61,9 +95,17 @@ export function createCheckoutReadTracker(originalService: any) {
               }
             };
             const pending = run();
-            if (key) {
-              cache.set(key, pending);
-              pending.catch(() => { if (cache.get(key) === pending) cache.delete(key); });
+            if (key && mutationsInFlight === 0) {
+              inFlight.set(key, pending);
+              // Only preflight metadata GETs persist for this request. Stock and
+              // filtered/list reads are fresh again as soon as the read settles.
+              if (method === "get" && validationEntities.has(entityName)) cache.set(key, pending);
+              pending.then(() => {
+                if (inFlight.get(key) === pending) inFlight.delete(key);
+              }, () => {
+                if (inFlight.get(key) === pending) inFlight.delete(key);
+                if (cache.get(key) === pending) cache.delete(key);
+              });
             }
             return pending;
           };

@@ -11,6 +11,70 @@ let databasePromise;
 let broadcastChannel;
 let fallbackSync = Promise.resolve();
 
+// This deadline changes presentation only. The original write is never aborted,
+// and its exact request is retained for the durable queue or an explicit retry.
+export const POS_CHECKOUT_RESPONSE_BUDGET_MS = 2500;
+export const POS_QUEUE_RESPONSE_BUDGET_MS = 15000;
+const saleRequests = new Map();
+
+export function startSaleRequest(request, send, { userId = '' } = {}) {
+  const key = String(request.idempotency_key || '');
+  if (!key) throw Object.assign(new Error('Savdo so‘rov kaliti yo‘q.'), { status: 400 });
+  const cacheKey = JSON.stringify([String(userId), key]);
+  const fingerprint = JSON.stringify(request);
+  const existing = saleRequests.get(cacheKey);
+  if (existing) {
+    if (existing.fingerprint !== fingerprint) {
+      throw new Error('Avvalgi to‘lov natijasini o‘sha mahsulot va to‘lov usullari bilan tekshiring.');
+    }
+    if (existing.status !== 'rejected') return existing;
+  }
+  const snapshot = JSON.parse(fingerprint);
+  const flight = { cacheKey, fingerprint, request: snapshot, status: 'pending', response: null, error: null };
+  // Invoke synchronously, preserving the immediate double-submit guard in POS.
+  const sent = new Promise((resolve, reject) => {
+    try { resolve(send(snapshot)); } catch (error) { reject(error); }
+  });
+  flight.promise = sent.then((response) => {
+    flight.status = 'fulfilled';
+    flight.response = response;
+    return response;
+  }, (error) => {
+    flight.status = 'rejected';
+    flight.error = error;
+    releaseSaleRequest(key, flight);
+    throw error;
+  });
+  // A timed-out presentation may have no active caller until the next drain.
+  void flight.promise.catch(() => {});
+  // This is only an optimization for same-page retries; IndexedDB owns recovery.
+  // Eviction may cause a same-key replay, never a different sale or lost record.
+  if (saleRequests.size >= 128) saleRequests.delete(saleRequests.keys().next().value);
+  saleRequests.set(cacheKey, flight);
+  return flight;
+}
+
+export function releaseSaleRequest(key, flight) {
+  if (flight && String(flight.request.idempotency_key) === String(key)
+    && saleRequests.get(flight.cacheKey) === flight) saleRequests.delete(flight.cacheKey);
+}
+
+export async function waitForSaleResponse(flight, {
+  timeoutMs = POS_CHECKOUT_RESPONSE_BUDGET_MS, timers = globalThis,
+} = {}) {
+  let timer;
+  try {
+    return await Promise.race([
+      flight.promise.then((response) => ({ pending: false, response })),
+      new Promise((resolve) => {
+        timer = timers.setTimeout(() => resolve({ pending: true }), timeoutMs);
+      }),
+    ]);
+  } finally {
+    timers.clearTimeout(timer);
+  }
+}
+
 const numberValue = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -198,8 +262,9 @@ function channel() {
 }
 
 function notifyQueueChanged() {
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event(QUEUE_EVENT));
-  channel()?.postMessage({ type: 'changed' });
+  // Notifications cannot turn a completed durable transaction into a failure.
+  try { if (typeof window !== 'undefined') window.dispatchEvent(new Event(QUEUE_EVENT)); } catch { /* Refresh on the next queue operation. */ }
+  try { channel()?.postMessage({ type: 'changed' }); } catch { /* A closed channel does not undo the stored sale. */ }
 }
 
 export function subscribePendingSales(listener) {
@@ -231,6 +296,9 @@ export async function listPendingSales(userId) {
 }
 
 export async function savePendingSale(record) {
+  if (!record?.id || record.id !== record.request?.idempotency_key) {
+    throw Object.assign(new Error('Offline savdo kaliti mos kelmadi.'), { status: 400 });
+  }
   const database = await openDatabase();
   await new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readwrite');
@@ -312,7 +380,7 @@ export function pendingSaleRetryDelay(records, now = Date.now()) {
 
 // Storage injection is used by memory-only regression tests; production defaults
 // remain IndexedDB. Failed records are retained until an explicit manual retry.
-export async function syncPendingSales({ userId, send, retryFailed = false,
+export async function syncPendingSales({ userId, send, retryFailed = false, onConfirmed,
   storage = { list: listPendingSales, update: updatePendingSale, remove: removePendingSale },
   lock = withSyncLock, now = () => Date.now(),
 }) {
@@ -338,10 +406,23 @@ export async function syncPendingSales({ userId, send, retryFailed = false,
         last_error: '',
       });
 
+      let flight;
       try {
-        const response = await send(record.request);
+        if (String(record.id) !== String(record.request?.idempotency_key || '')) {
+          throw Object.assign(new Error('Saqlangan savdo so‘rov kaliti mos emas.'), { status: 400 });
+        }
+        flight = startSaleRequest(record.request, send, { userId });
+        const outcome = await waitForSaleResponse(flight, { timeoutMs: POS_QUEUE_RESPONSE_BUDGET_MS });
+        if (outcome.pending) {
+          // Reuse the original flight for this drain. A later bounded retry may
+          // send the same key again; server idempotency owns any in-flight work.
+          releaseSaleRequest(record.id, flight);
+          throw Object.assign(new Error('Server javobi hali tasdiqlanmadi.'), { code: 'ETIMEDOUT' });
+        }
+        const response = outcome.response;
         const payload = response?.data || response;
         if (!payload?.sale?.id) {
+          releaseSaleRequest(record.id, flight);
           const error = errorWithCode(
             payload?.error || 'Server savdoni tasdiqlamadi.',
             'SALE_NOT_CONFIRMED',
@@ -350,7 +431,11 @@ export async function syncPendingSales({ userId, send, retryFailed = false,
           throw error;
         }
         await storage.remove(record.id);
+        releaseSaleRequest(record.id, flight);
         synced += 1;
+        // Reconcile only after the saved sale and queue removal are confirmed.
+        // A presentation failure must never requeue an acknowledged payment.
+        try { void Promise.resolve(onConfirmed?.({ id: record.id, request: record.request, record, payload })).catch(() => {}); } catch { /* onSynced can refresh authoritative state. */ }
       } catch (error) {
         const status = Number(error?.response?.status || error?.status || 0);
         const sessionBlocked = status === 401 || status === 403;

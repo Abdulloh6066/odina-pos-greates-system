@@ -240,3 +240,45 @@ test('required item reads reject missing IDs and repeated pagination instead of 
     assert.equal(f.calls.length, 0);
   }
 });
+
+test('concurrent required and optional recipe consumers share one request-local bulk read', { timeout: 5000 }, async () => {
+  const f = fixture(), recipeGate = deferred(), itemGate = deferred(), itemsStarted = deferred();
+  const recipeFilter = f.entities.Recipe.filter, itemFilter = f.entities.RecipeItem.filter;
+  let recipes = 0, items = 0;
+  f.entities.Recipe.filter = async (...args) => { recipes++; await recipeGate.promise; return recipeFilter(...args); };
+  f.entities.RecipeItem.filter = async (...args) => { items++; itemsStarted.resolve(); await itemGate.promise; return itemFilter(...args); };
+  const { createCheckoutRecipeLoader } = f.load('base44/shared/checkout-recipes.ts');
+  const reader = createCheckoutRecipeLoader(f.service, ['coffee', burger, 'cake', 'coffee']);
+  const pending = Array.from({ length: 12 }, (_, i) => i % 2
+    ? reader.itemsForRecipe('coffee-recipe', i % 3 === 0)
+    : reader.recipesForProduct('coffee', i % 3 === 0));
+  try {
+    assert.equal(recipes, 1); assert.equal(items, 0);
+    recipeGate.resolve(); await itemsStarted.promise;
+    assert.equal(recipes, 1); assert.equal(items, 1); assert.equal(f.calls.length, 0);
+  } finally { recipeGate.resolve(); itemGate.resolve(); }
+  const results = await Promise.all(pending);
+  assert.ok(results.every(rows => rows.length > 0));
+  results[0].length = 0;
+  assert.equal((await reader.recipesForProduct('coffee', true)).length, 1, 'callers receive independent result arrays');
+  assert.equal((await reader.itemsForRecipe('coffee-recipe', true)).length, 2);
+  assert.equal(recipes, 1); assert.equal(items, 1);
+});
+
+test('successful optional item fallback cannot satisfy a concurrent or later mandatory bulk read', async () => {
+  const f = fixture(), gate = deferred(), original = f.entities.RecipeItem.filter;
+  let bulk = 0, fallback = 0;
+  f.entities.RecipeItem.filter = async (...args) => {
+    if (args[0].recipe_id?.$in) { bulk++; await gate.promise; throw new Error('Mock mandatory item bulk failure'); }
+    fallback++; return original(...args);
+  };
+  const { createCheckoutRecipeLoader } = f.load('base44/shared/checkout-recipes.ts');
+  const reader = createCheckoutRecipeLoader(f.service, ['coffee']);
+  const optional = reader.itemsForRecipe('coffee-recipe');
+  const required = assert.rejects(reader.itemsForRecipe('coffee-recipe', true), /mandatory item bulk failure/);
+  gate.resolve();
+  assert.equal((await optional).length, 2);
+  await required;
+  await assert.rejects(reader.itemsForRecipe('coffee-recipe', true), /mandatory item bulk failure/);
+  assert.equal(bulk, 1); assert.equal(fallback, 1); assert.equal(f.calls.length, 0);
+});
