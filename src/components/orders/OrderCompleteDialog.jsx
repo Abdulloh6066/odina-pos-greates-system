@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Truck, PackageCheck } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { startOrderActionTiming } from '@/lib/order-action-timing';
 
 export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
   const { toast } = useToast();
@@ -34,6 +35,8 @@ export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
 
   const submit = async () => {
     if (!order || submitting) return;
+    const checkingSavedRequest = Boolean(pendingRef.current);
+    const elapsedSeconds = startOrderActionTiming();
     setSubmitting(true);
     try {
       let payload = pendingRef.current;
@@ -53,8 +56,9 @@ export default function OrderCompleteDialog({ open, onClose, order, onDone }) {
       const res = await base44.functions.invoke('customer-orders', payload);
       const data = res?.data || res;
       if (data?.order) {
+        const seconds = elapsedSeconds();
         clearOrderRequest(requestScope); pendingRef.current = null; setPending(null);
-        toast({ title: data.already_completed ? 'Allaqachon yakunlangan' : handoffLabel, description: displayOrderNumber(data.order) });
+        toast({ title: data.already_completed ? 'Allaqachon yakunlangan' : handoffLabel, description: `${displayOrderNumber(data.order)} · ${checkingSavedRequest || data.already_completed ? 'Qayta tekshirish' : 'Yakunlash'}: ${seconds} soniya` });
         onDone(data);
       } else {
         throw Object.assign(new Error(data?.error || 'Amal bajarilmadi'), { data });
