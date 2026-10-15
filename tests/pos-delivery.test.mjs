@@ -232,7 +232,7 @@ test('sales history shows/searches the delivery marker and reprints the same sav
   const rows = renderer.root.findAllByType('button').filter(node => node.props.className?.includes('odina-sale-row'));
   assert.equal(rows.length, 1);
   act(() => rows[0].props.onClick());
-  const printButton = () => renderer.root.findAllByType('button').find(node => JSON.stringify(node.props.children).includes('Chekni chiqarish'));
+  const printButton = () => renderer.root.findAllByType('button').find(node => node.children.some(child => typeof child === 'string' && child.includes('Chekni chiqarish')));
   await act(async () => { await printButton().props.onClick(); });
   assert.equal(settingsReads, 1); assert.equal(receiptProps.sale.id, sale.id);
   assert.equal(receiptProps.sale.is_delivery, true); assert.equal(receiptProps.print, true);
