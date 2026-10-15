@@ -154,6 +154,7 @@ function loadHandler(client) {
   const context = vm.createContext({
     ...memoryBackend().load('base44/shared/sale-ingredient-flow.ts'),
     ...memoryBackend().load('base44/shared/checkout-recipes.ts'),
+    ...memoryBackend().load('base44/shared/checkout-reads.ts'),
     ...memoryBackend().load('base44/shared/burger-fries.js'),
     client, Response, crypto: webcrypto, TextEncoder, console, structuredClone,
   });
