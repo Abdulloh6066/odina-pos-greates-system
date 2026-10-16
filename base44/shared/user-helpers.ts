@@ -3,7 +3,7 @@
 
 export const APP_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production", "warehouse"]);
 
-export const userLabel = (user: any) => user?.full_name || user?.email || "Noma’lum xodim";
+export const userLabel = (user: any) => user?.display_name || user?.data?.display_name || user?.full_name || user?.email || "Noma’lum xodim";
 
 export const userRole = (user: any) => {
   const rootRole = String(user?.role || "");
@@ -59,7 +59,7 @@ export const resolveAppUser = async (service: any, authenticatedUser: any) => {
     data: { ...(storedUser.data || {}), role: storedRole, shop_id: shopId },
     id: storedUser.id,
     email: storedUser.email || authenticatedUser?.email,
-    full_name: storedUser.full_name || authenticatedUser?.full_name,
+    full_name: storedUser.display_name || storedUser.data?.display_name || storedUser.full_name || authenticatedUser?.full_name,
     role: storedRole,
     shop_id: shopId,
     shop_name: userShopName(storedUser),
