@@ -193,7 +193,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     }
   };
 
-  if (!shop) return <div className="cake-stock-message" role="status"><AlertTriangle aria-hidden="true" /><div><strong>Do‘kon biriktirilmagan</strong><p>Tort qoldig‘ini ko‘rish uchun hisobingizga do‘kon biriktirilishi kerak.</p></div></div>;
+  if (!shop) return <div className="cake-stock-message" role="status"><AlertTriangle aria-hidden="true" /><div><strong>Do‘kon biriktirilmagan</strong><p>Qoldiqni ko‘rish uchun hisobingizga do‘kon biriktirilishi kerak.</p></div></div>;
   return <section className="cake-stock-workspace" aria-label="Mahsulotlar jonli qoldig‘i">
     <div className="cake-stock-topbar">
       <div><span className="cake-stock-eyebrow">{scope === 'cakes' ? 'TORTLAR VA SHIRINLIKLAR' : isIngredient ? 'MASALLIQLAR VA QADOQLAR' : 'TAYYOR MAHSULOTLAR'}</span><h2>{scope === 'cakes' ? 'Har bir tort o‘z joyida' : 'Har bir mahsulot o‘z joyida'}<span>.</span></h2><p>Jonli qoldiq, kelgan va ketgan mahsulotlar — bir sahifada.</p></div>
@@ -214,7 +214,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
       <Button type="button" variant="outline" onClick={() => void balances.refresh()} disabled={balances.loading || !balances.online} className="min-h-10 rounded-xl"><RefreshCw className={'mr-2 h-4 w-4' + (balances.loading ? ' animate-spin' : '')} />Yangilash</Button>
     </div>
     {balances.error && <div className="cake-stock-message is-warning" role="alert"><AlertTriangle aria-hidden="true" /><p>{balances.error} Oxirgi ma’lumot ko‘rsatilishi mumkin. Kirim yoki chiqimdan oldin yangilang.</p></div>}
-    {balances.ready && counts.needsCount > 0 && <div className="cake-stock-message is-warning"><ClipboardCheck aria-hidden="true" /><p><strong>{counts.needsCount} ta mahsulot turi sanoq yoki tekshiruv talab qiladi.</strong> Manfiy qoldiq haqiqiy dona soni emas. Mahsulotni tanlab, “Haqiqiy sanoq” orqali hozirgi miqdorni kiriting.</p></div>}
+    {balances.ready && counts.needsCount > 0 && <div className="cake-stock-message is-warning"><ClipboardCheck aria-hidden="true" /><p><strong>{counts.needsCount} ta mahsulot turi sanoq yoki tekshiruv talab qiladi.</strong> Manfiy qoldiq mavjud miqdorni bildirmaydi. Mahsulotni tanlab, “Haqiqiy sanoq” orqali hozirgi miqdorni kiriting.</p></div>}
     <nav className="cake-stock-tabs" aria-label="Tort ombori ko‘rinishi">
       <Button type="button" variant={view === 'shelf' && !entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(false); }} aria-pressed={view === 'shelf' && !entryMode}><Cake className="mr-2 h-4 w-4" />{scope === 'cakes' ? 'Tort tokchasi' : 'Mahsulotlar tokchasi'}</Button>
       {CAKE_STOCK_ROLES.has(user?.role) && <Button type="button" variant={entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(true); setNotice(''); }} aria-pressed={entryMode} disabled={!canChange}><ArrowDownLeft className="mr-2 h-4 w-4" />Kirim kiritish</Button>}
@@ -222,7 +222,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     </nav>
     {notice && <div className="cake-stock-message cake-stock-success" role="status"><Check aria-hidden="true" /><p>{notice}</p></div>}
     {view === 'shelf' && entryMode && <div className="cake-stock-entry-guide"><ArrowDownLeft aria-hidden="true" /><div><strong>{noun}ni tanlab kirim qo‘shing</strong><p>1. {noun}ni tanlang · 2. Kelgan miqdorni kiriting · 3. Kirimni saqlang</p><small>{isIngredient ? 'Hisob-faktura va to‘lov bilan kirim uchun Ombor → Kirim va qarzlar bo‘limidan foydalaning.' : 'Markazdan yuborilgan transfer uchun “Kelgan transferlar”ni oching.'}</small></div></div>}
-    {view === 'transfers' ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={cakes} onBalanceRefresh={balances.refresh} /> : <>
+    {view === 'transfers' && !isIngredient ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={cakes} onBalanceRefresh={balances.refresh} /> : <>
       <div className="cake-stock-filters">
         <label className="cake-stock-search"><span className="sr-only">{noun} qidirish</span><Search aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={noun + " nomini qidiring…"} /></label>
         <OdinaSelect aria-label={noun + " kategoriyasi"} value={category} onChange={(e) => setCategory(e.target.value)}><option value="all">Barcha {plural.toLocaleLowerCase()}</option>{categoryIds.map((id) => <option key={id} value={id}>{shelfCategories.find((c) => c.id === id)?.name || cakes.find((p) => p.category_id === id)?.category_name || 'Kategoriyasiz'}</option>)}</OdinaSelect>
