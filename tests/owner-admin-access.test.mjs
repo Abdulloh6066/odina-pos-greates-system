@@ -8,7 +8,7 @@ import ts from 'typescript';
 const read = (path) => readFileSync(path, 'utf8');
 const clone = (value) => value == null ? value : structuredClone(value);
 
-function fixture() {
+function fixture({ ignoreDisplayName = false, echoDisplayName = false } = {}) {
   const db = {
     User: [
       { id: 'owner', email: 'owner@example.test', role: 'admin', is_owner: true, active: true },
@@ -37,8 +37,13 @@ function fixture() {
         if (!row) throw new Error('Unknown user');
         userWrites += 1;
         userPatches.push({ id, patch: clone(patch) });
-        Object.assign(row, clone(patch));
-        return clone(row);
+        // Base44 owns the login profile name: generic entity updates cannot
+        // change full_name. Echoed response fields alone do not prove storage.
+        const storedPatch = Object.fromEntries(Object.entries(clone(patch)).filter(([key]) => (
+          key !== 'full_name' && !(ignoreDisplayName && key === 'display_name')
+        )));
+        Object.assign(row, storedPatch);
+        return clone({ ...row, ...(echoDisplayName && patch.display_name ? { display_name: patch.display_name } : {}) });
       },
     },
     Shop: { get: async (id) => id === 'center' ? { id: 'center', name: 'Center', active: true } : null },
@@ -164,8 +169,8 @@ test('owner saves a chosen employee name without changing login, permissions or 
 
   assert.equal(result.status, 200, JSON.stringify(result));
   assert.equal(result.data.ok, true);
-  assert.deepEqual(target, { ...beforeUser, full_name: name });
-  assert.deepEqual(f.patches, [{ id: target.id, patch: { full_name: name } }]);
+  assert.deepEqual(target, { ...beforeUser, display_name: name });
+  assert.deepEqual(f.patches, [{ id: target.id, patch: { display_name: name } }]);
   assert.deepEqual(result.data.user, {
     id: target.id, full_name: name, email: beforeUser.email, is_owner: false,
     role: beforeUser.role, shop_id: beforeUser.shop_id, shop_name: beforeUser.shop_name, active: true,
@@ -179,13 +184,16 @@ test('owner saves a chosen employee name without changing login, permissions or 
 
   const reopened = await run({ action: 'status' });
   assert.equal(reopened.data.users.find((row) => row.id === target.id).full_name, name);
+  const stored = await f.entities.User.get(target.id);
+  assert.equal(stored.display_name, name);
+  assert.equal(stored.full_name, beforeUser.full_name);
   assert.equal(f.writes, 1);
 });
 
 test('name-only action refuses email and privilege fields without any mutation', async () => {
   for (const [key, value] of Object.entries({
     email: 'different@example.test', role: 'admin', shop_id: 'other-shop', shop_name: 'Other',
-    active: false, is_owner: true, id: 'owner', data: { role: 'admin' }, unexpected: 'value',
+    active: false, is_owner: true, id: 'owner', display_name: 'Bypass', data: { role: 'admin' }, unexpected: 'value',
   })) {
     const f = fixture();
     const before = clone(f.db);
@@ -215,7 +223,7 @@ test('employee names reject invalid values and internal controls while accepting
   const result = await run({ action: 'update_user_name', target_user_id: 'cashier', full_name: name });
   assert.equal(result.status, 200, JSON.stringify(result));
   assert.equal(result.data.user.full_name, name);
-  assert.deepEqual(f.patches, [{ id: 'cashier', patch: { full_name: name } }]);
+  assert.deepEqual(f.patches, [{ id: 'cashier', patch: { display_name: name } }]);
 });
 
 test('name changes require an active stored admin and preserve protected-account rules', async () => {
@@ -252,7 +260,7 @@ test('name changes require an active stored admin and preserve protected-account
 
   f.as('owner');
   assert.equal((await rename('other')).status, 200, 'owner may manage another admin');
-  assert.deepEqual(f.patches, [{ id: 'other', patch: { full_name: 'Mahkam' } }]);
+  assert.deepEqual(f.patches, [{ id: 'other', patch: { display_name: 'Mahkam' } }]);
 });
 
 test('ordinary admin can rename staff independently of missing or obsolete shop assignments', async () => {
@@ -265,25 +273,86 @@ test('ordinary admin can rename staff independently of missing or obsolete shop 
     const run = loadHandler('base44/functions/security-admin/entry.ts', f);
     const result = await run({ action: 'update_user_name', target_user_id: target.id, full_name: 'Yangi ism' });
     assert.equal(result.status, 200, JSON.stringify({ role, shop_id, result }));
-    assert.deepEqual(target, { ...before, full_name: 'Yangi ism' });
-    assert.deepEqual(f.patches, [{ id: target.id, patch: { full_name: 'Yangi ism' } }]);
+    assert.deepEqual(target, { ...before, display_name: 'Yangi ism' });
+    assert.deepEqual(f.patches, [{ id: target.id, patch: { display_name: 'Yangi ism' } }]);
   }
 });
 
 test('saving an unchanged trimmed name is a successful no-op without duplicate audit entries', async () => {
-  const f = fixture();
-  f.db.User.find((row) => row.id === 'cashier').full_name = 'Mahkam Sadullayev';
-  const before = clone(f.db);
-  const run = loadHandler('base44/functions/security-admin/entry.ts', f);
-  for (const full_name of ['Mahkam Sadullayev', '  Mahkam Sadullayev  ']) {
-    const result = await run({ action: 'update_user_name', target_user_id: 'cashier', full_name });
-    assert.equal(result.status, 200, JSON.stringify(result));
-    assert.equal(result.data.ok, true);
-    assert.equal(result.data.user.full_name, 'Mahkam Sadullayev');
+  for (const names of [
+    { full_name: 'login-name', display_name: 'Mahkam Sadullayev' },
+    { full_name: 'login-name', data: { display_name: 'Mahkam Sadullayev' } },
+    { full_name: 'Mahkam Sadullayev' },
+  ]) {
+    const f = fixture();
+    Object.assign(f.db.User.find((row) => row.id === 'cashier'), names);
+    const before = clone(f.db);
+    const run = loadHandler('base44/functions/security-admin/entry.ts', f);
+    for (const full_name of ['Mahkam Sadullayev', '  Mahkam Sadullayev  ']) {
+      const result = await run({ action: 'update_user_name', target_user_id: 'cashier', full_name });
+      assert.equal(result.status, 200, JSON.stringify(result));
+      assert.equal(result.data.ok, true);
+      assert.equal(result.data.user.full_name, 'Mahkam Sadullayev');
+    }
+    assert.equal(f.writes, 0);
+    assert.deepEqual(f.patches, []);
+    assert.deepEqual(f.db, before);
   }
+});
+
+test('generic User update models platform-owned full_name as immutable', async () => {
+  const f = fixture();
+  const target = f.db.User.find((row) => row.id === 'cashier');
+  target.full_name = 'platform-login-name';
+  const result = await f.entities.User.update(target.id, { full_name: 'Ignored login rename', display_name: 'Mahkam' });
+  assert.equal(result.full_name, 'platform-login-name');
+  assert.equal((await f.entities.User.get(target.id)).full_name, 'platform-login-name');
+  assert.equal((await f.entities.User.get(target.id)).display_name, 'Mahkam');
+});
+
+test('name save requires a fresh stored custom display_name before success or audit', async () => {
+  for (const mode of ['ignored custom field with misleading update response', 'stale readback', 'unavailable readback']) {
+    const f = fixture({ ignoreDisplayName: mode.startsWith('ignored'), echoDisplayName: true });
+    const target = f.db.User.find((row) => row.id === 'cashier');
+    Object.assign(target, { full_name: 'login-name', display_name: 'Old chosen name' });
+    const original = clone(target);
+    const get = f.entities.User.get;
+    f.entities.User.get = async (id) => {
+      if (id === target.id && f.writes > 0) {
+        if (mode === 'stale readback') return clone(original);
+        if (mode === 'unavailable readback') throw new Error('Offline readback failure');
+      }
+      return get(id);
+    };
+    const run = loadHandler('base44/functions/security-admin/entry.ts', f);
+    const result = await run({ action: 'update_user_name', target_user_id: target.id, full_name: 'Mahkam' });
+    assert.ok(result.status >= 400, mode + ': ' + JSON.stringify(result));
+    assert.notEqual(result.data.ok, true, mode);
+    assert.equal(f.db.ActionHistory.length, 0, mode);
+    assert.equal(target.full_name, original.full_name, mode);
+    assert.deepEqual(f.patches, [{ id: target.id, patch: { display_name: 'Mahkam' } }], mode);
+    if (mode.startsWith('ignored')) assert.deepEqual(target, original);
+  }
+});
+
+test('staff names prefer root or nested custom display_name and fall back to the platform name', async () => {
+  const f = fixture();
+  const names = [
+    { id: 'name-root', full_name: 'root-login', display_name: 'Root chosen', data: { display_name: 'Nested old' } },
+    { id: 'name-nested', full_name: 'nested-login', data: { display_name: 'Nested chosen' } },
+    { id: 'name-fallback', full_name: 'Platform name' },
+    { id: 'name-empty-custom', full_name: 'Fallback name', display_name: '', data: { display_name: '' } },
+  ];
+  f.db.User.push(...names.map((name) => ({ ...name, role: 'cashier', active: true })));
+  const run = loadHandler('base44/functions/security-admin/entry.ts', f);
+  const result = await run({ action: 'status' });
+  assert.equal(result.status, 200);
+  const users = new Map(result.data.users.map((row) => [row.id, row]));
+  for (const [id, name] of [
+    ['name-root', 'Root chosen'], ['name-nested', 'Nested chosen'],
+    ['name-fallback', 'Platform name'], ['name-empty-custom', 'Fallback name'],
+  ]) assert.equal(users.get(id).full_name, name);
   assert.equal(f.writes, 0);
-  assert.deepEqual(f.patches, []);
-  assert.deepEqual(f.db, before);
 });
 
 test('owner can invite admin; admin claim requires owner-issued invite; disabled user cannot reclaim', async () => {
@@ -316,6 +385,9 @@ test('owner can invite admin; admin claim requires owner-issued invite; disabled
 test('RLS blocks direct admin privilege edits; UI obtains owner flag from authenticated backend', () => {
   const user = JSON.parse(read('base44/entities/User.jsonc'));
   const backend = read('base44/functions/security-admin/entry.ts');
+  assert.equal(user.properties.display_name.type, 'string');
+  assert.equal(user.properties.display_name.maxLength, 120);
+  assert.ok(!(user.required || []).includes('display_name'), 'existing accounts need no backfill');
   assert.match(backend, /is_owner === true/);
   for (const operation of ['update', 'delete']) {
     assert.equal(user.rls[operation].user_condition.is_owner, true);
