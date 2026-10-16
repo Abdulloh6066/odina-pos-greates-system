@@ -73,6 +73,7 @@ export default function Layout() {
     <div className="odina-redesign-shell min-h-dvh bg-background flex">
       <Sidebar
         user={user}
+        adminShopScope={adminShopScope}
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         collapsed={effectiveSidebarCollapsed}
