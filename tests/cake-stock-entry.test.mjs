@@ -277,6 +277,7 @@ test('ingredient counts repair negatives and shop or scope changes close stale f
     assert.equal(f.tree.root.findAllByType('form').length, 0);
     await act(async () => button(f.tree, 'Haqiqiy sanoq').props.onClick());
     await changeQuantity(f.tree, '3.25');
+    await act(async () => f.tree.root.findByProps({ id: 'cake-operation-reason' }).props.onChange({ target: { value: 'Haqiqiy sanoq' } }));
     await act(async () => submit(f.tree));
     assert.equal(f.sent[0].payload.counted_quantity, 3250);
     assert.equal(f.sent[0].payload.expected_quantity, -350);
