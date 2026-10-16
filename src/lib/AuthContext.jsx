@@ -32,7 +32,7 @@ const hydrateAppUser = async (value) => {
     const storedUser = normalizeAppUser(await base44.entities.User.get(sessionUser.id));
     return {
       ...sessionUser,
-      full_name: storedUser?.full_name || sessionUser.full_name,
+      full_name: storedUser?.display_name || storedUser?.data?.display_name || storedUser?.full_name || sessionUser.full_name,
       role: storedUser?.role || '',
       shop_id: storedUser?.shop_id || '',
       shop_name: storedUser?.shop_name || '',
