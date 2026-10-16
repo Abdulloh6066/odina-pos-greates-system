@@ -249,7 +249,6 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   if (!shop) return <div className="cake-stock-message" role="status"><AlertTriangle aria-hidden="true" /><div><strong>Do‘kon biriktirilmagan</strong><p>Qoldiqni ko‘rish uchun hisobingizga do‘kon biriktirilishi kerak.</p></div></div>;
   return <section className="cake-stock-workspace" aria-label="Mahsulotlar jonli qoldig‘i">
     <div className="cake-stock-topbar">
-      <div><span className="cake-stock-eyebrow">{scope === 'cakes' ? 'TORTLAR VA SHIRINLIKLAR' : isIngredient ? 'MASALLIQLAR VA QADOQLAR' : 'TAYYOR MAHSULOTLAR'}</span><h2>{scope === 'cakes' ? 'Har bir tort o‘z joyida' : 'Har bir mahsulot o‘z joyida'}<span>.</span></h2><p>Jonli qoldiq, kelgan va ketgan mahsulotlar — bir sahifada.</p></div>
       <div className="cake-stock-shop">
         <Label htmlFor="cake-stock-shop">Do‘kon</Label>
         <OdinaSelect id="cake-stock-shop" value={shop.id} onChange={(e) => setSelectedShopId(e.target.value)} disabled={allowedShops.length < 2}>
