@@ -2,6 +2,11 @@
   "name": "User",
   "type": "object",
   "properties": {
+    "display_name": {
+      "type": "string",
+      "maxLength": 120,
+      "description": "Egasi/Admin tanlagan xodim ismi. Email va kirish hisobidagi ismni o\u2018zgartirmaydi."
+    },
     "role": {
       "type": "string",
       "enum": [
