@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext, Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -9,10 +9,10 @@ import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { logAction } from '@/lib/pos';
 import { odinaConfirm } from '@/lib/odina-dialog';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { Trash2, RotateCcw, Pencil } from 'lucide-react';
 
 const ROLE_COLORS = {
   admin: 'bg-secondary text-brand-ink',
@@ -41,6 +41,7 @@ export default function Users() {
   const [demotionShopId, setDemotionShopId] = useState('');
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [nameTarget, setNameTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -194,7 +195,10 @@ export default function Users() {
                       </OdinaSelect>
                     )}
                   </div>
-                  <div className="flex gap-2 sm:col-span-2">
+                  <div className="flex flex-wrap gap-2 sm:col-span-2">
+                    <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => setNameTarget(u)}>
+                      <Pencil className="w-4 h-4 mr-1.5" /> Ismni o‘zgartirish
+                    </Button>
                     {u.active === false ? (
                       <Button
                         type="button"
@@ -228,6 +232,10 @@ export default function Users() {
         </div>
       )}
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} canManageAdmins={canManageAdmins} />
+      {nameTarget && <StaffNameDialog target={nameTarget} onClose={() => setNameTarget(null)} onDone={(updated) => {
+        setUsers((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+        setNameTarget(null);
+      }} />}
       <Dialog open={Boolean(pendingDemotion)} onOpenChange={(open) => { if (!open) setPendingDemotion(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Lavozim va ish joyini biriktirish</DialogTitle></DialogHeader>
@@ -246,6 +254,76 @@ export default function Users() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function StaffNameDialog({ target, onClose, onDone }) {
+  const [name, setName] = useState(target.full_name || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const savingRef = useRef(false);
+  const normalizedName = name.trim();
+  const hasControlCharacters = [...normalizedName].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+  const validationError = !normalizedName ? 'Xodimning ismini kiriting.'
+    : normalizedName.length > 120 ? 'Ism 120 ta belgidan oshmasligi kerak.'
+    : hasControlCharacters ? 'Ismda boshqaruv belgilaridan foydalanmang.' : '';
+  const unchanged = normalizedName === (target.full_name || '').trim();
+  const message = error || validationError;
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (savingRef.current || unchanged) return;
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      const response = await base44.functions.invoke('security-admin', {
+        action: 'update_user_name',
+        target_user_id: target.id,
+        full_name: normalizedName,
+      });
+      const data = response?.data || response;
+      if (!data?.ok || data.user?.id !== target.id) throw new Error(data?.error || 'Ism saqlanmadi. Qayta urinib ko‘ring.');
+      onDone(data.user);
+    } catch (failure) {
+      setError(failure?.response?.data?.error || failure?.message || 'Xodim ismini saqlab bo‘lmadi.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !savingRef.current) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={submit} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>Xodim ismini o‘zgartirish</DialogTitle>
+            <DialogDescription>Faqat ko‘rinadigan ism o‘zgaradi. Email, kirish ma’lumotlari va ruxsatlar saqlanadi.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="staff-name-email">Email</Label>
+            <Input id="staff-name-email" value={target.email || ''} readOnly className="min-h-11" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="staff-display-name">Xodim ismi</Label>
+            <Input id="staff-display-name" value={name} onChange={(event) => { setName(event.target.value); setError(''); }} maxLength={120} autoComplete="off" autoFocus disabled={saving} aria-invalid={Boolean(message)} aria-describedby={message ? 'staff-name-error' : undefined} className="min-h-11" />
+            {message && <p id="staff-name-error" role="alert" className="text-sm text-destructive">{message}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" className="min-h-11" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+            <Button type="submit" className="min-h-11" disabled={saving || Boolean(validationError) || unchanged}>{saving ? 'Saqlanmoqda…' : 'Ismni saqlash'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
