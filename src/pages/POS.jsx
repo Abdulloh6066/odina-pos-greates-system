@@ -56,7 +56,9 @@ import {
 const SHOW_NEGATIVE_STOCK_CONFIRMATION = false;
 
 export default function POS() {
-  const { user, sidebarCollapsed, screenMode, posCompact, togglePosCompact } = useOutletContext();
+  const { user, sidebarCollapsed, screenMode, posCompact, togglePosCompact, adminShopScope } = useOutletContext();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  const scopedShopId = shopScope?.specificShopId || '';
   const navigate = useNavigate();
   const location = useLocation();
   const tableQuery = useMemo(() => {
@@ -89,6 +91,10 @@ export default function POS() {
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
+  const scopedShop = shopScope?.shops?.find((row) => row.id === scopedShopId);
+  const posScopeReadOnly = Boolean(shopScope && (!shopScope.ready || !scopedShopId
+    || !scopedShop || scopedShop.location_type === 'production' || scopedShop.allows_pos === false
+    || (shift && shift.shop_id !== scopedShopId)));
   const [shiftReadState, setShiftReadState] = useState('loading');
   const shiftMutationRef = useRef(0);
   const shiftReadGenerationRef = useRef(0);
@@ -207,6 +213,12 @@ export default function POS() {
   const [savingTable, setSavingTable] = useState(false);
   const savingTableRef = useRef(false);
   const [tableReload, setTableReload] = useState(0);
+  const scopeWorkPending = cart.length > 0 || Boolean(selectedTable || takeawayOrder || takeawayRequestIdRef.current)
+    || paying || payOpen || stockChecking || savingTable || takeawaySaving || checkoutRetryPending
+    || shiftLoading || cashWithdrawalLoading || Boolean(cancellingTakeawayId);
+  useEffect(() => shopScope?.registerGuard?.(() => scopeWorkPending
+    ? 'Do‘konni almashtirishdan oldin joriy savat yoki ochiq buyurtmani yakunlang yoki saqlab yoping. Amal bajarilayotgan bo‘lsa, tugashini kuting.' : ''),
+  [shopScope?.registerGuard, scopeWorkPending]);
 
   // Do not accidentally carry an unsaved cart from one table to another when
   // only the URL changes and React keeps the POS component mounted.
@@ -256,6 +268,11 @@ export default function POS() {
       setTableSaveError('');
       return undefined;
     }
+    if (shopScope && selectedTable.shopId !== scopedShopId) {
+      setTableOrder(null); setCart([]); setTableOrderLoading(false);
+      setTableOrderError('Stol boshqa do‘konga tegishli. Shu do‘konni yuqoridan tanlang.');
+      return undefined;
+    }
     let active = true;
     setTableOrderLoading(true);
     setTableOrderError('');
@@ -286,7 +303,7 @@ export default function POS() {
       if (active) setTableOrderError(error?.response?.data?.error || error?.data?.error || error?.message || 'Buyurtmani yuklab bo‘lmadi.');
     }).finally(() => { if (active) setTableOrderLoading(false); });
     return () => { active = false; };
-  }, [tableKey, tableReload]);
+  }, [tableKey, tableReload, scopedShopId, Boolean(shopScope)]);
 
   const tableCartDirty = Boolean(selectedTable) && (
     cart.length !== (tableOrder?.items?.length || 0)
@@ -295,7 +312,7 @@ export default function POS() {
       return !saved || saved.quantity !== row.quantity || saved.price !== row.price;
     })
   );
-  const tableLocked = checkoutRetryPending || takeawaySaving || takeawayOrder?.state === 'paying'
+  const tableLocked = posScopeReadOnly || checkoutRetryPending || takeawaySaving || takeawayOrder?.state === 'paying'
     || (Boolean(selectedTable) && (tableOrderLoading || savingTable
     || Boolean(tableOrderError) || tableOrder?.state === 'paying'));
   // A browser refresh or tab close must warn about edits not yet acknowledged
@@ -307,6 +324,7 @@ export default function POS() {
     return () => window.removeEventListener('beforeunload', warnUnsaved);
   }, [tableKey, tableCartDirty, takeawayDirty]);
   const saveTableOrder = async () => {
+    if (posScopeReadOnly) return false;
     if (!selectedTable || !tableCartDirty) return !selectedTable || Boolean(tableOrder?.id);
     if (savingTableRef.current || tableOrderLoading || tableOrderError || tableOrder?.state === 'paying') return false;
     if (!shift || shift.shop_id !== selectedTable.shopId) {
@@ -355,6 +373,7 @@ export default function POS() {
   };
 
   const saveTakeawayOrder = async () => {
+    if (posScopeReadOnly) return null;
     if (takeawaySavingRef.current || selectedTable || !cart.length || !shift) return null;
     if (!isOnline || navigator.onLine === false) {
       void odinaAlert('Buyurtmani saqlash uchun internet kerak. Savatingiz saqlanib turadi.');
@@ -400,6 +419,7 @@ export default function POS() {
   };
 
   const loadOpenOrders = async () => {
+    if (posScopeReadOnly) return;
     const shopId = shift?.shop_id || user?.shop_id;
     if (!shopId) { void odinaAlert('Avval do‘kon smenasini oching.'); return; }
     setOpenOrdersOpen(true);
@@ -420,6 +440,7 @@ export default function POS() {
   };
 
   const openTakeaway = async (order) => {
+    if (posScopeReadOnly) return;
     if (paying || payOpen || stockChecking || takeawaySavingRef.current || savingTableRef.current) return;
     if (cart.length && !(await odinaConfirm({
       title: 'Buyurtmani ochish',
@@ -686,6 +707,7 @@ export default function POS() {
   // Show the current shop's floor plan over Kassa. Save pending table edits
   // before switching so an unpaid order cannot silently lose its cart.
   const goToTables = async () => {
+    if (posScopeReadOnly) return;
     if (savingTableRef.current || paying || payOpen || stockChecking || tableOrderLoading) return;
     if (selectedTable && tableOrderError) {
       void odinaAlert('Stol buyurtmasi yuklanmagan. Avval buyurtmani yangilang; saqlanmagan mahsulotlar yo‘qolmasligi kerak.');
@@ -698,6 +720,11 @@ export default function POS() {
   };
 
   const selectTableFromPicker = async (shopId, number, payDirect) => {
+    if (shopScope && shopId !== scopedShopId) {
+      void odinaAlert('Stol uchun do‘konni avval umumiy do‘kon tanlovidan almashtiring.');
+      return;
+    }
+    if (posScopeReadOnly) return;
     if (!selectedTable && cart.length && !(await odinaConfirm({
       title: 'Savatni almashtirish',
       description: 'Joriy savatda saqlanmagan mahsulotlar bor. Stolga o‘tsangiz bu savat tozalanadi. Davom etasizmi?',
@@ -846,8 +873,8 @@ export default function POS() {
   };
   const addToCart = useStableEvent((product) => {
     if (tableLocked || paying || payOpen || stockChecking) return;
-    if (canPreviewBurgerFries(product.id, shift?.shop_id || user?.shop_id)) {
-      setBurgerProduct({ ...product, shopId: shift?.shop_id || user?.shop_id });
+    if (canPreviewBurgerFries(product.id, catalogShopId)) {
+      setBurgerProduct({ ...product, shopId: catalogShopId });
       return;
     }
     setKeyboardProductId(product.id);
@@ -863,7 +890,7 @@ export default function POS() {
 
   const saveBurgerChoice = (option) => {
     if (!burgerProduct || !['with', 'without'].includes(option) || tableLocked || paying || payOpen || stockChecking
-      || burgerProduct.shopId !== (shift?.shop_id || user?.shop_id)) return;
+      || burgerProduct.shopId !== catalogShopId) return;
     const product = burgerProduct;
     const row = { product_id: product.id, product_name: burgerOptionName(product.name, option),
       image_url: product.image_url, price: product.price + friesSurcharge({ fries_option: option }),
@@ -1038,20 +1065,20 @@ export default function POS() {
     setPendingDiscountCode('');
   };
 
-  const catalogShopId = shift?.shop_id || user?.shop_id;
+  const catalogShopId = shopScope ? scopedShopId : shift?.shop_id || user?.shop_id;
   const { categories: visibleCategories, products: catalogProducts } = useMemo(
-    () => catalogForShop(products, categories, catalogShopId),
-    [products, categories, catalogShopId],
+    () => shopScope && !catalogShopId ? { categories, products } : catalogForShop(products, categories, catalogShopId),
+    [products, categories, catalogShopId, Boolean(shopScope)],
   );
   useEffect(() => {
     if (activeCat !== 'all' && categories.length && !visibleCategories.some(c => c.id === activeCat)) setActiveCat('all');
   }, [activeCat, categories.length, visibleCategories]);
   const { order: shopProductOrder, accept: acceptProductOrder } = usePosProductOrder(catalogShopId, user?.id);
   const [productOrderOpen, setProductOrderOpen] = useState(false);
-  const canEditProductOrder = ['admin', 'manager'].includes(user?.role);
+  const canEditProductOrder = ['admin', 'manager'].includes(user?.role) && (!shopScope || Boolean(shopScope.ready && scopedShopId));
 
   const filtered = useMemo(() => {
-    const shopId = shift?.shop_id || user?.shop_id;
+    const shopId = catalogShopId;
     let list = catalogProducts.map((product) => ({ ...product, price: priceForShop(product, shopId) }));
     if (!showFav && activeCat !== 'all') {
       const selectedCategory = categories.find((c) => c.id === activeCat);
@@ -1076,12 +1103,16 @@ export default function POS() {
       list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     }
     return sortByShopOrder(list, shopProductOrder);
-  }, [catalogProducts, categories, activeCat, showFav, search, shift?.shop_id, user?.shop_id, shopProductOrder]);
+  }, [catalogProducts, categories, activeCat, showFav, search, catalogShopId, shopProductOrder]);
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id && record.status !== 'confirmed'),
     [offlineSales, shift?.id],
   );
+  const scopeQueuePending = offlineSyncing || offlineSales.some((record) => record.status !== 'confirmed');
+  useEffect(() => shopScope?.registerGuard?.(() => scopeQueuePending
+    ? 'Do‘konni almashtirishdan oldin qurilmadagi navbatdagi savdolar yuborilishini kuting.' : ''),
+  [shopScope?.registerGuard, scopeQueuePending]);
   const queuedShiftTotal = useMemo(
     () => queuedForCurrentShift.reduce((sum, record) => sum + Number(record.local_sale?.total || 0), 0),
     [queuedForCurrentShift],
@@ -1101,7 +1132,7 @@ export default function POS() {
   );
 
   const stockByProduct = useMemo(() => {
-    const locationId = shift?.shop_id || user?.shop_id;
+    const locationId = catalogShopId;
     if (!locationId) return {};
 
     const quantities = Object.fromEntries(
@@ -1113,7 +1144,7 @@ export default function POS() {
       quantities[productId] = Number(quantities[productId] || 0) - Number(queuedQuantity || 0);
     }
     return quantities;
-  }, [productStock, queuedQuantityByProduct, shift?.shop_id, user?.shop_id]);
+  }, [productStock, queuedQuantityByProduct, catalogShopId]);
 
   const confirmStockWarnings = async (shortages, allowNegativeStock) => {
     if (!shortages.length) return true;
@@ -1181,6 +1212,7 @@ export default function POS() {
   };
 
   const openCheckout = async () => {
+    if (posScopeReadOnly) return;
     if (tableSelectionError || (selectedTable && (!tableShop || (shift && shift.shop_id !== selectedTable.shopId)))) {
       await odinaAlert(tableSelectionError || 'Stol uchun do‘kon va smenani tekshiring.');
       return;
@@ -1506,6 +1538,7 @@ export default function POS() {
   };
 
   const completeSale = async (payments, printReceipt = true) => {
+    if (posScopeReadOnly) return;
     if (saleSubmittingRef.current || !cart.length || stockChecking || discountLoading || !checkoutReadyRef.current) return;
     saleSubmittingRef.current = true;
     const checkoutTimingStarted = performance.now();
@@ -1703,6 +1736,7 @@ export default function POS() {
   };
 
   const openShift = async ({ shop, starting_cash }) => {
+    if (shopScope && (!shopScope.ready || !scopedShopId || shop?.id !== scopedShopId)) return;
     if (selectedTable && shop?.id !== selectedTable.shopId) {
       void odinaAlert('Stol boshqa do‘konga tegishli. Stolning do‘konida smena oching.');
       return;
@@ -1725,6 +1759,7 @@ export default function POS() {
   };
 
   const requestCloseShift = async () => {
+    if (posScopeReadOnly) return;
     if (offlineStorageError) {
       await odinaAlert('Qurilmadagi savdolarni tekshirib bo‘lmadi. Xotira xatosi tuzatilmaguncha smenani yopib bo‘lmaydi.');
       return;
@@ -1768,6 +1803,7 @@ export default function POS() {
   };
 
   const closeShift = async ({ actual_cash, budget_cash_submitted, cash_left_for_next_shift }) => {
+    if (posScopeReadOnly) return;
     if (closingShiftRef.current) return;
     const shiftId = shiftToClose?.id;
     if (!shiftId) {
@@ -1816,6 +1852,7 @@ export default function POS() {
   };
 
   const recordCashWithdrawal = async ({ amount, reason, expense_category, recipient_id, recipient_name, owner_pin }) => {
+    if (posScopeReadOnly) return;
     if (!shift || cashWithdrawalSubmittingRef.current) return;
     if (!isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       void odinaAlert('Kassadan pul olishni saqlash uchun internet kerak.');
@@ -1896,9 +1933,9 @@ export default function POS() {
             <Building2 className="w-4.5 h-4.5" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{shift?.shop_name || (shiftReadState === 'loading' ? 'Smena tekshirilmoqda…' : shiftReadState === 'error' ? 'Smenani yuklab bo‘lmadi' : 'Faol smena yo‘q')}</div>
+            <div className="text-sm font-semibold truncate">{shopScope ? (scopedShop?.name || (shopScope.shopId === 'all' ? 'Barcha do‘konlar' : 'Do‘kon yuklanmoqda…')) : shift?.shop_name || (shiftReadState === 'loading' ? 'Smena tekshirilmoqda…' : shiftReadState === 'error' ? 'Smenani yuklab bo‘lmadi' : 'Faol smena yo‘q')}</div>
             <div className="text-xs text-muted-foreground truncate">
-              {shift ? `${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : shiftReadState === 'error' ? 'Qayta tekshirish tugmasini bosing' : shiftReadState === 'loading' ? 'Iltimos, kuting' : 'Savdoni boshlash uchun smenani oching'}
+              {posScopeReadOnly ? 'Katalogni ko‘rish' : shift ? `${Number(shift.order_count || 0) + queuedForCurrentShift.length} ta buyurtma` : shiftReadState === 'error' ? 'Qayta tekshirish tugmasini bosing' : shiftReadState === 'loading' ? 'Iltimos, kuting' : 'Savdoni boshlash uchun smenani oching'}
             </div>
           </div>
         </div>
@@ -1921,7 +1958,7 @@ export default function POS() {
             <Monitor className="h-4 w-4" />
           </a>
         </Button>}
-        <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()}
+        <Button type="button" variant="outline" size="sm" onClick={() => void goToTables()} disabled={posScopeReadOnly}
           aria-label="Stollar sahifasini ochish" title="Stollar"
           className="inline-flex h-10 w-10 shrink-0 rounded-xl border-brand-olive/50 bg-brand-olive/10 px-0 font-semibold text-brand-ink hover:bg-brand-olive/20 touch-manipulation">
           <Armchair className="h-4 w-4" />
@@ -1934,15 +1971,15 @@ export default function POS() {
         {shift ? (
           <>
 
-            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" title="Pul olish" onClick={() => setCashWithdrawalOpen(true)} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
+            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" title="Pul olish" onClick={() => setCashWithdrawalOpen(true)} disabled={posScopeReadOnly} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
               <Banknote className="w-4 h-4" />
             </Button>
-            <Button variant="outline" size="sm" aria-label="Smenani yopish" title="Smenani yopish" onClick={requestCloseShift} disabled={offlineSyncing} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
+            <Button variant="outline" size="sm" aria-label="Smenani yopish" title="Smenani yopish" onClick={requestCloseShift} disabled={offlineSyncing || posScopeReadOnly} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
               <Clock className="w-4 h-4" />
             </Button>
           </>
         ) : shiftReadState === 'ready' ? (
-          <Button size="sm" onClick={() => setOpenShiftOpen(true)} className="h-10 bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+          <Button size="sm" onClick={() => setOpenShiftOpen(true)} disabled={posScopeReadOnly} className="h-10 bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             Smenani ochish
           </Button>
         ) : (
@@ -1955,9 +1992,10 @@ export default function POS() {
         )}
       </div>
 
+      {posScopeReadOnly && <p role="status" className="mx-3 sm:mx-5 mt-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">{!scopedShopId ? 'Savdo qilish uchun yuqoridan bitta do‘konni tanlang.' : scopedShop?.location_type === 'production' || scopedShop?.allows_pos === false ? 'Bu joylashuvda Kassa savdosi yoqilmagan. Ombor bo‘limidan foydalaning.' : shift && shift.shop_id !== scopedShopId ? `Sizning ochiq smenangiz ${shift.shop_name || 'boshqa do‘kon'}da. Tanlangan do‘kon katalogi faqat ko‘rish uchun. Smenangiz avtomatik almashtirilmaydi.` : 'Do‘kon ma’lumoti tekshirilmoqda.'}</p>}
       <CheckoutTimingStatus userRole={user?.role} pending={paying}
         onOpenHistory={() => setCheckoutTimingHistoryOpen(true)}
-        timing={lastCheckoutTiming?.shiftId === shift?.id ? lastCheckoutTiming : null} />
+        timing={(!shopScope || scopedShopId === shift?.shop_id) && lastCheckoutTiming?.shiftId === shift?.id ? lastCheckoutTiming : null} />
 
       {!selectedTable && Number.isInteger(location.state?.savedTableNumber) && (
         <div role="status" className="mx-3 sm:mx-5 mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 px-4 py-3 text-sm">
@@ -2097,7 +2135,7 @@ export default function POS() {
 
             <div className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
               <ProductGrid products={filtered} shopId={catalogShopId}
-                stockByProduct={stockByProduct} showStock={Boolean(shift)}
+                stockByProduct={stockByProduct} showStock={Boolean(shopScope ? catalogShopId : shift)}
                 onAdd={addToCart} disabled={tableLocked || paying || payOpen || stockChecking}
                 loading={loadingData} />
             </div>
@@ -2117,7 +2155,7 @@ export default function POS() {
             roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
-            total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError)}
+            total={total} onCheckout={openCheckout} disabled={!shift || Boolean(tableSelectionError) || posScopeReadOnly}
             takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable && isStaffTicketEnabled(shift?.shop_id || user?.shop_id) ? showTakeawayTicket : undefined}
             onOpenOrders={!selectedTable ? loadOpenOrders : undefined} onLeaveTakeaway={leaveTakeaway}
             savingTakeaway={takeawaySaving}
@@ -2148,7 +2186,7 @@ export default function POS() {
             roundingTarget={roundingTarget} adjustmentMode={adjustmentMode} roundingError={roundingError}
             onApplyRounding={applyRounding} onApplyManualDiscount={applyManualDiscount}
             onRemoveRounding={() => { setRoundingTarget(null); setAdjustmentMode(null); setRoundingError(''); }}
-            total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError)}
+            total={total} onCheckout={() => { setMobileCartOpen(false); void openCheckout(); }} disabled={!shift || Boolean(tableSelectionError) || posScopeReadOnly}
             takeawayOrder={takeawayOrder} onServiceTicket={!selectedTable && isStaffTicketEnabled(shift?.shop_id || user?.shop_id) ? showTakeawayTicket : undefined}
             onOpenOrders={!selectedTable ? loadOpenOrders : undefined} onLeaveTakeaway={leaveTakeaway}
             savingTakeaway={takeawaySaving}
@@ -2195,7 +2233,7 @@ export default function POS() {
       <PosTablePicker
         open={tablePickerOpen}
         onOpenChange={setTablePickerOpen}
-        activeShopId={shift?.shop_id || user?.shop_id}
+        activeShopId={shopScope ? scopedShopId : shift?.shop_id || user?.shop_id}
         onSelect={(shopId, number, payDirect) => { void selectTableFromPicker(shopId, number, payDirect); }}
       />
       <Dialog open={Boolean(burgerProduct)} onOpenChange={(open) => !open && setBurgerProduct(null)}>
@@ -2270,7 +2308,7 @@ export default function POS() {
         </DialogContent>
       </Dialog>
       <CheckoutTimingHistory key={user?.id || 'signed-out'} open={checkoutTimingHistoryOpen} onOpenChange={setCheckoutTimingHistoryOpen}
-        userRole={user?.role} shops={shops} />
+        userRole={user?.role} shops={shops} adminShopScope={shopScope} />
       <ShiftReport shift={shiftReport} onAfterPrint={() => setShiftReport(null)} />
       <Receipt
         sale={receiptPrintSale}
@@ -2281,7 +2319,7 @@ export default function POS() {
       <StaffOrderTicketModal open={!!staffTicket} onClose={() => setStaffTicket(null)}
         mode={staffTicket?.mode} order={staffTicket?.order} shop={staffTicket?.shop}
         shopId={staffTicket?.shopId} tableNumber={staffTicket?.tableNumber} autoPrint={staffTicket?.autoPrint} />
-      <OpenShiftDialog open={openShiftOpen} shops={shops} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
+      <OpenShiftDialog open={openShiftOpen} shops={shopScope ? shops.filter((shop) => shop.id === scopedShopId) : shops} preferredShopId={shopScope ? scopedShopId : undefined} user={user} onClose={() => setOpenShiftOpen(false)} onConfirm={openShift} loading={shiftLoading} />
       <CloseShiftDialog open={closeShiftOpen} shift={shiftToClose} onClose={() => { setCloseShiftOpen(false); setShiftToClose(null); }} onConfirm={closeShift} loading={shiftLoading} />
       <OwnerPinDialog
         open={discountApprovalOpen}

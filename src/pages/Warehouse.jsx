@@ -70,7 +70,8 @@ export function resolveWarehouseTab(requestedTab, role) {
 }
 
 export default function Warehouse() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
   const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
   const assignedShopName = user?.shop_name || user?.data?.shop_name || '';
   const [searchParams, setSearchParams] = useSearchParams();
@@ -83,12 +84,15 @@ export default function Warehouse() {
   const [movements, setMovements] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [recipients, setRecipients] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState((user?.role === 'admin') ? '' : assignedShopId);
+  const [localSelectedLocation, setSelectedLocation] = useState((user?.role === 'admin') ? '' : assignedShopId);
+  const selectedLocation = shopScope ? shopScope.specificShopId : localSelectedLocation;
   const requestedTab = searchParams.get('tab');
   const [newLayerView, setNewLayerView] = useState(true);
   const canViewSupplierLedger = ['admin', 'manager', 'warehouse', 'accountant'].includes(user?.role);
   const visibleTabs = TABS.filter((item) => !item.roles || item.roles.includes(user?.role));
-  const tab = resolveWarehouseTab(requestedTab, user?.role);
+  const requestedWarehouseTab = resolveWarehouseTab(requestedTab, user?.role);
+  const tab = shopScope?.specificShopId && shopScope.shops.find((location) => location.id === shopScope.specificShopId)?.location_type !== 'production'
+    && requestedWarehouseTab === 'cake_layers' ? 'ingredients' : requestedWarehouseTab;
   const [search, setSearch] = useState('');
   const [ingredientCategory, setIngredientCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -96,6 +100,9 @@ export default function Warehouse() {
   const [ingredientOpen, setIngredientOpen] = useState(false);
   const [ingredientIsLayer, setIngredientIsLayer] = useState(false);
   const [adjusting, setAdjusting] = useState(null);
+  useEffect(() => shopScope?.registerGuard?.(() => ingredientOpen || adjusting
+    ? 'Avval ombor oynasini yoping yoki saqlash tugashini kuting.' : ''),
+  [shopScope?.registerGuard, ingredientOpen, adjusting]);
 
   const loadAssignedTransfers = async () => {
     if (!assignedShopId) return [];
@@ -239,7 +246,7 @@ export default function Warehouse() {
         if (effectiveLocation && effectiveLocation !== selectedLocation) {
           setSelectedLocation(effectiveLocation);
         }
-      } else if (!selectedLocation || !activeLocations.some((location) => location.id === selectedLocation)) {
+      } else if (!shopScope && (!selectedLocation || !activeLocations.some((location) => location.id === selectedLocation))) {
         const preferred = assignedShopId || activeLocations[0]?.id || '';
         setSelectedLocation(preferred);
       }
@@ -282,14 +289,15 @@ export default function Warehouse() {
   };
 
   const selectedLocationRecord = locations.find((location) => location.id === selectedLocation);
-  const canCreateIngredients = ['admin', 'accountant'].includes(user?.role);
+  const canCreateIngredients = ['admin', 'accountant'].includes(user?.role) && (!shopScope || Boolean(shopScope.ready && selectedLocation));
 
   useEffect(() => {
+    if (shopScope) return;
     if (requestedTab !== 'cake_layers' || user?.role !== 'admin' || !locations.length) return;
     if (selectedLocationRecord?.location_type === 'production') return;
     const central = locations.find((location) => location.location_type === 'production');
     if (central) setSelectedLocation(central.id);
-  }, [requestedTab, user?.role, locations, selectedLocationRecord?.location_type]);
+  }, [requestedTab, user?.role, locations, selectedLocationRecord?.location_type, Boolean(shopScope)]);
 
   const stockMap = useMemo(() => {
     const balances = tab === 'products' ? productStock : ingredientStock;
@@ -330,7 +338,7 @@ export default function Warehouse() {
     <div className={`odina-page odina-workbench catalog-workbench catalog-warehouse p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in ${newLayerView ? 'warehouse-workspace' : ''}`}>
       <PageHeader
         title={visibleTabs.find((item) => item.id === tab)?.label || 'Ombor'}
-        subtitle={selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
+        subtitle={shopScope?.shopId === 'all' ? 'Barcha do‘konlar' : selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
@@ -378,14 +386,16 @@ export default function Warehouse() {
             <label className="sm:w-72 space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Ombor joylashuvi</span>
               <OdinaSelect
-                value={selectedLocation}
+                value={shopScope?.shopId || selectedLocation}
                 onChange={(event) => {
+                  if (shopScope) { shopScope.selectShop(event.target.value); return; }
                   const next = locations.find((location) => location.id === event.target.value);
                   if (tab === 'cake_layers' && next?.location_type !== 'production') changeTab('ingredients');
                   setSelectedLocation(event.target.value);
                 }}
                 className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
+                {shopScope && <option value="all">Barcha do‘konlar</option>}
                 {locations.map((location) => (
                   <option key={location.id} value={location.id}>
                     {location.name}{location.location_type === 'production' ? ' · Ishlab chiqarish' : ' · Do‘kon'}
@@ -420,7 +430,19 @@ export default function Warehouse() {
         )}
       </div>
 
-      {!selectedLocation ? (
+      {shopScope?.shopId === 'all' ? (
+        <section className="space-y-6" aria-label="Barcha omborlar qoldig‘i">
+          <p className="rounded-xl border border-border bg-card p-4 text-sm">Har bir do‘kon qoldig‘i alohida. Kirim, chiqim yoki boshqa ombor amali uchun yuqoridan bitta do‘konni tanlang.</p>
+          {!['ingredients', 'products', 'history'].includes(tab) ? <p className="rounded-xl border border-border bg-card p-4 text-sm">{visibleTabs.find((item) => item.id === tab)?.label || 'Bu bo‘lim'}ni ochish uchun yuqoridan bitta do‘konni tanlang.</p> : locations.map((location) => {
+            const balances = tab === 'products' ? productStock : ingredientStock;
+            const key = tab === 'products' ? 'product_id' : 'ingredient_id';
+            const locationMap = Object.fromEntries(balances.filter((row) => row.location_id === location.id).map((row) => [row[key], row]));
+            return <section key={location.id} className="space-y-3"><h2 className="font-semibold text-lg">{location.name}</h2>{tab === 'history'
+              ? <HistoryList movements={movements.filter((row) => row.location_id === location.id && (!search.trim() || [row.item_name, row.reason, row.user_name].filter(Boolean).join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} modernView={newLayerView} />
+              : <StockGrid modernView={newLayerView} items={tab === 'products' ? items : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory) && (!search.trim() || item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} stockMap={locationMap} kind={tab === 'products' ? 'product' : 'ingredient'} location={location} onAdjust={null} />}</section>;
+          })}
+        </section>
+      ) : !selectedLocation || !selectedLocationRecord || (shopScope && !shopScope.ready) ? (
         <div className="odina-panel rounded-2xl border border-border bg-card py-16 text-center">
           <WarehouseIcon className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
           <p className="font-medium">Ombor joylashuvi biriktirilmagan</p>
@@ -489,6 +511,7 @@ export default function Warehouse() {
           ) : tab === 'transfers' ? (
             <TransfersPanel
               user={user}
+              adminShopScope={shopScope}
               location={selectedLocationRecord}
               locations={locations}
               products={products}
@@ -499,9 +522,9 @@ export default function Warehouse() {
               onReload={load}
             />
           ) : tab === 'demands' ? (
-            <ShopDemandPanel user={user} products={products} locations={locations} />
+            <ShopDemandPanel key={shopScope ? selectedLocation : 'legacy'} user={user} products={products} locations={locations} adminShopScope={shopScope} />
           ) : tab === 'count' ? (
-            <StockCountPanel user={user} location={selectedLocationRecord} locations={locations} />
+            <StockCountPanel user={user} location={selectedLocationRecord} locations={locations} adminShopScope={shopScope} />
           ) : (
             <>
               {tab === 'products' && selectedLocationRecord?.location_type === 'production' && visibleTabs.some((item) => item.id === 'production') && (
@@ -860,4 +883,3 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
     </Dialog>
   );
 }
-

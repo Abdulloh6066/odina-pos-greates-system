@@ -6,6 +6,7 @@ import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
+import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import PageHeader from '@/components/PageHeader';
 import TestCatalogCleanup from '@/components/TestCatalogCleanup';
 import CakeStockShelf from '@/components/products/CakeStockShelf';
@@ -18,7 +19,9 @@ import { Image } from '@/components/ui/image';
 import '@/styles/catalog-workbench.css';
 
 export default function Products() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  const scopedShopId = shopScope?.specificShopId || '';
   const role = user?.role || 'cashier';
   const canManageCatalog = role === 'admin' || role === 'accountant';
   const [products, setProducts] = useState([]);
@@ -36,6 +39,11 @@ export default function Products() {
   const [shopPriceProduct, setShopPriceProduct] = useState(null);
   const [shopPrice, setShopPrice] = useState('');
   const [savingShopPrice, setSavingShopPrice] = useState(false);
+  useEffect(() => shopScope?.registerGuard?.(() => open || shopPriceProduct || savingShopPrice
+    ? 'Avval mahsulot oynasini yoping yoki saqlash tugashini kuting.' : ''),
+  [shopScope?.registerGuard, open, shopPriceProduct, savingShopPrice]);
+  const scopedCatalog = useMemo(() => scopedShopId
+    ? catalogForShop(products, categories, scopedShopId) : { products, categories }, [products, categories, scopedShopId]);
 
   const saveShopPrice = async () => {
     if (savingShopPrice || !shopPriceProduct) return;
@@ -67,11 +75,12 @@ export default function Products() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    let list = products.filter((p) => showArchived ? p.archived === true : p.archived !== true);
-    if (filterCat !== 'all') list = list.filter((p) => p.category_id === filterCat);
+    let list = scopedCatalog.products.filter((p) => showArchived ? p.archived === true : p.archived !== true);
+    if (filterCat !== 'all') list = list.filter((p) => categoryForShop(p, scopedShopId) === filterCat);
     if (search.trim()) list = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
     return list;
-  }, [products, filterCat, search, showArchived]);
+  }, [scopedCatalog, scopedShopId, filterCat, search, showArchived]);
+  useEffect(() => { setFilterCat('all'); }, [scopedShopId]);
 
   const openNew = () => { setEditing(null); setOpen(true); };
   const openEdit = (p) => { setEditing(p); setOpen(true); };
@@ -103,7 +112,7 @@ export default function Products() {
     <div className="odina-page odina-workbench catalog-workbench catalog-products p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Mahsulotlar"
-        subtitle={productView === 'stock' ? 'Tortlar, sut, kofe va boshqa mahsulotlarning kirim-chiqimi va qoldig‘i' : `${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
+        subtitle={productView === 'stock' ? 'Tortlar, sut, kofe va boshqa mahsulotlarning kirim-chiqimi va qoldig‘i' : `${scopedCatalog.products.filter((p) => p.archived !== true).length} ta mahsulot turi`}
         icon={Cake}
         actions={canManageCatalog && (
           <Button onClick={openNew} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
@@ -117,7 +126,8 @@ export default function Products() {
         <Button type="button" variant={productView === 'catalog' ? 'default' : 'outline'} aria-pressed={productView === 'catalog'} onClick={() => setProductView('catalog')} className="min-h-11 rounded-xl">Mahsulotlar katalogi</Button>
       </div>
       {loadError && <div role="alert" className="rounded-xl border border-border p-4 mb-5"><p>{loadError}</p><Button type="button" variant="outline" onClick={load} className="mt-3">Qayta yuklash</Button></div>}
-      {productView === 'stock' ? (loading ? <div className="h-56 rounded-2xl bg-secondary animate-pulse" aria-label="Mahsulotlar yuklanmoqda" /> : !loadError && <CakeStockShelf user={user} products={products} categories={categories} shops={shops} ingredients={ingredients} />) : <>
+      {productView === 'stock' ? (loading ? <div className="h-56 rounded-2xl bg-secondary animate-pulse" aria-label="Mahsulotlar yuklanmoqda" /> : !loadError && <CakeStockShelf user={user} adminShopScope={shopScope} products={products} categories={categories} shops={shopScope?.shops || shops} ingredients={ingredients} />) : <>
+      {shopScope && <p className="mb-4 text-sm text-muted-foreground">{scopedShopId ? (shopScope.shops.find((shop) => shop.id === scopedShopId)?.name || 'Tanlangan do‘kon') + ' katalogi va narxlari.' : 'Barcha do‘konlar katalogi.'} Mahsulot turini tahrirlash umumiy katalogga tegishli. Sotuvga chiqarish yoki sotuvdan olish barcha do‘konlarga ta’sir qiladi.</p>}
       {!loading && <TestCatalogCleanup user={user} products={products} onComplete={load} />}
 
       <div className="odina-panel catalog-toolbar catalog-product-toolbar flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
@@ -131,7 +141,7 @@ export default function Products() {
         <label className="catalog-filter-field catalog-category-field"><span>Kategoriya</span>
         <OdinaSelect value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium sm:w-56">
           <option value="all">Barcha kategoriyalar</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {scopedCatalog.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </OdinaSelect>
         </label>
         {role === 'admin' && (
@@ -170,23 +180,23 @@ export default function Products() {
               </div>
               <div className="catalog-product-info">
                 <div className="catalog-product-heading"><h3>{p.name}</h3><span className={`catalog-product-status ${p.active === false ? '' : 'is-active'}`}>{p.active === false ? 'Sotuvda emas' : 'Sotuvda'}</span></div>
-                <p className="catalog-product-category">{localizedCategoryName(p.category_name)}</p>
-                <div className={`catalog-product-price ${Number(p.price) === 0 ? 'text-muted-foreground' : 'text-brand-ink'}`}>
-                  {Number(p.price) === 0 ? '0 so‘m' : formatUZS(p.price)}
+                <p className="catalog-product-category">{localizedCategoryName(categories.find((c) => c.id === categoryForShop(p, scopedShopId))?.name || p.category_name)}</p>
+                <div className={`catalog-product-price ${priceForShop(p, scopedShopId) === 0 ? 'text-muted-foreground' : 'text-brand-ink'}`}>
+                  {priceForShop(p, scopedShopId) === 0 ? '0 so‘m' : formatUZS(priceForShop(p, scopedShopId))}
                   <span>{p.sale_unit === 'gram' ? '/ 1 kg' : p.production_unit === 'sheet' ? '/ bo‘lak' : '/ dona'}</span>
                 </div>
-                {shops.some((shop) => priceForShop(p, shop.id) !== Number(p.price)) && (
+                {!scopedShopId && shops.some((shop) => priceForShop(p, shop.id) !== Number(p.price)) && (
                   <div className="catalog-shop-prices">
                     {shops.map((shop) => `${shop.name}: ${formatUZS(priceForShop(p, shop.id))}`).join(' · ')}
                   </div>
                 )}
               </div>
               <div className="catalog-product-actions">
-                {canManageCatalog && <Button variant="outline" size="sm" onClick={() => openEdit(p)} aria-label={`${p.name} mahsulotini tahrirlash`}><Pencil className="w-4 h-4" aria-hidden="true" /> Tahrirlash</Button>}
+                {canManageCatalog && <Button variant="outline" size="sm" onClick={() => openEdit(p)} aria-label={`${p.name} mahsulotini umumiy katalogda tahrirlash`}><Pencil className="w-4 h-4" aria-hidden="true" /> {shopScope ? 'Umumiy katalogni tahrirlash' : 'Tahrirlash'}</Button>}
                 {role === 'manager' && <Button variant="outline" size="sm" onClick={() => { setShopPriceProduct(p); setShopPrice(String(priceForShop(p, user.shop_id))); }}>Do‘kon narxi: {formatUZS(priceForShop(p, user.shop_id))}</Button>}
                 {(role === 'production' || canManageCatalog) && (
                   <Button variant="outline" size="sm" className="catalog-availability" onClick={() => setAvailability(p)}>
-                    {p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
+                    {shopScope ? (p.active === false ? 'Barcha do‘konlarda sotuvga chiqarish' : 'Barcha do‘konlarda sotuvdan olish') : p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
                   </Button>
                 )}
               </div>
