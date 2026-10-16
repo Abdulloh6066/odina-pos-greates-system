@@ -140,9 +140,10 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const plural = scope === 'cakes' ? 'Tortlar' : 'Mahsulotlar';
   const shelfCategories = isIngredient ? INGREDIENT_SHELF_CATEGORIES : categories;
   const balances = useLiveCakeBalances(shop?.id || '', isIngredient ? 'ingredient' : 'product');
-  const cakes = useMemo(() => isIngredient ? shelfIngredients(ingredients)
+  const scopedProducts = useMemo(() => isIngredient ? shelfIngredients(ingredients)
     : scope === 'cakes' ? cakeProducts(products, categories, shop?.id) : allStockProducts(products, categories, shop?.id),
   [products, categories, ingredients, shop?.id, scope, isIngredient]);
+  const cakes = useMemo(() => scopedProducts.filter((product) => product.active !== false), [scopedProducts]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
@@ -273,7 +274,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     </nav>
     {notice && <div className="cake-stock-message cake-stock-success" role="status"><Check aria-hidden="true" /><p>{notice}</p></div>}
     {view === 'shelf' && entryMode && <div className="cake-stock-entry-guide"><ArrowDownLeft aria-hidden="true" /><div><strong>{noun}ni tanlab kirim qo‘shing</strong><p>1. {noun}ni tanlang · 2. Kelgan miqdorni kiriting · 3. Kirimni saqlang</p><small>{isIngredient ? 'Hisob-faktura va to‘lov bilan kirim uchun Ombor → Kirim va qarzlar bo‘limidan foydalaning.' : 'Markazdan yuborilgan transfer uchun “Kelgan transferlar”ni oching.'}</small></div></div>}
-    {view === 'transfers' && !isIngredient ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={cakes} onBalanceRefresh={balances.refresh} /> : <>
+    {view === 'transfers' && !isIngredient ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={scopedProducts} onBalanceRefresh={balances.refresh} /> : <>
       <div className="cake-stock-filters">
         <label className="cake-stock-search"><span className="sr-only">{noun} qidirish</span><Search aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={noun + " nomini qidiring…"} /></label>
         <OdinaSelect aria-label={noun + " kategoriyasi"} value={category} onChange={(e) => setCategory(e.target.value)}><option value="all">Barcha {plural.toLocaleLowerCase()}</option>{categoryIds.map((id) => <option key={id} value={id}>{shelfCategories.find((c) => c.id === id)?.name || cakes.find((p) => p.category_id === id)?.category_name || 'Kategoriyasiz'}</option>)}</OdinaSelect>
