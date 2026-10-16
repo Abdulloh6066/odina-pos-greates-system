@@ -17,7 +17,7 @@ const changeQuantity = async (tree, value) => act(async () => {
 });
 const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
 
-async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [] } = {}) {
+async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [], viewport = null } = {}) {
   const products = suppliedProducts || [
     { id: 'a', name: 'Cake A', active: true, price: 30000 },
     { id: 'b', name: 'Cake B', active: true, price: 32000 },
@@ -87,7 +87,7 @@ async function fixture({ role = 'cashier', invoke, products: suppliedProducts, c
   await act(async () => { tree = create(React.createElement(module.exports.default, {
     user: { role, shop_id: 'branch' }, products, categories, ingredients,
     shops: [{ id: 'branch', name: 'Odina Branch' }, { id: 'other', name: 'Odina Central' }],
-  })); });
+  }), { createNodeMock: element => element.props.className?.includes('cake-stock-category-scroll') ? viewport : null }); });
   return { tree, sent, rows, reads: () => reads, close: async () => act(async () => tree.unmount()) };
 }
 
@@ -309,5 +309,119 @@ test('ingredient scopes exclude inactive items and production-only layers; ready
     { id: 'salad', sale_unit: 'gram' }, { id: 'off', track_stock: false },
     { id: 'hidden', category_id: 'h' }, { id: 'other', available_shop_ids: ['other'] },
   ], [{ id: 'h', hidden_shop_ids: ['branch'] }], 'branch').map(p => p.id), ['cake', 'coffee']);
+});
+
+const scrollport = (tree) => tree.root.findAllByType('div').find(node => node.props.className?.includes('cake-stock-category-scroll'));
+function dragViewport(width = 1200, clientWidth = 600) {
+  const captured = new Set();
+  return { scrollWidth: width, clientWidth, scrollLeft: 0,
+    setPointerCapture: id => captured.add(id), hasPointerCapture: id => captured.has(id),
+    releasePointerCapture: id => captured.delete(id) };
+}
+function pointer(viewport, x, y = 100, extra = {}) {
+  return { currentTarget: viewport, clientX: x, clientY: y, pointerId: 7,
+    pointerType: 'mouse', button: 0, isPrimary: true, preventDefault() {}, ...extra };
+}
+function releaseClick(tree, name) {
+  let blocked = false;
+  scrollport(tree).props.onClickCapture({ detail: 1, preventDefault() { blocked = true; }, stopPropagation() {} });
+  if (!blocked) tile(tree, name)?.props.onClick();
+  return blocked;
+}
+test('drag pans the shelf and suppresses its release click; a deliberate receipt click still works', async () => {
+  const viewport = dragViewport();
+  const f = await fixture({ viewport });
+  try {
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    viewport.scrollLeft = 100;
+    await act(async () => {
+      scrollport(f.tree).props.onPointerDown(pointer(viewport, 300));
+      scrollport(f.tree).props.onPointerMove(pointer(viewport, 220));
+    });
+    assert.equal(viewport.scrollLeft, 180);
+    assert.equal(viewport.hasPointerCapture(7), true);
+    assert.ok(scrollport(f.tree).props.className.includes('is-dragging'));
+    await act(async () => {
+      scrollport(f.tree).props.onPointerUp(pointer(viewport, 220));
+      assert.equal(releaseClick(f.tree, 'Cake B'), true);
+    });
+    assert.equal(viewport.hasPointerCapture(7), false);
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    assert.equal(f.sent.length, 0);
+    await act(async () => {
+      scrollport(f.tree).props.onPointerDown(pointer(viewport, 220));
+      scrollport(f.tree).props.onPointerUp(pointer(viewport, 220));
+      assert.equal(releaseClick(f.tree, 'Cake B'), false);
+    });
+    assert.equal(f.tree.root.findAllByType('form').length, 1);
+    assert.equal(f.tree.root.findByProps({ id: 'cake-operation-quantity' }).props.value, '');
+  } finally { await f.close(); }
+});
+test('mouse swipes change pages without footer buttons, stay within bounds and retain each category', async () => {
+  const viewport = dragViewport(600, 600);
+  const products = Array.from({ length: 14 }, (_, i) => ({ id: 'swipe-' + i, name: 'Swipe ' + i, category_id: '15' }));
+  const f = await fixture({ viewport, products, categories: [{ id: '15', name: '15 somlik' }] });
+  const swipe = async (from, to) => act(async () => {
+    scrollport(f.tree).props.onPointerDown(pointer(viewport, from));
+    scrollport(f.tree).props.onPointerMove(pointer(viewport, to));
+    scrollport(f.tree).props.onPointerUp(pointer(viewport, to));
+    assert.equal(releaseClick(f.tree, 'Swipe 7'), true);
+  });
+  try {
+    await swipe(300, 450); // First page cannot move further back.
+    assert.ok(tile(f.tree, 'Swipe 0'));
+    await swipe(300, 150);
+    assert.ok(tile(f.tree, 'Swipe 6'));
+    assert.equal(tile(f.tree, 'Swipe 0'), undefined);
+    assert.equal(f.tree.root.findByProps({ className: 'cake-stock-category-column' }).props['aria-label'], '15 somlik');
+    await swipe(300, 150);
+    assert.ok(tile(f.tree, 'Swipe 12'));
+    await swipe(300, 150); // Last page cannot wrap around.
+    assert.ok(tile(f.tree, 'Swipe 12'));
+    await swipe(150, 300);
+    assert.ok(tile(f.tree, 'Swipe 6'));
+    await swipe(300, 280); // A short drag must not change the page.
+    assert.ok(tile(f.tree, 'Swipe 6'));
+    assert.equal(f.sent.length, 0);
+  } finally { await f.close(); }
+});
+test('panning uses available columns before page turns; cancelled, vertical, touch and right-button gestures never turn a page', async () => {
+  const viewport = dragViewport(900, 600);
+  const products = Array.from({ length: 9 }, (_, i) => ({ id: 'pan-' + i, name: 'Pan ' + i }));
+  const f = await fixture({ viewport, products });
+  try {
+    await act(async () => {
+      scrollport(f.tree).props.onPointerDown(pointer(viewport, 400));
+      scrollport(f.tree).props.onPointerMove(pointer(viewport, 200));
+      scrollport(f.tree).props.onPointerUp(pointer(viewport, 200));
+    });
+    assert.equal(viewport.scrollLeft, 200);
+    assert.ok(tile(f.tree, 'Pan 0'));
+    await act(async () => {
+      scrollport(f.tree).props.onPointerDown(pointer(viewport, 400));
+      scrollport(f.tree).props.onPointerMove(pointer(viewport, 200));
+      scrollport(f.tree).props.onPointerCancel(pointer(viewport, 200));
+    });
+    assert.ok(tile(f.tree, 'Pan 0'));
+    assert.equal(viewport.hasPointerCapture(7), false);
+    assert.equal(scrollport(f.tree).props.className.includes('is-dragging'), false);
+    for (const extra of [{ pointerType: 'touch' }, { button: 2 }]) {
+      const before = viewport.scrollLeft;
+      await act(async () => {
+        scrollport(f.tree).props.onPointerDown(pointer(viewport, 500, 100, extra));
+        scrollport(f.tree).props.onPointerMove(pointer(viewport, 100, 100, extra));
+        scrollport(f.tree).props.onPointerUp(pointer(viewport, 100, 100, extra));
+      });
+      assert.equal(viewport.scrollLeft, before);
+      assert.ok(tile(f.tree, 'Pan 0'));
+    }
+    await act(async () => {
+      scrollport(f.tree).props.onPointerDown(pointer(viewport, 400, 100));
+      scrollport(f.tree).props.onPointerMove(pointer(viewport, 250, 500));
+      scrollport(f.tree).props.onPointerUp(pointer(viewport, 250, 500));
+    });
+    assert.ok(tile(f.tree, 'Pan 0'));
+    assert.equal(f.sent.length, 0);
+  } finally { await f.close(); }
 });
 
