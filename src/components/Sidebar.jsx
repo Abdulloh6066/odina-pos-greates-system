@@ -46,7 +46,7 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
   const warehouseWorkspace = scopedLocation?.location_type === 'production'
     || scopedLocation?.allows_pos === false;
   const items = MENU_ITEMS.filter((item) => canAccess(role, item.key)
-    && !(warehouseWorkspace && item.key === 'pos'));
+    && !(warehouseWorkspace && ['pos', 'sales', 'cashouts', 'recipients'].includes(item.key)));
   const hasKassa = items.some((item) => item.key === 'pos');
   const kassaChildren = hasKassa ? items.filter((item) => KASSA_CHILD_KEYS.includes(item.key)) : [];
   const topItems = items.filter((item) => !hasKassa || !KASSA_CHILD_KEYS.includes(item.key));
