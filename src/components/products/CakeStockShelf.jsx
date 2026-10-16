@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Image } from '@/components/ui/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
 import './cake-stock-shelf.css';
@@ -76,9 +75,18 @@ function useLiveCakeBalances(shopId) {
   return { ...(data.shopId === shopId ? data : { rows: [], ready: false, loading: Boolean(shopId), error: '', updatedAt: null }), online, refresh: useCallback(() => refreshRef.current(), []) };
 }
 
-function CakePhoto({ product, large = false }) {
-  return <span className={'cake-stock-photo' + (large ? ' is-large' : '')}>
-    {product.image_url ? <Image src={product.image_url} alt="" fittingType="fit" loading="lazy" decoding="async" className="h-full w-full" /> : <Cake aria-hidden="true" />}
+function CakeSymbol({ large = false }) {
+  return <span className={'cake-stock-symbol' + (large ? ' is-large' : '')} aria-hidden="true">
+    <svg viewBox="0 0 120 120" focusable="false">
+      <ellipse cx="60" cy="89" rx="40" ry="8" fill="#ece9df" />
+      <path d="M25 53h70v29c0 14-70 14-70 0z" fill="#ddc69a" />
+      <path d="M25 64c16 8 54 8 70 0v8c-16 8-54 8-70 0z" fill="#fff4d8" opacity=".8" />
+      <ellipse cx="60" cy="53" rx="35" ry="15" fill="#ddc69a" />
+      <ellipse cx="60" cy="49" rx="33" ry="12" fill="#fff3d9" opacity=".7" />
+      <path d="M37 49q23-19 46 0" stroke="#ddc69a" fill="none" strokeWidth="3" />
+      <circle cx="55" cy="39" r="5" fill="#6d7c46" />
+      <circle cx="64" cy="38" r="5" fill="#99a95d" />
+    </svg>
   </span>;
 }
 
@@ -165,7 +173,7 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
       <Button type="button" variant={view === 'transfers' ? 'default' : 'outline'} onClick={() => { setView('transfers'); setEntryMode(false); }} aria-pressed={view === 'transfers'}><Truck className="mr-2 h-4 w-4" />Kelgan transferlar</Button>
     </nav>
     {notice && <div className="cake-stock-message cake-stock-success" role="status"><Check aria-hidden="true" /><p>{notice}</p></div>}
-    {view === 'shelf' && entryMode && <div className="cake-stock-entry-guide"><ArrowDownLeft aria-hidden="true" /><div><strong>Kelgan tortning rasmini bosib qo‘shing</strong><p>1. Tortni tanlang · 2. Kelgan dona sonini kiriting · 3. Kirimni saqlang</p><small>Markazdan yuborilgan transfer uchun “Kelgan transferlar”ni oching.</small></div></div>}
+    {view === 'shelf' && entryMode && <div className="cake-stock-entry-guide"><ArrowDownLeft aria-hidden="true" /><div><strong>Kelgan tortni tanlab qo‘shing</strong><p>1. Tortni tanlang · 2. Kelgan dona sonini kiriting · 3. Kirimni saqlang</p><small>Markazdan yuborilgan transfer uchun “Kelgan transferlar”ni oching.</small></div></div>}
     {view === 'transfers' ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={cakes} onBalanceRefresh={balances.refresh} /> : <>
       <div className="cake-stock-filters">
         <label className="cake-stock-search"><span className="sr-only">Tort qidirish</span><Search aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tort nomini qidiring…" /></label>
@@ -190,7 +198,7 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
                       if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) || !adjacent?.products[nextRow]) return;
                       e.preventDefault();
                       shelfRef.current?.querySelector('[data-column="' + nextColumn + '"][data-row="' + nextRow + '"]')?.focus();
-                    }}><CakePhoto product={p} /><strong title={p.name}>{p.name}</strong>{entryMode && <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span>}<span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatNum(info.quantity)}<small>{info.quantity == null ? '' : ' dona'}</small></span>{['negative', 'missing', 'invalid'].includes(info.status) && <span className="cake-stock-cell-note">{info.label}</span>}</button>;
+                    }}><CakeSymbol /><strong title={p.name}>{p.name}</strong><span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatNum(info.quantity)}<small>{info.quantity == null ? '' : ' dona'}</small></span>{entryMode ? <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span> : <span className="cake-stock-cell-note">{['negative', 'missing', 'invalid'].includes(info.status) ? info.label : '\u00a0'}</span>}</button>;
                   })}
                   {Array.from({ length: CAKE_STOCK_COLUMN_ROWS - column.products.length }, (_, index) => <div key={'empty-' + index} className="cake-stock-empty-cell" aria-hidden="true"><span>·</span></div>)}
                 </div>
@@ -201,7 +209,7 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
         </div>
         <aside className="cake-stock-detail" aria-label="Tanlangan tort">
           {selected ? <>
-            <span className="cake-stock-eyebrow">{shop.name}</span><CakePhoto product={selected} large /><h3>{selected.name}</h3><p className="cake-stock-detail-category">{categoryName(selected)}</p><p className="cake-stock-detail-price">{formatUZS(priceForShop(selected, shop.id))}<small> / dona yoki bo‘lak</small></p>
+            <span className="cake-stock-eyebrow">{shop.name}</span><CakeSymbol large /><h3>{selected.name}</h3><p className="cake-stock-detail-category">{categoryName(selected)}</p><p className="cake-stock-detail-price">{formatUZS(priceForShop(selected, shop.id))}<small> / dona yoki bo‘lak</small></p>
             <div className={'cake-stock-balance ' + selectedStock.status}><span>Do‘kondagi qoldiq</span><strong>{selectedStock.quantity == null ? '—' : formatNum(selectedStock.quantity)}<small>{selectedStock.quantity == null ? '' : ' dona'}</small></strong><p>{selectedStock.label}</p></div>
             {canChange && selectedStock.status !== 'invalid' && <div className="cake-stock-operations">
               <Button type="button" onClick={() => openOperation('in')} disabled={selected.active === false || selectedStock.quantity == null || selectedStock.quantity < 0}><ArrowDownLeft className="mr-1.5 h-4 w-4" />Kirim</Button>
