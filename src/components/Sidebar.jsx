@@ -37,10 +37,16 @@ const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];
 
-export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle }) {
+export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, collapsed, onToggle }) {
   const role = user?.role || 'cashier';
   const location = useLocation();
-  const items = MENU_ITEMS.filter((item) => canAccess(role, item.key));
+  const scopedLocation = adminShopScope?.isAdmin
+    ? adminShopScope.shops?.find((shop) => shop.id === adminShopScope.specificShopId)
+    : null;
+  const warehouseWorkspace = location.pathname === '/warehouse'
+    || scopedLocation?.location_type === 'production' || scopedLocation?.allows_pos === false;
+  const items = MENU_ITEMS.filter((item) => canAccess(role, item.key)
+    && !(warehouseWorkspace && item.key === 'pos'));
   const hasKassa = items.some((item) => item.key === 'pos');
   const kassaChildren = hasKassa ? items.filter((item) => KASSA_CHILD_KEYS.includes(item.key)) : [];
   const topItems = items.filter((item) => !hasKassa || !KASSA_CHILD_KEYS.includes(item.key));
@@ -72,6 +78,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
     if (navigator.connection?.saveData) return undefined;
     const warm = () => {
       for (const path of likelyRoutesForRole(role)) {
+        if (warehouseWorkspace && path.split('?')[0] === '/pos') continue;
         if (path !== window.location.pathname) void preloadRoute(path, role).catch(() => {});
       }
     };
@@ -81,7 +88,7 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
     }
     const id = window.setTimeout(warm, 600);
     return () => window.clearTimeout(id);
-  }, [role]);
+  }, [role, warehouseWorkspace]);
 
   const warmNavigation = (path) => {
     if (!navigator.connection?.saveData) void preloadRoute(path, role).catch(() => {});
@@ -209,7 +216,8 @@ export default function Sidebar({ user, mobileOpen, onClose, collapsed, onToggle
           }
 
           if (item.key === 'screens') {
-            const screenChildren = SCREENS_CHILDREN.filter((child) => !child.roles || child.roles.includes(role));
+            const screenChildren = SCREENS_CHILDREN.filter((child) => (!child.roles || child.roles.includes(role))
+              && !(warehouseWorkspace && child.key === 'launch-pos'));
             if (screenChildren.length === 0) return null;
             return (
               <div key={item.key}>
