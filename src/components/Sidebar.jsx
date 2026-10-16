@@ -43,8 +43,8 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
   const scopedLocation = adminShopScope?.isAdmin
     ? adminShopScope.shops?.find((shop) => shop.id === adminShopScope.specificShopId)
     : null;
-  const warehouseWorkspace = location.pathname === '/warehouse'
-    || scopedLocation?.location_type === 'production' || scopedLocation?.allows_pos === false;
+  const warehouseWorkspace = scopedLocation?.location_type === 'production'
+    || scopedLocation?.allows_pos === false;
   const items = MENU_ITEMS.filter((item) => canAccess(role, item.key)
     && !(warehouseWorkspace && item.key === 'pos'));
   const hasKassa = items.some((item) => item.key === 'pos');
