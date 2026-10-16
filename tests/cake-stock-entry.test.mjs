@@ -17,7 +17,7 @@ const changeQuantity = async (tree, value) => act(async () => {
 });
 const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
 
-async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [] } = {}) {
+async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [] } = {}) {
   const products = suppliedProducts || [
     { id: 'a', name: 'Cake A', active: true, price: 30000 },
     { id: 'b', name: 'Cake B', active: true, price: 32000 },
@@ -34,10 +34,15 @@ async function fixture({ role = 'cashier', invoke, products: suppliedProducts, c
     { id: 'sz', product_id: 'zero', location_id: 'branch', quantity: 0, unit: 'piece' },
     { id: 'other-a', product_id: 'a', location_id: 'other', quantity: 17, unit: 'piece' },
   ];
+  rows.push(...ingredientRows.map(row => ({ ...row })));
   const sent = []; let reads = 0;
   const backend = { entities: {
     ProductStock: {
-      filter: async query => { reads++; return rows.filter(row => row.location_id === query.location_id).map(row => ({ ...row })); },
+      filter: async query => { reads++; return rows.filter(row => row.product_id && row.location_id === query.location_id).map(row => ({ ...row })); },
+      subscribe: () => () => {},
+    },
+    IngredientStock: {
+      filter: async query => { reads++; return rows.filter(row => row.ingredient_id && row.location_id === query.location_id).map(row => ({ ...row })); },
       subscribe: () => () => {},
     },
     StockMovement: { filter: async () => [] },
@@ -45,9 +50,10 @@ async function fixture({ role = 'cashier', invoke, products: suppliedProducts, c
   }, functions: { invoke: async (name, payload) => {
     sent.push({ name, payload: structuredClone(payload) });
     if (invoke) return invoke(name, payload);
-    const row = rows.find(row => row.product_id === payload.item_id && row.location_id === payload.location_id);
+    const field = payload.item_kind === 'ingredient' ? 'ingredient_id' : 'product_id';
+    const row = rows.find(row => row[field] === payload.item_id && row.location_id === payload.location_id);
     assert.equal(row.quantity, payload.expected_quantity);
-    row.quantity += payload.quantity_change;
+    row.quantity = payload.counted_quantity ?? row.quantity + payload.quantity_change;
     return { data: { stock: { ...row } } };
   } } };
   const wrapper = tag => ({ children, ...props }) => React.createElement(tag, props, children);
@@ -79,7 +85,7 @@ async function fixture({ role = 'cashier', invoke, products: suppliedProducts, c
   vm.runInNewContext('(function(require,module,exports){' + source + '\n})', context)(require, module, module.exports);
   let tree;
   await act(async () => { tree = create(React.createElement(module.exports.default, {
-    user: { role, shop_id: 'branch' }, products, categories,
+    user: { role, shop_id: 'branch' }, products, categories, ingredients,
     shops: [{ id: 'branch', name: 'Odina Branch' }, { id: 'other', name: 'Odina Central' }],
   })); });
   return { tree, sent, rows, reads: () => reads, close: async () => act(async () => tree.unmount()) };
@@ -224,3 +230,83 @@ test('uncertain save freezes the form and reloads balances without resubmitting'
     assert.equal(f.sent.length, 1);
   } finally { await f.close(); }
 });
+const milk = { id: 'milk', name: 'Sut Nestle 3.2%', category: 'food', base_unit: 'ml', purchase_unit: 'l', conversion_to_base: 1000 };
+const coffee = { id: 'coffee', name: 'Qahva doni', category: 'food', base_unit: 'g', purchase_unit: 'kg', conversion_to_base: 1000 };
+test('milk litres and coffee kilograms submit base-unit deltas to the existing ingredient ledger', async () => {
+  const f = await fixture({ ingredients: [milk, coffee], ingredientRows: [
+    { id: 'im', ingredient_id: 'milk', location_id: 'branch', quantity: 12500, unit: 'ml' },
+    { id: 'ic', ingredient_id: 'coffee', location_id: 'branch', quantity: 5800, unit: 'g' },
+  ] });
+  try {
+    await act(async () => button(f.tree, 'Sut, kofe va masalliqlar').props.onClick());
+    assert.ok(tile(f.tree, milk.name).props['aria-label'].includes('12.5 litr'));
+    assert.ok(tile(f.tree, coffee.name).props['aria-label'].includes('5.8 kg'));
+    assert.equal(tile(f.tree, 'Cake A'), undefined);
+    assert.equal(button(f.tree, 'Kelgan transferlar'), undefined);
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => tile(f.tree, milk.name).props.onClick());
+    assert.equal(f.tree.root.findByProps({ id: 'cake-operation-quantity' }).props.step, 0.001);
+    await changeQuantity(f.tree, '2.5');
+    await act(async () => submit(f.tree));
+    assert.deepEqual(f.sent[0].payload, {
+      action: 'adjust_stock', location_id: 'branch', item_kind: 'ingredient', item_id: 'milk',
+      movement_type: 'adjustment', expected_quantity: 12500, quantity_change: 2500,
+      reason: 'Mahsulot kirimi: Kelgan mahsulotlar',
+    });
+    assert.equal(f.rows.find(row => row.id === 'im').quantity, 15000);
+    assert.ok(JSON.stringify(f.tree.toJSON()).includes('Sut Nestle 3.2%: qoldiq 15 litr.'));
+    await act(async () => tile(f.tree, coffee.name).props.onClick());
+    await changeQuantity(f.tree, '0.125');
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent[1].payload.item_kind, 'ingredient');
+    assert.equal(f.sent[1].payload.quantity_change, 125);
+    assert.equal(f.rows.find(row => row.id === 'ic').quantity, 5925);
+    assert.equal(f.rows.find(row => row.id === 'sa').quantity, 5);
+  } finally { await f.close(); }
+});
+
+test('ingredient counts repair negatives and shop or scope changes close stale forms', async () => {
+  const f = await fixture({ role: 'admin', ingredients: [milk], ingredientRows: [
+    { id: 'im', ingredient_id: 'milk', location_id: 'branch', quantity: -350, unit: 'ml' },
+    { id: 'om', ingredient_id: 'milk', location_id: 'other', quantity: 24000, unit: 'ml' },
+  ] });
+  try {
+    await act(async () => button(f.tree, 'Sut, kofe va masalliqlar').props.onClick());
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => tile(f.tree, milk.name).props.onClick());
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    await act(async () => button(f.tree, 'Haqiqiy sanoq').props.onClick());
+    await changeQuantity(f.tree, '3.25');
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent[0].payload.counted_quantity, 3250);
+    assert.equal(f.sent[0].payload.expected_quantity, -350);
+    assert.equal(f.rows.find(row => row.id === 'im').quantity, 3250);
+    await act(async () => tile(f.tree, milk.name).props.onClick());
+    assert.equal(f.tree.root.findAllByType('form').length, 1);
+    await act(async () => f.tree.root.findByProps({ id: 'cake-stock-shop' }).props.onChange({ target: { value: 'other' } }));
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    assert.ok(tile(f.tree, milk.name).props['aria-label'].includes('24 litr'));
+    await act(async () => button(f.tree, 'Tortlar').props.onClick());
+    assert.equal(tile(f.tree, milk.name), undefined);
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.rows.find(row => row.id === 'om').quantity, 24000);
+  } finally { await f.close(); }
+});
+
+test('ingredient scopes exclude inactive items and production-only layers; ready products respect stock and shop settings', () => {
+  assert.deepEqual(shelf.shelfIngredients([milk, coffee,
+    { id: 'off', name: 'Inactive', active: false }, { id: 'layer', name: 'Layer', is_cake_layer: true },
+  ]).map(item => item.id).sort(), ['coffee', 'milk']);
+  const items = shelf.shelfIngredients([milk, coffee]);
+  assert.equal(shelf.inventoryStockChange('in', '1.2345', 0, items[0]).error.length > 0, true);
+  assert.equal(shelf.inventoryStockChange('out', '6', 5800, items.find(item => item.id === 'coffee')).error.length > 0, true);
+  const box = shelf.shelfIngredients([{ id: 'box', name: 'Quti', base_unit: 'piece', purchase_unit: 'piece', category: 'packaging' }])[0];
+  assert.ok(shelf.inventoryStockChange('in', '1.5', 0, box).error);
+  assert.equal(shelf.inventoryStockInfo([{ ingredient_id: milk.id, quantity: 4, unit: 'g' }], items.find(item => item.id === 'milk')).status, 'invalid');
+  assert.deepEqual(shelf.allStockProducts([
+    { id: 'cake' }, { id: 'coffee', source_type: 'shop_prepared', track_stock: true },
+    { id: 'salad', sale_unit: 'gram' }, { id: 'off', track_stock: false },
+    { id: 'hidden', category_id: 'h' }, { id: 'other', available_shop_ids: ['other'] },
+  ], [{ id: 'h', hidden_shop_ids: ['branch'] }], 'branch').map(p => p.id), ['cake', 'coffee']);
+});
+
