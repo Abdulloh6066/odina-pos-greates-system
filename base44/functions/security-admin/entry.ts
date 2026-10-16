@@ -6,9 +6,11 @@ const STAFF_ROLES = new Set(["manager", "cashier", "accountant", "production", "
 // Hisob egasi — boshqa adminlar tomonidan o'chirilishi yoki o'zgartirilishi mumkin emas.
 const isOwner = (user: any) => user?.is_owner === true || user?.data?.is_owner === true;
 
+const displayName = (user: any) => String(user?.display_name || user?.data?.display_name || user?.full_name || "");
+
 const safeUser = (user: any) => ({
   id: String(user?.id || ""),
-  full_name: String(user?.full_name || ""),
+  full_name: displayName(user),
   email: String(user?.email || ""),
   is_owner: isOwner(user),
   role: userRole(user),
@@ -102,15 +104,21 @@ Deno.serve(async (req) => {
       if (!fullName || fullName.length > 120 || hasControlCharacter) {
         return Response.json({ error: "Ism 1–120 belgidan iborat bo‘lsin; yangi qator va boshqaruv belgilari mumkin emas." }, { status: 400 });
       }
-      if (fullName === String(target.full_name || "")) {
+      if (fullName === displayName(target)) {
         return Response.json({ ok: true, user: safeUser(target) });
       }
-      const updated = await service.entities.User.update(target.id, { full_name: fullName });
+      // full_name belongs to the sign-in account and can be ignored by the
+      // platform. Store the app-specific name in its declared custom field.
+      await service.entities.User.update(target.id, { display_name: fullName });
+      const updated = await service.entities.User.get(target.id);
+      if (displayName(updated) !== fullName) {
+        return Response.json({ error: "Yangi ism saqlanganligi tasdiqlanmadi. Sahifani yangilab, qayta urinib ko‘ring." }, { status: 502 });
+      }
       await service.entities.ActionHistory.create({
         user_id: String(admin.id || auth.id),
-        user_name: String(admin.full_name || auth.full_name || auth.email || "Egasi"),
+        user_name: displayName(admin) || String(auth.full_name || auth.email || "Egasi"),
         action: "user_name_updated",
-        details: String(target.id) + " · ism: " + String(target.full_name || target.email || "Nomsiz xodim") + " → " + fullName,
+        details: String(target.id) + " · ism: " + String(displayName(target) || target.email || "Nomsiz xodim") + " → " + fullName,
       });
       return Response.json({ ok: true, user: safeUser(updated) });
     }
