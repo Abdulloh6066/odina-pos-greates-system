@@ -90,6 +90,7 @@ for (const mobileOpen of [false, true]) {
         await f.openScreens();
         assert.equal(kassaButtons(f.tree).length, 0);
         assert.equal(posLinks(f.tree).length, 0);
+        assert.ok(!f.tree.root.findAllByType('a').some(node => ['/sales', '/cash-outs', '/cash-recipients'].includes(node.props.href)));
         assert.ok(f.tree.root.findAllByType('a').some(node => node.props.href === '/products'));
         assert.ok(f.tree.root.findAllByType('a').some(node => node.props.href === '/warehouse?tab=production'));
         assert.ok(!f.preloads.includes('/pos'));
@@ -131,9 +132,10 @@ test('Branch and Central retain POS on their warehouse inventory page', async ()
   } finally { await f.close(); }
 });
 test('cashier retail navigation remains available', async () => {
-  const f = await fixture({ role: 'cashier', pathname: '/products', mobileOpen: true });
+  const f = await fixture({ role: 'cashier', pathname: '/warehouse', mobileOpen: true });
   try {
     assert.ok(kassaButtons(f.tree).length > 0);
+    await act(async () => kassaButtons(f.tree)[0].props.onClick());
     assert.ok(posLinks(f.tree).length > 0);
   } finally { await f.close(); }
 });
