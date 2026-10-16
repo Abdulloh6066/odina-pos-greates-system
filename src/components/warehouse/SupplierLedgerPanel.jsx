@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import OdinaSelect from "@/components/ui/odina-select";
-import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from "@/lib/order-request-retry";
 import {
   Ban,
   CalendarDays,
@@ -13,7 +12,6 @@ import {
   ReceiptText,
   Scale,
   Trash2,
-  WalletCards,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { odinaAlert } from "@/lib/odina-dialog";
@@ -76,7 +74,6 @@ export default function SupplierLedgerPanel({
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
-  const [budgetPaymentTarget, setBudgetPaymentTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -425,17 +422,8 @@ export default function SupplierLedgerPanel({
 
       <SupplierDetailDialog
         supplier={selectedSupplier}
-        canPayBudget={user?.role === "admin"}
-        onPayBudget={(supplier) => { setSelectedSupplierId(""); setBudgetPaymentTarget(supplier); }}
         onReceipt={(receipt) => { setSelectedSupplierId(""); setSelectedReceipt(receipt); }}
         onClose={() => setSelectedSupplierId("")}
-      />
-
-      <BudgetSupplierPaymentDialog
-        actorId={user?.id}
-        supplier={budgetPaymentTarget}
-        onClose={() => setBudgetPaymentTarget(null)}
-        onPaid={() => { setBudgetPaymentTarget(null); load(); }}
       />
 
       <CancelReceiptDialog
@@ -616,7 +604,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
 
         {!cancelled && hasPayment && canCancel && (
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-            Bu kirim bo‘yicha pul to‘langan. Kassa va qarz tarixini saqlash uchun avtomatik bekor qilish yopilgan.
+            Bu kirim bo‘yicha pul to‘langan. To‘lov va qarz tarixini saqlash uchun avtomatik bekor qilish yopilgan.
           </div>
         )}
 
@@ -633,7 +621,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
   );
 }
 
-function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, onClose }) {
+function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
   if (!supplier) return null;
   const active = supplier.receipts.filter((receipt) => !isCancelled(receipt));
   const purchases = active.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
@@ -654,16 +642,6 @@ function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, 
           <MiniSummary label="Qolgan qarz" value={formatUZS(debt)} warning={debt > 0} />
           <MiniSummary label="Kirimlar" value={formatNum(supplier.receipts.length)} />
         </div>
-
-        {canPayBudget && debt > 0 && (
-          <Button
-            type="button"
-            onClick={() => onPayBudget(supplier)}
-            className="w-full min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong"
-          >
-            <WalletCards className="w-4 h-4 mr-1.5" /> Budgetdan qarzni to‘lash
-          </Button>
-        )}
 
         <div>
           <h4 className="font-semibold mb-2">Barcha kirimlar</h4>
@@ -707,182 +685,6 @@ function SupplierDetailDialog({ supplier, canPayBudget, onPayBudget, onReceipt, 
         </div>
 
         <Button type="button" variant="outline" onClick={onClose}>Yopish</Button>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function BudgetSupplierPaymentDialog({ actorId, supplier, onClose, onPaid }) {
-  const [balances, setBalances] = useState({});
-  const [account, setAccount] = useState("cash");
-  const [amount, setAmount] = useState("");
-  const [notes, setNotes] = useState("");
-  const [ownerPin, setOwnerPin] = useState("");
-  const [loadingBalances, setLoadingBalances] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const requestScope = orderRequestScope(actorId, "pay_supplier");
-  const [retryPending, setRetryPending] = useState(() => Boolean(readOrderRequest(requestScope)));
-  const requestRef = useRef(readOrderRequest(requestScope));
-  const pendingSupplierRef = useRef(requestRef.current?._supplier_label || null);
-  const pendingSupplierChanged = retryPending && requestRef.current?.supplier_id !== supplier?.id;
-
-  const debt = supplier
-    ? supplier.receipts
-      .filter((receipt) => !isCancelled(receipt))
-      .reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0)
-    : 0;
-  const value = Math.round(Number(amount) || 0);
-  const available = Number(balances[account] || 0);
-  const invalidAmount = value <= 0 || value > debt || value > available;
-
-  useEffect(() => {
-    if (!supplier) return undefined;
-    const saved = readOrderRequest(requestScope);
-    requestRef.current = saved;
-    pendingSupplierRef.current = saved?._supplier_label || null;
-    setRetryPending(Boolean(saved));
-    let active = true;
-    setAccount(saved?.account || "cash");
-    setAmount(saved ? String(saved.amount) : String(debt));
-    setNotes(saved?.notes || "");
-    setOwnerPin("");
-    setLoadingBalances(true);
-    base44.functions.invoke("budget-ledger", { action: "summary" })
-      .then((result) => {
-        if (!active) return;
-        const payload = result?.data || result;
-        if (!payload?.balances) throw new Error(payload?.error || "Budget balansi yuklanmadi.");
-        setBalances(Object.fromEntries(
-          payload.balances.map((row) => [row.account, Number(row.balance || 0)]),
-        ));
-      })
-      .catch((error) => {
-        if (active) void odinaAlert("Budget balansi yuklanmadi: " + errorText(error));
-      })
-      .finally(() => {
-        if (active) setLoadingBalances(false);
-      });
-    return () => { active = false; };
-  }, [supplier, debt, requestScope]);
-
-  const submit = async () => {
-    if (pendingSupplierChanged) return;
-    if (!supplier || !/^\d{4,8}$/.test(ownerPin) || (!retryPending && invalidAmount)) return;
-    if (saving) return;
-    const hadPending = retryPending;
-    setSaving(true);
-    try {
-      requestRef.current = retainOrderRequest(requestScope, requestRef.current || {
-        action: "pay_supplier", supplier_id: supplier.id, account, amount: value,
-        notes: notes.trim(), idempotency_key: crypto.randomUUID(), _supplier_label: supplier.name,
-      });
-      pendingSupplierRef.current = requestRef.current._supplier_label;
-      setRetryPending(true);
-      const { _supplier_label: _label, ...submitted } = requestRef.current;
-      const result = await base44.functions.invoke("budget-ledger", { ...submitted, owner_pin: ownerPin });
-      const payload = result?.data || result;
-      if (!payload?.paid) throw Object.assign(new Error(payload?.error || "Qarz to‘lovi bajarilmadi."), { data: payload });
-      clearOrderRequest(requestScope);
-      requestRef.current = null;
-      pendingSupplierRef.current = null;
-      setRetryPending(false);
-      onPaid();
-    } catch (error) {
-      const failure = error?.response?.data || error?.data || {};
-      const status = Number(error?.response?.status || error?.status || 0);
-      if (failure.operation_reversed || (!hadPending && status >= 400 && status < 500 && !failure.operation_pending)) {
-        clearOrderRequest(requestScope);
-        requestRef.current = null;
-        pendingSupplierRef.current = null;
-        setRetryPending(false);
-      }
-      void odinaAlert("Qarz to‘lanmadi: " + errorText(error));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={!!supplier} onOpenChange={(open) => !open && !saving && onClose()}>
-      <DialogContent className="warehouse-dialog sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">Budgetdan qarzni to‘lash</DialogTitle>
-          <p className="text-sm text-muted-foreground">{supplier?.name} · Qarz {formatUZS(debt)}</p>
-        </DialogHeader>
-
-        <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
-          To‘lov eng eski kirim qarzidan boshlab avtomatik taqsimlanadi. Amal qilgan admin va pul hisobi tarixda saqlanadi.
-        </div>
-
-        <div>
-          <Label className="text-xs mb-1.5 block">Qaysi Budget hisobidan</Label>
-          <OdinaSelect
-            value={account}
-            onChange={(event) => setAccount(event.target.value)}
-            disabled={saving || loadingBalances || retryPending}
-            className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
-          >
-            <option value="cash">Naqd pul · {formatUZS(balances.cash || 0)}</option>
-            <option value="uzcard">Bank card · {formatUZS(balances.uzcard || 0)}</option>
-            <option value="humo">Humo · {formatUZS(balances.humo || 0)}</option>
-            <option value="online">Online · {formatUZS(balances.online || 0)}</option>
-            <option value="bank">Bank · {formatUZS(balances.bank || 0)}</option>
-          </OdinaSelect>
-        </div>
-
-        <div>
-          <Label className="text-xs mb-1.5 block">To‘lov summasi</Label>
-          <Input
-            type="number"
-            min="1"
-            max={Math.min(debt, available)}
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            placeholder="0"
-            disabled={saving || loadingBalances || retryPending}
-            className="h-11 rounded-xl"
-          />
-          {value > debt && <p className="text-xs text-destructive mt-1">To‘lov qolgan qarzdan oshmasligi kerak.</p>}
-          {value > available && <p className="text-xs text-destructive mt-1">Tanlangan Budget hisobida pul yetarli emas.</p>}
-        </div>
-
-        <div>
-          <Label className="text-xs mb-1.5 block">Izoh (ixtiyoriy)</Label>
-          <Textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Masalan: sentabr kirimlari uchun"
-            rows={2}
-            disabled={saving || retryPending}
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs mb-1.5 block">Owner PIN</Label>
-          <Input
-            type="password"
-            inputMode="numeric"
-            maxLength={8}
-            value={ownerPin}
-            onChange={(event) => setOwnerPin(event.target.value.replace(/\D/g, "").slice(0, 8))}
-            placeholder="4–8 xonali PIN"
-            disabled={saving}
-            className="h-11 rounded-xl"
-          />
-        </div>
-
-        {retryPending && <p className="text-xs text-muted-foreground">Avvalgi {pendingSupplierRef.current} to‘lovi saqlandi. {pendingSupplierChanged ? "Natijani tekshirish uchun shu yetkazib beruvchining oynasini oching." : "Qayta tekshirish aynan shu summa va izoh bilan amalga oshadi."}</p>}
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>{retryPending ? "Yopish" : "Bekor qilish"}</Button>
-          <Button
-            type="button"
-            onClick={submit}
-            disabled={saving || loadingBalances || pendingSupplierChanged || (!retryPending && invalidAmount) || !/^\d{4,8}$/.test(ownerPin)}
-            className="bg-primary text-primary-foreground hover:bg-primary-strong"
-          >
-            {saving ? "To‘lanmoqda…" : retryPending ? "Avvalgi to‘lovni tekshirish" : "Owner PIN bilan to‘lash"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1100,7 +902,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
               </OdinaSelect>
               {supplierList.length === 0 && (
                 <p className="text-xs text-amber-700 mt-1.5">
-                  Owner avval Kassa → Qabul qiluvchilar bo‘limida yetkazib beruvchi yaratishi kerak.
+                  Egasi avval yetkazib beruvchini ro‘yxatga kiritishi kerak.
                 </p>
               )}
             </div>
@@ -1202,7 +1004,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
             <div>
               <p className="text-xs text-amber-800">Avtomatik yaratiladigan qarz</p>
               <p className="text-xs text-amber-700 mt-1">
-                To‘lov keyin istalgan do‘kon kassasidan owner PIN bilan qilinadi.
+                Kirim summasi yetkazib beruvchiga qarz sifatida yoziladi.
               </p>
             </div>
             <p className="text-xl font-semibold text-amber-800 whitespace-nowrap">{formatUZS(total)}</p>
