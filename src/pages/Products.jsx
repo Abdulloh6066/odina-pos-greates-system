@@ -100,17 +100,17 @@ export default function Products() {
     <div className="odina-page odina-workbench catalog-workbench catalog-products p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Mahsulotlar"
-        subtitle={`${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
+        subtitle={productView === 'stock' ? 'Kelgan tortlar, kirim-chiqim va do‘kondagi qoldiq' : `${products.filter((p) => p.archived !== true).length} ta faol mahsulot`}
         icon={Cake}
         actions={canManageCatalog && (
           <Button onClick={openNew} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
-            <Plus className="w-4 h-4 mr-1.5" /> Mahsulot qo‘shish
+            <Plus className="w-4 h-4 mr-1.5" /> Yangi mahsulot turi
           </Button>
         )}
       />
 
       <div className="flex flex-wrap gap-2 mb-5" role="group" aria-label="Mahsulotlar ko‘rinishi">
-        <Button type="button" variant={productView === 'stock' ? 'default' : 'outline'} aria-pressed={productView === 'stock'} onClick={() => setProductView('stock')} className="min-h-11 rounded-xl">Tortlar qoldig‘i</Button>
+        <Button type="button" variant={productView === 'stock' ? 'default' : 'outline'} aria-pressed={productView === 'stock'} onClick={() => setProductView('stock')} className="min-h-11 rounded-xl">Tortlar kirimi va qoldig‘i</Button>
         <Button type="button" variant={productView === 'catalog' ? 'default' : 'outline'} aria-pressed={productView === 'catalog'} onClick={() => setProductView('catalog')} className="min-h-11 rounded-xl">Mahsulotlar katalogi</Button>
       </div>
       {loadError && <div role="alert" className="rounded-xl border border-border p-4 mb-5"><p>{loadError}</p><Button type="button" variant="outline" onClick={load} className="mt-3">Qayta yuklash</Button></div>}
