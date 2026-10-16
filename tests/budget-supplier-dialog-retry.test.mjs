@@ -69,31 +69,29 @@ test('actual Budget adjustment dialog keeps its request through timeout/unmount 
   await act(async () => { tree.unmount(); });
 });
 
-test('actual Budget supplier dialog restores a frozen payment after refresh even when debt is now zero', async () => {
-  globalThis.sessionStorage = storage(); const sent = []; let paid = 0; let available = 10000;
-  const backend = { functions: { invoke: async (_name, payload) => {
-    if (payload.action === 'summary') return { data: { balances: [{ account: 'cash', balance: available }] } };
-    sent.push(structuredClone(payload));
-    if (sent.length === 1) throw new Error('Mock lost reply');
-    return { data: { paid: true } };
-  } } };
-  const Component = dialog('src/components/warehouse/SupplierLedgerPanel.jsx', 'BudgetSupplierPaymentDialog', backend);
-  const supplier = { id: 'supplier', name: 'Mock supplier', receipts: [{ remaining_debt: 1000, status: 'unpaid' }] };
-  const props = { actorId: 'owner', supplier, onClose: () => {}, onPaid: () => { paid++; } };
+test('warehouse supplier history keeps balances and receipt navigation without initiating payments', async () => {
+  const calls = [], opened = [];
+  const backend = { functions: { invoke: async (...args) => { calls.push(args); throw new Error('History must not initiate payments'); } } };
+  const Component = dialog('src/components/warehouse/SupplierLedgerPanel.jsx', 'SupplierDetailDialog', backend);
+  const receipt = { id: 'receipt', receipt_number: 'KR-REVIEW', total_amount: 1000, debt_amount: 1000,
+    paid_at_receipt: 0, remaining_debt: 600, status: 'partial' };
   let tree;
-  await act(async () => { tree = create(React.createElement(Component, props)); });
-  await act(async () => { enter(tree.root.findByType('textarea'), 'Mock supplier note'); enter(input(tree, 'password'), '1234'); });
-  await act(async () => { await submit(tree); });
-  const scope = retry.orderRequestScope('owner', 'pay_supplier');
-  assert.equal(retry.readOrderRequest(scope).owner_pin, undefined);
-  available = 0;
-  await act(async () => { tree.unmount(); tree = create(React.createElement(Component, { ...props, supplier: { ...supplier, receipts: [{ remaining_debt: 0, status: 'paid' }] } })); });
-  assert.equal(input(tree, 'number').props.disabled, true);
-  await act(async () => { enter(input(tree, 'number'), '2000'); enter(tree.root.findByType('textarea'), 'Changed note'); enter(input(tree, 'password'), '2468'); });
-  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, false);
-  await act(async () => { await submit(tree); });
-  assert.deepEqual(withoutPin(sent[1]), withoutPin(sent[0]));
-  assert.equal(paid, 1); assert.equal(retry.readOrderRequest(scope), null);
+  await act(async () => { tree = create(React.createElement(Component, {
+    supplier: { id: 'supplier', name: 'Mock supplier', receipts: [receipt], payments: [] },
+    onReceipt: value => opened.push(value.id), onClose: () => {},
+  })); });
+  const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
+  const content = text(tree.toJSON());
+  assert.ok(content.includes('Mock supplier'));
+  assert.ok(content.includes('1000 UZS'));
+  assert.ok(content.includes('400 UZS'));
+  assert.ok(content.includes('600 UZS'));
+  assert.equal(tree.root.findAllByType('input').length, 0);
+  const receiptButton = tree.root.findAllByType('button').find(node => text(node).includes('KR-REVIEW'));
+  assert.ok(receiptButton);
+  await act(async () => receiptButton.props.onClick());
+  assert.deepEqual(opened, ['receipt']);
+  assert.equal(calls.length, 0);
   await act(async () => { tree.unmount(); });
 });
 
