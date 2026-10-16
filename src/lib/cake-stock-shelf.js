@@ -63,6 +63,7 @@ export function mergeCakeStockEvent(rows, event, shopId) {
   if (data.location_id && data.location_id !== shopId) return rows.filter((row) => row.id !== data.id);
   const previous = rows.find((row) => row.id === data.id);
   if (!previous && (data.location_id !== shopId || !data.product_id || data.quantity == null)) return null;
+  if (previous?.updated_at && data.updated_at && new Date(data.updated_at).getTime() < new Date(previous.updated_at).getTime()) return rows;
   const next = { ...previous, ...data };
   return previous ? rows.map((row) => row.id === data.id ? next : row) : [...rows, next];
 }
