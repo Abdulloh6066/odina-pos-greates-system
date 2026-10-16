@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 
 export default function Settings() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
   const [shops, setShops] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,12 @@ export default function Settings() {
   const [editingShopId, setEditingShopId] = useState('');
   const [shopContact, setShopContact] = useState({ instagram: '', phone: '', address: '' });
   const [savingShopContact, setSavingShopContact] = useState(false);
+  useEffect(() => {
+    if (user?.role !== 'admin' || !adminShopScope?.registerGuard) return undefined;
+    return adminShopScope.registerGuard(() => editingShopId || savingShopContact
+      ? 'Do‘konni almashtirishdan oldin chek aloqa ma’lumotlarini saqlang yoki bekor qiling.' : '');
+  }, [user?.role, adminShopScope?.registerGuard, editingShopId, savingShopContact]);
+  const visibleShops = shops.filter((shop) => !scopedShopId || shop.id === scopedShopId);
 
   const load = async () => {
     setLoading(true);
@@ -141,6 +148,7 @@ export default function Settings() {
   return (
     <div className="odina-page odina-workbench odina-operations odina-settings p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader title="Sozlamalar" eyebrow="TIZIM BOSHQARUVI" subtitle="Cheklar, sotuv qoidalari va do‘kon ma’lumotlarini boshqaring." icon={SettingsIcon} />
+      {scopedShopId && <p className="mb-4 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Umumiy tizim, chek va xavfsizlik sozlamalari barcha do‘konlarga tegishli. Quyida faqat tanlangan do‘konning aloqa kartasi ko‘rsatiladi.</p>}
       <TelegramSetup user={user} />
       {loading ? (
         <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
@@ -220,7 +228,7 @@ export default function Settings() {
               <Button variant="outline" size="sm" onClick={addShop}>Do‘kon qo‘shish</Button>
             </div>
             <div className="odina-shop-settings-grid grid gap-3">
-              {shops.map((s) => (
+              {visibleShops.map((s) => (
                 <div key={s.id} className="odina-shop-settings-card p-4 rounded-xl border border-border bg-secondary/30 space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
@@ -257,7 +265,7 @@ export default function Settings() {
                   )}
                 </div>
               ))}
-              {shops.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Hali do‘konlar yo‘q.</p>}
+              {visibleShops.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Hali do‘konlar yo‘q.</p>}
             </div>
           </div>
         </div>

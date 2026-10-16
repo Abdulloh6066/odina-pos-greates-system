@@ -76,7 +76,8 @@ const latestFirst = (rows, field) => [...(rows || [])].sort((left, right) =>
   String(right[field] || '').localeCompare(String(left[field] || '')));
 
 export default function Shifts() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
   const role = user?.role || "cashier";
   const [shopOptions, setShopOptions] = useState([]);
   const detailRequest = useRef(0);
@@ -90,9 +91,10 @@ export default function Shifts() {
     shop_id: "all",
     status: "all",
   });
+  const effectiveFilters = useMemo(() => shopScope ? { ...filters, shop_id: shopScope.shopId } : filters, [filters, shopScope?.shopId]);
 
   const { rows: shifts, loading, loadingMore, error: loadError, hasMore, reload: load, loadMore } = useEntityHistory(
-    base44.entities.Shift, shiftsHistoryQuery({ user, ...filters }), "-opened_at",
+    base44.entities.Shift, shiftsHistoryQuery({ user, ...effectiveFilters }), "-opened_at",
   );
   useEffect(() => {
     let current = true;
@@ -107,23 +109,25 @@ export default function Shifts() {
   }, [shifts, role, user]);
 
   const shops = useMemo(() => {
+    if (shopScope) return (shopScope.shops || []).map((shop) => ({ id: shop.id, name: shop.name }));
     const permitted = ['cashier', 'manager'].includes(role)
       ? shopOptions.filter((shop) => shop.id === (user?.shop_id || user?.data?.shop_id)) : shopOptions;
     const available = new Map(permitted.map((shop) => [shop.id, { id: shop.id, name: shop.name }]));
     for (const shop of listShiftHistoryShops(visible)) if (!available.has(shop.id)) available.set(shop.id, shop);
     return [...available.values()].sort((a, b) => a.name.localeCompare(b.name, 'uz'));
-  }, [visible, shopOptions, role, user]);
-  const filtered = useMemo(() => filterShiftHistory(visible, filters), [visible, filters]);
+  }, [visible, shopOptions, role, user, shopScope]);
+  const filtered = useMemo(() => shopScope?.ready === false ? [] : filterShiftHistory(visible, effectiveFilters), [visible, effectiveFilters, shopScope]);
   const open = filtered.filter((shift) => shiftHistoryStatusGroup(shift) === "open");
   const closed = filtered.filter((shift) => shiftHistoryStatusGroup(shift) === "closed");
   const hasFilters = Boolean(
     filters.query.trim()
     || filters.date
-    || filters.shop_id !== "all"
+    || effectiveFilters.shop_id !== "all"
     || filters.status !== "all",
   );
 
   const changeFilter = (key, value) => {
+    if (key === 'shop_id' && shopScope) { shopScope.selectShop(value); return; }
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
@@ -221,7 +225,7 @@ export default function Shifts() {
           </FilterField>
 
           <FilterField label="Do‘kon">
-            <Select value={filters.shop_id} onValueChange={(value) => changeFilter("shop_id", value)}>
+            <Select value={effectiveFilters.shop_id} onValueChange={(value) => changeFilter("shop_id", value)}>
               <SelectTrigger className="h-11 rounded-xl bg-card">
                 <SelectValue placeholder="Barcha do‘konlar" />
               </SelectTrigger>

@@ -33,7 +33,8 @@ const ROLE_LABELS = {
 };
 
 export default function Users() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
   const [users, setUsers] = useState([]);
   const [shops, setShops] = useState([]);
   const [canManageAdmins, setCanManageAdmins] = useState(false);
@@ -61,6 +62,12 @@ export default function Users() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (user?.role !== 'admin' || !adminShopScope?.registerGuard) return undefined;
+    return adminShopScope.registerGuard(() => nameTarget || inviteOpen || pendingDemotion
+      ? 'Do‘konni almashtirishdan oldin xodim oynasini yoping.' : '');
+  }, [user?.role, adminShopScope?.registerGuard, nameTarget, inviteOpen, pendingDemotion]);
+  const visibleUsers = users.filter((item) => !scopedShopId || item.shop_id === scopedShopId || item.role === 'admin' || !item.shop_id);
 
   if (user?.role !== 'admin') return <Navigate to="/" replace />;
 
@@ -140,7 +147,7 @@ export default function Users() {
       <PageHeader
         title="Xodimlar"
         eyebrow="JAMOA BOSHQARUVI"
-        subtitle={`${users.length} ta xodim · lavozim, ish joyi va kirish ruxsatlari`}
+        subtitle={`${visibleUsers.length} ta xodim · lavozim, ish joyi va kirish ruxsatlari`}
         icon={UsersIcon}
         actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
@@ -150,7 +157,7 @@ export default function Users() {
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
         <div className="odina-ledger odina-staff-ledger space-y-3">
-          {users.map((u) => (
+          {visibleUsers.map((u) => (
             <div key={u.id} className="odina-ledger-row odina-staff-row odina-panel rounded-2xl bg-card border border-border p-4 flex flex-col gap-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-semibold shrink-0">
@@ -164,6 +171,7 @@ export default function Users() {
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                  {scopedShopId && (u.role === 'admin' || !u.shop_id) && <div className="text-xs text-muted-foreground">{u.role === 'admin' ? 'Barcha do‘konlar uchun umumiy hisob' : 'Ish joyi biriktirilmagan'}</div>}
                 </div>
               </div>
               {u.is_owner ? (
@@ -228,7 +236,7 @@ export default function Users() {
               )}
             </div>
           ))}
-          {users.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">Xodimlar topilmadi.</p>}
+          {visibleUsers.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">Xodimlar topilmadi.</p>}
         </div>
       )}
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} canManageAdmins={canManageAdmins} />

@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
@@ -16,9 +16,11 @@ import { isStaffTicketEnabled } from '@/lib/staff-order-ticket';
 import { salesHistoryQuery } from '@/lib/history-pagination';
 import { useEntityHistory } from '@/hooks/useEntityHistory';
 import Receipt from '@/components/pos/Receipt';
+import { adminReportingScope, scopeReportingRows } from '@/lib/admin-shop-reporting';
 
 export default function SalesHistory({ embedded = false, settings = null }) {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = adminReportingScope(user, adminShopScope);
   const role = user?.role || 'cashier';
   const [search, setSearch] = useState('');
   const [filterDate, setFilterDate] = useState('');
@@ -54,11 +56,11 @@ export default function SalesHistory({ embedded = false, settings = null }) {
   };
 
   const { rows: sales, loading, loadingMore, error: loadError, hasMore, reload: load, loadMore } = useEntityHistory(
-    base44.entities.Sale, salesHistoryQuery({ user, date: filterDate, search }), '-created_date',
+    base44.entities.Sale, salesHistoryQuery({ user, date: filterDate, search, shop_id: shopScope?.specificShopId }), '-created_date',
   );
 
   const visible = useMemo(() => {
-    let list = sales;
+    let list = scopeReportingRows(sales, shopScope);
     if (role === 'cashier') list = list.filter((s) => s.user_id === user?.id);
     if (filterDate) list = list.filter((s) => saleBusinessDate(s) === filterDate);
     if (search.trim()) {
@@ -68,7 +70,14 @@ export default function SalesHistory({ embedded = false, settings = null }) {
     return [...list].sort(
       (left, right) => new Date(saleOccurredAt(right)).getTime() - new Date(saleOccurredAt(left)).getTime(),
     );
-  }, [sales, role, user, search, filterDate]);
+  }, [sales, role, user, search, filterDate, shopScope]);
+
+  useEffect(() => {
+    if (!shopScope) return;
+    setSelected(null);
+    setStaffTicketSale(null);
+    setRefundOpen(false);
+  }, [shopScope?.shopId]);
 
   const totalRev = visible.reduce((s, x) => s + (x.status === 'refunded' ? 0 : x.total), 0);
 

@@ -6,17 +6,19 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { formatUZS, formatNum } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import RealProfitDashboard from '@/components/reports/RealProfitDashboard';
+import { adminReportingScope, scopeRangeReport } from '@/lib/admin-shop-reporting';
 
 const PAY_COLORS = { cash: 'hsl(var(--primary))', bank_card: 'hsl(var(--brand-olive))', online: 'hsl(var(--brand-sand))', uzcard: 'hsl(var(--brand-olive))', humo: '#86895a', click: 'hsl(var(--brand-sand))', payme: '#b58b52', bank_transfer: '#676653', other: 'hsl(0 0% 60%)' };
 const PAY_LABELS = { cash: 'Naqd pul', bank_card: 'Bank card', online: 'Online', uzcard: 'Uzcard', humo: 'Humo', click: 'Click', payme: 'Payme', bank_transfer: 'Bank o‘tkazmasi', other: 'Boshqa' };
 
 export default function Reports() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
   const role = user?.role;
 
   // All charts share the same filtered result as the summary above them.
   // No separate latest-1,000-sale download or contradictory date scope.
-  const [reportData, setReportData] = useState(null);
+  const [rawReportData, setReportData] = useState(null);
+  const reportData = scopeRangeReport(rawReportData, adminReportingScope(user, adminShopScope));
   const [loading, setLoading] = useState(true);
   const acceptReport = (data) => { setReportData(data); setLoading(false); };
   const last7 = useMemo(() => (reportData?.byDay || []).map(row => ({
@@ -37,7 +39,7 @@ export default function Reports() {
     <div className="odina-page odina-workbench odina-operations odina-reports p-5 sm:p-8 max-w-6xl mx-auto animate-fade-in">
       <PageHeader title="Hisobotlar" eyebrow="BIZNES TAHLILI" subtitle={reportData ? `${reportData.date_from} — ${reportData.date_to} · ${formatNum(reportData.grand?.sales || 0)} ta Kassa savdosi · olingan pul ${formatUZS(totalRev)}` : 'Davr bo‘yicha pul tushumi va Kassa foydasi'} icon={BarChart3} />
 
-      <div className="odina-report-summary"><RealProfitDashboard onData={acceptReport} /></div>
+      <div className="odina-report-summary"><RealProfitDashboard onData={acceptReport} adminShopScope={role === 'admin' ? adminShopScope : null} /></div>
       <div className="odina-operations-section-heading"><div><p className="odina-page-eyebrow">TUSHUM TAQSIMOTI</p><h2>Davr natijalari</h2></div><p>Tanlangan davr bo‘yicha kunlar, to‘lov usullari va do‘konlar.</p></div>
 
       {loading ? (

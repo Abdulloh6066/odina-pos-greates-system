@@ -14,7 +14,9 @@ const MAX_TABLES = 30;
 const QUICK_COUNTS = [5, 6, 8, 10];
 
 export default function RestaurantTables() {
-  const { user } = useAuth();
+  const { user, adminShopScope } = useAuth();
+  const sharedScope = user?.role === 'admin' && adminShopScope?.isAdmin === true;
+  const scopedShopId = sharedScope ? adminShopScope.specificShopId : '';
   const navigate = useNavigate();
   const location = useLocation();
   const [layoutEditing, setLayoutEditing] = useState(false);
@@ -52,15 +54,22 @@ export default function RestaurantTables() {
   }, [location.state?.shopId, user?.shop_id]);
 
   useEffect(() => { void load(); }, [load]);
-  const selectedShop = shops.find((shop) => shop.id === selectedShopId);
+  const effectiveShopId = scopedShopId || selectedShopId;
+  const selectedShop = shops.find((shop) => shop.id === effectiveShopId);
   useEffect(() => {
     setDraftCount(String(selectedShop?.table_count ?? 0));
-  }, [selectedShopId, selectedShop?.table_count]);
-  useEffect(() => { setNotice(''); }, [selectedShopId]);
+  }, [effectiveShopId, selectedShop?.table_count]);
+  useEffect(() => { setNotice(''); setInspectTableNumber(null); }, [effectiveShopId]);
 
   const count = Number(draftCount);
   const validCount = /^(0|[1-9]\d*)$/.test(draftCount) && Number.isInteger(count) && count <= MAX_TABLES;
   const hasChanges = Boolean(selectedShop) && validCount && count !== selectedShop.table_count;
+  const dirtyCount = Boolean(selectedShop) && draftCount !== String(selectedShop.table_count ?? 0);
+  useEffect(() => {
+    if (!sharedScope || !adminShopScope.registerGuard) return undefined;
+    return adminShopScope.registerGuard(() => saving || layoutEditing || dirtyCount || inspectTableNumber !== null
+      ? 'Do‘konni almashtirishdan oldin stol oynasini yoping va stol o‘zgarishlarini saqlang yoki bekor qiling.' : '');
+  }, [sharedScope, adminShopScope?.registerGuard, saving, layoutEditing, dirtyCount, inspectTableNumber]);
   const adjustCount = (step) => setDraftCount((previous) =>
     String(Math.max(0, Math.min(MAX_TABLES, (Number(previous) || 0) + step))));
 
@@ -97,7 +106,8 @@ export default function RestaurantTables() {
   };
 
   const changeShop = async (shopId) => {
-    if (shopId === selectedShopId || saving) return;
+    if (shopId === effectiveShopId || saving) return;
+    if (sharedScope && !adminShopScope.selectShop(shopId)) return;
     if (layoutEditing && !(await odinaConfirm('Xaritadagi saqlanmagan o‘zgarishlar yo‘qoladi. Boshqa do‘konga o‘tasizmi?'))) return;
     setLayoutEditing(false);
     setInspectTableNumber(null);
@@ -150,6 +160,11 @@ export default function RestaurantTables() {
         </div>
       ) : (
         <div className="space-y-5">
+          {scopedShopId && !selectedShop && <div role="status" className="rounded-2xl border border-border bg-card p-8 text-center">
+            <Building2 className="w-8 h-8 mx-auto text-brand-olive mb-3" />
+            <h2 className="font-semibold">Tanlangan joyda kassa stollari mavjud emas</h2>
+            <p className="text-sm text-muted-foreground mt-2">Stollarni ko‘rish uchun umumiy tanlovdan do‘konni tanlang.</p>
+          </div>}
           {selectedShop && <section className="odina-table-overview" aria-label="Zal holati">
             <div className="odina-table-overview-shop"><Building2 className="h-5 w-5" aria-hidden="true" /><div><span>Tanlangan zal</span><strong>{selectedShop.name}</strong></div></div>
             <dl className="odina-table-overview-counts">
@@ -198,7 +213,7 @@ export default function RestaurantTables() {
             )}
           </div>
 
-          {canManage && shops.length > 1 && (
+          {canManage && !scopedShopId && shops.length > 1 && (
             <div aria-label="Do‘kon tanlash" className="flex gap-2 flex-wrap items-center">
               <span className="text-xs font-semibold text-muted-foreground mr-1">Do‘kon:</span>
               {shops.map((shop) => (
@@ -207,9 +222,9 @@ export default function RestaurantTables() {
                   type="button"
                   disabled={saving}
                   onClick={() => void changeShop(shop.id)}
-                  aria-pressed={shop.id === selectedShopId}
+                  aria-pressed={shop.id === effectiveShopId}
                   className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors touch-manipulation flex items-center gap-1.5 ${
-                    shop.id === selectedShopId
+                    shop.id === effectiveShopId
                       ? 'border-brand-olive bg-brand-olive/20 text-foreground shadow-xs'
                       : 'border-border bg-card hover:bg-secondary text-muted-foreground'
                   }`}
@@ -384,4 +399,3 @@ export default function RestaurantTables() {
     </div>
   );
 }
-
