@@ -188,6 +188,36 @@ test('malformed success response cannot replace a different staff row', async ()
   } finally { await f.close(); }
 });
 
+test('success with the old name keeps the dialog open until the saved name is confirmed', async () => {
+  let attempts = 0;
+  const f = await fixture({ invoke: async (_name, payload) => ({ data: { ok: true, user: {
+    id: 'worker', email: workerEmail, role: 'cashier', shop_id: 'branch', active: true,
+    full_name: attempts++ === 0 ? 'mahkamsadullayev1' : payload.full_name,
+  } } }) });
+  try {
+    await f.open();
+    await changeName(f.tree, '  Mahkam Sadullayev  ');
+    await act(async () => submit(f.tree));
+    assert.equal(f.tree.root.findAllByType('form').length, 1, 'unconfirmed writes do not close the editor');
+    assert.equal(f.tree.root.findByProps({ id: 'staff-display-name' }).props.value, '  Mahkam Sadullayev  ');
+    assert.equal(f.tree.root.findByProps({ id: 'staff-name-email' }).props.value, workerEmail);
+    assert.equal(text(f.tree.root.findByProps({ role: 'alert' })), 'Yangi ism saqlanganligi tasdiqlanmadi. Qayta urinib ko‘ring.');
+    assert.equal(button(f.tree, 'Ismni saqlash').props.disabled, false);
+    assert.ok(text(row(f.tree, workerEmail)).includes('mahkamsadullayev1'), 'the row keeps the previous confirmed name');
+    assert.equal(text(row(f.tree, workerEmail)).includes('Mahkam Sadullayev'), false);
+
+    await act(async () => submit(f.tree));
+    assert.equal(f.writes().length, 2);
+    assert.ok(f.writes().every(call => call.payload.full_name === 'Mahkam Sadullayev'));
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    assert.ok(text(row(f.tree, workerEmail)).includes('Mahkam Sadullayev'));
+    await f.open();
+    assert.equal(f.tree.root.findByProps({ id: 'staff-display-name' }).props.value, 'Mahkam Sadullayev');
+    assert.equal(button(f.tree, 'Ismni saqlash').props.disabled, true);
+    assert.equal(f.tree.root.findAllByProps({ role: 'alert' }).length, 0);
+  } finally { await f.close(); }
+});
+
 for (const canManageAdmins of [false, true]) {
   test('rename controls preserve owner/self/admin protections with can_manage_admins=' + canManageAdmins, async () => {
     const f = await fixture({ canManageAdmins });
