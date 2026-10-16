@@ -1,0 +1,174 @@
+// Render the real stock shelf; all balances and mutations stay in memory.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import React from 'react';
+import { create, act } from 'react-test-renderer';
+import * as shelf from '../src/lib/cake-stock-shelf.js';
+
+const text = node => typeof node === 'string' || typeof node === 'number' ? String(node)
+  : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
+const button = (tree, label) => tree.root.findAllByType('button').find(node => text(node.props.children) === label);
+const tile = (tree, name) => tree.root.findAllByType('button').find(node => node.props['aria-label']?.startsWith(name + ':'));
+const changeQuantity = async (tree, value) => act(async () => {
+  tree.root.findByProps({ id: 'cake-operation-quantity' }).props.onChange({ target: { value } });
+});
+const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+
+async function fixture({ role = 'cashier', invoke } = {}) {
+  const products = [
+    { id: 'a', name: 'Cake A', active: true, price: 30000 },
+    { id: 'b', name: 'Cake B', active: true, price: 32000 },
+    { id: 'negative', name: 'Negative', active: true },
+    { id: 'missing', name: 'Missing', active: true },
+    { id: 'inactive', name: 'Inactive', active: false },
+    { id: 'zero', name: 'Zero', active: true },
+  ];
+  const rows = [
+    { id: 'sa', product_id: 'a', location_id: 'branch', quantity: 5, unit: 'piece' },
+    { id: 'sb', product_id: 'b', location_id: 'branch', quantity: 9, unit: 'piece' },
+    { id: 'sn', product_id: 'negative', location_id: 'branch', quantity: -3, unit: 'piece' },
+    { id: 'si', product_id: 'inactive', location_id: 'branch', quantity: 2, unit: 'piece' },
+    { id: 'sz', product_id: 'zero', location_id: 'branch', quantity: 0, unit: 'piece' },
+    { id: 'other-a', product_id: 'a', location_id: 'other', quantity: 17, unit: 'piece' },
+  ];
+  const sent = []; let reads = 0;
+  const backend = { entities: {
+    ProductStock: {
+      filter: async query => { reads++; return rows.filter(row => row.location_id === query.location_id).map(row => ({ ...row })); },
+      subscribe: () => () => {},
+    },
+    StockMovement: { filter: async () => [] },
+    StockTransfer: { filter: async () => [] },
+  }, functions: { invoke: async (name, payload) => {
+    sent.push({ name, payload: structuredClone(payload) });
+    if (invoke) return invoke(name, payload);
+    const row = rows.find(row => row.product_id === payload.item_id && row.location_id === payload.location_id);
+    assert.equal(row.quantity, payload.expected_quantity);
+    row.quantity += payload.quantity_change;
+    return { data: { stock: { ...row } } };
+  } } };
+  const wrapper = tag => ({ children, ...props }) => React.createElement(tag, props, children);
+  const require = specifier => {
+    if (specifier === 'react') return { ...React, default: React };
+    if (specifier === '@/api/base44Client') return { base44: backend };
+    if (specifier === '@/lib/cake-stock-shelf') return shelf;
+    if (specifier === '@/lib/pos') return { formatNum: String, formatUZS: String };
+    if (specifier === '@/lib/shop-pricing') return { priceForShop: product => product.price };
+    if (specifier === '@/lib/uzbekistan-time') return { formatUzbekistanTime: String, formatUzbekistanDateTime: String };
+    if (specifier === 'lucide-react') return new Proxy({}, { get: () => wrapper('svg') });
+    if (specifier.endsWith('/odina-select')) return { default: wrapper('select') };
+    if (specifier.endsWith('/TransfersPanel')) return { default: wrapper('div') };
+    if (specifier.endsWith('.css')) return {};
+    if (specifier.startsWith('@/components/ui/')) return new Proxy({}, { get: (_target, name) =>
+      wrapper(({ Button: 'button', Input: 'input', Textarea: 'textarea', Label: 'label', Image: 'img' })[name] || 'div') });
+    throw Error('Unexpected dependency: ' + specifier);
+  };
+  const source = ts.transpileModule(readFileSync('src/components/products/CakeStockShelf.jsx', 'utf8'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React },
+  }).outputText;
+  const module = { exports: {} };
+  const eventTarget = { addEventListener() {}, removeEventListener() {} };
+  const context = {
+    console, navigator: { onLine: true }, window: eventTarget,
+    document: { ...eventTarget, visibilityState: 'visible' },
+    setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout,
+  };
+  vm.runInNewContext('(function(require,module,exports){' + source + '\n})', context)(require, module, module.exports);
+  let tree;
+  await act(async () => { tree = create(React.createElement(module.exports.default, {
+    user: { role, shop_id: 'branch' }, products, categories: [],
+    shops: [{ id: 'branch', name: 'Odina Branch' }, { id: 'other', name: 'Odina Central' }],
+  })); });
+  return { tree, sent, rows, reads: () => reads, close: async () => act(async () => tree.unmount()) };
+}
+
+test('incoming mode opens the clicked cake and adds to its actual balance', async () => {
+  const f = await fixture();
+  try {
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => tile(f.tree, 'Cake B').props.onClick());
+    assert.equal(f.tree.root.findByProps({ id: 'cake-operation-reason' }).props.value, 'Kelgan tortlar');
+    await changeQuantity(f.tree, '3');
+    assert.equal(button(f.tree, 'Kirimni saqlash').props.disabled, false);
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent[0].name, 'warehouse-stock');
+    assert.deepEqual(f.sent[0].payload, {
+      action: 'adjust_stock', location_id: 'branch', item_kind: 'product', item_id: 'b',
+      movement_type: 'adjustment', expected_quantity: 9, quantity_change: 3,
+      reason: 'Tort kirimi: Kelgan tortlar',
+    });
+    assert.equal(f.rows.find(row => row.id === 'sb').quantity, 12);
+    assert.equal(f.rows.find(row => row.id === 'sa').quantity, 5);
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    assert.ok(JSON.stringify(f.tree.toJSON()).includes('Cake B: qoldiq 12 dona.'));
+  } finally { await f.close(); }
+});
+
+test('rapid duplicate submit sends only one incoming request', async () => {
+  let resolve;
+  const f = await fixture({ invoke: () => new Promise(done => { resolve = done; }) });
+  try {
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => tile(f.tree, 'Cake A').props.onClick());
+    await changeQuantity(f.tree, '2');
+    let first;
+    await act(async () => { first = submit(f.tree); await submit(f.tree); });
+    assert.equal(f.sent.length, 1);
+    await act(async () => { resolve({ data: { stock: { id: 'sa', product_id: 'a', quantity: 7 } } }); await first; });
+    assert.equal(f.sent.length, 1);
+  } finally { await f.close(); }
+});
+
+test('negative, missing and inactive balances cannot become an incoming receipt', async () => {
+  const f = await fixture();
+  try {
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    for (const name of ['Negative', 'Missing', 'Inactive']) {
+      await act(async () => tile(f.tree, name).props.onClick());
+      assert.equal(f.tree.root.findAllByType('form').length, 0);
+    }
+    assert.equal(f.sent.length, 0);
+    await act(async () => tile(f.tree, 'Zero').props.onClick());
+    assert.equal(f.tree.root.findAllByType('form').length, 1);
+  } finally { await f.close(); }
+});
+
+test('changing shops exits incoming mode and uses the destination balance', async () => {
+  const f = await fixture({ role: 'admin' });
+  try {
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => f.tree.root.findByProps({ id: 'cake-stock-shop' }).props.onChange({ target: { value: 'other' } }));
+    assert.equal(button(f.tree, 'Kirim kiritish').props['aria-pressed'], false);
+    await act(async () => tile(f.tree, 'Cake A').props.onClick());
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => tile(f.tree, 'Cake A').props.onClick());
+    await changeQuantity(f.tree, '2');
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent[0].payload.location_id, 'other');
+    assert.equal(f.sent[0].payload.expected_quantity, 17);
+    assert.equal(f.rows.find(row => row.id === 'other-a').quantity, 19);
+    assert.equal(f.rows.find(row => row.id === 'sa').quantity, 5);
+  } finally { await f.close(); }
+});
+
+test('uncertain save freezes the form and reloads balances without resubmitting', async () => {
+  const f = await fixture({ invoke: async () => { throw Error('Reply lost'); } });
+  try {
+    await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+    await act(async () => tile(f.tree, 'Cake A').props.onClick());
+    await changeQuantity(f.tree, '4');
+    const before = f.reads();
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent.length, 1);
+    assert.equal(button(f.tree, 'Kirimni saqlash').props.disabled, true);
+    assert.equal(f.tree.root.findByProps({ id: 'cake-operation-quantity' }).props.disabled, true);
+    assert.ok(f.reads() > before);
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent.length, 1);
+  } finally { await f.close(); }
+});
