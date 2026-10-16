@@ -1,4 +1,26 @@
 export const CAKE_STOCK_PAGE_SIZE = 48;
+export const CAKE_STOCK_COLUMN_ROWS = 6;
+
+// Products have already been scoped to the selected shop by cakeProducts.
+export function cakeStockColumns(products, categories, shopId) {
+  const catalog = new Map((categories || []).map((category) => [category.id, category]));
+  const groups = new Map();
+  for (const product of products || []) {
+    const id = product.shop_category_ids?.[shopId] || product.category_id || '__uncategorized';
+    const category = catalog.get(id);
+    if (!groups.has(id)) groups.set(id, {
+      id,
+      name: category?.name || product.category_name || 'Kategoriyasiz',
+      order: Number(category?.sort_order) || 0,
+      products: [],
+    });
+    groups.get(id).products.push(product);
+  }
+  return [...groups.values()].sort((a, b) =>
+    Number(a.id === '__uncategorized') - Number(b.id === '__uncategorized')
+    || a.order - b.order || a.name.localeCompare(b.name, 'uz', { numeric: true }));
+}
+
 export const CAKE_STOCK_ROLES = new Set(['admin', 'manager', 'cashier', 'accountant', 'production']);
 
 export function assignedStockShop(user) {
