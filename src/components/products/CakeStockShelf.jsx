@@ -87,6 +87,8 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
   const [selectedShopId, setSelectedShopId] = useState(() => allowedShops.find((s) => /branch/i.test(s.name))?.id || allowedShops[0]?.id || '');
   const shop = allowedShops.find((s) => s.id === selectedShopId) || allowedShops[0] || null;
   const [view, setView] = useState('shelf');
+  const [entryMode, setEntryMode] = useState(false);
+  const [notice, setNotice] = useState('');
   const balances = useLiveCakeBalances(shop?.id || '');
   const cakes = useMemo(() => cakeProducts(products, categories, shop?.id), [products, categories, shop?.id]);
   const [search, setSearch] = useState('');
@@ -114,16 +116,26 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
   const counts = cakes.reduce((result, p) => { const s = cakeStockInfo(balances.rows, p.id, balances.ready); if (s.status === 'positive') result.inStock++; if (['negative', 'missing', 'invalid'].includes(s.status)) result.needsCount++; return result; }, { inStock: 0, needsCount: 0 });
   const canChange = CAKE_STOCK_ROLES.has(user?.role) && balances.online && balances.ready && !balances.error;
   useEffect(() => { setPage(0); }, [search, category, stockFilter, shop?.id]);
-  useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); }, [shop?.id]);
-  const selectProduct = (product) => { setSelectedId(product.id); setShowHistory(false); };
-  const openOperation = (mode) => {
-    if (!selected || !canChange || selectedStock.status === 'invalid') return;
-    setOperation({ product: selected, shop, mode, current: selectedStock.quantity, stockStatus: selectedStock.status });
+  useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); setEntryMode(false); setNotice(''); }, [shop?.id]);
+  const openOperation = (mode, product = selected) => {
+    const info = product ? cakeStockInfo(balances.rows, product.id, balances.ready) : null;
+    if (!product || !canChange || product.active === false || info.status === 'invalid') return;
+    if (mode !== 'count' && (info.quantity == null || info.quantity < 0)) return;
+    if (mode === 'out' && !(info.quantity > 0)) return;
+    setNotice('');
+    setOperation({ product, shop, mode, current: info.quantity, stockStatus: info.status });
+  };
+  const selectProduct = (product) => {
+    setSelectedId(product.id); setShowHistory(false);
+    if (entryMode) openOperation('in', product);
   };
   const onSaved = async (stock) => {
     setOperation(null); setHistoryVersion((version) => version + 1);
     await balances.refresh();
-    if (stock?.product_id) setSelectedId(stock.product_id);
+    if (stock?.product_id) {
+      setSelectedId(stock.product_id);
+      setNotice((operation?.product?.name || 'Tort') + ': qoldiq ' + formatNum(stock.quantity) + ' dona. ' + (operation?.mode === 'in' ? 'Kirim tarixga yozildi.' : 'Qoldiq saqlandi.'));
+    }
   };
 
   if (!shop) return <div className="cake-stock-message" role="status"><AlertTriangle aria-hidden="true" /><div><strong>Do‘kon biriktirilmagan</strong><p>Tort qoldig‘ini ko‘rish uchun hisobingizga do‘kon biriktirilishi kerak.</p></div></div>;
@@ -145,9 +157,12 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
     {balances.error && <div className="cake-stock-message is-warning" role="alert"><AlertTriangle aria-hidden="true" /><p>{balances.error} Oxirgi ma’lumot ko‘rsatilishi mumkin. Kirim yoki chiqimdan oldin yangilang.</p></div>}
     {balances.ready && counts.needsCount > 0 && <div className="cake-stock-message is-warning"><ClipboardCheck aria-hidden="true" /><p><strong>{counts.needsCount} ta tort turi sanoq yoki tekshiruv talab qiladi.</strong> Manfiy qoldiq haqiqiy dona soni emas. Mahsulotni tanlab, “Haqiqiy sanoq” orqali hozirgi miqdorni kiriting.</p></div>}
     <nav className="cake-stock-tabs" aria-label="Tort ombori ko‘rinishi">
-      <Button type="button" variant={view === 'shelf' ? 'default' : 'outline'} onClick={() => setView('shelf')} aria-pressed={view === 'shelf'}><Cake className="mr-2 h-4 w-4" />Tort tokchasi</Button>
-      <Button type="button" variant={view === 'transfers' ? 'default' : 'outline'} onClick={() => setView('transfers')} aria-pressed={view === 'transfers'}><Truck className="mr-2 h-4 w-4" />Kelgan transferlar</Button>
+      <Button type="button" variant={view === 'shelf' && !entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(false); }} aria-pressed={view === 'shelf' && !entryMode}><Cake className="mr-2 h-4 w-4" />Tort tokchasi</Button>
+      {CAKE_STOCK_ROLES.has(user?.role) && <Button type="button" variant={entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(true); setNotice(''); }} aria-pressed={entryMode} disabled={!canChange}><ArrowDownLeft className="mr-2 h-4 w-4" />Kirim kiritish</Button>}
+      <Button type="button" variant={view === 'transfers' ? 'default' : 'outline'} onClick={() => { setView('transfers'); setEntryMode(false); }} aria-pressed={view === 'transfers'}><Truck className="mr-2 h-4 w-4" />Kelgan transferlar</Button>
     </nav>
+    {notice && <div className="cake-stock-message cake-stock-success" role="status"><Check aria-hidden="true" /><p>{notice}</p></div>}
+    {view === 'shelf' && entryMode && <div className="cake-stock-entry-guide"><ArrowDownLeft aria-hidden="true" /><div><strong>Kelgan tortning rasmini bosib qo‘shing</strong><p>1. Tortni tanlang · 2. Kelgan dona sonini kiriting · 3. Kirimni saqlang</p><small>Markazdan yuborilgan transfer uchun “Kelgan transferlar”ni oching.</small></div></div>}
     {view === 'transfers' ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={cakes} onBalanceRefresh={balances.refresh} /> : <>
       <div className="cake-stock-filters">
         <label className="cake-stock-search"><span className="sr-only">Tort qidirish</span><Search aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tort nomini qidiring…" /></label>
@@ -165,7 +180,7 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
                 return <button key={p.id} type="button" data-position={index} className={'cake-stock-cell ' + info.status + (selected?.id === p.id ? ' is-selected' : '')} aria-pressed={selected?.id === p.id} aria-label={p.name + ': ' + (info.quantity == null ? info.label : formatNum(info.quantity) + ' dona, ' + info.label)} onClick={() => selectProduct(p)} onKeyDown={(e) => {
                   const col = index % 8, target = e.key === 'ArrowRight' && col < 7 ? index + 1 : e.key === 'ArrowLeft' && col > 0 ? index - 1 : e.key === 'ArrowDown' ? index + 8 : e.key === 'ArrowUp' ? index - 8 : null;
                   if (target !== null && target >= 0 && target < pageProducts.length) { e.preventDefault(); shelfRef.current?.querySelector('[data-position="' + target + '"]')?.focus(); }
-                }}><CakePhoto product={p} /><strong title={p.name}>{p.name}</strong><span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatNum(info.quantity)}<small>{info.quantity == null ? '' : ' dona'}</small></span>{['negative', 'missing', 'invalid'].includes(info.status) && <span className="cake-stock-cell-note">{info.label}</span>}</button>;
+                }}><CakePhoto product={p} /><strong title={p.name}>{p.name}</strong>{entryMode && <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span>}<span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatNum(info.quantity)}<small>{info.quantity == null ? '' : ' dona'}</small></span>{['negative', 'missing', 'invalid'].includes(info.status) && <span className="cake-stock-cell-note">{info.label}</span>}</button>;
               })}
               {visible.length > 0 && Array.from({ length: CAKE_STOCK_PAGE_SIZE - pageProducts.length }, (_, i) => <div key={'empty-' + i} className="cake-stock-empty-cell" aria-hidden="true"><span>·</span></div>)}
             </div>
@@ -182,6 +197,7 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
               <Button type="button" variant="outline" onClick={() => openOperation('out')} disabled={selected.active === false || !(selectedStock.quantity > 0)}><ArrowUpRight className="mr-1.5 h-4 w-4" />Chiqim</Button>
               <Button type="button" variant="outline" onClick={() => openOperation('count')} disabled={selected.active === false} className="cake-stock-count-action"><ClipboardCheck className="mr-2 h-4 w-4" />Haqiqiy sanoq</Button>
             </div>}
+            {entryMode && ['negative', 'missing'].includes(selectedStock.status) && <p className="cake-stock-help cake-stock-entry-warning">Kirimdan oldin “Haqiqiy sanoq” orqali hozir mavjud tortlar sonini kiriting. Keyin kelgan tortlarni alohida kirim qiling.</p>}
             {selected.active === false && <p className="cake-stock-help">Sotuvdan olingan mahsulot. O‘zgartirish uchun katalogdagi holatini tekshiring.</p>}
             <p className="cake-stock-help">Kassa savdolari avtomatik kamayadi. Markazdan transfer kelgan bo‘lsa, “Kelgan transferlar”dan qabul qiling. Bir kirimni qayta kiritmang.</p>
             <Button type="button" variant="outline" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory} className="w-full min-h-11"><History className="mr-2 h-4 w-4" />Kirim-chiqim tarixi</Button>
@@ -198,7 +214,7 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
 const MODE_LABELS = { in: 'Tort kirimi', out: 'Tort chiqimi', count: 'Haqiqiy sanoq' };
 export function CakeStockOperation({ operation, onClose, onSaved, onRefresh, online }) {
   const [quantity, setQuantity] = useState('');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState(() => operation?.mode === 'in' ? 'Kelgan tortlar' : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [needsReview, setNeedsReview] = useState(false);
@@ -230,14 +246,14 @@ export function CakeStockOperation({ operation, onClose, onSaved, onRefresh, onl
     <DialogContent className="cake-stock-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto">
       <DialogHeader><DialogTitle>{MODE_LABELS[operation.mode]}</DialogTitle><p className="text-sm text-muted-foreground">{operation.product.name} · {operation.shop.name}</p></DialogHeader>
       <form onSubmit={save} className="space-y-4">
-        <p className="cake-stock-operation-note">{operation.mode === 'count' ? 'Hozir sanab chiqqan haqiqiy dona sonini kiriting. Eski manfiy qoldiq shu miqdorga tuzatiladi.' : 'Bu qo‘lda qoldiq tuzatish. Kassa savdosi yoki qabul qilingan transferni qayta kiritmang. Masalliqlar sarfi hisoblanmaydi.'}</p>
-        <div><Label htmlFor="cake-operation-quantity">{operation.mode === 'count' ? 'Hozir mavjud (dona)' : 'Miqdor (dona)'}</Label><Input id="cake-operation-quantity" autoFocus type="number" min={operation.mode === 'count' ? 0 : 1} step="1" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} required disabled={saving || needsReview} /></div>
+        <p className="cake-stock-operation-note">{operation.mode === 'in' ? 'Do‘konga kelgan yangi tortlar sonini kiriting. Shu miqdor mavjud qoldiqqa qo‘shiladi. Markazdan yuborilgan transferni “Kelgan transferlar” orqali qabul qiling.' : operation.mode === 'count' ? 'Hozir sanab chiqqan haqiqiy dona sonini kiriting. Eski manfiy qoldiq shu miqdorga tuzatiladi.' : 'Bu qo‘lda qoldiq tuzatish. Kassa savdosi yoki qabul qilingan transferni qayta kiritmang. Masalliqlar sarfi hisoblanmaydi.'}</p>
+        <div><Label htmlFor="cake-operation-quantity">{operation.mode === 'in' ? 'Kelgan miqdor (dona)' : operation.mode === 'count' ? 'Hozir mavjud (dona)' : 'Miqdor (dona)'}</Label><Input id="cake-operation-quantity" autoFocus type="number" min={operation.mode === 'count' ? 0 : 1} step="1" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} required disabled={saving || needsReview} /></div>
         <div><Label htmlFor="cake-operation-reason">Sabab / izoh</Label><Textarea id="cake-operation-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} placeholder="Masalan: ertalabki sanoq" required disabled={saving || needsReview} /></div>
         <div className="cake-stock-operation-preview"><span>Oldingi: {operation.current == null ? 'kiritilmagan' : formatNum(operation.current) + ' dona'}</span><strong>Keyingi: {change.error ? '—' : formatNum(change.after) + ' dona'}</strong></div>
         {quantity !== '' && change.error && <p role="alert" className="text-sm text-destructive">{change.error}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {!online && <p role="alert" className="text-sm text-destructive">Internet yo‘q. Qoldiqni hozir o‘zgartirib bo‘lmaydi.</p>}
-        <DialogFooter><Button type="button" variant="outline" onClick={onClose} disabled={saving}><X className="mr-2 h-4 w-4" />Yopish</Button><Button type="submit" disabled={saving || needsReview || !online || Boolean(change.error) || !reason.trim()}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{saving ? 'Saqlanmoqda…' : 'Tarix bilan saqlash'}</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" onClick={onClose} disabled={saving}><X className="mr-2 h-4 w-4" />Yopish</Button><Button type="submit" disabled={saving || needsReview || !online || Boolean(change.error) || !reason.trim()}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{saving ? 'Saqlanmoqda…' : operation.mode === 'in' ? 'Kirimni saqlash' : 'Tarix bilan saqlash'}</Button></DialogFooter>
       </form>
     </DialogContent>
   </Dialog>;
