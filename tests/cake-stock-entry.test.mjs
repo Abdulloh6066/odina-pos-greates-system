@@ -16,6 +16,11 @@ const changeQuantity = async (tree, value) => act(async () => {
   tree.root.findByProps({ id: 'cake-operation-quantity' }).props.onChange({ target: { value } });
 });
 const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
+const keyboardPage = (tree, key) => act(async () => {
+  tree.root.findByProps({ 'aria-label': 'Mahsulotlar tokchasini surish' }).props.onKeyDown({
+    key, preventDefault() {}, stopPropagation() {}, currentTarget: { focus() {} },
+  });
+});
 
 async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [], viewport = null } = {}) {
   const products = suppliedProducts || [
@@ -199,16 +204,18 @@ test('category pages retain every cake under its own heading and filters reset t
         }
         seen.push(...names);
       }
-      if (page < 2) await act(async () => f.tree.root.findByProps({ 'aria-label': 'Keyingi tortlar' }).props.onClick());
+      if (page < 2) await keyboardPage(f.tree, 'PageDown');
     }
     assert.equal(seen.length, 23);
     assert.equal(new Set(seen).size, 23);
-    assert.equal(f.tree.root.findByProps({ 'aria-label': 'Keyingi tortlar' }).props.disabled, true);
+    await keyboardPage(f.tree, 'PageDown');
+    assert.match(text(f.tree.root.findByProps({ 'aria-live': 'polite' }).props.children), /^3 \/ 3 sahifa$/);
     await act(async () => f.tree.root.findAllByType('select').find(node => node.props['aria-label'] === 'Tort kategoriyasi').props.onChange({ target: { value: '18' } }));
     const columns = f.tree.root.findAllByProps({ className: 'cake-stock-category-column' });
     assert.equal(columns.length, 1);
     assert.equal(columns[0].props['aria-label'], '18 somlik');
-    assert.equal(f.tree.root.findByProps({ 'aria-label': 'Oldingi tortlar' }).props.disabled, true);
+    await keyboardPage(f.tree, 'PageUp');
+    assert.match(text(f.tree.root.findByProps({ 'aria-live': 'polite' }).props.children), /^1 \/ 2 sahifa$/);
     assert.match(text(f.tree.root.findByType('aside').findByType('h3').props.children), /Cake 14/);
     assert.equal(f.sent.length, 0);
   } finally { await f.close(); }
