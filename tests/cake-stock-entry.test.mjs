@@ -16,11 +16,7 @@ const changeQuantity = async (tree, value) => act(async () => {
   tree.root.findByProps({ id: 'cake-operation-quantity' }).props.onChange({ target: { value } });
 });
 const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
-const keyboardPage = (tree, key) => act(async () => {
-  tree.root.findByProps({ 'aria-label': 'Mahsulotlar tokchasini surish' }).props.onKeyDown({
-    key, preventDefault() {}, stopPropagation() {}, currentTarget: { focus() {} },
-  });
-});
+
 
 async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [], viewport = null } = {}) {
   const products = suppliedProducts || [
@@ -186,37 +182,34 @@ test('category columns follow each shop category and numeric category order', ()
   assert.equal(central.some(column => column.id === '18'), false);
 });
 
-test('category pages retain every cake under its own heading and filters reset the page', async () => {
+test('category rows show every product together and filters keep the right category and selection', async () => {
   const products = Array.from({ length: 23 }, (_, i) => ({
     id: 'group-' + i, name: 'Cake ' + i, active: true, category_id: i < 14 ? '15' : '18',
   }));
   const f = await fixture({ products, categories: [{ id: '18', name: '18 somlik' }, { id: '15', name: '15 somlik' }] });
   try {
-    const seen = [];
-    for (let page = 0; page < 3; page++) {
-      const columns = f.tree.root.findAllByProps({ className: 'cake-stock-category-column' });
-      assert.deepEqual(columns.map(column => column.props['aria-label']), ['15 somlik', '18 somlik']);
-      for (const column of columns) {
-        const names = column.findAllByType('button').map(node => node.props['aria-label'].split(':')[0]);
-        for (const name of names) {
-          const index = Number(name.slice(5));
-          assert.equal(column.props['aria-label'], index < 14 ? '15 somlik' : '18 somlik');
-        }
-        seen.push(...names);
-      }
-      if (page < 2) await keyboardPage(f.tree, 'PageDown');
-    }
+    const rows = f.tree.root.findAllByProps({ className: 'cake-stock-category-row' });
+    assert.deepEqual(rows.map(row => row.props['aria-label']), ['15 somlik', '18 somlik']);
+    assert.deepEqual(rows.map(row => row.findAllByType('button').length), [14, 9]);
+    const seen = rows.flatMap(row => row.findAllByType('button').map(node => {
+      const name = node.props['aria-label'].split(':')[0];
+      assert.equal(row.props['aria-label'], Number(name.slice(5)) < 14 ? '15 somlik' : '18 somlik');
+      return name;
+    }));
     assert.equal(seen.length, 23);
     assert.equal(new Set(seen).size, 23);
-    await keyboardPage(f.tree, 'PageDown');
-    assert.match(text(f.tree.root.findByProps({ 'aria-live': 'polite' }).props.children), /^3 \/ 3 sahifa$/);
+    assert.equal(f.tree.root.findAllByProps({ className: 'cake-stock-empty-cell' }).length, 0);
+    assert.doesNotMatch(text(f.tree.toJSON()), /\d+ \/ \d+ sahifa/);
+    await act(async () => tile(f.tree, 'Cake 22').props.onClick());
+    assert.equal(text(f.tree.root.findByType('aside').findByType('h3').props.children), 'Cake 22');
     await act(async () => f.tree.root.findAllByType('select').find(node => node.props['aria-label'] === 'Tort kategoriyasi').props.onChange({ target: { value: '18' } }));
-    const columns = f.tree.root.findAllByProps({ className: 'cake-stock-category-column' });
-    assert.equal(columns.length, 1);
-    assert.equal(columns[0].props['aria-label'], '18 somlik');
-    await keyboardPage(f.tree, 'PageUp');
-    assert.match(text(f.tree.root.findByProps({ 'aria-live': 'polite' }).props.children), /^1 \/ 2 sahifa$/);
-    assert.match(text(f.tree.root.findByType('aside').findByType('h3').props.children), /Cake 14/);
+    const filtered = f.tree.root.findAllByProps({ className: 'cake-stock-category-row' });
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].props['aria-label'], '18 somlik');
+    assert.equal(filtered[0].findAllByType('button').length, 9);
+    assert.equal(text(f.tree.root.findByType('aside').findByType('h3').props.children), 'Cake 22');
+    await act(async () => f.tree.root.findAllByType('select').find(node => node.props['aria-label'] === 'Tort kategoriyasi').props.onChange({ target: { value: '15' } }));
+    assert.equal(text(f.tree.root.findByType('aside').findByType('h3').props.children), 'Cake 0');
     assert.equal(f.sent.length, 0);
   } finally { await f.close(); }
 });
@@ -364,8 +357,8 @@ test('drag pans the shelf and suppresses its release click; a deliberate receipt
     assert.equal(f.tree.root.findByProps({ id: 'cake-operation-quantity' }).props.value, '');
   } finally { await f.close(); }
 });
-test('mouse swipes change pages without footer buttons, stay within bounds and retain each category', async () => {
-  const viewport = dragViewport(600, 600);
+test('continuous dragging clamps at both ends and keeps every product in its category', async () => {
+  const viewport = dragViewport(1800, 600);
   const products = Array.from({ length: 14 }, (_, i) => ({ id: 'swipe-' + i, name: 'Swipe ' + i, category_id: '15' }));
   const f = await fixture({ viewport, products, categories: [{ id: '15', name: '15 somlik' }] });
   const swipe = async (from, to) => act(async () => {
@@ -374,25 +367,28 @@ test('mouse swipes change pages without footer buttons, stay within bounds and r
     scrollport(f.tree).props.onPointerUp(pointer(viewport, to));
     assert.equal(releaseClick(f.tree, 'Swipe 7'), true);
   });
+  const allNames = () => f.tree.root.findByProps({ className: 'cake-stock-category-row' }).findAllByType('button').map(node => node.props['aria-label']);
   try {
-    await swipe(300, 450); // First page cannot move further back.
-    assert.ok(tile(f.tree, 'Swipe 0'));
-    await swipe(300, 150);
-    assert.ok(tile(f.tree, 'Swipe 6'));
-    assert.equal(tile(f.tree, 'Swipe 0'), undefined);
-    assert.equal(f.tree.root.findByProps({ className: 'cake-stock-category-column' }).props['aria-label'], '15 somlik');
-    await swipe(300, 150);
-    assert.ok(tile(f.tree, 'Swipe 12'));
-    await swipe(300, 150); // Last page cannot wrap around.
-    assert.ok(tile(f.tree, 'Swipe 12'));
-    await swipe(150, 300);
-    assert.ok(tile(f.tree, 'Swipe 6'));
-    await swipe(300, 280); // A short drag must not change the page.
-    assert.ok(tile(f.tree, 'Swipe 6'));
+    const before = allNames();
+    assert.equal(before.length, 14);
+    await swipe(300, 450);
+    assert.equal(viewport.scrollLeft, 0);
+    await swipe(1500, 0);
+    assert.equal(viewport.scrollLeft, 1200);
+    await swipe(300, 0);
+    assert.equal(viewport.scrollLeft, 1200);
+    assert.deepEqual(allNames(), before);
+    await swipe(0, 1500);
+    assert.equal(viewport.scrollLeft, 0);
+    assert.deepEqual(allNames(), before);
+    assert.equal(f.tree.root.findByProps({ className: 'cake-stock-category-row' }).props['aria-label'], '15 somlik');
+    assert.equal(f.tree.root.findAllByProps({ className: 'cake-stock-board-footer' })[0].findAllByType('button').length, 0);
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
     assert.equal(f.sent.length, 0);
   } finally { await f.close(); }
 });
-test('panning uses available columns before page turns; cancelled, vertical, touch and right-button gestures never turn a page', async () => {
+
+test('cancelled, vertical, touch and right-button gestures preserve all products and native scrolling', async () => {
   const viewport = dragViewport(900, 600);
   const products = Array.from({ length: 9 }, (_, i) => ({ id: 'pan-' + i, name: 'Pan ' + i }));
   const f = await fixture({ viewport, products });
@@ -431,4 +427,3 @@ test('panning uses available columns before page turns; cancelled, vertical, tou
     assert.equal(f.sent.length, 0);
   } finally { await f.close(); }
 });
-
