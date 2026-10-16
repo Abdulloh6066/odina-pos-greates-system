@@ -27,6 +27,22 @@
   .odina-home .odina-home-filter-label { font-size: 13px; font-weight: 600; color: var(--odina-text); }
   .odina-home .odina-home-shop-select { min-width: 0; min-height: 44px; box-shadow: none; }
   .odina-home .odina-home-filter-scope { margin: 0; text-align: right; color: var(--odina-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+  .odina-home .odina-home-filter-admin { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .odina-home .odina-home-filter-admin .odina-home-filter-scope { text-align: left; font-weight: 600; color: var(--odina-text); }
+  .odina-home .odina-home-shop-buttons { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .odina-home .odina-home-shop-button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    min-width: 0; max-width: 100%; min-height: 48px; padding: 11px 16px;
+    border: 1px solid var(--odina-line); border-radius: 12px;
+    background: var(--odina-surface); color: var(--odina-text);
+    font-size: 14px; font-weight: 600; line-height: 1.5; text-align: left;
+    overflow-wrap: anywhere; cursor: pointer; touch-action: manipulation;
+    transition: border-color .14s, background-color .14s;
+  }
+  .odina-home .odina-home-shop-button:not(:disabled):hover { border-color: var(--odina-olive); }
+  .odina-home .odina-home-shop-button[aria-pressed="true"] { border-color: var(--odina-olive); background: var(--odina-selection, #FECD7C); }
+  .odina-home .odina-home-shop-button:focus-visible { outline: 2px solid var(--odina-olive); outline-offset: 3px; }
+  .odina-home .odina-home-shop-button:disabled { opacity: .55; cursor: wait; }
   .odina-home .odina-home-expiry {
     min-height: 72px; margin-bottom: 24px; padding: 16px 18px; border-radius: 14px;
     border: 1px solid var(--odina-home-danger-line); background: var(--odina-home-danger-surface);
