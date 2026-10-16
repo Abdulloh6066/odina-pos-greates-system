@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { formatNum, formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import { formatUzbekistanDateTime, formatUzbekistanTime } from '@/lib/uzbekistan-time';
-import { CAKE_STOCK_PAGE_SIZE, CAKE_STOCK_ROLES, cakeProducts, cakeStockInfo, loadAllCakeBalances, mergeCakeStockEvent, stockChange, stockShops } from '@/lib/cake-stock-shelf';
+import { CAKE_STOCK_COLUMN_ROWS, CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, cakeStockInfo, loadAllCakeBalances, mergeCakeStockEvent, stockChange, stockShops } from '@/lib/cake-stock-shelf';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -108,15 +108,18 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
       && (!search.trim() || p.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
       && (stockFilter === 'all' || (stockFilter === 'positive' ? info.status === 'positive' : ['negative', 'missing', 'invalid'].includes(info.status)));
   });
-  const pageCount = Math.max(1, Math.ceil(visible.length / CAKE_STOCK_PAGE_SIZE));
+  const columns = cakeStockColumns(visible, categories, shop?.id);
+  const pageCount = Math.max(1, ...columns.map((column) => Math.ceil(column.products.length / CAKE_STOCK_COLUMN_ROWS)));
   const activePage = Math.min(page, pageCount - 1);
-  const pageProducts = visible.slice(activePage * CAKE_STOCK_PAGE_SIZE, (activePage + 1) * CAKE_STOCK_PAGE_SIZE);
-  const selected = cakes.find((p) => p.id === selectedId) || pageProducts[0] || cakes[0] || null;
+  const pageColumns = columns.map((column) => ({ ...column, total: column.products.length,
+    products: column.products.slice(activePage * CAKE_STOCK_COLUMN_ROWS, (activePage + 1) * CAKE_STOCK_COLUMN_ROWS) }));
+  const pageProducts = pageColumns.flatMap((column) => column.products);
+  const selected = pageProducts.find((p) => p.id === selectedId) || pageProducts[0] || null;
   const selectedStock = selected ? cakeStockInfo(balances.rows, selected.id, balances.ready) : null;
   const counts = cakes.reduce((result, p) => { const s = cakeStockInfo(balances.rows, p.id, balances.ready); if (s.status === 'positive') result.inStock++; if (['negative', 'missing', 'invalid'].includes(s.status)) result.needsCount++; return result; }, { inStock: 0, needsCount: 0 });
   const canChange = CAKE_STOCK_ROLES.has(user?.role) && balances.online && balances.ready && !balances.error;
   useEffect(() => { setPage(0); }, [search, category, stockFilter, shop?.id]);
-  useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); setEntryMode(false); setNotice(''); }, [shop?.id]);
+  useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); setEntryMode(false); setNotice(''); setCategory('all'); }, [shop?.id]);
   const openOperation = (mode, product = selected) => {
     const info = product ? cakeStockInfo(balances.rows, product.id, balances.ready) : null;
     if (!product || !canChange || product.active === false || info.status === 'invalid') return;
@@ -172,21 +175,29 @@ export default function CakeStockShelf({ user, products, categories, shops }) {
       <div className="cake-stock-layout">
         <div className="cake-stock-board">
           <div className="cake-stock-board-heading"><div><h3>{shop.name} · tort tokchasi</h3><p>{visible.length} ta mahsulot turi</p></div><span>{balances.ready ? counts.inStock + ' turda qoldiq bor' : 'Yuklanmoqda…'}</span></div>
-          <div className="cake-stock-board-scroll"><div className="cake-stock-board-inner">
-            <div className="cake-stock-column-labels" aria-hidden="true">{'ABCDEFGH'.split('').map((c) => <span key={c}>{c}</span>)}</div>
-            <div className="cake-stock-grid" ref={shelfRef} role="group" aria-label="8 ustunli tort tokchasi">
-              {pageProducts.map((p, index) => {
-                const info = cakeStockInfo(balances.rows, p.id, balances.ready);
-                return <button key={p.id} type="button" data-position={index} className={'cake-stock-cell ' + info.status + (selected?.id === p.id ? ' is-selected' : '')} aria-pressed={selected?.id === p.id} aria-label={p.name + ': ' + (info.quantity == null ? info.label : formatNum(info.quantity) + ' dona, ' + info.label)} onClick={() => selectProduct(p)} onKeyDown={(e) => {
-                  const col = index % 8, target = e.key === 'ArrowRight' && col < 7 ? index + 1 : e.key === 'ArrowLeft' && col > 0 ? index - 1 : e.key === 'ArrowDown' ? index + 8 : e.key === 'ArrowUp' ? index - 8 : null;
-                  if (target !== null && target >= 0 && target < pageProducts.length) { e.preventDefault(); shelfRef.current?.querySelector('[data-position="' + target + '"]')?.focus(); }
-                }}><CakePhoto product={p} /><strong title={p.name}>{p.name}</strong>{entryMode && <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span>}<span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatNum(info.quantity)}<small>{info.quantity == null ? '' : ' dona'}</small></span>{['negative', 'missing', 'invalid'].includes(info.status) && <span className="cake-stock-cell-note">{info.label}</span>}</button>;
-              })}
-              {visible.length > 0 && Array.from({ length: CAKE_STOCK_PAGE_SIZE - pageProducts.length }, (_, i) => <div key={'empty-' + i} className="cake-stock-empty-cell" aria-hidden="true"><span>·</span></div>)}
-            </div>
-            {!visible.length && <div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>Tort topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div>}
-          </div></div>
-          <div className="cake-stock-board-footer"><span className="cake-stock-swipe">Barcha ustunlarni ko‘rish uchun suring</span><span>{activePage + 1} / {pageCount} sahifa</span><div><Button type="button" variant="outline" size="icon" aria-label="Oldingi tortlar" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label="Keyingi tortlar" disabled={activePage + 1 >= pageCount} onClick={() => setPage(activePage + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
+          <div className="cake-stock-board-scroll cake-stock-category-scroll">
+            {visible.length > 0 ? <div className="cake-stock-category-columns" style={{ '--cake-column-count': columns.length }} ref={shelfRef} role="group" aria-label="Kategoriyalar bo‘yicha tort tokchasi">
+              {pageColumns.map((column, columnIndex) => <section key={column.id} className="cake-stock-category-column" aria-label={column.name}>
+                <h4 className="cake-stock-category-heading">{column.name}<span>{column.total} tur</span></h4>
+                <div className="cake-stock-category-items">
+                  {column.products.map((p, rowIndex) => {
+                    const info = cakeStockInfo(balances.rows, p.id, balances.ready);
+                    return <button key={p.id} type="button" data-column={columnIndex} data-row={rowIndex} className={'cake-stock-cell ' + info.status + (selected?.id === p.id ? ' is-selected' : '')} aria-pressed={selected?.id === p.id} aria-label={p.name + ': ' + (info.quantity == null ? info.label : formatNum(info.quantity) + ' dona, ' + info.label)} onClick={() => selectProduct(p)} onKeyDown={(e) => {
+                      const nextColumn = e.key === 'ArrowRight' ? columnIndex + 1 : e.key === 'ArrowLeft' ? columnIndex - 1 : columnIndex;
+                      const adjacent = pageColumns[nextColumn];
+                      const nextRow = e.key === 'ArrowDown' ? rowIndex + 1 : e.key === 'ArrowUp' ? rowIndex - 1
+                        : Math.min(rowIndex, (adjacent?.products.length || 0) - 1);
+                      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) || !adjacent?.products[nextRow]) return;
+                      e.preventDefault();
+                      shelfRef.current?.querySelector('[data-column="' + nextColumn + '"][data-row="' + nextRow + '"]')?.focus();
+                    }}><CakePhoto product={p} /><strong title={p.name}>{p.name}</strong>{entryMode && <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span>}<span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatNum(info.quantity)}<small>{info.quantity == null ? '' : ' dona'}</small></span>{['negative', 'missing', 'invalid'].includes(info.status) && <span className="cake-stock-cell-note">{info.label}</span>}</button>;
+                  })}
+                  {Array.from({ length: CAKE_STOCK_COLUMN_ROWS - column.products.length }, (_, index) => <div key={'empty-' + index} className="cake-stock-empty-cell" aria-hidden="true"><span>·</span></div>)}
+                </div>
+              </section>)}
+            </div> : <div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>Tort topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div>}
+          </div>
+          <div className="cake-stock-board-footer"><span className="cake-stock-swipe">Kategoriyalarni ko‘rish uchun suring</span><span>{activePage + 1} / {pageCount} sahifa</span><div><Button type="button" variant="outline" size="icon" aria-label="Oldingi tortlar" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label="Keyingi tortlar" disabled={activePage + 1 >= pageCount} onClick={() => setPage(activePage + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
         </div>
         <aside className="cake-stock-detail" aria-label="Tanlangan tort">
           {selected ? <>
