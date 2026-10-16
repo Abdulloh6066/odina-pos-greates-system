@@ -18,7 +18,7 @@ const changeQuantity = async (tree, value) => act(async () => {
 const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
 
 
-async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [], viewport = null } = {}) {
+async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [], ingredients = [], ingredientRows = [], transfers = [], viewport = null } = {}) {
   const products = suppliedProducts || [
     { id: 'a', name: 'Cake A', active: true, price: 30000 },
     { id: 'b', name: 'Cake B', active: true, price: 32000 },
@@ -47,7 +47,7 @@ async function fixture({ role = 'cashier', invoke, products: suppliedProducts, c
       subscribe: () => () => {},
     },
     StockMovement: { filter: async () => [] },
-    StockTransfer: { filter: async () => [] },
+    StockTransfer: { filter: async () => transfers.map(row => ({ ...row })) },
   }, functions: { invoke: async (name, payload) => {
     sent.push({ name, payload: structuredClone(payload) });
     if (invoke) return invoke(name, payload);
@@ -85,11 +85,19 @@ async function fixture({ role = 'cashier', invoke, products: suppliedProducts, c
   };
   vm.runInNewContext('(function(require,module,exports){' + source + '\n})', context)(require, module, module.exports);
   let tree;
-  await act(async () => { tree = create(React.createElement(module.exports.default, {
+  let props = {
     user: { role, shop_id: 'branch' }, products, categories, ingredients,
     shops: [{ id: 'branch', name: 'Odina Branch' }, { id: 'other', name: 'Odina Central' }],
-  }), { createNodeMock: element => element.props.className?.includes('cake-stock-category-scroll') ? viewport : null }); });
-  return { tree, sent, rows, reads: () => reads, close: async () => act(async () => tree.unmount()) };
+  };
+  await act(async () => { tree = create(React.createElement(module.exports.default, props), {
+    createNodeMock: element => element.props.className?.includes('cake-stock-category-scroll') ? viewport : null,
+  }); });
+  return { tree, sent, rows, reads: () => reads,
+    updateProducts: async nextProducts => act(async () => {
+      props = { ...props, products: nextProducts };
+      tree.update(React.createElement(module.exports.default, props));
+    }),
+    close: async () => act(async () => tree.unmount()) };
 }
 
 test('incoming mode opens the clicked cake and adds to its actual balance', async () => {
@@ -130,17 +138,98 @@ test('rapid duplicate submit sends only one incoming request', async () => {
   } finally { await f.close(); }
 });
 
-test('negative, missing and inactive balances cannot become an incoming receipt', async () => {
+test('negative and missing balances cannot become an incoming receipt; inactive products are absent', async () => {
   const f = await fixture();
   try {
     await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
-    for (const name of ['Negative', 'Missing', 'Inactive']) {
+    assert.equal(tile(f.tree, 'Inactive'), undefined);
+    for (const name of ['Negative', 'Missing']) {
       await act(async () => tile(f.tree, name).props.onClick());
       assert.equal(f.tree.root.findAllByType('form').length, 0);
     }
     assert.equal(f.sent.length, 0);
     await act(async () => tile(f.tree, 'Zero').props.onClick());
     assert.equal(f.tree.root.findAllByType('form').length, 1);
+  } finally { await f.close(); }
+});
+
+for (const scope of ['Tortlar', 'Barcha tayyor mahsulotlar']) {
+  test(scope + ' hides inactive products until reactivation and keeps filters, counts and details consistent', async () => {
+    let products = [
+      { id: 'a', name: 'Cake A', active: true, category_id: 'cakes' },
+      { id: 'b', name: 'Cake B', category_id: 'cakes' },
+      { id: 'inactive', name: 'Inactive', active: false, category_id: 'inactive-only' },
+      { id: 'ready', name: 'Prepared', active: true, source_type: 'shop_prepared', track_stock: true, category_id: 'ready' },
+      { id: 'inactive-ready', name: 'Inactive prepared', active: false, source_type: 'shop_prepared', track_stock: true, category_id: 'inactive-only' },
+    ];
+    const f = await fixture({ products, categories: [
+      { id: 'cakes', name: 'Tortlar' }, { id: 'inactive-only', name: 'Inactive category' }, { id: 'ready', name: 'Tayyor mahsulotlar' },
+    ] });
+    const categoryFilter = () => f.tree.root.findAllByType('select').find(node => node.props['aria-label']?.endsWith(' kategoriyasi'));
+    const search = async value => act(async () => f.tree.root.findByType('input').props.onChange({ target: { value } }));
+    const heading = () => text(f.tree.root.findByProps({ className: 'cake-stock-board-heading' }));
+    const selectedName = () => f.tree.root.findByType('aside').findAllByType('h3').map(node => text(node.props.children));
+    const setActive = async (id, active) => {
+      products = products.map(product => product.id === id ? { ...product, active } : product);
+      await f.updateProducts(products);
+    };
+    const categoryValues = () => categoryFilter().findAllByType('option').map(node => node.props.value);
+    try {
+      await act(async () => button(f.tree, scope).props.onClick());
+      const before = structuredClone(f.rows);
+      assert.ok(tile(f.tree, 'Cake A'));
+      assert.ok(tile(f.tree, 'Cake B'), 'legacy products without active remain visible');
+      assert.equal(Boolean(tile(f.tree, 'Prepared')), scope === 'Barcha tayyor mahsulotlar');
+      assert.equal(tile(f.tree, 'Inactive'), undefined);
+      assert.equal(tile(f.tree, 'Inactive prepared'), undefined);
+      assert.equal(categoryValues().includes('inactive-only'), false);
+      assert.ok(heading().includes((scope === 'Tortlar' ? 2 : 3) + ' ta mahsulot turi'));
+      assert.ok(heading().includes('2 turda qoldiq bor'));
+      await search('Inactive');
+      assert.ok(heading().includes('0 ta mahsulot turi'));
+      assert.deepEqual(selectedName(), []);
+      await search('');
+      await act(async () => tile(f.tree, 'Cake B').props.onClick());
+      assert.deepEqual(selectedName(), ['Cake B']);
+      await setActive('b', false);
+      assert.equal(tile(f.tree, 'Cake B'), undefined);
+      assert.deepEqual(selectedName(), [scope === 'Tortlar' ? 'Cake A' : 'Prepared']);
+      assert.ok(heading().includes('1 turda qoldiq bor'));
+      await setActive('inactive', true);
+      assert.ok(tile(f.tree, 'Inactive').props['aria-label'].includes('2 dona'));
+      assert.equal(categoryValues().includes('inactive-only'), true);
+      assert.ok(heading().includes('2 turda qoldiq bor'));
+      await act(async () => categoryFilter().props.onChange({ target: { value: 'inactive-only' } }));
+      assert.ok(heading().includes('1 ta mahsulot turi'));
+      assert.deepEqual(selectedName(), ['Inactive']);
+      await setActive('inactive', false);
+      assert.equal(tile(f.tree, 'Inactive'), undefined);
+      assert.equal(categoryValues().includes('inactive-only'), false);
+      assert.ok(heading().includes('0 ta mahsulot turi'));
+      assert.deepEqual(selectedName(), []);
+      assert.deepEqual(f.rows, before, 'visibility changes preserve all stored balances');
+      assert.equal(f.sent.length, 0);
+    } finally { await f.close(); }
+  });
+}
+
+test('pending transfers for inactive products remain available in both product scopes', async () => {
+  const transfers = [
+    { id: 'inactive-transfer', product_id: 'inactive', destination_location_id: 'branch', status: 'pending', quantity: 3 },
+  ];
+  const f = await fixture({ transfers });
+  try {
+    const before = structuredClone(f.rows);
+    for (const scope of ['Tortlar', 'Barcha tayyor mahsulotlar']) {
+      await act(async () => button(f.tree, scope).props.onClick());
+      assert.equal(tile(f.tree, 'Inactive'), undefined);
+      await act(async () => button(f.tree, 'Kelgan transferlar').props.onClick());
+      const panel = f.tree.root.findAllByType('div').find(node => Array.isArray(node.props.transfers));
+      assert.deepEqual(JSON.parse(JSON.stringify(panel.props.transfers)), transfers);
+      assert.equal(panel.props.products.find(product => product.id === 'inactive').active, false);
+    }
+    assert.deepEqual(f.rows, before);
+    assert.equal(f.sent.length, 0);
   } finally { await f.close(); }
 });
 
