@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Cake, Check, ChevronLeft, ChevronRight, ClipboardCheck, History, Loader2, RefreshCw, Search, Truck, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Cake, Check, ClipboardCheck, History, Loader2, RefreshCw, Search, Truck, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
@@ -304,7 +304,15 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
           <div className={'cake-stock-board-scroll cake-stock-category-scroll' + (dragging ? ' is-dragging' : '')} ref={scrollRef}
             onPointerDown={startShelfDrag} onPointerMove={moveShelfDrag} onPointerUp={finishShelfDrag}
             onPointerCancel={(event) => finishShelfDrag(event, true)} onLostPointerCapture={(event) => finishShelfDrag(event, true)}
-            onClickCapture={blockDraggedClick} onDragStart={(event) => event.preventDefault()} aria-describedby="cake-stock-drag-help">
+            onClickCapture={blockDraggedClick} onDragStart={(event) => event.preventDefault()} aria-describedby="cake-stock-drag-help"
+            role="region" aria-label="Mahsulotlar tokchasini surish" tabIndex={0} onKeyDown={(event) => {
+              const nextPage = event.key === 'PageDown' ? Math.min(activePage + 1, pageCount - 1)
+                : event.key === 'PageUp' ? Math.max(activePage - 1, 0) : activePage;
+              if (nextPage === activePage) return;
+              event.preventDefault(); event.stopPropagation();
+              setPage(nextPage);
+              event.currentTarget.focus({ preventScroll: true });
+            }}>
             {visible.length > 0 ? <div className="cake-stock-category-columns" style={{ '--cake-column-count': columns.length }} ref={shelfRef} role="group" aria-label={"Kategoriyalar bo‘yicha " + noun.toLocaleLowerCase() + " tokchasi"}>
               {pageColumns.map((column, columnIndex) => <section key={column.id} className="cake-stock-category-column" aria-label={column.name}>
                 <h4 className="cake-stock-category-heading">{column.name}<span>{column.total} tur</span></h4>
@@ -326,7 +334,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
               </section>)}
             </div> : <div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>{noun} topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div>}
           </div>
-          <div className="cake-stock-board-footer"><span className="cake-stock-swipe" id="cake-stock-drag-help">Ushlab o‘ng-chapga suring · chetida yana surib sahifani almashtiring</span><span aria-live="polite">{activePage + 1} / {pageCount} sahifa</span><div><Button type="button" variant="outline" size="icon" aria-label={scope === 'cakes' ? 'Oldingi tortlar' : 'Oldingi mahsulotlar'} disabled={activePage === 0} onClick={() => setPage(activePage - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label={scope === 'cakes' ? 'Keyingi tortlar' : 'Keyingi mahsulotlar'} disabled={activePage + 1 >= pageCount} onClick={() => setPage(activePage + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
+          <div className="cake-stock-board-footer"><span className="cake-stock-swipe" id="cake-stock-drag-help">Ushlab o‘ng-chapga suring · chetida yana surib sahifani almashtiring<span className="sr-only">. Klaviaturada: PageDown — keyingi sahifa, PageUp — oldingi sahifa.</span></span><span aria-live="polite">{activePage + 1} / {pageCount} sahifa</span></div>
         </div>
         <aside className="cake-stock-detail" aria-label={"Tanlangan " + noun.toLocaleLowerCase()}>
           {selected ? <>
