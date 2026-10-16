@@ -85,7 +85,7 @@ const kassaButtons = tree => tree.root.findAllByType('button').filter(node => no
 for (const mobileOpen of [false, true]) {
   for (const collapsed of [false, true]) {
     test('warehouse menu omits POS on ' + (mobileOpen ? 'mobile' : 'desktop') + (collapsed ? ' collapsed' : ''), async () => {
-      const f = await fixture({ mobileOpen, collapsed, shopId: 'branch' });
+      const f = await fixture({ mobileOpen, collapsed, shopId: 'sex' });
       try {
         await f.openScreens();
         assert.equal(kassaButtons(f.tree).length, 0);
@@ -115,15 +115,26 @@ test('production selection removes POS and retail shop changes restore it withou
     assert.equal(f.serviceCalls.length, 0);
   } finally { await f.close(); }
 });
-test('cashier keeps shop POS while the warehouse page has no POS menu entry', async () => {
-  const f = await fixture({ role: 'cashier', pathname: '/products', mobileOpen: true });
+test('Branch and Central retain POS on their warehouse inventory page', async () => {
+  const f = await fixture({ pathname: '/warehouse', shopId: 'central', mobileOpen: true });
   try {
     assert.ok(kassaButtons(f.tree).length > 0);
-    await f.update({ pathname: '/warehouse' });
+    await f.update({ shopId: 'branch' });
+    assert.ok(kassaButtons(f.tree).length > 0);
+    await f.update({ shopId: 'sex' });
     assert.equal(kassaButtons(f.tree).length, 0);
     await f.openScreens();
     assert.equal(posLinks(f.tree).length, 0);
-    await f.update({ pathname: '/products' });
+    await f.update({ shopId: 'central' });
     assert.ok(kassaButtons(f.tree).length > 0);
+    assert.ok(posLinks(f.tree).length > 0);
   } finally { await f.close(); }
 });
+test('cashier retail navigation remains available', async () => {
+  const f = await fixture({ role: 'cashier', pathname: '/products', mobileOpen: true });
+  try {
+    assert.ok(kassaButtons(f.tree).length > 0);
+    assert.ok(posLinks(f.tree).length > 0);
+  } finally { await f.close(); }
+});
+
