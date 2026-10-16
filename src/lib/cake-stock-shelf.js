@@ -10,7 +10,7 @@ export function inventoryUnits(item) {
 }
 
 export function formatStockQuantity(quantity, item) {
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 })
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: inventoryUnits(item).factor === 1000 ? 6 : 3 })
     .format(Number(quantity) / inventoryUnits(item).factor).replaceAll(',', ' ');
 }
 
