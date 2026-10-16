@@ -2,7 +2,7 @@ import '@/styles/dashboard-workbench.css';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { AlertTriangle, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Building2, Check, LayoutDashboard, ShoppingBag, Receipt, TrendingUp, Star, Users as UsersIcon, ArrowRight } from 'lucide-react';
 import { formatUZS, formatNum, saleBusinessDate, tashkentDateKey, canAccess } from '@/lib/pos';
 import PageHeader from '@/components/PageHeader';
 import OdinaSelect from '@/components/ui/odina-select';
@@ -213,25 +213,40 @@ export default function Dashboard() {
         )}
       />
 
-      <div className="odina-home-filter">
-        <label htmlFor="dashboard-shop" className="odina-home-filter-label">Do‘konni tanlang</label>
-        <OdinaSelect
-          id="dashboard-shop"
-          aria-label="Do‘kon bo‘yicha ko‘rish"
-          value={shopId}
-          disabled={loading || shops.length === 0}
-          onChange={(event) => setSelectedShopId(event.target.value)}
-          placeholder={shopName}
-          className="odina-home-shop-select w-full min-h-11 touch-manipulation"
-        >
-          {[
-            ...(role === 'manager' ? [] : [{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }]),
-            ...shops,
-            ...(role === 'manager' && shops.length === 0 ? [{ shop_id: assignedShopId, shop_name: shopName }] : []),
-          ].map((shop) => (
-            <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name}</option>
-          ))}
-        </OdinaSelect>
+      <div className={'odina-home-filter' + (role === 'admin' ? ' odina-home-filter-admin' : '')}>
+        {role === 'admin' ? <>
+          <span className="odina-home-filter-label">Do‘konni tanlang</span>
+          <div className="odina-home-shop-buttons" role="group" aria-label="Do‘kon bo‘yicha ko‘rish">
+            {[{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }, ...shops].map((shop) => (
+              <button key={shop.shop_id} type="button" className="odina-home-shop-button"
+                aria-pressed={shopId === shop.shop_id} disabled={loading || shops.length === 0}
+                onClick={() => setSelectedShopId(shop.shop_id)}>
+                <Building2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{shop.shop_name}</span>
+                {shopId === shop.shop_id && <Check className="w-4 h-4 shrink-0" aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        </> : <>
+          <label htmlFor="dashboard-shop" className="odina-home-filter-label">Do‘konni tanlang</label>
+          <OdinaSelect
+            id="dashboard-shop"
+            aria-label="Do‘kon bo‘yicha ko‘rish"
+            value={shopId}
+            disabled={loading || shops.length === 0}
+            onChange={(event) => setSelectedShopId(event.target.value)}
+            placeholder={shopName}
+            className="odina-home-shop-select w-full min-h-11 touch-manipulation"
+          >
+            {[
+              ...(role === 'manager' ? [] : [{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }]),
+              ...shops,
+              ...(role === 'manager' && shops.length === 0 ? [{ shop_id: assignedShopId, shop_name: shopName }] : []),
+            ].map((shop) => (
+              <option key={shop.shop_id} value={shop.shop_id}>{shop.shop_name}</option>
+            ))}
+          </OdinaSelect>
+        </>}
         <p aria-live="polite" className="odina-home-filter-scope">{shopName} · Bugungi ko‘rsatkichlar</p>
       </div>
 
