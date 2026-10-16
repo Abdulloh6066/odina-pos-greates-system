@@ -166,6 +166,76 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const pageColumns = columns.map((column) => ({ ...column, total: column.products.length,
     products: column.products.slice(activePage * CAKE_STOCK_COLUMN_ROWS, (activePage + 1) * CAKE_STOCK_COLUMN_ROWS) }));
   const pageProducts = pageColumns.flatMap((column) => column.products);
+
+  const scrollRef = useRef(null);
+  const dragRef = useRef(null);
+  const blockClickRef = useRef(false);
+  const clickResetRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => () => { clearTimeout(clickResetRef.current); dragRef.current = null; }, []);
+  useEffect(() => {
+    dragRef.current = null;
+    setDragging(false);
+    if (scrollRef.current) scrollRef.current.scrollLeft = 0;
+  }, [search, category, stockFilter, shop?.id, scope, view]);
+
+  const startShelfDrag = (event) => {
+    // Touch keeps the browser's native scrolling and pinch zoom.
+    if (!['mouse', 'pen'].includes(event.pointerType) || event.button !== 0 || event.isPrimary === false) return;
+    clearTimeout(clickResetRef.current);
+    blockClickRef.current = false;
+    const viewport = event.currentTarget;
+    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+      scrollLeft: viewport.scrollLeft, maxScroll: Math.max(0, viewport.scrollWidth - viewport.clientWidth),
+      moved: false, horizontal: false };
+  };
+  const moveShelfDrag = (event) => {
+    const gesture = dragRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
+    if (!gesture.moved) {
+      if (Math.hypot(dx, dy) < 7) return;
+      gesture.moved = true;
+      gesture.horizontal = Math.abs(dx) > Math.abs(dy);
+      blockClickRef.current = true;
+      if (gesture.horizontal) {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        setDragging(true);
+      }
+    }
+    if (!gesture.horizontal) return;
+    event.preventDefault();
+    event.currentTarget.scrollLeft = Math.max(0, Math.min(gesture.maxScroll, gesture.scrollLeft - dx));
+  };
+  const finishShelfDrag = (event, cancelled = false) => {
+    const gesture = dragRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+    const viewport = event.currentTarget;
+    if (viewport.hasPointerCapture?.(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    if (!cancelled && gesture.horizontal) {
+      const requestedScroll = gesture.scrollLeft - (event.clientX - gesture.x);
+      const pageThreshold = 90;
+      if (requestedScroll > gesture.maxScroll + pageThreshold && activePage + 1 < pageCount) {
+        setPage(activePage + 1);
+        viewport.scrollLeft = 0;
+      } else if (requestedScroll < -pageThreshold && activePage > 0) {
+        setPage(activePage - 1);
+        viewport.scrollLeft = gesture.maxScroll;
+      }
+    }
+    // The browser dispatches the release click before this timer. A later
+    // intentional click must still select a product or open its receipt form.
+    clickResetRef.current = setTimeout(() => { blockClickRef.current = false; }, 0);
+  };
+  const blockDraggedClick = (event) => {
+    if (blockClickRef.current && event.detail !== 0) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
   const selected = pageProducts.find((p) => p.id === selectedId) || pageProducts[0] || null;
   const selectedStock = selected ? inventoryStockInfo(balances.rows, selected, balances.ready) : null;
   const counts = cakes.reduce((result, p) => { const s = inventoryStockInfo(balances.rows, p, balances.ready); if (s.status === 'positive') result.inStock++; if (['negative', 'missing', 'invalid'].includes(s.status)) result.needsCount++; return result; }, { inStock: 0, needsCount: 0 });
@@ -231,7 +301,10 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
       <div className="cake-stock-layout">
         <div className="cake-stock-board">
           <div className="cake-stock-board-heading"><div><h3>{shop.name} · {scope === 'cakes' ? 'tort tokchasi' : 'mahsulotlar tokchasi'}</h3><p>{visible.length} ta mahsulot turi</p></div><span>{balances.ready ? counts.inStock + ' turda qoldiq bor' : 'Yuklanmoqda…'}</span></div>
-          <div className="cake-stock-board-scroll cake-stock-category-scroll">
+          <div className={'cake-stock-board-scroll cake-stock-category-scroll' + (dragging ? ' is-dragging' : '')} ref={scrollRef}
+            onPointerDown={startShelfDrag} onPointerMove={moveShelfDrag} onPointerUp={finishShelfDrag}
+            onPointerCancel={(event) => finishShelfDrag(event, true)} onLostPointerCapture={(event) => finishShelfDrag(event, true)}
+            onClickCapture={blockDraggedClick} onDragStart={(event) => event.preventDefault()} aria-describedby="cake-stock-drag-help">
             {visible.length > 0 ? <div className="cake-stock-category-columns" style={{ '--cake-column-count': columns.length }} ref={shelfRef} role="group" aria-label={"Kategoriyalar bo‘yicha " + noun.toLocaleLowerCase() + " tokchasi"}>
               {pageColumns.map((column, columnIndex) => <section key={column.id} className="cake-stock-category-column" aria-label={column.name}>
                 <h4 className="cake-stock-category-heading">{column.name}<span>{column.total} tur</span></h4>
@@ -253,7 +326,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
               </section>)}
             </div> : <div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>{noun} topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div>}
           </div>
-          <div className="cake-stock-board-footer"><span className="cake-stock-swipe">Kategoriyalarni ko‘rish uchun suring</span><span>{activePage + 1} / {pageCount} sahifa</span><div><Button type="button" variant="outline" size="icon" aria-label={scope === 'cakes' ? 'Oldingi tortlar' : 'Oldingi mahsulotlar'} disabled={activePage === 0} onClick={() => setPage(activePage - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label={scope === 'cakes' ? 'Keyingi tortlar' : 'Keyingi mahsulotlar'} disabled={activePage + 1 >= pageCount} onClick={() => setPage(activePage + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
+          <div className="cake-stock-board-footer"><span className="cake-stock-swipe" id="cake-stock-drag-help">Ushlab o‘ng-chapga suring · chetida yana surib sahifani almashtiring</span><span aria-live="polite">{activePage + 1} / {pageCount} sahifa</span><div><Button type="button" variant="outline" size="icon" aria-label={scope === 'cakes' ? 'Oldingi tortlar' : 'Oldingi mahsulotlar'} disabled={activePage === 0} onClick={() => setPage(activePage - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="icon" aria-label={scope === 'cakes' ? 'Keyingi tortlar' : 'Keyingi mahsulotlar'} disabled={activePage + 1 >= pageCount} onClick={() => setPage(activePage + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div>
         </div>
         <aside className="cake-stock-detail" aria-label={"Tanlangan " + noun.toLocaleLowerCase()}>
           {selected ? <>
