@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import {
   ArrowRight,
@@ -72,10 +72,14 @@ function groupTransferRows(rows) {
 }
 
 export default function TransfersPanel({
-  user, location, locations, products, productStock, transfers, archivedProductIds = [], search, onReload,
+  user, location, locations, products, productStock, transfers, archivedProductIds = [], search, onReload, adminShopScope,
 }) {
   const [sendOpen, setSendOpen] = useState(false);
   const [receivingId, setReceivingId] = useState('');
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  useEffect(() => shopScope?.registerGuard?.(() => receivingId || sendOpen
+    ? 'Avval transfer amali tugashini kuting yoki transfer oynasini yoping.' : ''),
+  [shopScope?.registerGuard, receivingId, sendOpen]);
   const canSend = ['admin', 'manager'].includes(user?.role) && location?.location_type === 'production';
   const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
   const effectiveLocationId = location?.id || assignedShopId;

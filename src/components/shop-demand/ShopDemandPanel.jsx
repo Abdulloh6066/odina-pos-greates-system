@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,33 +8,50 @@ import ShopDemandForm from '@/components/shop-demand/ShopDemandForm';
 import { useShopDemand } from '@/components/shop-demand/useShopDemand';
 import { DEMAND_STATUSES, sortRequests } from '@/lib/shop-demand';
 
-export default function ShopDemandPanel({ user, products, locations }) {
-  const { requests, itemsByRequest, loading, error, reload, create, update, cancel, accept, progress, send, safe } = useShopDemand(user);
+export default function ShopDemandPanel({ user, products, locations, adminShopScope }) {
+  const { requests, itemsByRequest, loading, error, busy, reload, create, update, cancel, accept, progress, send, safe } = useShopDemand(user);
   const role = user?.role;
+  const shopScope = role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  const scopedShopId = shopScope?.specificShopId || '';
+  const selectedShop = shopScope?.shops.find((shop) => shop.id === scopedShopId);
+  const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
+  const scopeReadOnly = Boolean(shopScope && (!shopScope.ready || !scopedShopId));
   const shopName = user?.shop_name || user?.data?.shop_name || '';
-  const canCreate = ['admin', 'manager', 'cashier'].includes(role);
+  // The existing backend creates demands only at the real employee assignment.
+  // A viewing filter must never relabel that assignment as another shop.
+  const canCreate = ['admin', 'manager', 'cashier'].includes(role) && (!shopScope
+    || (shopScope.ready && scopedShopId === assignedShopId && selectedShop?.location_type === 'shop'));
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [fDate, setFDate] = useState('');
   const [fShop, setFShop] = useState('');
   const [fProduct, setFProduct] = useState('');
   const [fStatus, setFStatus] = useState('');
+  useEffect(() => shopScope?.registerGuard?.(() => formOpen || busy
+    ? 'Avval talab oynasini yoping yoki talab amali tugashini kuting.' : ''),
+  [shopScope?.registerGuard, formOpen, busy]);
 
   const canViewAll = ['admin', 'accountant', 'production'].includes(role);
   const shopOptions = locations || [];
 
   const filtered = useMemo(() => sortRequests(requests.filter((r) => {
+    if (scopedShopId && r.shop_id !== scopedShopId) return false;
     if (fDate && r.required_date !== fDate) return false;
-    if (fShop && r.shop_id !== fShop) return false;
+    if (!shopScope && fShop && r.shop_id !== fShop) return false;
     if (fStatus && r.status !== fStatus) return false;
     if (fProduct && !(r.items || []).some((it) => it.product_id === fProduct)) return false;
     return true;
-  })), [requests, fDate, fShop, fStatus, fProduct]);
+  })), [requests, scopedShopId, Boolean(shopScope), fDate, fShop, fStatus, fProduct]);
 
-  const openCreate = () => { setEditing(null); setFormOpen(true); };
-  const openEdit = (req) => { setEditing(req); setFormOpen(true); };
+  const openCreate = () => { if (!canCreate) return; setEditing(null); setFormOpen(true); };
+  const openEdit = (req) => { if (scopeReadOnly || (scopedShopId && req.shop_id !== scopedShopId)) return; setEditing(req); setFormOpen(true); };
+  const scopedAction = (action) => (...args) => {
+    if (scopeReadOnly || (scopedShopId && !requests.some((request) => request.id === args[0] && request.shop_id === scopedShopId))) return;
+    return action(...args);
+  };
 
   const submitForm = async (data) => {
+    if (scopeReadOnly || (editing ? scopedShopId && editing.shop_id !== scopedShopId : !canCreate)) return;
     if (editing) {
       await safe(() => update({ request_id: editing.id, ...data }), 'Tahrirlash');
     } else {
@@ -63,6 +80,7 @@ export default function ShopDemandPanel({ user, products, locations }) {
           )}
         </div>
       </div>
+      {shopScope && !canCreate && <p className="rounded-xl border border-border bg-card p-3 text-sm">{scopeReadOnly ? 'Talab amallari uchun yuqoridan bitta do‘konni tanlang.' : 'Bu do‘kon talablari ko‘rsatilmoqda. Yangi talab mavjud qoida bo‘yicha faqat hisobingizga biriktirilgan do‘kondan yuboriladi.'}</p>}
 
       <div className="odina-panel rounded-2xl bg-card border border-border premium-shadow p-4 sm:p-5">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -73,7 +91,7 @@ export default function ShopDemandPanel({ user, products, locations }) {
           {canViewAll && (
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-muted-foreground">Do'kon</span>
-              <OdinaSelect value={fShop} onChange={(e) => setFShop(e.target.value)} className="w-full h-11 rounded-xl">
+              <OdinaSelect value={shopScope ? scopedShopId : fShop} onChange={(e) => shopScope ? shopScope.selectShop(e.target.value || 'all') : setFShop(e.target.value)} className="w-full h-11 rounded-xl">
                 <option value="">Barcha do'konlar</option>
                 {shopOptions.filter((s) => s.location_type !== 'production').map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </OdinaSelect>
@@ -115,18 +133,19 @@ export default function ShopDemandPanel({ user, products, locations }) {
               key={r.id}
               request={{ ...r, items: r.items || itemsByRequest[r.id] || [] }}
               user={user}
-              actions={{ accept, progress, send, cancel, onEdit: openEdit }}
+              readOnly={scopeReadOnly}
+              actions={{ accept: scopedAction(accept), progress: scopedAction(progress), send: scopedAction(send), cancel: scopedAction(cancel), onEdit: openEdit }}
             />
           ))}
         </div>
       )}
 
-      {canCreate && (
+      {(canCreate || editing) && (
         <ShopDemandForm
           open={formOpen}
           onClose={() => setFormOpen(false)}
           user={user}
-          shopName={shopName}
+          shopName={editing?.shop_name_snapshot || selectedShop?.name || shopName}
           products={products}
           editing={editing}
           onSubmit={submitForm}

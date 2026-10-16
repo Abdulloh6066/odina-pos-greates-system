@@ -22,7 +22,7 @@ function urgencyBadge(request) {
   return null;
 }
 
-export default function ShopDemandCard({ request, user, actions }) {
+export default function ShopDemandCard({ request, user, actions, readOnly = false }) {
   const items = request.items || [];
   const role = user?.role;
   const shopId = user?.shop_id || user?.data?.shop_id;
@@ -30,15 +30,15 @@ export default function ShopDemandCard({ request, user, actions }) {
   const [busy, setBusy] = useState(false);
 
   const status = demandStatus(request.status);
-  const canEditNow = request.status === 'yangi' && (role === 'admin' || request.shop_id === shopId);
-  const canAccept = (role === 'admin' || role === 'production') && request.status === 'yangi';
-  const canProgress = (role === 'admin' || role === 'production')
+  const canEditNow = !readOnly && request.status === 'yangi' && (role === 'admin' || request.shop_id === shopId);
+  const canAccept = !readOnly && (role === 'admin' || role === 'production') && request.status === 'yangi';
+  const canProgress = !readOnly && (role === 'admin' || role === 'production')
     && ['qabul_qilindi', 'tayyorlanmoqda'].includes(request.status);
-  const canSendNow = role === 'admin' && ['qabul_qilindi', 'tayyorlanmoqda', 'tayyor'].includes(request.status);
+  const canSendNow = !readOnly && role === 'admin' && ['qabul_qilindi', 'tayyorlanmoqda', 'tayyor'].includes(request.status);
   const hasRemaining = items.some((it) => remainingForItem(it) > 0);
 
   const run = async (fn) => {
-    if (busy) return;
+    if (busy || readOnly) return;
     setBusy(true);
     try { await fn(); } finally { setBusy(false); }
   };
