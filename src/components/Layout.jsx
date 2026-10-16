@@ -3,9 +3,10 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import OdinaBrand from './brand/OdinaBrand';
 import { useAuth } from '@/lib/AuthContext';
+import AdminShopSwitcher from './AdminShopSwitcher';
 
 export default function Layout() {
-  const { user, isLoadingAuth, checkUserAuth } = useAuth();
+  const { user, isLoadingAuth, checkUserAuth, adminShopScope } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('odina-sidebar-collapsed') === 'true');
   const [posCompact, setPosCompact] = useState(() => localStorage.getItem('odina-pos-density') === 'compact');
@@ -59,8 +60,9 @@ export default function Layout() {
     return (
       <div className="odina-redesign-shell min-h-dvh bg-background flex flex-col">
         <main className="odina-workspace odina-workbench flex-1 min-w-0" data-page={location.pathname}>
+          <AdminShopSwitcher scope={adminShopScope} pathname={location.pathname} />
           <Suspense fallback={pageFallback}>
-            <Outlet context={{ user, sidebarCollapsed: false, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: true }} />
+            <Outlet context={{ user, adminShopScope, sidebarCollapsed: false, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: true }} />
           </Suspense>
         </main>
       </div>
@@ -85,8 +87,9 @@ export default function Layout() {
           <div className="w-9" />
         </div>
         <main className="odina-workspace odina-workbench flex-1 min-w-0" data-page={location.pathname}>
+          <AdminShopSwitcher scope={adminShopScope} pathname={location.pathname} />
           <Suspense fallback={pageFallback}>
-            <Outlet context={{ user, sidebarCollapsed: effectiveSidebarCollapsed, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: false }} />
+            <Outlet context={{ user, adminShopScope, sidebarCollapsed: effectiveSidebarCollapsed, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: false }} />
           </Suspense>
         </main>
       </div>

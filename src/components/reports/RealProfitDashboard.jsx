@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatNum, formatUZS, tashkentDateKey } from '@/lib/pos';
 import { TrendingUp, Calendar, CalendarRange, RefreshCw } from 'lucide-react';
+import { scopeRangeReport } from '@/lib/admin-shop-reporting';
 
 function StatCard({ label, value, sub, tone }) {
   const toneClass = tone === 'profit' ? 'text-emerald-600' : tone === 'cost' ? 'text-destructive' : 'text-foreground';
@@ -19,19 +20,21 @@ function StatCard({ label, value, sub, tone }) {
   );
 }
 
-export default function RealProfitDashboard({ onData } = {}) {
+export default function RealProfitDashboard({ onData, adminShopScope } = {}) {
   const today = tashkentDateKey();
   const [mode, setMode] = useState('range'); // 'day' | 'range'
   const [day, setDay] = useState(today);
   const [from, setFrom] = useState(() => tashkentDateKey(new Date(Date.now() - 6 * 86400000)));
   const [to, setTo] = useState(today);
-  const [data, setData] = useState(null);
+  const [reportData, setData] = useState(null);
+  const data = useMemo(() => scopeRangeReport(reportData, adminShopScope), [reportData, adminShopScope?.shopId, adminShopScope?.ready]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
   const requestVersion = useRef(0);
   const onDataRef = useRef(onData);
   onDataRef.current = onData;
+  useEffect(() => { onDataRef.current?.(reportData); }, [reportData]);
   useEffect(() => () => { requestVersion.current += 1; }, []);
 
   const fetchData = async () => {
@@ -48,12 +51,10 @@ export default function RealProfitDashboard({ onData } = {}) {
       });
       if (version !== requestVersion.current) return;
       setData(res.data || null);
-      onDataRef.current?.(res.data || null);
     } catch (e) {
       if (version !== requestVersion.current) return;
       setErr(e?.response?.data?.error || e?.message || 'Hisobni yuklab bo‘lmadi.');
       setData(null);
-      onDataRef.current?.(null);
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }

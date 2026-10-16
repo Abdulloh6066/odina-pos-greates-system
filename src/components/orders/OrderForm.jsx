@@ -67,7 +67,7 @@ function mapPrefillItems(sourceItems, products) {
   });
 }
 
-export default function OrderForm({ open, onClose, onCreated, user, shops, prefill }) {
+export default function OrderForm({ open, onClose, onCreated, user, shops, prefill, adminShopScope }) {
   const { toast } = useToast();
   const requestScope = orderRequestScope(user?.id, 'create_order');
   const pendingRef = useRef(readOrderRequest(requestScope));
@@ -78,6 +78,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   }, [requestScope]);
   const role = user?.role || 'cashier';
   const isAdmin = role === 'admin';
+  const defaultShopId = (isAdmin && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '') || user?.shop_id || '';
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -86,12 +87,26 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const [dateParts, setDateParts] = useState({ day: '', month: '', year: '' });
   const [form, setForm] = useState(() => ({
     order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '',
-    required_date: '', required_time: '18:00', shop_id: user?.shop_id || '',
+    required_date: '', required_time: '18:00', shop_id: defaultShopId,
     fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
     cake_shape: '', reference_image: '', notes: '',
     adjustment_amount: '', adjustment_reason: '',
     useAdvance: false, advance_method: 'cash', advance_amount: 0,
   }));
+
+  const dirty = Boolean(items.length || form.customer_name || form.customer_phone || dateParts.day
+    || form.required_time !== '18:00' || form.fulfilment_type !== 'pickup' || form.delivery_address || Number(form.delivery_fee)
+    || form.cake_shape || form.reference_image || form.notes || form.adjustment_amount || form.adjustment_reason
+    || form.useAdvance || form.order_type !== 'toy_va_bazmlar');
+  useEffect(() => {
+    if (!isAdmin || !adminShopScope?.registerGuard) return undefined;
+    return adminShopScope.registerGuard(() => pendingRef.current || submitting
+      ? 'Buyurtma saqlanishi tasdiqlanmaguncha do‘konni almashtirib bo‘lmaydi.'
+      : dirty ? 'Saqlanmagan buyurtma qoralamasi bor. Buyurtma oynasini qayta ochib saqlang yoki «Qoralamani tozalash va yopish»ni bosing.' : '');
+  }, [isAdmin, adminShopScope?.registerGuard, open, dirty, submitting]);
+  useEffect(() => {
+    if (open && !prefill && !pendingRef.current && !dirty) setForm((current) => ({ ...current, shop_id: defaultShopId }));
+  }, [open, prefill, defaultShopId, dirty]);
 
   useEffect(() => {
     if (!open) return;
@@ -161,7 +176,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
       const np = tashkentNowParts();
       setDateParts({ day: '', month: String(np.month), year: String(np.year) });
       setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
-        shop_id: user?.shop_id || '', fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
+        shop_id: defaultShopId, fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
         cake_shape: '', reference_image: '', notes: '', adjustment_amount: '', adjustment_reason: '',
         useAdvance: false, advance_method: 'cash', advance_amount: 0 });
     }
@@ -280,7 +295,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     setDateParts({ day: '', month: String(np.month), year: String(np.year) });
     setAcceptanceStamp(tashkentNowStamp());
     setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
-      shop_id: user?.shop_id || '', fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
+      shop_id: defaultShopId, fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
       cake_shape: '', reference_image: '', notes: '', adjustment_amount: '', adjustment_reason: '',
       useAdvance: false, advance_method: 'cash', advance_amount: 0 });
   };
@@ -484,7 +499,8 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
         </fieldset>
         {pending && <p className="mt-3 text-sm text-muted-foreground">Oldingi buyurtma natijasini shu ma’lumotlar bilan qayta tekshiring.</p>}
 
-        <div className="flex justify-end gap-2 mt-4 sticky bottom-0 bg-card pt-3">
+        <div className="flex flex-wrap justify-end gap-2 mt-4 sticky bottom-0 bg-card pt-3">
+          {isAdmin && adminShopScope?.isAdmin && dirty && !pending && <Button type="button" variant="outline" disabled={submitting} onClick={() => { reset(); onClose(); }}>Qoralamani tozalash va yopish</Button>}
           <Button variant="outline" onClick={onClose}><X className="w-4 h-4" /> Bekor</Button>
           <Button onClick={submit} disabled={(!valid && !pending) || submitting}>
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {pending ? 'Qayta tekshirish' : 'Saqlash'}

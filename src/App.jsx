@@ -5,6 +5,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Outlet, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import AdminShopProvider from '@/lib/AdminShopContext';
 import OdinaDialogProvider from '@/components/ui/odina-dialog-provider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
@@ -120,6 +121,7 @@ const AuthGate = () => {
 function App() {
   return (
     <AuthProvider>
+      <AdminShopProvider>
       <QueryClientProvider client={queryClientInstance}>
         <OdinaDialogProvider>
         <Router>
@@ -165,6 +167,7 @@ function App() {
         <Toaster />
         </OdinaDialogProvider>
       </QueryClientProvider>
+      </AdminShopProvider>
     </AuthProvider>
   )
 }
