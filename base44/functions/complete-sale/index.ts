@@ -64,7 +64,7 @@ const resolveAppUser = async (service: any, authenticatedUser: any) => {
     ...authenticatedUser,
     id: authenticatedUser?.id || storedUser?.id,
     email: authenticatedUser?.email || storedUser?.email,
-    full_name: storedUser?.full_name || authenticatedUser?.full_name,
+    full_name: storedUser?.display_name || storedUser?.data?.display_name || storedUser?.full_name || authenticatedUser?.full_name,
     role: APP_ROLES.has(storedRole) ? storedRole : userRole(authenticatedUser),
     shop_id: userShopId(storedUser) || userShopId(authenticatedUser),
     shop_name: storedUser?.shop_name || storedUser?.data?.shop_name
