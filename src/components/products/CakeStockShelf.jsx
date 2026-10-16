@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import { formatUzbekistanDateTime, formatUzbekistanTime } from '@/lib/uzbekistan-time';
-import { CAKE_STOCK_COLUMN_ROWS, CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, allStockProducts, formatStockQuantity, INGREDIENT_SHELF_CATEGORIES, inventoryStockChange, inventoryStockInfo, inventoryUnits, loadAllCakeBalances, mergeCakeStockEvent, shelfIngredients, stockShops } from '@/lib/cake-stock-shelf';
+import { CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, allStockProducts, formatStockQuantity, INGREDIENT_SHELF_CATEGORIES, inventoryStockChange, inventoryStockInfo, inventoryUnits, loadAllCakeBalances, mergeCakeStockEvent, shelfIngredients, stockShops } from '@/lib/cake-stock-shelf';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -146,7 +146,6 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
-  const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState('');
   const [operation, setOperation] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -161,11 +160,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
       && (stockFilter === 'all' || (stockFilter === 'positive' ? info.status === 'positive' : ['negative', 'missing', 'invalid'].includes(info.status)));
   });
   const columns = cakeStockColumns(visible, shelfCategories, shop?.id);
-  const pageCount = Math.max(1, ...columns.map((column) => Math.ceil(column.products.length / CAKE_STOCK_COLUMN_ROWS)));
-  const activePage = Math.min(page, pageCount - 1);
-  const pageColumns = columns.map((column) => ({ ...column, total: column.products.length,
-    products: column.products.slice(activePage * CAKE_STOCK_COLUMN_ROWS, (activePage + 1) * CAKE_STOCK_COLUMN_ROWS) }));
-  const pageProducts = pageColumns.flatMap((column) => column.products);
+  const shelfProducts = columns.flatMap((column) => column.products);
 
   const scrollRef = useRef(null);
   const dragRef = useRef(null);
@@ -207,24 +202,13 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     event.preventDefault();
     event.currentTarget.scrollLeft = Math.max(0, Math.min(gesture.maxScroll, gesture.scrollLeft - dx));
   };
-  const finishShelfDrag = (event, cancelled = false) => {
+  const finishShelfDrag = (event) => {
     const gesture = dragRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     dragRef.current = null;
     setDragging(false);
     const viewport = event.currentTarget;
     if (viewport.hasPointerCapture?.(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
-    if (!cancelled && gesture.horizontal) {
-      const requestedScroll = gesture.scrollLeft - (event.clientX - gesture.x);
-      const pageThreshold = 90;
-      if (requestedScroll > gesture.maxScroll + pageThreshold && activePage + 1 < pageCount) {
-        setPage(activePage + 1);
-        viewport.scrollLeft = 0;
-      } else if (requestedScroll < -pageThreshold && activePage > 0) {
-        setPage(activePage - 1);
-        viewport.scrollLeft = gesture.maxScroll;
-      }
-    }
     // The browser dispatches the release click before this timer. A later
     // intentional click must still select a product or open its receipt form.
     clickResetRef.current = setTimeout(() => { blockClickRef.current = false; }, 0);
@@ -236,11 +220,10 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     }
   };
 
-  const selected = pageProducts.find((p) => p.id === selectedId) || pageProducts[0] || null;
+  const selected = shelfProducts.find((p) => p.id === selectedId) || shelfProducts[0] || null;
   const selectedStock = selected ? inventoryStockInfo(balances.rows, selected, balances.ready) : null;
   const counts = cakes.reduce((result, p) => { const s = inventoryStockInfo(balances.rows, p, balances.ready); if (s.status === 'positive') result.inStock++; if (['negative', 'missing', 'invalid'].includes(s.status)) result.needsCount++; return result; }, { inStock: 0, needsCount: 0 });
   const canChange = CAKE_STOCK_ROLES.has(user?.role) && balances.online && balances.ready && !balances.error;
-  useEffect(() => { setPage(0); }, [search, category, stockFilter, shop?.id, scope]);
   useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); setEntryMode(false); setNotice(''); setCategory('all'); setSearch(''); setStockFilter('all'); setView('shelf'); }, [shop?.id, scope]);
   const openOperation = (mode, product = selected) => {
     const info = product ? inventoryStockInfo(balances.rows, product, balances.ready) : null;
@@ -303,38 +286,31 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
           <div className="cake-stock-board-heading"><div><h3>{shop.name} · {scope === 'cakes' ? 'tort tokchasi' : 'mahsulotlar tokchasi'}</h3><p>{visible.length} ta mahsulot turi</p></div><span>{balances.ready ? counts.inStock + ' turda qoldiq bor' : 'Yuklanmoqda…'}</span></div>
           <div className={'cake-stock-board-scroll cake-stock-category-scroll' + (dragging ? ' is-dragging' : '')} ref={scrollRef}
             onPointerDown={startShelfDrag} onPointerMove={moveShelfDrag} onPointerUp={finishShelfDrag}
-            onPointerCancel={(event) => finishShelfDrag(event, true)} onLostPointerCapture={(event) => finishShelfDrag(event, true)}
+            onPointerCancel={finishShelfDrag} onLostPointerCapture={finishShelfDrag}
             onClickCapture={blockDraggedClick} onDragStart={(event) => event.preventDefault()} aria-describedby="cake-stock-drag-help"
-            role="region" aria-label="Mahsulotlar tokchasini surish" tabIndex={0} onKeyDown={(event) => {
-              const nextPage = event.key === 'PageDown' ? Math.min(activePage + 1, pageCount - 1)
-                : event.key === 'PageUp' ? Math.max(activePage - 1, 0) : activePage;
-              if (nextPage === activePage) return;
-              event.preventDefault(); event.stopPropagation();
-              setPage(nextPage);
-              event.currentTarget.focus({ preventScroll: true });
-            }}>
-            {visible.length > 0 ? <div className="cake-stock-category-columns" style={{ '--cake-column-count': columns.length }} ref={shelfRef} role="group" aria-label={"Kategoriyalar bo‘yicha " + noun.toLocaleLowerCase() + " tokchasi"}>
-              {pageColumns.map((column, columnIndex) => <section key={column.id} className="cake-stock-category-column" aria-label={column.name}>
-                <h4 className="cake-stock-category-heading">{column.name}<span>{column.total} tur</span></h4>
+            role="region" aria-label="Mahsulotlar tokchasini surish" tabIndex={0}>
+            {visible.length > 0 ? <div className="cake-stock-category-rows" ref={shelfRef} role="group" aria-label={"Kategoriyalar bo‘yicha " + noun.toLocaleLowerCase() + " tokchasi"}>
+              {columns.map((column, categoryIndex) => <section key={column.id} className="cake-stock-category-row" aria-label={column.name}>
+                <h4 className="cake-stock-category-heading">{column.name}<span>{column.products.length} tur</span></h4>
                 <div className="cake-stock-category-items">
-                  {column.products.map((p, rowIndex) => {
+                  {column.products.map((p, productIndex) => {
                     const info = inventoryStockInfo(balances.rows, p, balances.ready);
-                    return <button key={p.id} type="button" data-column={columnIndex} data-row={rowIndex} className={'cake-stock-cell ' + info.status + (selected?.id === p.id ? ' is-selected' : '')} aria-pressed={selected?.id === p.id} aria-label={p.name + ': ' + (info.quantity == null ? info.label : formatStockQuantity(info.quantity, p) + ' ' + inventoryUnits(p).label + ', ' + info.label)} onClick={() => selectProduct(p)} onKeyDown={(e) => {
-                      const nextColumn = e.key === 'ArrowRight' ? columnIndex + 1 : e.key === 'ArrowLeft' ? columnIndex - 1 : columnIndex;
-                      const adjacent = pageColumns[nextColumn];
-                      const nextRow = e.key === 'ArrowDown' ? rowIndex + 1 : e.key === 'ArrowUp' ? rowIndex - 1
-                        : Math.min(rowIndex, (adjacent?.products.length || 0) - 1);
-                      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key) || !adjacent?.products[nextRow]) return;
+                    return <button key={p.id} type="button" data-column={productIndex} data-row={categoryIndex} className={'cake-stock-cell ' + info.status + (selected?.id === p.id ? ' is-selected' : '')} aria-pressed={selected?.id === p.id} aria-label={p.name + ': ' + (info.quantity == null ? info.label : formatStockQuantity(info.quantity, p) + ' ' + inventoryUnits(p).label + ', ' + info.label)} onClick={() => selectProduct(p)} onKeyDown={(e) => {
+                      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+                      const nextRow = e.key === 'ArrowDown' ? categoryIndex + 1 : e.key === 'ArrowUp' ? categoryIndex - 1 : categoryIndex;
+                      const adjacent = columns[nextRow];
+                      const nextColumn = e.key === 'ArrowRight' ? productIndex + 1 : e.key === 'ArrowLeft' ? productIndex - 1
+                        : Math.min(productIndex, (adjacent?.products.length || 0) - 1);
+                      if (!adjacent?.products[nextColumn]) return;
                       e.preventDefault();
                       shelfRef.current?.querySelector('[data-column="' + nextColumn + '"][data-row="' + nextRow + '"]')?.focus();
                     }}><InventorySymbol product={p} /><strong title={p.name}>{p.name}</strong><span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatStockQuantity(info.quantity, p)}<small>{info.quantity == null ? '' : ' ' + inventoryUnits(p).label}</small></span>{entryMode ? <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span> : <span className="cake-stock-cell-note">{['negative', 'missing', 'invalid'].includes(info.status) ? info.label : '\u00a0'}</span>}</button>;
                   })}
-                  {Array.from({ length: CAKE_STOCK_COLUMN_ROWS - column.products.length }, (_, index) => <div key={'empty-' + index} className="cake-stock-empty-cell" aria-hidden="true"><span>·</span></div>)}
                 </div>
               </section>)}
             </div> : <div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>{noun} topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div>}
           </div>
-          <div className="cake-stock-board-footer"><span className="cake-stock-swipe" id="cake-stock-drag-help">Ushlab o‘ng-chapga suring · chetida yana surib sahifani almashtiring<span className="sr-only">. Klaviaturada: PageDown — keyingi sahifa, PageUp — oldingi sahifa.</span></span><span aria-live="polite">{activePage + 1} / {pageCount} sahifa</span></div>
+          <div className="cake-stock-board-footer"><span className="cake-stock-swipe" id="cake-stock-drag-help">Mahsulotlarni ko‘rish uchun ushlab o‘ng-chapga suring<span className="sr-only">. Mahsulotlar orasida klaviaturaning yo‘nalish tugmalari bilan yuring.</span></span></div>
         </div>
         <aside className="cake-stock-detail" aria-label={"Tanlangan " + noun.toLocaleLowerCase()}>
           {selected ? <>
