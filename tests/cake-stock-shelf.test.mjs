@@ -7,11 +7,13 @@ import ts from 'typescript';
 import { cakeProducts, cakeStockInfo, loadAllCakeBalances, mergeCakeStockEvent, stockChange, stockShops } from '../src/lib/cake-stock-shelf.js';
 import { matches } from './helpers/memory-backend.mjs';
 
-function fixture({ quantity = 10, existing = true, role = 'cashier', assigned = 'branch' } = {}) {
+function fixture({ quantity = 10, existing = true, role = 'cashier', assigned = 'branch', baseUnit = 'ml' } = {}) {
   const db = {
     Shop: [{ id: 'branch', name: 'Branch', active: true, location_type: 'shop' }, { id: 'other', name: 'Other', active: true, location_type: 'shop' }],
     Product: [{ id: 'cake', name: 'Cake', active: true, production_unit: 'piece' }],
     ProductStock: existing ? [{ id: 'stock', product_id: 'cake', location_id: 'branch', unit: 'piece', quantity }] : [],
+    Ingredient: [{ id: 'ingredient', name: 'Ingredient', active: true, base_unit: baseUnit }],
+    IngredientStock: existing ? [{ id: 'ingredient-stock', ingredient_id: 'ingredient', location_id: 'branch', unit: baseUnit, quantity }] : [],
     StockMovement: [], ActionHistory: [],
   };
   let sequence = 0;
@@ -119,4 +121,40 @@ await test('legacy warehouse calls still work without the new optional count fie
   assert.equal((await f.call(request({ quantity_change: 2 }))).status, 200);
   assert.equal(f.db.ProductStock[0].quantity, 12);
 });
-console.log(checks + ' cake-stock checks passed.');
+
+const ingredientRequest = fields => request({ item_kind: 'ingredient', item_id: 'ingredient', ...fields });
+await test('ingredient counts support fractional base units, negative repair and stale-write protection', async () => {
+  const f = fixture({ quantity: -350.5 });
+  const body = ingredientRequest({ counted_quantity: 3250.25, expected_quantity: -350.5 });
+  assert.equal((await f.call(body)).status, 200);
+  assert.equal(f.db.IngredientStock[0].quantity, 3250.25);
+  assert.equal(f.db.StockMovement[0].item_kind, 'ingredient');
+  assert.equal(f.db.StockMovement[0].unit, 'ml');
+  assert.equal(f.db.StockMovement[0].quantity_change, 3600.75);
+  assert.equal((await f.call(body)).status, 409);
+  assert.equal(f.db.StockMovement.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, -350.5);
+});
+await test('ingredient receipt and count validation preserve units, whole pieces and assigned-shop access', async () => {
+  const f = fixture({ quantity: 5800, baseUnit: 'g' });
+  assert.equal((await f.call(ingredientRequest({ quantity_change: 125, expected_quantity: 5800 }))).status, 200);
+  assert.equal(f.db.IngredientStock[0].quantity, 5925);
+  assert.equal(f.db.StockMovement[0].unit, 'g');
+  assert.equal((await f.call(ingredientRequest({ counted_quantity: '6000', expected_quantity: 5925 }))).status, 400);
+  assert.equal((await f.call(ingredientRequest({ counted_quantity: 1.2345, expected_quantity: 5925 }))).status, 400);
+  f.db.IngredientStock[0].unit = 'ml';
+  assert.equal((await f.call(ingredientRequest({ quantity_change: 100, expected_quantity: 5925 }))).status, 409);
+  assert.equal(f.db.IngredientStock[0].quantity, 5925);
+  const pieces = fixture({ baseUnit: 'piece' });
+  assert.equal((await pieces.call(ingredientRequest({ counted_quantity: 1.5, expected_quantity: 10 }))).status, 400);
+  assert.equal((await pieces.call(ingredientRequest({ quantity_change: 1.5, expected_quantity: 10 }))).status, 400);
+  const other = fixture({ assigned: 'other' });
+  assert.equal((await other.call(ingredientRequest({ counted_quantity: 5, expected_quantity: 10 }))).status, 403);
+  assert.equal(other.db.StockMovement.length, 0);
+  const missing = fixture({ existing: false });
+  const zero = ingredientRequest({ counted_quantity: 0, expected_quantity: 0 });
+  assert.equal((await missing.call(zero)).status, 200);
+  assert.equal((await missing.call(zero)).data.unchanged, true);
+  assert.equal(missing.db.StockMovement.length, 1);
+});
+console.log(checks + ' stock checks passed.');
