@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action !== "update_user_access") {
+    if (action !== "update_user_access" && action !== "update_user_name") {
       return Response.json({ error: "Noma’lum xavfsizlik amali." }, { status: 400 });
     }
 
@@ -83,6 +83,36 @@ Deno.serve(async (req) => {
     // Other admins retain their existing staff-management privileges.
     if (userRole(target) === "admin" && !canManageAdmins) {
       return Response.json({ error: "Boshqa Admin hisobini faqat hisob egasi boshqaradi." }, { status: 403 });
+    }
+
+    if (action === "update_user_name") {
+      // Display-name editing never changes authentication or access fields.
+      const allowedFields = new Set(["action", "target_user_id", "full_name"]);
+      if (Object.keys(body).some((key) => !allowedFields.has(key))) {
+        return Response.json({ error: "Bu amal orqali faqat xodim ismini o‘zgartirish mumkin." }, { status: 400 });
+      }
+      if (typeof body.full_name !== "string") {
+        return Response.json({ error: "Xodim ismini kiriting." }, { status: 400 });
+      }
+      const fullName = body.full_name.trim();
+      const hasControlCharacter = [...fullName].some((character) => {
+        const code = character.charCodeAt(0);
+        return code < 32 || code === 127;
+      });
+      if (!fullName || fullName.length > 120 || hasControlCharacter) {
+        return Response.json({ error: "Ism 1–120 belgidan iborat bo‘lsin; yangi qator va boshqaruv belgilari mumkin emas." }, { status: 400 });
+      }
+      if (fullName === String(target.full_name || "")) {
+        return Response.json({ ok: true, user: safeUser(target) });
+      }
+      const updated = await service.entities.User.update(target.id, { full_name: fullName });
+      await service.entities.ActionHistory.create({
+        user_id: String(admin.id || auth.id),
+        user_name: String(admin.full_name || auth.full_name || auth.email || "Egasi"),
+        action: "user_name_updated",
+        details: String(target.id) + " · ism: " + String(target.full_name || target.email || "Nomsiz xodim") + " → " + fullName,
+      });
+      return Response.json({ ok: true, user: safeUser(updated) });
     }
 
     const patch: Record<string, unknown> = {};
