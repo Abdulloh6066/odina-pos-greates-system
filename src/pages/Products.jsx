@@ -8,6 +8,7 @@ import { formatUZS, logAction } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import PageHeader from '@/components/PageHeader';
 import TestCatalogCleanup from '@/components/TestCatalogCleanup';
+import CakeStockShelf from '@/components/products/CakeStockShelf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,8 @@ export default function Products() {
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [productView, setProductView] = useState('stock');
+  const [loadError, setLoadError] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -49,11 +52,14 @@ export default function Products() {
 
   const load = async () => {
     setLoading(true);
-    const [p, c, s] = await Promise.all([base44.entities.Product.list(), base44.entities.Category.list(), base44.entities.Shop.list()]);
-    setProducts(p || []);
-    setCategories(c || []);
-    setShops((s || []).filter((shop) => shop.location_type === 'shop' && shop.active !== false));
-    setLoading(false);
+    setLoadError('');
+    try {
+      const [p, c, s] = await Promise.all([base44.entities.Product.list('-created_date', 500), base44.entities.Category.list('-created_date', 500), base44.entities.Shop.list()]);
+      setProducts(p || []);
+      setCategories(c || []);
+      setShops((s || []).filter((shop) => shop.location_type === 'shop' && shop.active !== false));
+    } catch (error) { setLoadError(error?.message || 'Mahsulotlar yuklanmadi. Qayta urinib ko‘ring.'); }
+    finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
 
@@ -103,6 +109,12 @@ export default function Products() {
         )}
       />
 
+      <div className="flex flex-wrap gap-2 mb-5" role="group" aria-label="Mahsulotlar ko‘rinishi">
+        <Button type="button" variant={productView === 'stock' ? 'default' : 'outline'} aria-pressed={productView === 'stock'} onClick={() => setProductView('stock')} className="min-h-11 rounded-xl">Tortlar qoldig‘i</Button>
+        <Button type="button" variant={productView === 'catalog' ? 'default' : 'outline'} aria-pressed={productView === 'catalog'} onClick={() => setProductView('catalog')} className="min-h-11 rounded-xl">Mahsulotlar katalogi</Button>
+      </div>
+      {loadError && <div role="alert" className="rounded-xl border border-border p-4 mb-5"><p>{loadError}</p><Button type="button" variant="outline" onClick={load} className="mt-3">Qayta yuklash</Button></div>}
+      {productView === 'stock' ? (loading ? <div className="h-56 rounded-2xl bg-secondary animate-pulse" aria-label="Tortlar yuklanmoqda" /> : !loadError && <CakeStockShelf user={user} products={products} categories={categories} shops={shops} />) : <>
       {!loading && <TestCatalogCleanup user={user} products={products} onComplete={load} />}
 
       <div className="odina-panel catalog-toolbar catalog-product-toolbar flex flex-col sm:flex-row gap-3 mb-5 rounded-2xl bg-card border border-border premium-shadow p-3 sm:p-4">
@@ -180,6 +192,7 @@ export default function Products() {
         </div>
       )}
 
+      </>}
       <Dialog open={Boolean(shopPriceProduct)} onOpenChange={(value) => { if (!value && !savingShopPrice) setShopPriceProduct(null); }}>
         <DialogContent><DialogHeader><DialogTitle>{shopPriceProduct?.name} — do‘kon narxi</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{user?.shop_name} uchun sotuv narxi</p>
