@@ -127,10 +127,14 @@ function InventorySymbol({ product, large = false }) {
   </span>;
 }
 
-export default function CakeStockShelf({ user, products, categories, shops, ingredients = [] }) {
-  const allowedShops = useMemo(() => stockShops(shops, user), [shops, user]);
+export default function CakeStockShelf({ user, products, categories, shops, ingredients = [], adminShopScope, overviewShopId = '', readOnly = false }) {
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  const allowedShops = useMemo(() => shopScope ? (shops || []).filter((s) => s.active !== false) : stockShops(shops, user), [shops, user, Boolean(shopScope)]);
   const [selectedShopId, setSelectedShopId] = useState(() => allowedShops.find((s) => /branch/i.test(s.name))?.id || allowedShops[0]?.id || '');
-  const shop = allowedShops.find((s) => s.id === selectedShopId) || allowedShops[0] || null;
+  const effectiveShopId = overviewShopId || (shopScope ? shopScope.specificShopId : selectedShopId);
+  const shop = allowedShops.find((s) => s.id === effectiveShopId) || (!shopScope ? allowedShops[0] : null) || null;
+  const allShops = Boolean(shopScope && !overviewShopId && shopScope.shopId === 'all');
+  const stockReadOnly = readOnly || shop?.location_type === 'production' || Boolean(shopScope && !shopScope.ready);
   const [view, setView] = useState('shelf');
   const [entryMode, setEntryMode] = useState(false);
   const [notice, setNotice] = useState('');
@@ -140,15 +144,24 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const plural = scope === 'cakes' ? 'Tortlar' : 'Mahsulotlar';
   const shelfCategories = isIngredient ? INGREDIENT_SHELF_CATEGORIES : categories;
   const balances = useLiveCakeBalances(shop?.id || '', isIngredient ? 'ingredient' : 'product');
-  const scopedProducts = useMemo(() => isIngredient ? shelfIngredients(ingredients)
-    : scope === 'cakes' ? cakeProducts(products, categories, shop?.id) : allStockProducts(products, categories, shop?.id),
-  [products, categories, ingredients, shop?.id, scope, isIngredient]);
+  const scopedProducts = useMemo(() => {
+    if (isIngredient) return shelfIngredients(ingredients);
+    // Production inventory is independent of the destinations where products are sold.
+    const inventoryProducts = shop?.location_type === 'production' ? products.map((product) => ({ ...product, available_shop_ids: [] })) : products;
+    return scope === 'cakes' ? cakeProducts(inventoryProducts, categories, shop?.id) : allStockProducts(inventoryProducts, categories, shop?.id);
+  }, [products, categories, ingredients, shop?.id, shop?.location_type, scope, isIngredient]);
   const cakes = useMemo(() => scopedProducts.filter((product) => product.active !== false), [scopedProducts]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   const [selectedId, setSelectedId] = useState('');
   const [operation, setOperation] = useState(null);
+  const [finishingSave, setFinishingSave] = useState(false);
+  const shelfIdentity = (shop?.id || '') + ':' + scope;
+  const currentShelfIdentity = useRef(shelfIdentity);
+  currentShelfIdentity.current = shelfIdentity;
+  useEffect(() => shopScope?.registerGuard?.(() => operation || finishingSave ? 'Avval qoldiq oynasini yoping yoki saqlash tugashini kuting.' : ''),
+  [shopScope?.registerGuard, operation, finishingSave]);
   const [showHistory, setShowHistory] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const shelfRef = useRef(null);
@@ -224,7 +237,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const selected = shelfProducts.find((p) => p.id === selectedId) || shelfProducts[0] || null;
   const selectedStock = selected ? inventoryStockInfo(balances.rows, selected, balances.ready) : null;
   const counts = cakes.reduce((result, p) => { const s = inventoryStockInfo(balances.rows, p, balances.ready); if (s.status === 'positive') result.inStock++; if (['negative', 'missing', 'invalid'].includes(s.status)) result.needsCount++; return result; }, { inStock: 0, needsCount: 0 });
-  const canChange = CAKE_STOCK_ROLES.has(user?.role) && balances.online && balances.ready && !balances.error;
+  const canChange = !stockReadOnly && !finishingSave && CAKE_STOCK_ROLES.has(user?.role) && balances.online && balances.ready && !balances.error;
   useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); setEntryMode(false); setNotice(''); setCategory('all'); setSearch(''); setStockFilter('all'); setView('shelf'); }, [shop?.id, scope]);
   const openOperation = (mode, product = selected) => {
     const info = product ? inventoryStockInfo(balances.rows, product, balances.ready) : null;
@@ -239,24 +252,33 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     if (entryMode) openOperation('in', product);
   };
   const onSaved = async (stock) => {
-    setOperation(null); setHistoryVersion((version) => version + 1);
-    await balances.refresh();
-    if (stock?.ingredient_id || stock?.product_id) {
-      setSelectedId(stock.ingredient_id || stock.product_id);
-      setNotice((operation?.product?.name || 'Mahsulot') + ': qoldiq ' + formatStockQuantity(stock.quantity, operation?.product) + ' ' + inventoryUnits(operation?.product).label + '. ' + (operation?.mode === 'in' ? 'Kirim tarixga yozildi.' : 'Qoldiq saqlandi.'));
-    }
+    const savedOperation = operation;
+    const savedIdentity = shelfIdentity;
+    setFinishingSave(true);
+    setOperation(null);
+    try {
+      await balances.refresh();
+      if (currentShelfIdentity.current !== savedIdentity) return;
+      setHistoryVersion((version) => version + 1);
+      if (stock?.ingredient_id || stock?.product_id) {
+        setSelectedId(stock.ingredient_id || stock.product_id);
+        setNotice((savedOperation?.product?.name || 'Mahsulot') + ': qoldiq ' + formatStockQuantity(stock.quantity, savedOperation?.product) + ' ' + inventoryUnits(savedOperation?.product).label + '. ' + (savedOperation?.mode === 'in' ? 'Kirim tarixga yozildi.' : 'Qoldiq saqlandi.'));
+      }
+    } finally { setFinishingSave(false); }
   };
 
-  if (!shop) return <div className="cake-stock-message" role="status"><AlertTriangle aria-hidden="true" /><div><strong>Do‘kon biriktirilmagan</strong><p>Qoldiqni ko‘rish uchun hisobingizga do‘kon biriktirilishi kerak.</p></div></div>;
+  if (allShops) return <section className="space-y-6" aria-label="Barcha do‘konlar qoldig‘i"><p className="cake-stock-message">Barcha do‘konlar alohida ko‘rsatilgan. Kirim yoki chiqim uchun yuqoridan bitta do‘konni tanlang.</p>{allowedShops.map((s) => <CakeStockShelf key={s.id} user={user} products={products} categories={categories} shops={shops} ingredients={ingredients} adminShopScope={shopScope} overviewShopId={s.id} readOnly />)}</section>;
+  if (!shop) return <div className="cake-stock-message" role="status"><AlertTriangle aria-hidden="true" /><div><strong>{shopScope ? 'Tanlangan joylashuv mavjud emas' : 'Do‘kon biriktirilmagan'}</strong><p>{shopScope ? 'Yuqoridan faol do‘konni tanlang.' : 'Qoldiqni ko‘rish uchun hisobingizga do‘kon biriktirilishi kerak.'}</p></div></div>;
   return <section className="cake-stock-workspace" aria-label="Mahsulotlar jonli qoldig‘i">
-    <div className="cake-stock-topbar">
+    {!overviewShopId && <div className="cake-stock-topbar">
       <div className="cake-stock-shop">
         <Label htmlFor="cake-stock-shop">Do‘kon</Label>
-        <OdinaSelect id="cake-stock-shop" value={shop.id} onChange={(e) => setSelectedShopId(e.target.value)} disabled={allowedShops.length < 2}>
+        <OdinaSelect id="cake-stock-shop" value={shop.id} onChange={(e) => shopScope ? shopScope.selectShop(e.target.value) : setSelectedShopId(e.target.value)} disabled={allowedShops.length < 2}>
           {allowedShops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </OdinaSelect>
       </div>
-    </div>
+    </div>}
+    {shop.location_type === 'production' && <p className="cake-stock-message">{shop.name} · Ishlab chiqarish ombori. Kirim-chiqim va ishlab chiqarish amallari Ombor bo‘limida bajariladi.</p>}
     <nav className="cake-stock-scopes" aria-label="Qoldiq mahsulot turi">
       {[['cakes', 'Tortlar'], ['ingredients', 'Sut, kofe va masalliqlar'], ['products', 'Barcha tayyor mahsulotlar']].map(([id, label]) =>
         <Button key={id} type="button" variant={scope === id ? 'default' : 'outline'} aria-pressed={scope === id} onClick={() => setScope(id)}>{label}</Button>)}
@@ -270,11 +292,11 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     <nav className="cake-stock-tabs" aria-label="Tort ombori ko‘rinishi">
       <Button type="button" variant={view === 'shelf' && !entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(false); }} aria-pressed={view === 'shelf' && !entryMode}><Cake className="mr-2 h-4 w-4" />{scope === 'cakes' ? 'Tort tokchasi' : 'Mahsulotlar tokchasi'}</Button>
       {CAKE_STOCK_ROLES.has(user?.role) && <Button type="button" variant={entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(true); setNotice(''); }} aria-pressed={entryMode} disabled={!canChange}><ArrowDownLeft className="mr-2 h-4 w-4" />Kirim kiritish</Button>}
-      {!isIngredient && <Button type="button" variant={view === 'transfers' ? 'default' : 'outline'} onClick={() => { setView('transfers'); setEntryMode(false); }} aria-pressed={view === 'transfers'}><Truck className="mr-2 h-4 w-4" />Kelgan transferlar</Button>}
+      {!isIngredient && !stockReadOnly && <Button type="button" variant={view === 'transfers' ? 'default' : 'outline'} onClick={() => { setView('transfers'); setEntryMode(false); }} aria-pressed={view === 'transfers'}><Truck className="mr-2 h-4 w-4" />Kelgan transferlar</Button>}
     </nav>
     {notice && <div className="cake-stock-message cake-stock-success" role="status"><Check aria-hidden="true" /><p>{notice}</p></div>}
     {view === 'shelf' && entryMode && <div className="cake-stock-entry-guide"><ArrowDownLeft aria-hidden="true" /><div><strong>{noun}ni tanlab kirim qo‘shing</strong><p>1. {noun}ni tanlang · 2. Kelgan miqdorni kiriting · 3. Kirimni saqlang</p><small>{isIngredient ? 'Hisob-faktura va to‘lov bilan kirim uchun Ombor → Kirim va qarzlar bo‘limidan foydalaning.' : 'Markazdan yuborilgan transfer uchun “Kelgan transferlar”ni oching.'}</small></div></div>}
-    {view === 'transfers' && !isIngredient ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={scopedProducts} onBalanceRefresh={balances.refresh} /> : <>
+    {view === 'transfers' && !isIngredient ? <CakeIncomingTransfers key={shop.id} user={user} shop={shop} shops={shops} products={products} cakes={scopedProducts} onBalanceRefresh={balances.refresh} adminShopScope={shopScope} /> : <>
       <div className="cake-stock-filters">
         <label className="cake-stock-search"><span className="sr-only">{noun} qidirish</span><Search aria-hidden="true" /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={noun + " nomini qidiring…"} /></label>
         <OdinaSelect aria-label={noun + " kategoriyasi"} value={category} onChange={(e) => setCategory(e.target.value)}><option value="all">Barcha {plural.toLocaleLowerCase()}</option>{categoryIds.map((id) => <option key={id} value={id}>{shelfCategories.find((c) => c.id === id)?.name || cakes.find((p) => p.category_id === id)?.category_name || 'Kategoriyasiz'}</option>)}</OdinaSelect>
@@ -398,7 +420,7 @@ function CakeMovementHistory({ shopId, productId, item, refreshVersion }) {
   return <div className="cake-stock-history" role="region" aria-label="Oxirgi 20 ta harakat"><p className="cake-stock-eyebrow">OXIRGI 20 TA HARAKAT</p>{state.loading ? <p>Yuklanmoqda…</p> : state.error ? <p role="alert">{state.error}</p> : !state.rows.length ? <p>Hali harakat yozilmagan.</p> : state.rows.map((row) => <div key={row.id}><span>{MOVEMENTS[row.movement_type] || row.movement_type}<small>{formatUzbekistanDateTime(row.created_at || row.created_date)}</small><small>{row.reason}</small></span><strong className={Number(row.quantity_change) < 0 ? 'is-out' : 'is-in'}>{Number(row.quantity_change) > 0 ? '+' : ''}{formatStockQuantity(row.quantity_change, item)} {inventoryUnits(item).label}</strong></div>)}</div>;
 }
 
-function CakeIncomingTransfers({ user, shop, shops, products, cakes, onBalanceRefresh }) {
+function CakeIncomingTransfers({ user, shop, shops, products, cakes, onBalanceRefresh, adminShopScope }) {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -423,5 +445,5 @@ function CakeIncomingTransfers({ user, shop, shops, products, cakes, onBalanceRe
   const cakeIds = new Set(cakes.map((p) => p.id));
   const batches = new Set(rows.filter((row) => cakeIds.has(row.product_id) && row.batch_id).map((row) => row.batch_id));
   const cakeRows = rows.filter((row) => cakeIds.has(row.product_id) || (row.batch_id && batches.has(row.batch_id)));
-  return <div className="space-y-4"><p className="cake-stock-message">Markazdan yuborilgan tortlarni shu yerda qabul qiling. Qabul qilinganda qoldiq avtomatik oshadi.</p>{error ? <div role="alert" className="cake-stock-message is-warning"><p>{error}</p><Button type="button" variant="outline" onClick={() => void load()}>Qayta yuklash</Button></div> : loading ? <div className="cake-stock-message"><Loader2 className="h-5 w-5 animate-spin" />Transferlar yuklanmoqda…</div> : <TransfersPanel user={user} location={shop} locations={shops} products={products} productStock={[]} transfers={cakeRows} archivedProductIds={products.filter((p) => p.archived).map((p) => p.id)} search="" onReload={async () => { await Promise.all([load(), onBalanceRefresh()]); }} />}</div>;
+  return <div className="space-y-4"><p className="cake-stock-message">Markazdan yuborilgan tortlarni shu yerda qabul qiling. Qabul qilinganda qoldiq avtomatik oshadi.</p>{error ? <div role="alert" className="cake-stock-message is-warning"><p>{error}</p><Button type="button" variant="outline" onClick={() => void load()}>Qayta yuklash</Button></div> : loading ? <div className="cake-stock-message"><Loader2 className="h-5 w-5 animate-spin" />Transferlar yuklanmoqda…</div> : <TransfersPanel user={user} adminShopScope={adminShopScope} location={shop} locations={shops} products={products} productStock={[]} transfers={cakeRows} archivedProductIds={products.filter((p) => p.archived).map((p) => p.id)} search="" onReload={async () => { await Promise.all([load(), onBalanceRefresh()]); }} />}</div>;
 }

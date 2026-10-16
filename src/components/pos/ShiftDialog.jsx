@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { formatUZS } from '@/lib/pos';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
-export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading }) {
+export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading, preferredShopId }) {
   const [shopId, setShopId] = useState('');
   const [startingCash, setStartingCash] = useState(0);
   const assignedShopId = String(user?.shop_id || user?.data?.shop_id || '');
@@ -19,12 +19,13 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
       if (['cashier', 'manager'].includes(user?.role)) {
         setShopId(assignedShopId);
       } else {
+        const preferred = preferredShopId ? shops.find((s) => s.id === preferredShopId) : null;
         const main = shops.find((s) => s.is_main);
-        setShopId(main?.id || shops[0]?.id || '');
+        setShopId(preferredShopId !== undefined ? preferred?.id || '' : main?.id || shops[0]?.id || '');
       }
       setStartingCash(0);
     }
-  }, [open, shops, user, assignedShopId]);
+  }, [open, shops, user, assignedShopId, preferredShopId]);
 
   const submit = () => {
     const shop = shops.find((s) => s.id === shopId)
@@ -50,6 +51,7 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
             ) : (
               <OdinaSelect
                 value={shopId}
+                disabled={preferredShopId !== undefined || loading}
                 onChange={(e) => setShopId(e.target.value)}
                 className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
               >

@@ -30,13 +30,15 @@ function TimingDuration({ record }) {
   </div>;
 }
 
-export default function CheckoutTimingHistory({ open, onOpenChange, userRole, shops = [] }) {
-  const [shopId, setShopId] = useState('');
+export default function CheckoutTimingHistory({ open, onOpenChange, userRole, shops = [], adminShopScope }) {
+  const shopScope = userRole === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  const [localShopId, setShopId] = useState('');
+  const shopId = shopScope ? shopScope.specificShopId : localShopId;
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const history = useCheckoutTimingHistory({ open, userRole, shopId, fromDate, toDate });
   if (userRole !== 'admin') return null;
-  const availableShops = [...new Map((shops || []).filter((shop) => shop?.id)
+  const availableShops = [...new Map((shopScope?.shops || shops || []).filter((shop) => shop?.id)
     .map((shop) => [shop.id, shop])).values()];
 
   return <Dialog open={open === true} onOpenChange={onOpenChange}>
@@ -49,7 +51,7 @@ export default function CheckoutTimingHistory({ open, onOpenChange, userRole, sh
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-border bg-secondary/30 p-3">
         <label className="min-w-0 space-y-1.5 text-xs font-medium text-muted-foreground">
           <span className="block">Do‘kon</span>
-          <OdinaSelect aria-label="Vaqtlar tarixidagi do‘kon" value={shopId} onChange={(event) => setShopId(event.target.value)}>
+          <OdinaSelect aria-label="Vaqtlar tarixidagi do‘kon" value={shopId} disabled={Boolean(shopScope)} onChange={(event) => shopScope ? shopScope.selectShop(event.target.value || 'all') : setShopId(event.target.value)}>
             <option value="">Barcha do‘konlar</option>
             {shopId && !availableShops.some((shop) => shop.id === shopId) && <option value={shopId}>Tanlangan do‘kon</option>}
             {availableShops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { ClipboardCheck, Plus, Loader2, CheckCircle2, Clock, Send, XCircle } from 'lucide-react';
@@ -14,8 +14,9 @@ const STATUS_META = {
   cancelled: { label: 'Bekor qilingan', icon: XCircle, cls: 'bg-rose-100 text-rose-700' },
 };
 
-export default function StockCountPanel({ user, location, locations }) {
+export default function StockCountPanel({ user, location, locations, adminShopScope }) {
   const role = user?.role || 'cashier';
+  const shopScope = role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
   const canCount = ['admin', 'manager', 'cashier', 'accountant'].includes(role);
   const [counts, setCounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,20 @@ export default function StockCountPanel({ user, location, locations }) {
   const [showNew, setShowNew] = useState(false);
   const [newLoc, setNewLoc] = useState('');
   const [starting, setStarting] = useState(false);
+  const [openingId, setOpeningId] = useState('');
+  const openingRequest = useRef(0);
+  const currentScope = useRef(shopScope?.specificShopId || '');
+  currentScope.current = shopScope?.specificShopId || '';
+  useEffect(() => {
+    openingRequest.current++;
+    setOpeningId('');
+    if (shopScope) setActive(null);
+    return () => { openingRequest.current++; };
+  }, [shopScope?.specificShopId]);
+  const visibleCounts = shopScope?.specificShopId ? counts.filter((count) => count.location_id === shopScope.specificShopId) : counts;
+  useEffect(() => shopScope?.registerGuard?.(() => active || showNew || starting || openingId
+    ? 'Avval ochiq sanoqni saqlab yoping yoki sanoq oynasini yoping.' : ''),
+  [shopScope?.registerGuard, active, showNew, starting, openingId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,16 +51,23 @@ export default function StockCountPanel({ user, location, locations }) {
   useEffect(() => { load(); }, [load]);
 
   const openCount = async (c) => {
+    if (openingId) return;
+    const request = ++openingRequest.current;
+    const requestedScope = currentScope.current;
+    setOpeningId(c.id);
     try {
       const res = await base44.functions.invoke('stock-count', { action: 'get_count', count_id: c.id });
       const data = res?.data || res;
+      if (request !== openingRequest.current || requestedScope !== currentScope.current) return;
+      if (shopScope && data.count?.location_id !== requestedScope) throw new Error('Sanoq tanlangan do‘konga tegishli emas.');
       setActive({ count: data.count, items: data.items });
-    } catch (e) { void odinaAlert("Sanog'ni ochib bo'lmadi: " + (e?.message || e)); }
+    } catch (e) { if (request === openingRequest.current) void odinaAlert("Sanog'ni ochib bo'lmadi: " + (e?.message || e)); }
+    finally { if (request === openingRequest.current) setOpeningId(''); }
   };
 
   const startNew = async () => {
     const locId = (role === 'admin')
-      ? newLoc
+      ? (shopScope ? shopScope.specificShopId : newLoc)
       : (user?.shop_id || user?.data?.shop_id || '');
     if (!locId) { void odinaAlert("Do'konni tanlang."); return; }
     setStarting(true);
@@ -67,7 +89,7 @@ export default function StockCountPanel({ user, location, locations }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Tayyor mahsulotlar, masalliqlar va qadoqlarni jismoniy sanash. Qoldiq faqat egasi tasdiqlagach o‘zgartiriladi.</p>
         {canCount && (
-          <Button onClick={() => setShowNew(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong shrink-0">
+          <Button onClick={() => { setNewLoc(location?.id || ''); setShowNew(true); }} disabled={Boolean(shopScope && (!shopScope.ready || !shopScope.specificShopId))} className="bg-primary text-primary-foreground hover:bg-primary-strong shrink-0">
             <Plus className="w-4 h-4 mr-1.5" /> Yangi sanoq
           </Button>
         )}
@@ -75,17 +97,17 @@ export default function StockCountPanel({ user, location, locations }) {
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-      ) : counts.length === 0 ? (
+      ) : visibleCounts.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card py-14 text-center text-sm text-muted-foreground">
           <ClipboardCheck className="w-9 h-9 mx-auto mb-2 opacity-40" /> Hozircha sanoqlar yo‘q.
         </div>
       ) : (
         <div className="space-y-2.5">
-          {counts.map((c) => {
+          {visibleCounts.map((c) => {
             const m = STATUS_META[c.status] || STATUS_META.draft;
             const Icon = m.icon;
             return (
-              <button key={c.id} onClick={() => openCount(c)} className="w-full text-left rounded-2xl border border-border bg-card premium-shadow p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors touch-manipulation">
+              <button key={c.id} onClick={() => openCount(c)} disabled={Boolean(openingId || starting)} className="w-full text-left rounded-2xl border border-border bg-card premium-shadow p-4 flex items-center gap-3 hover:bg-secondary/40 transition-colors touch-manipulation disabled:opacity-60">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${m.cls}`}><Icon className="w-5 h-5" /></div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold truncate">{c.count_number}</div>
@@ -107,7 +129,7 @@ export default function StockCountPanel({ user, location, locations }) {
             {(role === 'admin') ? (
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Do‘kon</label>
-                <OdinaSelect value={newLoc} onChange={(e) => setNewLoc(e.target.value)} className="h-11 w-full">
+                <OdinaSelect value={shopScope?.specificShopId || newLoc} onChange={(e) => shopScope ? shopScope.selectShop(e.target.value) : setNewLoc(e.target.value)} disabled={Boolean(shopScope)} className="h-11 w-full">
                   <option value="">Tanlang…</option>
                   {(locations || []).filter((l) => l.active !== false).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </OdinaSelect>
