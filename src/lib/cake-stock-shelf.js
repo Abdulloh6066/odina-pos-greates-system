@@ -1,4 +1,93 @@
 export const CAKE_STOCK_PAGE_SIZE = 48;
+
+export function inventoryUnits(item) {
+  if (item?.stock_kind !== 'ingredient') return { base: 'piece', unit: 'piece', label: 'dona', factor: 1, step: 1 };
+  const base = item.base_unit;
+  const unit = (base === 'g' && item.purchase_unit === 'kg') ? 'kg'
+    : (base === 'ml' && item.purchase_unit === 'l') ? 'l' : base;
+  return { base, unit, label: unit === 'piece' ? 'dona' : unit === 'l' ? 'litr' : unit,
+    factor: unit === 'kg' || unit === 'l' ? 1000 : 1, step: base === 'piece' ? 1 : 0.001 };
+}
+
+export function formatStockQuantity(quantity, item) {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 })
+    .format(Number(quantity) / inventoryUnits(item).factor).replaceAll(',', ' ');
+}
+
+export const INGREDIENT_SHELF_CATEGORIES = [
+  { id: 'ingredient-milk', name: 'Sut va qaymoq', sort_order: 1 },
+  { id: 'ingredient-coffee', name: 'Kofe va choy', sort_order: 2 },
+  { id: 'ingredient-syrup', name: 'Sirop va pyurelar', sort_order: 3 },
+  { id: 'ingredient-food', name: 'Boshqa masalliqlar', sort_order: 4 },
+  { id: 'ingredient-packaging', name: 'Qadoqlar', sort_order: 5 },
+  { id: 'ingredient-household', name: 'Xo‘jalik', sort_order: 6 },
+];
+
+export function shelfIngredients(ingredients) {
+  return (ingredients || []).filter(item => item.active !== false && item.is_cake_layer !== true).map(item => {
+    const category = item.category === 'packaging' ? 'packaging' : item.category === 'household' ? 'household'
+      : /sut|slivka|qaymoq|milk/i.test(item.name) ? 'milk'
+      : /qahva|kofe|coffee|choy|matcha|kakao/i.test(item.name) ? 'coffee'
+      : /sirop|pyure|bazasi|fresh/i.test(item.name) ? 'syrup' : 'food';
+    return { ...item, stock_kind: 'ingredient', category_id: 'ingredient-' + category,
+      category_name: INGREDIENT_SHELF_CATEGORIES.find(group => group.id === 'ingredient-' + category)?.name };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'uz', { numeric: true }));
+}
+
+export function allStockProducts(products, categories, shopId) {
+  if (!shopId) return [];
+  const hidden = new Set((categories || []).filter(c => c.hidden_shop_ids?.includes(shopId)).map(c => c.id));
+  return (products || []).filter(p => p.archived !== true && p.track_stock !== false && p.sale_unit !== 'gram'
+    && (!p.available_shop_ids?.length || p.available_shop_ids.includes(shopId))
+    && !hidden.has(p.shop_category_ids?.[shopId] || p.category_id));
+}
+
+export function inventoryStockInfo(rows, item, ready = true) {
+  if (item?.stock_kind !== 'ingredient') return cakeStockInfo(rows, item.id, ready);
+  const { base } = inventoryUnits(item);
+  if (!ready) return { status: 'loading', quantity: null, unit: base, label: 'Yuklanmoqda' };
+  if (!['g', 'ml', 'piece'].includes(base)) return { status: 'invalid', quantity: null, unit: base, label: 'Birlikni tekshiring' };
+  const matches = (rows || []).filter(row => row.ingredient_id === item.id);
+  if (!matches.length) return { status: 'missing', quantity: null, unit: base, label: 'Sanoq kiritilmagan' };
+  const row = matches[0], quantity = Number(row.quantity);
+  if (matches.length !== 1 || row.quantity == null || !Number.isFinite(quantity)
+    || Math.abs(quantity) > Number.MAX_SAFE_INTEGER / 1000 || row.unit !== base
+    || (base === 'piece' && !Number.isSafeInteger(quantity))) {
+    return { status: 'invalid', quantity: null, unit: base, label: 'Birlik yoki qoldiq xatosi' };
+  }
+  return { row, quantity, unit: base, status: quantity < 0 ? 'negative' : quantity === 0 ? 'zero' : 'positive',
+    label: quantity < 0 ? 'Sanoq kerak' : quantity === 0 ? 'Qoldiq yo‘q' : 'Mavjud' };
+}
+
+export function inventoryStockChange(mode, value, current, item) {
+  if (item?.stock_kind !== 'ingredient') return stockChange(mode, value, current);
+  const { base, factor, step, label } = inventoryUnits(item);
+  const input = Number(value), scaled = input * 1000;
+  if (!['g', 'ml', 'piece'].includes(base) || String(value).trim() === '' || !Number.isFinite(input)
+    || input < (mode === 'count' ? 0 : step) || !Number.isSafeInteger(Math.round(scaled))
+    || Math.abs(scaled - Math.round(scaled)) > 0.000001 || (base === 'piece' && !Number.isSafeInteger(input))) {
+    return { error: base === 'piece' ? 'Butun dona kiriting.' : 'Miqdorni ' + label + 'da, ko‘pi bilan 3 kasr xonasi bilan kiriting.' };
+  }
+  const round = n => Math.round(n * 1000) / 1000;
+  const quantity = round(input * factor), before = current == null ? 0 : Number(current);
+  const after = mode === 'count' ? quantity : round(before + (mode === 'out' ? -quantity : quantity));
+  if (!Number.isFinite(before) || !Number.isSafeInteger(Math.round(after * 1000)) || after < 0) {
+    return { error: 'Qoldiq manfiy bo‘la olmaydi. Haqiqiy sanoqni kiriting.' };
+  }
+  return { quantity, before, after, delta: round(after - before) };
+}
+
+export async function loadAllInventoryItems(entity, sort = 'name') {
+  const rows = [];
+  for (let skip = 0; skip < 10000; skip += 500) {
+    const page = await entity.list(sort, 500, skip);
+    if (!Array.isArray(page)) throw new Error('Mahsulotlar javobi noto‘g‘ri.');
+    rows.push(...page);
+    if (page.length < 500) return rows;
+  }
+  throw new Error('Mahsulotlar to‘liq yuklanmadi. Qayta yuklang.');
+}
+
 export const CAKE_STOCK_COLUMN_ROWS = 6;
 
 // Products have already been scoped to the selected shop by cakeProducts.
@@ -78,13 +167,13 @@ export async function loadAllCakeBalances(entity, shopId) {
   throw new Error('Qoldiqlar to‘liq yuklanmadi. Qayta yangilang.');
 }
 
-export function mergeCakeStockEvent(rows, event, shopId) {
+export function mergeCakeStockEvent(rows, event, shopId, itemIdField = 'product_id') {
   const data = event?.data;
   if (!data?.id) return null;
   if (event.type === 'delete') return rows.filter((row) => row.id !== data.id);
   if (data.location_id && data.location_id !== shopId) return rows.filter((row) => row.id !== data.id);
   const previous = rows.find((row) => row.id === data.id);
-  if (!previous && (data.location_id !== shopId || !data.product_id || data.quantity == null)) return null;
+  if (!previous && (data.location_id !== shopId || !data[itemIdField] || data.quantity == null)) return null;
   if (previous?.updated_at && data.updated_at && new Date(data.updated_at).getTime() < new Date(previous.updated_at).getTime()) return rows;
   const next = { ...previous, ...data };
   return previous ? rows.map((row) => row.id === data.id ? next : row) : [...rows, next];
