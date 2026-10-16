@@ -33,12 +33,18 @@ export default async function(req) {
     const itemId = String(body?.item_id || "");
     const movementType = String(body?.movement_type || "adjustment");
     const reason = String(body?.reason || "").trim();
-    const quantityChange = number(body?.quantity_change);
+    const hasCount = body?.counted_quantity !== undefined;
+    const countedQuantity = Number(body?.counted_quantity);
+    let quantityChange = number(body?.quantity_change);
 
     if (!locationId || !["ingredient", "product"].includes(itemKind) || !itemId) {
       return Response.json({ error: "Location and stock item are required." }, { status: 400 });
     }
-    if (!Number.isFinite(quantityChange) || quantityChange === 0 || !reason) {
+    if (hasCount && (itemKind !== "product" || !Number.isSafeInteger(countedQuantity) || countedQuantity < 0
+      || typeof body?.counted_quantity !== "number" || typeof body?.expected_quantity !== "number" || movementType !== "adjustment")) {
+      return Response.json({ error: "Haqiqiy sanoq uchun manfiy bo‘lmagan butun dona va ko‘rilgan qoldiq majburiy." }, { status: 400 });
+    }
+    if ((!hasCount && (!Number.isFinite(quantityChange) || quantityChange === 0)) || !reason) {
       return Response.json({ error: "A non-zero quantity and reason are required." }, { status: 400 });
     }
     if (!ALLOWED_TYPES.has(movementType)) {
@@ -82,6 +88,15 @@ export default async function(req) {
 
     const existing = matches?.[0] || null;
     const balanceBefore = number(existing?.quantity || 0);
+    if (body?.expected_quantity !== undefined) {
+      if (typeof body.expected_quantity !== "number" || !Number.isFinite(body.expected_quantity)) {
+        return Response.json({ error: "Ko‘rilgan qoldiq noto‘g‘ri." }, { status: 400 });
+      }
+      if (number(body.expected_quantity) !== balanceBefore) {
+        return Response.json({ error: "Qoldiq boshqa qurilmada o‘zgardi. Yangilangan miqdorni tekshirib, oynani qayta oching." }, { status: 409 });
+      }
+    }
+    if (hasCount) quantityChange = number(countedQuantity - balanceBefore);
     const balanceAfter = number(balanceBefore + quantityChange);
     if (itemKind === "ingredient" && item.is_cake_layer === true
       && ((existing && existing.unit !== "piece") || !Number.isSafeInteger(balanceBefore) || !Number.isSafeInteger(balanceAfter))) {
@@ -97,6 +112,9 @@ export default async function(req) {
       : location.location_type === "production" ? (item.production_unit || "piece") : "piece";
     if (itemKind === "product" && (!Number.isSafeInteger(quantityChange) || (existing && (existing.unit || "piece") !== unit))) {
       return Response.json({ error: "Butun list/dona kiriting; qoldiq birligi mahsulotga mos bo‘lishi kerak." }, { status: 400 });
+    }
+    if (hasCount && existing && quantityChange === 0) {
+      return Response.json({ stock: existing, movement: null, unchanged: true });
     }
     let stock;
 
