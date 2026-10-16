@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import WasteBatchDialog from '@/components/waste/WasteBatchDialog';
 import { wasteDateTime as dateTime } from '@/lib/waste';
+import { adminReportingScope, scopeReportingRows } from '@/lib/admin-shop-reporting';
 
 const emptyContext = {
   shops: [],
@@ -30,17 +31,24 @@ const errorText = (error, fallback) => (
 );
 
 export default function Waste() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = adminReportingScope(user, adminShopScope);
   const role = user?.role || 'cashier';
-  const canCancel = role === 'admin' || role === 'manager';
   const [context, setContext] = useState(emptyContext);
-  const [locationId, setLocationId] = useState('');
+  const [localLocationId, setLocationId] = useState('');
+  const locationId = shopScope?.shopId || localLocationId;
+  const canOperate = !shopScope || (shopScope.ready !== false && Boolean(shopScope.specificShopId)
+    && context.shops.some((shop) => shop.id === shopScope.specificShopId));
+  const canCancel = (role === 'admin' || role === 'manager') && canOperate;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [prefill, setPrefill] = useState(null);
   const [cancellingId, setCancellingId] = useState('');
   const [expiryFilter, setExpiryFilter] = useState('expired');
+
+  useEffect(() => shopScope?.registerGuard?.(() => dialogOpen || cancellingId
+    ? 'Avval chiqit oynasini yoping yoki saqlash tugashini kuting.' : ''), [shopScope?.registerGuard, dialogOpen, cancellingId]);
 
   const load = async ({ quiet = false } = {}) => {
     quiet ? setRefreshing(true) : setLoading(true);
@@ -64,23 +72,27 @@ export default function Waste() {
   useEffect(() => { if (user) load(); }, [user?.id]);
 
   const locationStock = useMemo(() => (
-    context.stock_items.filter((item) => item.location_id === locationId)
+    (shopScope ? scopeReportingRows(context.stock_items, shopScope, 'location_id')
+      : context.stock_items.filter((item) => item.location_id === locationId))
       .sort((a, b) => String(a.product_name).localeCompare(String(b.product_name)))
-  ), [context.stock_items, locationId]);
+  ), [context.stock_items, locationId, shopScope?.ready]);
 
   const locationExpired = useMemo(() => (
-    context.expired_items.filter((item) => item.location_id === locationId)
-  ), [context.expired_items, locationId]);
+    shopScope ? scopeReportingRows(context.expired_items, shopScope, 'location_id')
+      : context.expired_items.filter((item) => item.location_id === locationId)
+  ), [context.expired_items, locationId, shopScope?.ready]);
 
   const locationNearExpiry = useMemo(() => (
-    context.near_expiry_items.filter((item) => item.location_id === locationId)
-  ), [context.near_expiry_items, locationId]);
+    shopScope ? scopeReportingRows(context.near_expiry_items, shopScope, 'location_id')
+      : context.near_expiry_items.filter((item) => item.location_id === locationId)
+  ), [context.near_expiry_items, locationId, shopScope?.ready]);
 
   const alertItems = expiryFilter === 'expired' ? locationExpired : locationNearExpiry;
 
   const locationRecords = useMemo(() => (
-    context.waste_records.filter((record) => record.location_id === locationId)
-  ), [context.waste_records, locationId]);
+    shopScope ? scopeReportingRows(context.waste_records, shopScope, 'location_id')
+      : context.waste_records.filter((record) => record.location_id === locationId)
+  ), [context.waste_records, locationId, shopScope?.ready]);
 
   const locationSummary = useMemo(() => ({
     expiredTypes: locationExpired.length,
@@ -95,6 +107,7 @@ export default function Waste() {
   }), [locationExpired, locationNearExpiry, locationRecords]);
 
   const openWaste = (item = null, selectExpired = false) => {
+    if (!canOperate) return;
     if (locationStock.length === 0) {
       void odinaAlert('Bu do‘konda chiqitga chiqarish uchun mahsulot qoldig‘i yo‘q.');
       return;
@@ -116,6 +129,7 @@ export default function Waste() {
   };
 
   const cancelWaste = async (record) => {
+    if (!canCancel || (shopScope && record.location_id !== locationId)) return;
     const accepted = await odinaConfirm(
       `${record.product_name_snapshot} — ${formatNum(record.quantity)} dona chiqit yozuvini bekor qilasizmi?`,
       {
@@ -155,7 +169,7 @@ export default function Waste() {
               <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Yangilash</span>
             </Button>
-            <Button onClick={() => openWaste()} disabled={loading || !locationStock.length} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+            <Button onClick={() => openWaste()} disabled={loading || !locationStock.length || !canOperate} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
               <Plus className="w-4 h-4 mr-1.5" /> Chiqit kiritish
             </Button>
           </div>
@@ -177,19 +191,26 @@ export default function Waste() {
         </div>
       </div>
 
-      {context.shops.length > 1 && (
+      {(shopScope || context.shops.length > 1) && (
         <div className="odina-operations-toolbar odina-panel rounded-2xl bg-card border border-border p-4 mb-5">
           <Label htmlFor="waste-location" className="text-xs mb-1.5 block">Do‘kon</Label>
           <OdinaSelect
             id="waste-location"
             value={locationId}
-            onChange={(event) => setLocationId(event.target.value)}
+            onChange={(event) => shopScope ? shopScope.selectShop(event.target.value) : setLocationId(event.target.value)}
             className="w-full sm:max-w-sm h-11 rounded-xl border border-input bg-background px-3 text-sm font-medium"
           >
+            {shopScope && <option value="all">Barcha do‘konlar</option>}
+            {shopScope?.specificShopId && !context.shops.some((shop) => shop.id === shopScope.specificShopId)
+              && <option value={shopScope.specificShopId}>{shopScope.shops?.find((shop) => shop.id === shopScope.specificShopId)?.name || 'Tanlangan do‘kon'}</option>}
             {context.shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
           </OdinaSelect>
         </div>
       )}
+      {shopScope && !canOperate && <p className="mb-5 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+        {shopScope.shopId === 'all' ? 'Barcha do‘konlar bo‘yicha ko‘rinish. Chiqit kiritish yoki bekor qilish uchun bitta do‘konni tanlang.'
+          : 'Tanlangan joy uchun do‘kon chiqiti yuritilmaydi. Boshqa do‘konni tanlang.'}
+      </p>}
 
       {loading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -210,7 +231,7 @@ export default function Waste() {
                 <p className="odina-page-eyebrow">NAZORAT</p>
                 <h2 className="font-display text-xl sm:text-2xl font-bold">Mahsulotlar muddati</h2>
               </div>
-              {expiryFilter === 'expired' && locationExpired.length > 0 && (
+              {canOperate && expiryFilter === 'expired' && locationExpired.length > 0 && (
                 <Button variant="outline" onClick={() => openWaste(null, true)} className="min-h-11 rounded-xl">
                   <Trash2 className="w-4 h-4 mr-2" /> Birgalikda chiqarish
                 </Button>
@@ -248,6 +269,7 @@ export default function Waste() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-semibold break-words">{item.product_name}</h3>
+                        {shopScope?.shopId === 'all' && <p className="mt-1 text-xs text-muted-foreground">{context.shops.find((shop) => shop.id === item.location_id)?.name || item.location_id}</p>}
                         <p className={`text-sm font-semibold mt-1 ${expiryFilter === 'expired' ? 'text-red-700' : 'text-brand-ink'}`}>
                           {formatNum(expiryFilter === 'expired' ? item.expired_quantity : item.near_expiry_quantity)} dona
                           {expiryFilter === 'expired' ? ` · ${item.age_days} kun` : ' · muddat yaqin'}
@@ -261,7 +283,7 @@ export default function Waste() {
                     </div>
                     {expiryFilter === 'expired' && (
                       <div className="px-4 pb-4">
-                        <Button onClick={() => openWaste(item)} className="w-full min-h-11 rounded-xl bg-red-600 text-white hover:bg-red-700 touch-manipulation">
+                        <Button onClick={() => openWaste(item)} disabled={!canOperate} className="w-full min-h-11 rounded-xl bg-red-600 text-white hover:bg-red-700 touch-manipulation">
                           <Trash2 className="w-4 h-4 mr-1.5" /> Chiqitga chiqarish
                         </Button>
                       </div>
@@ -290,6 +312,7 @@ export default function Waste() {
                     key={record.id}
                     record={record}
                     canCancel={canCancel}
+                    locationName={shopScope?.shopId === 'all' ? context.shops.find((shop) => shop.id === record.location_id)?.name : ''}
                     cancelling={cancellingId === record.id}
                     onCancel={() => cancelWaste(record)}
                   />
@@ -303,8 +326,8 @@ export default function Waste() {
       <WasteBatchDialog
         open={dialogOpen}
         initial={prefill}
-        shops={context.shops}
-        stockItems={context.stock_items}
+        shops={shopScope ? context.shops.filter((shop) => shop.id === locationId) : context.shops}
+        stockItems={shopScope ? locationStock : context.stock_items}
         onUpdated={() => load({ quiet: true })}
         onClose={() => setDialogOpen(false)}
         onSaved={async () => {
@@ -328,7 +351,7 @@ function Metric({ icon: Icon, label, value, danger = false }) {
   );
 }
 
-function WasteRow({ record, canCancel, cancelling, onCancel }) {
+function WasteRow({ record, canCancel, cancelling, onCancel, locationName }) {
   const cancelled = record.status === 'cancelled';
   return (
     <div className={`odina-ledger-row odina-waste-row odina-panel rounded-2xl border bg-card p-4 ${cancelled ? 'border-border opacity-70' : 'border-border'}`}>
@@ -341,6 +364,7 @@ function WasteRow({ record, canCancel, cancelling, onCancel }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold">{record.product_name_snapshot}</h3>
+            {locationName && <span className="text-xs text-muted-foreground">{locationName}</span>}
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${cancelled ? 'bg-secondary text-muted-foreground' : 'bg-red-50 text-red-700'}`}>
               {cancelled ? 'Bekor qilingan' : `${formatNum(record.quantity)} dona`}
             </span>
@@ -370,6 +394,3 @@ function WasteRow({ record, canCancel, cancelling, onCancel }) {
     </div>
   );
 }
-
-
-
