@@ -291,6 +291,7 @@ function StaffNameDialog({ target, onClose, onDone }) {
       });
       const data = response?.data || response;
       if (!data?.ok || data.user?.id !== target.id) throw new Error(data?.error || 'Ism saqlanmadi. Qayta urinib ko‘ring.');
+      if (data.user.full_name !== normalizedName) throw new Error('Yangi ism saqlanganligi tasdiqlanmadi. Qayta urinib ko‘ring.');
       onDone(data.user);
     } catch (failure) {
       setError(failure?.response?.data?.error || failure?.message || 'Xodim ismini saqlab bo‘lmadi.');
