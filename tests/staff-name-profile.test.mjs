@@ -30,7 +30,7 @@ function profile(stored) {
 }
 
 test('reopening uses the saved employee name while retaining session identity and stored access', async () => {
-  const p = profile({ full_name: 'Mahkam Sadullayev', role: 'cashier', shop_id: 'branch', active: true });
+  const p = profile({ display_name: 'Mahkam Sadullayev', full_name: 'old-login-name', role: 'cashier', shop_id: 'branch', active: true });
   const result = await p.hydrate({ id: 'worker', email: 'worker@example.test', full_name: 'old-login-name', role: 'admin' });
   assert.equal(result.full_name, 'Mahkam Sadullayev');
   assert.equal(result.id, 'worker');
