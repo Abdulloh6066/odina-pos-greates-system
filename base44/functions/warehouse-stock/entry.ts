@@ -40,9 +40,12 @@ export default async function(req) {
     if (!locationId || !["ingredient", "product"].includes(itemKind) || !itemId) {
       return Response.json({ error: "Location and stock item are required." }, { status: 400 });
     }
-    if (hasCount && (itemKind !== "product" || !Number.isSafeInteger(countedQuantity) || countedQuantity < 0
+    if (hasCount && (!Number.isFinite(countedQuantity) || countedQuantity < 0
+      || Math.abs(countedQuantity) > Number.MAX_SAFE_INTEGER / 1000
+      || Math.abs(countedQuantity - number(countedQuantity)) > 0.0000001
+      || (itemKind === "product" && !Number.isSafeInteger(countedQuantity))
       || typeof body?.counted_quantity !== "number" || typeof body?.expected_quantity !== "number" || movementType !== "adjustment")) {
-      return Response.json({ error: "Haqiqiy sanoq uchun manfiy bo‘lmagan butun dona va ko‘rilgan qoldiq majburiy." }, { status: 400 });
+      return Response.json({ error: "Haqiqiy sanoq uchun manfiy bo‘lmagan miqdor va ko‘rilgan qoldiq majburiy." }, { status: 400 });
     }
     if ((!hasCount && (!Number.isFinite(quantityChange) || quantityChange === 0)) || !reason) {
       return Response.json({ error: "A non-zero quantity and reason are required." }, { status: 400 });
@@ -71,9 +74,14 @@ export default async function(req) {
         return Response.json({ error: "Qavat/list qoldig‘i faqat markaziy ishlab chiqarishda yuritiladi." }, { status: 400 });
       }
       if (item.base_unit !== "piece" || item.purchase_unit !== "piece" || Number(item.conversion_to_base) !== 1
-        || !Number.isSafeInteger(Number(body?.quantity_change))) {
+        || !Number.isSafeInteger(hasCount ? countedQuantity : Number(body?.quantity_change))) {
         return Response.json({ error: "Qavatlar butun list sonida, dona birligida kiritiladi." }, { status: 400 });
       }
+    }
+
+    if (itemKind === "ingredient" && (!["g", "ml", "piece"].includes(item.base_unit)
+      || (item.base_unit === "piece" && !Number.isSafeInteger(hasCount ? countedQuantity : quantityChange)))) {
+      return Response.json({ error: "Masalliq birligi noto‘g‘ri yoki butun dona kiritilmagan." }, { status: 400 });
     }
 
     const stockEntity = itemKind === "ingredient"
@@ -87,7 +95,12 @@ export default async function(req) {
     }
 
     const existing = matches?.[0] || null;
-    const balanceBefore = number(existing?.quantity || 0);
+    const balanceBefore = number(existing ? existing.quantity : 0);
+    if (!Number.isFinite(balanceBefore) || (existing && existing.quantity == null)
+      || (itemKind === "ingredient" && existing && existing.unit !== item.base_unit)
+      || (itemKind === "ingredient" && item.base_unit === "piece" && !Number.isSafeInteger(balanceBefore))) {
+      return Response.json({ error: "Qoldiq yoki uning birligini avval tekshiring." }, { status: 409 });
+    }
     if (body?.expected_quantity !== undefined) {
       if (typeof body.expected_quantity !== "number" || !Number.isFinite(body.expected_quantity)) {
         return Response.json({ error: "Ko‘rilgan qoldiq noto‘g‘ri." }, { status: 400 });
@@ -102,7 +115,7 @@ export default async function(req) {
       && ((existing && existing.unit !== "piece") || !Number.isSafeInteger(balanceBefore) || !Number.isSafeInteger(balanceAfter))) {
       return Response.json({ error: "Qavat qoldig‘i yoki uning birligi noto‘g‘ri." }, { status: 409 });
     }
-    if (balanceAfter < 0) {
+    if (!Number.isFinite(balanceAfter) || Math.abs(balanceAfter) > Number.MAX_SAFE_INTEGER / 1000 || balanceAfter < 0) {
       return Response.json({ error: "This change would make stock negative." }, { status: 409 });
     }
 
