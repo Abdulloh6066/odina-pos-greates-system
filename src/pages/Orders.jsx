@@ -40,7 +40,7 @@ const PAY_OPTIONS = [
 const FINISHED = FINISHED_ORDER_STATUSES;
 
 export default function Orders() {
-  const { user } = useAuth();
+  const { user, adminShopScope } = useAuth();
   const { toast } = useToast();
   const isAdmin = user?.role === 'admin';
 
@@ -51,7 +51,10 @@ export default function Orders() {
   const [shops, setShops] = useState([]);
   const [view, setView] = useState('today');
   const [query, setQuery] = useState('');
-  const [shopFilter, setShopFilter] = useState('');
+  const [localShopFilter, setLocalShopFilter] = useState('');
+  const sharedScope = isAdmin && adminShopScope?.isAdmin === true;
+  const shopFilter = sharedScope ? adminShopScope.specificShopId : localShopFilter;
+  const setShopFilter = (id) => sharedScope ? adminShopScope.selectShop(id || 'all') : setLocalShopFilter(id);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [payFilter, setPayFilter] = useState('');
@@ -60,7 +63,24 @@ export default function Orders() {
   const [detailOrder, setDetailOrder] = useState(null);
   const [staffTicket, setStaffTicket] = useState(null);
   const [repeatPrefill, setRepeatPrefill] = useState(null);
-  const { alerts, counts } = useOrderAlerts(activeOrders);
+  const [repeatLoading, setRepeatLoading] = useState(false);
+  const repeatRequest = useRef(0);
+  const repeatLoadingRef = useRef(false);
+  const repeatScopeRef = useRef(shopFilter);
+  repeatScopeRef.current = shopFilter;
+  const scopedActiveOrders = useMemo(() => activeOrders.filter((order) => !shopFilter || order.shop_id === shopFilter), [activeOrders, shopFilter]);
+  const { alerts, counts } = useOrderAlerts(scopedActiveOrders);
+  useEffect(() => {
+    if (!sharedScope || !adminShopScope.registerGuard) return undefined;
+    return adminShopScope.registerGuard(() => repeatLoadingRef.current ? 'Buyurtma ma’lumotlari yuklanmoqda. Do‘konni almashtirishdan oldin kuting.'
+      : detailOrder || staffTicket ? 'Do‘konni almashtirishdan oldin buyurtma oynasini yoping.' : '');
+  }, [sharedScope, adminShopScope?.registerGuard, detailOrder, staffTicket]);
+  useEffect(() => {
+    repeatRequest.current += 1;
+    repeatLoadingRef.current = false;
+    setRepeatLoading(false);
+    return () => { repeatRequest.current += 1; repeatLoadingRef.current = false; };
+  }, [user?.id, shopFilter]);
   const today = uzbekistanDateKey();
   const tomorrow = shiftDateKey(today, 1);
   const { rows: orders, loading, loadingMore, error: loadError, hasMore, reload, loadMore } = useEntityHistory(
@@ -100,9 +120,9 @@ export default function Orders() {
 
   const isActive = (order) => !FINISHED.includes(order.order_status);
   const tabs = [
-    { key: 'today', label: 'Bugun', count: activeOrders.filter((o) => o.required_date === today).length },
-    { key: 'tomorrow', label: 'Ertaga', count: activeOrders.filter((o) => o.required_date === tomorrow).length },
-    { key: 'other', label: 'Boshqa kunlar', count: activeOrders.filter((o) => o.required_date !== today && o.required_date !== tomorrow).length },
+    { key: 'today', label: 'Bugun', count: scopedActiveOrders.filter((o) => o.required_date === today).length },
+    { key: 'tomorrow', label: 'Ertaga', count: scopedActiveOrders.filter((o) => o.required_date === tomorrow).length },
+    { key: 'other', label: 'Boshqa kunlar', count: scopedActiveOrders.filter((o) => o.required_date !== today && o.required_date !== tomorrow).length },
     { key: 'history', label: 'Tarix' },
     { key: 'all', label: 'Barchasi' },
   ];
@@ -137,24 +157,32 @@ export default function Orders() {
   };
   const clearFilters = () => {
     setQuery('');
-    setShopFilter('');
+    if (!sharedScope) setLocalShopFilter('');
     setTypeFilter('');
     setStatusFilter('');
     setPayFilter('');
     setDateFilter('');
     setView('today');
   };
-  const hasFilters = !!(query || shopFilter || typeFilter || statusFilter || payFilter || dateFilter);
+  const hasFilters = !!(query || (!sharedScope && shopFilter) || typeFilter || statusFilter || payFilter || dateFilter);
 
   const handleRepeat = async (order, items) => {
+    if (repeatLoadingRef.current) return;
+    const request = ++repeatRequest.current;
+    const scopeAtStart = shopFilter;
+    repeatLoadingRef.current = true;
+    setRepeatLoading(true);
     try {
       let it = items;
       if (!it) it = await base44.entities.CustomerOrderItem.filter({ order_id: order.id });
+      if (request !== repeatRequest.current || scopeAtStart !== repeatScopeRef.current) return;
       setDetailOrder(null);
       setRepeatPrefill({ order, items: it || [] });
       setFormOpen(true);
     } catch (e) {
-      toast({ title: 'Buyurtma ma’lumotlarini yuklab bo‘lmadi', description: e?.message, variant: 'destructive' });
+      if (request === repeatRequest.current) toast({ title: 'Buyurtma ma’lumotlarini yuklab bo‘lmadi', description: e?.message, variant: 'destructive' });
+    } finally {
+      if (request === repeatRequest.current) { repeatLoadingRef.current = false; setRepeatLoading(false); }
     }
   };
 
@@ -168,6 +196,7 @@ export default function Orders() {
   return (
     <div className="opl-page">
       <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />
+      {repeatLoading && <p role="status" className="p-3 text-sm text-muted-foreground">Buyurtma ma’lumotlari yuklanmoqda…</p>}
       <div className="opl-workspace">
         <nav className="opl-tabs" aria-label="Buyurtma sanalari">
           {tabs.map((tab) => (
@@ -225,7 +254,7 @@ export default function Orders() {
           </div>}
         </section>
       </div>
-      <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} />
+      <OrderForm open={formOpen} onClose={() => { setFormOpen(false); setRepeatPrefill(null); }} onCreated={handleCreated} user={user} shops={shops} prefill={repeatPrefill} adminShopScope={adminShopScope} />
       <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} onPaid={() => { loadOrders(); }} onRepeat={handleRepeat}
         onStaffTicket={(order, items) => { setDetailOrder(null); setStaffTicket({ order, items }); }} />
       <StaffOrderTicketModal open={!!staffTicket} mode="customer" order={staffTicket?.order}

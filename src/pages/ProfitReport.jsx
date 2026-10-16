@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -16,7 +16,8 @@ const firstOfMonth = () => uzbekistanMonthStartKey();
 const todayISO = () => uzbekistanDateKey();
 
 export default function ProfitReport() {
-  const { user } = useAuth();
+  const { user, adminShopScope } = useAuth();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
   const role = user?.role;
   const isAdmin = role === 'admin';
 
@@ -25,11 +26,17 @@ export default function ProfitReport() {
   const [categories, setCategories] = useState([]);
   const [dateFrom, setDateFrom] = useState(firstOfMonth());
   const [dateTo, setDateTo] = useState(todayISO());
-  const [shopId, setShopId] = useState('');
+  const [localShopId, setLocalShopId] = useState('');
+  const shopId = shopScope ? shopScope.specificShopId : localShopId;
+  const setShopId = (value) => shopScope ? shopScope.selectShop(value || 'all') : setLocalShopId(value);
   const [productId, setProductId] = useState('');
   const [categoryId, setCategoryId] = useState('');
 
-  const [report, setReport] = useState(null);
+  const [rawReport, setReport] = useState(null);
+  const [loadedScope, setLoadedScope] = useState('');
+  const scopeKey = shopScope?.shopId || 'legacy';
+  const report = loadedScope === scopeKey && shopScope?.ready !== false ? rawReport : null;
+  const reportRequest = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -55,6 +62,9 @@ export default function ProfitReport() {
   }, [isAdmin]);
 
   const loadReport = async () => {
+    if (shopScope?.ready === false) return;
+    const request = ++reportRequest.current;
+    const requestedScope = scopeKey;
     setLoading(true);
     setError('');
     try {
@@ -66,15 +76,24 @@ export default function ProfitReport() {
         product_id: productId,
         category_id: categoryId,
       });
+      if (request !== reportRequest.current) return;
       setReport(res?.data || res);
+      setLoadedScope(requestedScope);
     } catch (e) {
+      if (request !== reportRequest.current) return;
       setError(e?.response?.data?.error || e?.message || 'Hisobotni yuklab bo‘lmadi.');
     } finally {
-      setLoading(false);
+      if (request === reportRequest.current) setLoading(false);
     }
   };
 
-  useEffect(() => { loadReport(); }, []);
+  useEffect(() => {
+    setBreakdownOpen(false);
+    void loadReport();
+    return () => { reportRequest.current += 1; };
+    // Other report filters retain their existing explicit refresh button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopScope?.shopId, shopScope?.ready]);
 
   const openBreakdown = async (prodId) => {
     setBreakdownOpen(true);

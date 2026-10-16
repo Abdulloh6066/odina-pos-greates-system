@@ -20,7 +20,7 @@ function formatDashboardDate(dateKey) {
 }
 
 export default function Dashboard() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
   const navigate = useNavigate();
   const role = user?.role || 'cashier';
   const [sales, setSales] = useState([]);
@@ -32,6 +32,8 @@ export default function Dashboard() {
   const [businessDate, setBusinessDate] = useState(tashkentDateKey);
   const [reportError, setReportError] = useState('');
   const assignedShopId = user?.shop_id || user?.data?.shop_id || '';
+  const globalScope = role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
+  const changeShop = (id) => globalScope ? globalScope.selectShop(id) : setSelectedShopId(id);
 
   useEffect(() => {
     if (role === 'cashier') { navigate('/pos', { replace: true }); return; }
@@ -149,8 +151,10 @@ export default function Dashboard() {
     role !== 'manager' || row.shop_id === assignedShopId
   ), [dailyReports, role, assignedShopId]);
   const shopId = role === 'manager' ? assignedShopId
-    : shops.some((shop) => shop.shop_id === selectedShopId) ? selectedShopId : 'all';
+    : globalScope ? globalScope.shopId
+      : shops.some((shop) => shop.shop_id === selectedShopId) ? selectedShopId : 'all';
   const shopName = shops.find((shop) => shop.shop_id === shopId)?.shop_name
+    || globalScope?.shops.find((shop) => shop.id === shopId)?.name
     || (role === 'manager' ? user?.shop_name || 'Biriktirilgan do‘kon' : 'Barcha do‘konlar');
   const dailyTotals = useMemo(() => dailyReports === null ? null
     : dailyReports.filter((row) => shopId === 'all' || Boolean(shopId && row.shop_id === shopId)).reduce((totals, row) => ({
@@ -220,7 +224,7 @@ export default function Dashboard() {
             {[{ shop_id: 'all', shop_name: 'Barcha do‘konlar' }, ...shops].map((shop) => (
               <button key={shop.shop_id} type="button" className="odina-home-shop-button"
                 aria-pressed={shopId === shop.shop_id} disabled={loading || shops.length === 0}
-                onClick={() => setSelectedShopId(shop.shop_id)}>
+                onClick={() => changeShop(shop.shop_id)}>
                 <Building2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{shop.shop_name}</span>
                 {shopId === shop.shop_id && <Check className="w-4 h-4 shrink-0" aria-hidden="true" />}
@@ -234,7 +238,7 @@ export default function Dashboard() {
             aria-label="Do‘kon bo‘yicha ko‘rish"
             value={shopId}
             disabled={loading || shops.length === 0}
-            onChange={(event) => setSelectedShopId(event.target.value)}
+            onChange={(event) => changeShop(event.target.value)}
             placeholder={shopName}
             className="odina-home-shop-select w-full min-h-11 touch-manipulation"
           >
@@ -356,4 +360,3 @@ function Panel({ title, icon: Icon, children }) {
 function Empty({ text }) {
   return <div className="odina-home-empty">{text}</div>;
 }
-

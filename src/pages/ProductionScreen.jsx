@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import AdminShopSwitcher from '@/components/AdminShopSwitcher';
 import { Image } from '@/components/ui/image';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -125,7 +126,8 @@ function ScreenCrashFallback({ error, onReset }) {
 }
 
 function ProductionScreenInner() {
-  const { user } = useAuth();
+  const { user, adminShopScope } = useAuth();
+  const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
   const { toast } = useToast();
   const [active, setActive] = useState([]);
   const [shippedToday, setShippedToday] = useState([]);
@@ -145,6 +147,12 @@ function ProductionScreenInner() {
   const refreshInFlight = useRef(null);
   const refreshQueued = useRef(false);
   const forecastQueued = useRef(false);
+  useEffect(() => {
+    if (user?.role !== 'admin' || !adminShopScope?.registerGuard) return undefined;
+    return adminShopScope.registerGuard(() => busyId || confirm ? 'Do‘konni almashtirishdan oldin buyurtma amalini tugating yoki oynani yoping.' : '');
+  }, [user?.role, adminShopScope?.registerGuard, busyId, confirm]);
+  const scopedActive = useMemo(() => active.filter((order) => !scopedShopId || order.shop_id === scopedShopId), [active, scopedShopId]);
+  const scopedShippedToday = useMemo(() => shippedToday.filter((order) => !scopedShopId || order.shop_id === scopedShopId), [shippedToday, scopedShopId]);
 
   const loadOrders = async () => {
     try {
@@ -320,13 +328,13 @@ function ProductionScreenInner() {
       const timeCompare = (a.required_time || '').localeCompare(b.required_time || '');
       return timeCompare || (a.order_sequence || 0) - (b.order_sequence || 0);
     };
-    const ordersFor = (date) => active.filter((o) => o.required_date === date).sort(sortByTime);
+    const ordersFor = (date) => scopedActive.filter((o) => o.required_date === date).sort(sortByTime);
 
     return [
       { key: 'today', title: 'Bugungi buyurtmalar', date: today, orders: ordersFor(today) },
       { key: 'tomorrow', title: 'Ertangi buyurtmalar', date: tomorrow, orders: ordersFor(tomorrow) },
     ];
-  }, [active, clock]);
+  }, [scopedActive, clock]);
 
   const logout = () => base44.auth.logout();
   const homePath = ROLE_HOME[user?.role] || '/';
@@ -367,6 +375,8 @@ function ProductionScreenInner() {
 
       {/* Body — always one of loading / error / empty / orders */}
       <main className="odina-production-content flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 sm:p-6">
+        <AdminShopSwitcher scope={adminShopScope} pathname="/production-screen" />
+        {scopedShopId && <p className="mb-4 rounded-xl bg-secondary p-3 text-sm text-muted-foreground">Buyurtmalar tanlangan do‘kon bo‘yicha. Ertangi masalliq hisobi va ishlab chiqarish talablari barcha do‘konlar uchun umumiy.</p>}
         {loading ? (
           <div className="h-[60vh] flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Loader2 className="w-8 h-8 animate-spin text-brand-olive" />
@@ -418,15 +428,15 @@ function ProductionScreenInner() {
         )}
 
         {/* Bugun yuborilgan */}
-        {shippedToday.length > 0 && !loading && !error && (
+        {scopedShippedToday.length > 0 && !loading && !error && (
           <section className="mt-8">
             <div className="flex items-center gap-2 mb-3">
               <Truck className="w-5 h-5 text-brand-olive" />
               <h2 className="font-display text-lg font-semibold">Bugun yuborilgan</h2>
-              <span className="text-xs font-medium bg-secondary text-muted-foreground rounded-full px-2 py-0.5">{shippedToday.length}</span>
+              <span className="text-xs font-medium bg-secondary text-muted-foreground rounded-full px-2 py-0.5">{scopedShippedToday.length}</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {shippedToday.map((o) => (
+              {scopedShippedToday.map((o) => (
                 <div key={o.id} className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-brand-olive/15 flex items-center justify-center shrink-0">
                     <Truck className="w-4 h-4 text-brand-olive" />
@@ -774,4 +784,3 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import '@/styles/operations-workbench.css';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/PageHeader';
@@ -15,6 +15,7 @@ import {
 import { formatNum, tashkentDateKey } from '@/lib/pos';
 import { odinaConfirm } from '@/lib/odina-dialog';
 import { reportsToCsv } from '../../base44/shared/daily-report-logic';
+import { adminReportingScope, scopeReportingRows } from '@/lib/admin-shop-reporting';
 
 function downloadCsv(filename, reports) {
   const csv = '\uFEFF' + reportsToCsv(reports);
@@ -47,13 +48,15 @@ const COLS = [
 ];
 
 export default function DailyExport() {
-  const { user } = useAuth();
+  const { user, adminShopScope } = useAuth();
+  const shopScope = adminReportingScope(user, adminShopScope);
   const role = user?.role || 'cashier';
   const isAdmin = role === 'admin';
   const { toast } = useToast();
 
   const [businessDate, setBusinessDate] = useState(tashkentDateKey());
-  const [reports, setReports] = useState([]);
+  const [allReports, setReports] = useState([]);
+  const reports = scopeReportingRows(allReports, shopScope);
   const [config, setConfig] = useState(null);
   const [sheetsConnected, setSheetsConnected] = useState(false);
   const [history, setHistory] = useState([]);
@@ -63,6 +66,11 @@ export default function DailyExport() {
   const [emailDraft, setEmailDraft] = useState('');
   const [autoSend, setAutoSend] = useState(true);
   const [reminder, setReminder] = useState(true);
+  const previewRequest = useRef(0);
+  const canSendAll = !shopScope || (shopScope.shopId === 'all' && shopScope.ready !== false);
+
+  useEffect(() => shopScope?.registerGuard?.(() => sending || saving
+    ? 'Hisobotni yuborish yoki sozlamalarni saqlash tugashini kuting.' : ''), [shopScope?.registerGuard, sending, saving]);
 
   const loadConfig = async () => {
     try {
@@ -81,18 +89,20 @@ export default function DailyExport() {
   };
 
   const loadPreview = async (date) => {
+    const request = ++previewRequest.current;
     setLoading(true);
     try {
       const res = await base44.functions.invoke('daily-sales-export', {
         action: 'preview',
         business_date: date,
       });
-      setReports(res.data?.reports || []);
+      if (request === previewRequest.current) setReports(res.data?.reports || []);
     } catch (e) {
+      if (request !== previewRequest.current) return;
       toast({ title: 'Hisobni yuklab bo‘lmadi', description: e?.message, variant: 'destructive' });
       setReports([]);
     } finally {
-      setLoading(false);
+      if (request === previewRequest.current) setLoading(false);
     }
   };
 
@@ -109,6 +119,7 @@ export default function DailyExport() {
     loadConfig();
     loadPreview(tashkentDateKey());
     loadHistory();
+    return () => { previewRequest.current += 1; };
   }, []);
 
   const totals = useMemo(() => Object.fromEntries(COLS.filter(c => c.num).map(c => [
@@ -116,7 +127,7 @@ export default function DailyExport() {
   ])), [reports]);
 
   const handleSend = async () => {
-    if (!isAdmin || sending) return;
+    if (!isAdmin || sending || !canSendAll) return;
     const uncertain = history.some(row => row.business_date === businessDate
       && ['sending', 'uncertain'].includes(row.email_delivery_state));
     let retryUncertain = false;
@@ -172,12 +183,12 @@ export default function DailyExport() {
 
   const historyByDate = useMemo(() => {
     const map = new Map();
-    for (const r of history) {
+    for (const r of scopeReportingRows(history, shopScope)) {
       if (!map.has(r.business_date)) map.set(r.business_date, []);
       map.get(r.business_date).push(r);
     }
     return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [history]);
+  }, [history, shopScope?.shopId, shopScope?.ready]);
 
   return (
     <div className="odina-page odina-workbench odina-operations odina-daily-export p-5 sm:p-8 max-w-[1500px] mx-auto space-y-6">
@@ -252,8 +263,8 @@ export default function DailyExport() {
                 <Download className="w-4 h-4" /> CSV
               </Button>
               {isAdmin && (
-                <Button size="sm" onClick={handleSend} disabled={sending}>
-                  <Send className="w-4 h-4" /> {sending ? 'Yuborilmoqda…' : 'Sheet + Email ga yuborish'}
+                <Button size="sm" onClick={handleSend} disabled={sending || !canSendAll} title={!canSendAll ? 'Yuborish uchun Barcha do‘konlar rejimini tanlang.' : undefined}>
+                  <Send className="w-4 h-4" /> {sending ? 'Yuborilmoqda…' : 'Barcha do‘konlar: Sheet + Email'}
                 </Button>
               )}
             </div>
@@ -262,6 +273,7 @@ export default function DailyExport() {
           <p className="odina-operations-note mb-3 text-xs text-muted-foreground leading-relaxed">Buyurtma avansi va qoldig‘i pul olingan kuni hisoblanadi, Kassa foydasiga qo‘shilmaydi. Kassa yalpi foydasidan do‘kon xarajatlari ayrilmagan.
             {reports.some(row => row.unknown_cost_count > 0) && ' Ayrim tannarxlar noma’lum yoki taxminiy; foyda to‘liq emas.'}
           </p>
+          {!canSendAll && <p className="mb-3 text-xs text-muted-foreground">Ko‘rinish va CSV tanlangan do‘kon uchun. Sheet + Email yuborish Barcha do‘konlar rejimida bajariladi.</p>}
           {loading ? (
             <div className="py-10 text-center text-sm text-muted-foreground">Hisoblanmoqda…</div>
           ) : (
