@@ -45,7 +45,8 @@ const errorText = (error) =>
   error?.response?.data?.error || error?.data?.error || error?.message || String(error || "Noma’lum xato");
 
 export default function Budget() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
   const [balances, setBalances] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,7 @@ export default function Budget() {
   const visibleTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
     return transactions.filter((transaction) => {
+      if (scopedShopId && transaction.shop_id !== scopedShopId) return false;
       if (accountFilter !== "all" && transaction.account !== accountFilter) return false;
       if (typeFilter !== "all" && transaction.type !== typeFilter) return false;
       if (!query) return true;
@@ -93,7 +95,7 @@ export default function Budget() {
         transaction.performed_by_name,
       ].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [transactions, accountFilter, typeFilter, search]);
+  }, [transactions, accountFilter, typeFilter, search, scopedShopId]);
 
   if (user?.role !== "admin") return null;
 
@@ -122,6 +124,7 @@ export default function Budget() {
           <p className="text-xs text-muted-foreground mt-1">
             Smena yopilganda topshirilgan naqd pul va elektron tushumlar avtomatik qo‘shiladi.
             Eski mablag‘ni boshlang‘ich kirim sifatida bir marta kiritish mumkin.
+            {scopedShopId && ' Budget qoldiqlari barcha do‘konlar uchun umumiy. Faqat quyidagi tarix tanlangan do‘kon bo‘yicha ko‘rsatiladi.'}
           </p>
         </div>
       </div>

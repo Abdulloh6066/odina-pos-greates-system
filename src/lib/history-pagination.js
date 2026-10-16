@@ -16,9 +16,10 @@ const dayRange = (date) => ({
 });
 
 // Include legacy records that predate stored business dates and occurrence times.
-export function salesHistoryQuery({ user, date, search } = {}) {
+export function salesHistoryQuery({ user, date, search, shop_id = '' } = {}) {
   const parts = [];
   if (user?.role === 'cashier') parts.push({ user_id: user.id });
+  if (user?.role === 'admin' && shop_id && shop_id !== 'all') parts.push({ shop_id });
   if (date) parts.push({ $or: [
     { business_date: date },
     { $and: [absent('business_date'), { sold_at: dayRange(date) }] },

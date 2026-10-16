@@ -79,12 +79,13 @@ function quantityText(row) {
 }
 
 export default function AuditExport() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
   const [draft, setDraft] = useState(() => defaultAuditFilters());
   const [applied, setApplied] = useState(() => defaultAuditFilters());
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
-  const [data, setData] = useState({
+  const [rawData, setData] = useState({
     rows: [],
     total: 0,
     summary: {},
@@ -95,9 +96,25 @@ export default function AuditExport() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  const [loadedScope, setLoadedScope] = useState('');
+  const scopeKey = shopScope?.shopId || 'legacy';
+  const data = loadedScope !== scopeKey || shopScope?.ready === false
+    ? { rows: [], total: 0, summary: {}, users: rawData.users, shops: rawData.shops }
+    : rawData;
+  const effectiveApplied = useMemo(() => shopScope ? { ...applied, shop_id: shopScope.shopId } : applied, [applied, shopScope?.shopId]);
+
+  useEffect(() => shopScope?.registerGuard?.(() => exporting ? 'Eksport tayyor bo‘lishini kuting.' : ''), [shopScope?.registerGuard, exporting]);
+
+  useEffect(() => {
+    if (!shopScope) return;
+    setDraft((current) => ({ ...current, shop_id: shopScope.shopId }));
+    setApplied((current) => ({ ...current, shop_id: shopScope.shopId }));
+    setPage(1);
+  }, [shopScope?.shopId]);
 
   useEffect(() => {
     let cancelled = false;
+    if (shopScope?.ready === false) return;
 
     async function load() {
       setLoading(true);
@@ -105,7 +122,7 @@ export default function AuditExport() {
       try {
         const response = await base44.functions.invoke("audit-report", {
           action: "list",
-          ...auditRequestFilters(applied),
+          ...auditRequestFilters(effectiveApplied),
           offset: (page - 1) * PAGE_SIZE,
           limit: PAGE_SIZE,
         });
@@ -113,7 +130,7 @@ export default function AuditExport() {
         if (!Array.isArray(payload.rows)) {
           throw new Error(payload.error || "Nazorat ma’lumotlari noto‘g‘ri qaytdi.");
         }
-        if (!cancelled) setData(payload);
+        if (!cancelled) { setData(payload); setLoadedScope(scopeKey); }
       } catch (loadError) {
         if (!cancelled) setError(errorMessage(loadError));
       } finally {
@@ -123,7 +140,7 @@ export default function AuditExport() {
 
     void load();
     return () => { cancelled = true; };
-  }, [applied, page, reloadKey]);
+  }, [effectiveApplied, page, reloadKey, scopeKey, shopScope?.ready]);
 
   const totalPages = Math.max(1, Math.ceil(Number(data.total || 0) / PAGE_SIZE));
   const rangeStart = data.total ? (page - 1) * PAGE_SIZE + 1 : 0;
@@ -133,11 +150,12 @@ export default function AuditExport() {
     [data.users],
   );
   const shops = useMemo(
-    () => [...(data.shops || [])].sort((left, right) => left.name.localeCompare(right.name, "uz")),
-    [data.shops],
+    () => [...(shopScope?.shops || data.shops || [])].sort((left, right) => left.name.localeCompare(right.name, "uz")),
+    [data.shops, shopScope?.shops],
   );
 
   const changeDraft = (key, value) => {
+    if (key === 'shop_id' && shopScope) { shopScope.selectShop(value); return; }
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
@@ -153,6 +171,7 @@ export default function AuditExport() {
 
   const resetFilters = () => {
     const next = defaultAuditFilters();
+    if (shopScope) next.shop_id = shopScope.shopId;
     setDraft(next);
     setPage(1);
     setApplied(next);
@@ -163,7 +182,7 @@ export default function AuditExport() {
     try {
       const response = await base44.functions.invoke("audit-report", {
         action: "export",
-        ...auditRequestFilters(applied),
+        ...auditRequestFilters(effectiveApplied),
         limit: 5000,
       });
       const payload = payloadFrom(response);
@@ -310,7 +329,7 @@ export default function AuditExport() {
             </Select>
           </FilterField>
           <FilterField label="Do‘kon / joy">
-            <Select value={draft.shop_id} onValueChange={(value) => changeDraft("shop_id", value)}>
+            <Select value={shopScope?.shopId || draft.shop_id} onValueChange={(value) => changeDraft("shop_id", value)}>
               <SelectTrigger className="h-11 rounded-xl bg-card">
                 <SelectValue placeholder="Barcha joylar" />
               </SelectTrigger>
@@ -586,4 +605,3 @@ function LoadingRows() {
     </div>
   );
 }
-

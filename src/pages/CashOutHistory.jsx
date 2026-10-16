@@ -20,7 +20,8 @@ const CATEGORY_LABELS = {
 const categoryOf = (movement) => movement.expense_category || 'other_expense';
 
 export default function CashOutHistory() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
   const [movements, setMovements] = useState([]);
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,9 @@ export default function CashOutHistory() {
   const [period, setPeriod] = useState('today');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => uzbekistanMonthKey());
-  const [selectedShop, setSelectedShop] = useState('all');
+  const [localShop, setLocalShop] = useState('all');
+  const selectedShop = shopScope?.shopId || localShop;
+  const setSelectedShop = (value) => shopScope ? shopScope.selectShop(value) : setLocalShop(value);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedRecipient, setSelectedRecipient] = useState('all');
 
@@ -54,9 +57,11 @@ export default function CashOutHistory() {
   }, []);
 
   const visible = useMemo(() => {
+    if (shopScope?.ready === false) return [];
+    if (user?.role === 'admin' && shopScope?.specificShopId) return movements.filter((movement) => movement.shop_id === shopScope.specificShopId);
     if (['admin', 'manager'].includes(user?.role)) return movements;
     return movements.filter((movement) => movement.user_id === user?.id);
-  }, [movements, user]);
+  }, [movements, user, shopScope]);
 
   const shopNames = useMemo(
     () => Object.fromEntries(shops.map((shop) => [shop.id, shop.name])),
@@ -118,7 +123,9 @@ export default function CashOutHistory() {
       <PageHeader
         title="Kassadan pul olish tarixi"
         eyebrow="NAQD PUL JURNALI"
-        subtitle={ownerView ? 'Barcha do‘konlardan olingan naqd pullar' : 'Faqat sizning hisobingiz orqali olingan pullar'}
+        subtitle={shopScope?.specificShopId
+          ? `${shopScope.shops?.find((shop) => shop.id === shopScope.specificShopId)?.name || 'Tanlangan do‘kon'} · olingan naqd pullar`
+          : ownerView ? 'Barcha do‘konlardan olingan naqd pullar' : 'Faqat sizning hisobingiz orqali olingan pullar'}
         icon={Banknote}
       />
 
@@ -304,5 +311,3 @@ export default function CashOutHistory() {
     </div>
   );
 }
-
-

@@ -4,6 +4,7 @@ import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 
 const AuthContext = createContext();
+export const AdminShopScopeContext = createContext(null);
 
 const APP_ROLES = new Set(['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse']);
 
@@ -247,8 +248,9 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+  const adminShopScope = useContext(AdminShopScopeContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context;
+  return adminShopScope ? { ...context, adminShopScope } : context;
 };
