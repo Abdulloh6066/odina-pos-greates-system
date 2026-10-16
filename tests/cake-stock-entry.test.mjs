@@ -17,8 +17,8 @@ const changeQuantity = async (tree, value) => act(async () => {
 });
 const submit = tree => tree.root.findByType('form').props.onSubmit({ preventDefault() {} });
 
-async function fixture({ role = 'cashier', invoke } = {}) {
-  const products = [
+async function fixture({ role = 'cashier', invoke, products: suppliedProducts, categories = [] } = {}) {
+  const products = suppliedProducts || [
     { id: 'a', name: 'Cake A', active: true, price: 30000 },
     { id: 'b', name: 'Cake B', active: true, price: 32000 },
     { id: 'negative', name: 'Negative', active: true },
@@ -79,7 +79,7 @@ async function fixture({ role = 'cashier', invoke } = {}) {
   vm.runInNewContext('(function(require,module,exports){' + source + '\n})', context)(require, module, module.exports);
   let tree;
   await act(async () => { tree = create(React.createElement(module.exports.default, {
-    user: { role, shop_id: 'branch' }, products, categories: [],
+    user: { role, shop_id: 'branch' }, products, categories,
     shops: [{ id: 'branch', name: 'Odina Branch' }, { id: 'other', name: 'Odina Central' }],
   })); });
   return { tree, sent, rows, reads: () => reads, close: async () => act(async () => tree.unmount()) };
@@ -153,6 +153,58 @@ test('changing shops exits incoming mode and uses the destination balance', asyn
     assert.equal(f.sent[0].payload.expected_quantity, 17);
     assert.equal(f.rows.find(row => row.id === 'other-a').quantity, 19);
     assert.equal(f.rows.find(row => row.id === 'sa').quantity, 5);
+  } finally { await f.close(); }
+});
+
+test('category columns follow each shop category and numeric category order', () => {
+  const categories = [
+    { id: '18', name: '18 somlik', sort_order: 0 },
+    { id: 'mix', name: 'Aralash', sort_order: 0 },
+    { id: '15', name: '15 somlik', sort_order: 0 },
+  ];
+  const products = [
+    { id: 'nap', name: 'Napalon', category_id: 'mix', shop_category_ids: { branch: '18' } },
+    { id: 'twix', name: 'Twix', category_id: '15' },
+    { id: 'other', name: 'Uncategorized' },
+  ];
+  const branch = shelf.cakeStockColumns(products, categories, 'branch');
+  assert.deepEqual(branch.map(column => column.name), ['15 somlik', '18 somlik', 'Kategoriyasiz']);
+  assert.equal(branch.find(column => column.id === '18').products[0].id, 'nap');
+  const central = shelf.cakeStockColumns(products, categories, 'other');
+  assert.equal(central.find(column => column.id === 'mix').products[0].id, 'nap');
+  assert.equal(central.some(column => column.id === '18'), false);
+});
+
+test('category pages retain every cake under its own heading and filters reset the page', async () => {
+  const products = Array.from({ length: 23 }, (_, i) => ({
+    id: 'group-' + i, name: 'Cake ' + i, active: true, category_id: i < 14 ? '15' : '18',
+  }));
+  const f = await fixture({ products, categories: [{ id: '18', name: '18 somlik' }, { id: '15', name: '15 somlik' }] });
+  try {
+    const seen = [];
+    for (let page = 0; page < 3; page++) {
+      const columns = f.tree.root.findAllByProps({ className: 'cake-stock-category-column' });
+      assert.deepEqual(columns.map(column => column.props['aria-label']), ['15 somlik', '18 somlik']);
+      for (const column of columns) {
+        const names = column.findAllByType('button').map(node => node.props['aria-label'].split(':')[0]);
+        for (const name of names) {
+          const index = Number(name.slice(5));
+          assert.equal(column.props['aria-label'], index < 14 ? '15 somlik' : '18 somlik');
+        }
+        seen.push(...names);
+      }
+      if (page < 2) await act(async () => f.tree.root.findByProps({ 'aria-label': 'Keyingi tortlar' }).props.onClick());
+    }
+    assert.equal(seen.length, 23);
+    assert.equal(new Set(seen).size, 23);
+    assert.equal(f.tree.root.findByProps({ 'aria-label': 'Keyingi tortlar' }).props.disabled, true);
+    await act(async () => f.tree.root.findAllByType('select').find(node => node.props['aria-label'] === 'Tort kategoriyasi').props.onChange({ target: { value: '18' } }));
+    const columns = f.tree.root.findAllByProps({ className: 'cake-stock-category-column' });
+    assert.equal(columns.length, 1);
+    assert.equal(columns[0].props['aria-label'], '18 somlik');
+    assert.equal(f.tree.root.findByProps({ 'aria-label': 'Oldingi tortlar' }).props.disabled, true);
+    assert.match(text(f.tree.root.findByType('aside').findByType('h3').props.children), /Cake 14/);
+    assert.equal(f.sent.length, 0);
   } finally { await f.close(); }
 });
 
