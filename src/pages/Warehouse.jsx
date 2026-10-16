@@ -55,7 +55,7 @@ const MOVEMENT_LABELS = {
   production_output: 'Ishlab chiqarilgan mahsulot',
   transfer_out: 'Jo‘natilgan transfer',
   transfer_in: 'Qabul qilingan transfer',
-  sale: 'Kassa savdosi',
+  sale: 'Savdoda sarf',
   waste: 'Chiqit',
   waste_cancel: 'Chiqit bekor qilindi',
   refund: 'Qaytarish',
