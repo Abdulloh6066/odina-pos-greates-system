@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { saleLineKey } from '../base44/shared/burger-fries.js';
+import { productPhotoFallbackFor } from '../src/lib/product-photos.js';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import React from 'react';
@@ -22,7 +23,7 @@ const Icon = () => React.createElement('span', { 'aria-hidden': true });
 const Button = ({ children, disabled, type, onClick, className, ...rest }) =>
   React.createElement('button', { disabled, type, onClick, className, ...rest }, children);
 const context = {
-  saleLineKey, React, useState: React.useState, formatUZS: (value) => `${value.toLocaleString('en-US')} UZS`,
+  saleLineKey, productPhotoFallbackFor, React, useState: React.useState, formatUZS: (value) => `${value.toLocaleString('en-US')} UZS`,
   Minus: Icon, Plus: Icon, Trash2: Icon, Ticket: Icon, X: Icon,
   ShoppingBag: Icon, ReceiptText: Icon, ArrowUpRight: Icon,
   Button, Input: ({ 'aria-label': ariaLabel, placeholder }) =>
