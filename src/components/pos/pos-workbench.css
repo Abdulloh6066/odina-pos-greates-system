@@ -218,31 +218,36 @@
 .odina-workbench-receipt .odina-cart-empty-icon { width: 60px; height: 60px; border: 1px solid var(--pos-line); border-radius: 14px; background: var(--pos-canvas); transform: none; }
 .odina-workbench-receipt .odina-cart-empty-icon svg { color: var(--pos-muted); transform: none; }
 .odina-workbench-receipt .odina-cart-line {
-  grid-template-columns: minmax(116px, .9fr) minmax(0, 1fr) 44px;
-  grid-template-areas: "product product remove" "quantity amount remove";
+  grid-template-columns: minmax(0, 1fr) max-content 44px;
+  grid-template-areas: "product amount remove" "product quantity remove";
   align-items: center;
-  gap: 8px;
-  padding: 12px 4px;
+  gap: 2px 6px;
+  padding: 4px 2px;
   border-style: solid;
   border-color: var(--pos-line);
   border-radius: 8px;
 }
-.odina-workbench-receipt .odina-cart-line-product { grid-area: product; }
+.odina-workbench-receipt .odina-cart-line-product { grid-area: product; gap: 6px; }
+.odina-workbench-receipt .odina-cart-line-image { width: 28px; height: 28px; border-radius: 6px; }
 .odina-workbench-receipt .odina-cart-line-name {
   color: var(--pos-text);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.25;
   font-weight: 500;
-  overflow: visible;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   overflow-wrap: anywhere;
   white-space: normal;
 }
-.odina-workbench-receipt .odina-cart-line-unit-price { color: var(--pos-muted); font-size: 12px; }
-.odina-workbench-receipt .odina-cart-line-quantity { grid-area: quantity; justify-self: start; max-width: 100%; background: var(--pos-surface); border-color: #bdbda7; border-radius: 8px; }
+.odina-workbench-receipt .odina-cart-line-unit-price { color: var(--pos-muted); font-size: 11px; line-height: 1.3; overflow: visible; overflow-wrap: anywhere; white-space: normal; }
+.odina-workbench-receipt .odina-cart-line-quantity { grid-area: quantity; justify-self: end; max-width: 100%; background: var(--pos-surface); border-color: #bdbda7; border-radius: 8px; }
 .odina-workbench-receipt .odina-cart-line-quantity button { flex: 0 0 44px; width: 44px; height: 44px; color: var(--pos-text); }
-.odina-workbench-receipt .odina-cart-line-quantity span { width: 24px; min-width: 24px; overflow-wrap: anywhere; font-size: 13px; }
+.odina-workbench-receipt .odina-cart-line-quantity span { flex: 0 0 auto; width: auto; min-width: 24px; white-space: nowrap; font-size: 13px; }
 .odina-workbench-receipt .odina-cart-weight { min-height: 44px; height: auto; padding: 0 12px; overflow-wrap: anywhere; font-size: 13px; }
-.odina-workbench-receipt .odina-cart-line-amount { grid-area: amount; min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--pos-text); }
-.odina-workbench-receipt .odina-cart-line-remove { grid-area: remove; align-self: start; width: 44px; height: 44px; color: var(--pos-muted); }
+.odina-workbench-receipt .odina-cart-line-amount { grid-area: amount; justify-self: end; min-width: 0; overflow-wrap: anywhere; font-size: 13px; font-weight: 600; color: var(--pos-text); }
+.odina-workbench-receipt .odina-cart-line-remove { grid-area: remove; align-self: center; width: 44px; height: 44px; color: var(--pos-muted); }
 .odina-workbench-receipt .odina-cart-order-context { flex-wrap: wrap; border-color: var(--pos-line); background: var(--pos-canvas); }
 .odina-workbench-receipt .odina-cart-order-context > span { min-width: 0; overflow-wrap: anywhere; }
 .odina-workbench-receipt .odina-cart-summary { padding: 16px; border-top: 1px solid var(--pos-line); background: var(--pos-surface); }
@@ -325,8 +330,11 @@
   .odina-pos.odina-pos-workbench.odina-pos-compact .odina-product-price { font-size: 13px; }
   .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-wrap { width: 320px; padding: 12px 12px 12px 0; }
   .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-header { padding: 12px; }
-  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line { grid-template-columns: minmax(116px, .9fr) minmax(0, 1fr) 44px; gap: 6px; padding: 10px 2px; }
-  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-name { font-size: 13px; display: block; -webkit-line-clamp: unset; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line { grid-template-columns: minmax(0, 1fr) max-content 44px; gap: 2px 6px; padding: 4px 2px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-product { gap: 6px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-image { display: block; width: 28px; height: 28px; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-name { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; }
+  .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-unit-price { font-size: 11px; }
   .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-quantity button { width: 44px; height: 44px; }
   .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-amount { font-size: 13px; white-space: normal; }
   .odina-pos.odina-pos-workbench.odina-pos-compact .odina-cart-line-remove { width: 44px; height: 44px; }
