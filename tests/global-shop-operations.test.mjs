@@ -9,6 +9,7 @@ import { create, act } from 'react-test-renderer';
 import * as shelf from '../src/lib/cake-stock-shelf.js';
 import * as pricing from '../src/lib/shop-pricing.js';
 import * as catalog from '../src/lib/shop-category.js';
+import * as productPhotos from '../src/lib/product-photos.js';
 
 const text = node => typeof node === 'string' || typeof node === 'number' ? String(node)
   : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
@@ -48,6 +49,7 @@ function component(path, dependencies = {}) {
     if (specifier === '@/lib/pos') return { formatNum: String, formatUZS: String, logAction() {} };
     if (specifier === '@/lib/shop-pricing') return pricing;
     if (specifier === '@/lib/shop-category') return catalog;
+    if (specifier === '@/lib/product-photos') return productPhotos;
     if (specifier === '@/lib/cake-stock-shelf') return shelf;
     if (specifier === '@/lib/uzbekistan-time') return { formatUzbekistanTime: String, formatUzbekistanDateTime: String };
     if (specifier === '@/lib/odina-dialog') return { odinaAlert: async () => {}, odinaConfirm: async () => false };
