@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Plus, Minus, X, PackagePlus, Check } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
+import { productPhotoFallbackFor } from '@/lib/product-photos';
 
 const CATEGORY_LABELS = {
   Pastries: 'Piroglar',
@@ -191,6 +192,8 @@ export default function ProductCombobox({ products, onAdd, loading }) {
                   const price = isSheet ? product.sheet_price : product.price;
                   const qty = safeQty(selected[product.id]);
                   const isSelected = qty > 0;
+                  const fallbackPhoto = !product.image_url && productPhotoFallbackFor(product.id);
+                  const imageSrc = product.image_url || fallbackPhoto;
 
                   return (
                     <div
@@ -203,8 +206,8 @@ export default function ProductCombobox({ products, onAdd, loading }) {
                         className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
                         <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-secondary text-lg font-semibold text-brand-ink">
-                          {product.image_url ? (
-                            <Image src={product.image_url} alt={product.name || 'Mahsulot rasmi'} fittingType="fill" className="h-full w-full" />
+                          {imageSrc ? (
+                            <Image src={imageSrc} alt={product.name || 'Mahsulot rasmi'} fittingType={fallbackPhoto ? 'fit' : 'fill'} className="h-full w-full" style={fallbackPhoto ? { objectFit: 'contain', backgroundColor: '#fff' } : undefined} />
                           ) : (
                             String(product.name || '')[0]
                           )}

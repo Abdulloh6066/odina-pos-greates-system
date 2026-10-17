@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Minus, Plus, Trash2, Ticket, X, ShoppingBag, ReceiptText, ArrowUpRight, Truck } from 'lucide-react';
 import { formatUZS } from '@/lib/pos';
 import { saleLineKey } from '@/lib/burger-fries';
+import { productPhotoFallbackFor } from '@/lib/product-photos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -53,12 +54,15 @@ export default function Cart({
             <p className="text-xs text-muted-foreground mt-1">Buyurtmaga qo‘shish uchun mahsulotni bosing.</p>
           </div>
         ) : (
-          cart.map((item) => (
+          cart.map((item) => {
+            const fallbackPhoto = !item.image_url && productPhotoFallbackFor(item.product_id);
+            const imageSrc = item.image_url || fallbackPhoto;
+            return (
             <div key={saleLineKey(item)} onClick={() => onSelectItem?.(item)} onFocus={() => onSelectItem?.(item)} style={selectedProductId === saleLineKey(item) ? { backgroundColor: 'rgba(254, 205, 124, 0.18)' } : undefined} className="odina-cart-line grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(6.5rem,auto)_2.75rem] items-center gap-2 border-b border-brand-sand/60 px-1 py-1.5 last:border-b-0">
               <div className="odina-cart-line-product flex min-w-0 items-center gap-2">
                 <div className="odina-cart-line-image w-9 h-9 rounded-lg bg-card overflow-hidden shrink-0 border border-border/60">
-                  {item.image_url ? (
-                    <img src={item.image_url} alt={item.product_name || 'Mahsulot rasmi'} className="w-full h-full object-cover" />
+                  {imageSrc ? (
+                    <img src={imageSrc} alt={item.product_name || 'Mahsulot rasmi'} className="w-full h-full object-cover" style={fallbackPhoto ? { objectFit: 'contain', backgroundColor: '#fff' } : undefined} />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center font-display text-sm text-brand-ink">{item.product_name.charAt(0)}</div>
                   )}
@@ -84,7 +88,8 @@ export default function Cart({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Image } from '@/components/ui/image';
+import { productPhotoFallbackFor } from '@/lib/product-photos';
 import '@/styles/catalog-workbench.css';
 
 export default function Products() {
@@ -165,11 +166,14 @@ export default function Products() {
         <div className="catalog-empty"><Cake className="w-10 h-10" aria-hidden="true" /><h3>Mahsulot topilmadi</h3><p>Qidiruv yoki kategoriya filtrini o‘zgartiring.</p>{(search || filterCat !== 'all') && <Button variant="outline" onClick={() => { setSearch(''); setFilterCat('all'); }}>Filtrlarni tozalash</Button>}</div>
       ) : (
         <div className="catalog-product-grid">
-          {filtered.map((p) => (
+          {filtered.map((p) => {
+            const fallbackPhoto = !p.image_url && productPhotoFallbackFor(p.id);
+            const imageSrc = p.image_url || fallbackPhoto;
+            return (
             <article key={p.id} className={`odina-panel catalog-product-card rounded-2xl bg-card border border-border overflow-hidden ${p.active === false ? 'is-unavailable' : ''}`}>
               <div className="catalog-product-image relative bg-secondary/70 overflow-hidden">
-                {p.image_url ? (
-                  <Image src={p.image_url} alt={p.name} fittingType="fill" className="w-full h-full" />
+                {imageSrc ? (
+                  <Image src={imageSrc} alt={p.name} fittingType={fallbackPhoto ? 'fit' : 'fill'} className="w-full h-full" style={fallbackPhoto ? { objectFit: 'contain', backgroundColor: '#fff' } : undefined} />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/35">
                     <Cake className="w-8 h-8" />
@@ -201,7 +205,8 @@ export default function Products() {
                 )}
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -2,12 +2,14 @@ import React from 'react';
 import { Image } from '@/components/ui/image';
 import { formatUZS } from '@/lib/pos';
 import { posThumbnailFor } from '@/lib/pos-thumbnails';
+import { productPhotoFallbackFor } from '@/lib/product-photos';
 
 function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false, priority = false }) {
   const [failedThumbnail, setFailedThumbnail] = React.useState(null);
   const thumbnail = posThumbnailFor(product, shopId);
   const useThumbnail = Boolean(thumbnail && thumbnail !== failedThumbnail);
-  const imageSrc = useThumbnail ? thumbnail : product.image_url;
+  const fallbackPhoto = !product.image_url && productPhotoFallbackFor(product.id);
+  const imageSrc = useThumbnail ? thumbnail : product.image_url || fallbackPhoto;
 
   return (
     <button
@@ -18,15 +20,16 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
       className="odina-product-card odina-workbench-product group relative text-left bg-card rounded-2xl overflow-hidden border border-border transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 touch-manipulation select-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <div className="odina-product-photo relative aspect-square bg-white overflow-hidden">
-        {product.image_url ? (
+        {imageSrc ? (
           <Image
             src={imageSrc}
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             onError={useThumbnail ? () => setFailedThumbnail(thumbnail) : undefined}
             alt={product.name}
-            fittingType="fill"
+            fittingType={fallbackPhoto ? 'fit' : 'fill'}
             className="w-full h-full"
+            style={fallbackPhoto ? { objectFit: 'contain', backgroundColor: '#fff' } : undefined}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-4xl font-display text-muted-foreground/40">
@@ -44,4 +47,3 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
   );
 }
 export default React.memo(ProductCard);
-
