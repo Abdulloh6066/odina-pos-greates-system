@@ -296,7 +296,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
       stock_unit: 'piece',
       sale_unit: saleUnit,
       production_unit: productionUnit,
-      pieces_per_sheet: productionUnit === 'sheet' ? Number(piecesPerSheet) : 1,
+      ...(!product ? { pieces_per_sheet: productionUnit === 'sheet' ? Number(piecesPerSheet) : 1 } : {}),
       sheet_price: productionUnit === 'sheet' ? Number(sheetPrice) : 0,
       track_stock: saleUnit !== 'gram',
       is_favorite: isFavorite,
