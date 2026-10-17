@@ -20,6 +20,7 @@ import ShopDemandPanel from '@/components/shop-demand/ShopDemandPanel';
 import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 import ProductionPanel from '@/components/warehouse/ProductionPanel';
 import StockCountPanel from '@/components/warehouse/StockCountPanel';
+import CakeSheetYieldDialog from '@/components/warehouse/CakeSheetYieldDialog';
 import { TEST_PRODUCT_IDS } from '@/lib/test-catalog-cleanup';
 import { isCakeLayer, ingredientUnitLabel } from '@/lib/cake-layer-inventory';
 
@@ -100,9 +101,10 @@ export default function Warehouse() {
   const [ingredientOpen, setIngredientOpen] = useState(false);
   const [ingredientIsLayer, setIngredientIsLayer] = useState(false);
   const [adjusting, setAdjusting] = useState(null);
-  useEffect(() => shopScope?.registerGuard?.(() => ingredientOpen || adjusting
+  const [cakeSheetYieldOpen, setCakeSheetYieldOpen] = useState(false);
+  useEffect(() => shopScope?.registerGuard?.(() => ingredientOpen || adjusting || cakeSheetYieldOpen
     ? 'Avval ombor oynasini yoping yoki saqlash tugashini kuting.' : ''),
-  [shopScope?.registerGuard, ingredientOpen, adjusting]);
+  [shopScope?.registerGuard, ingredientOpen, adjusting, cakeSheetYieldOpen]);
 
   const loadAssignedTransfers = async () => {
     if (!assignedShopId) return [];
@@ -342,6 +344,11 @@ export default function Warehouse() {
         icon={WarehouseIcon}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
+          {['admin', 'accountant'].includes(user?.role) && (
+            <Button type="button" variant="outline" disabled={loading} onClick={() => setCakeSheetYieldOpen(true)} className="min-h-11 rounded-xl">
+              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> Tort listlari
+            </Button>
+          )}
           {(
             <Button type="button" variant="outline" aria-pressed={newLayerView} onClick={() => setNewLayerView((current) => !current)} className="min-h-11 rounded-xl">
               <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Kartalar ko‘rinishi' : 'Ro‘yxat ko‘rinishi'}
@@ -557,6 +564,12 @@ export default function Warehouse() {
       </div>
       </div>
 
+      {cakeSheetYieldOpen && <CakeSheetYieldDialog
+        products={products}
+        user={user}
+        onClose={() => setCakeSheetYieldOpen(false)}
+        onProductUpdated={(updated) => setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))}
+      />}
       <IngredientDialog
         open={ingredientOpen}
         asLayer={ingredientIsLayer}
