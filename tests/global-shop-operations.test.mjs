@@ -264,6 +264,7 @@ test('Products catalog follows store availability and price without rewriting sh
     '@/components/PageHeader': { default: wrapper('page-header') },
     '@/components/TestCatalogCleanup': { default: wrapper('catalog-cleanup') },
     '@/components/products/CakeStockShelf': { default: wrapper('stock-shelf') },
+    '@/components/warehouse/CakeSheetYieldDialog': { default: wrapper('cake-sheet-yield-dialog') },
   }).default;
   let tree; await act(async () => { tree = create(React.createElement(Component)); });
   try {
