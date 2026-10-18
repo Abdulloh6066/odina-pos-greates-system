@@ -3,13 +3,14 @@ import OdinaSelect from '@/components/ui/odina-select';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
-import { Cake, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
+import { Cake, Layers3, Plus, Search, Pencil, Star, Upload, Loader2, Trash2, ArchiveRestore } from 'lucide-react';
 import { formatUZS, logAction } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import PageHeader from '@/components/PageHeader';
 import TestCatalogCleanup from '@/components/TestCatalogCleanup';
 import CakeStockShelf from '@/components/products/CakeStockShelf';
+import CakeSheetYieldDialog from '@/components/warehouse/CakeSheetYieldDialog';
 import { loadAllInventoryItems } from '@/lib/cake-stock-shelf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,18 +32,19 @@ export default function Products() {
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [productView, setProductView] = useState('stock');
+  const [productView, setProductView] = useState(canManageCatalog ? 'catalog' : 'stock');
   const [loadError, setLoadError] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
+  const [cakeSheetYieldOpen, setCakeSheetYieldOpen] = useState(false);
   const [shopPriceProduct, setShopPriceProduct] = useState(null);
   const [shopPrice, setShopPrice] = useState('');
   const [savingShopPrice, setSavingShopPrice] = useState(false);
-  useEffect(() => shopScope?.registerGuard?.(() => open || shopPriceProduct || savingShopPrice
+  useEffect(() => shopScope?.registerGuard?.(() => open || shopPriceProduct || savingShopPrice || cakeSheetYieldOpen
     ? 'Avval mahsulot oynasini yoping yoki saqlash tugashini kuting.' : ''),
-  [shopScope?.registerGuard, open, shopPriceProduct, savingShopPrice]);
+  [shopScope?.registerGuard, open, shopPriceProduct, savingShopPrice, cakeSheetYieldOpen]);
   const scopedCatalog = useMemo(() => scopedShopId
     ? catalogForShop(products, categories, scopedShopId) : { products, categories }, [products, categories, scopedShopId]);
 
@@ -112,13 +114,18 @@ export default function Products() {
   return (
     <div className="odina-page odina-workbench catalog-workbench catalog-products p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
-        title="Mahsulotlar"
+        title="3D +"
         subtitle={productView === 'stock' ? 'Tortlar, sut, kofe va boshqa mahsulotlarning kirim-chiqimi va qoldig‘i' : `${scopedCatalog.products.filter((p) => p.archived !== true).length} ta mahsulot turi`}
         icon={Cake}
         actions={canManageCatalog && (
-          <Button onClick={openNew} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
-            <Plus className="w-4 h-4 mr-1.5" /> Yangi mahsulot turi
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" disabled={loading || Boolean(loadError)} onClick={() => setCakeSheetYieldOpen(true)} className="min-h-11 rounded-xl">
+              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> Tort listlari
+            </Button>
+            <Button onClick={openNew} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+              <Plus className="w-4 h-4 mr-1.5" /> Yangi mahsulot turi
+            </Button>
+          </div>
         )}
       />
 
@@ -218,6 +225,12 @@ export default function Products() {
           <DialogFooter><Button disabled={savingShopPrice || !shopPrice.trim() || !Number.isSafeInteger(Number(shopPrice)) || Number(shopPrice) < 0} onClick={saveShopPrice}>{savingShopPrice ? 'Saqlanmoqda…' : 'Saqlash'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+      {cakeSheetYieldOpen && <CakeSheetYieldDialog
+        products={products}
+        user={user}
+        onClose={() => setCakeSheetYieldOpen(false)}
+        onProductUpdated={(updated) => setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))}
+      />}
       <ProductDialog open={open} product={editing} categories={categories} shops={shops} onClose={() => setOpen(false)} onSaved={onSaved} user={user} canArchive={role === 'admin'} />
     </div>
   );
