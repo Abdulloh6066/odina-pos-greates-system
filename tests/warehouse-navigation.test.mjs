@@ -184,4 +184,3 @@ for (const mobileOpen of [false, true]) {
   }
 }
 
-
