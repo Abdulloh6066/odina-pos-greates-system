@@ -18,7 +18,7 @@ const ICONS = {
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
-const KASSA_CHILD_KEYS = ['products', 'categories', 'sales', 'cashouts', 'recipients'];
+const KASSA_CHILD_KEYS = ['categories', 'sales', 'cashouts', 'recipients'];
 const SCREENS_CHILDREN = [
   { key: 'launch-pos', label: 'Kassada ochish', path: '/pos?screen=1', icon: ShoppingCart, roles: ['admin', 'cashier'] },
   { key: 'launch-warehouse', label: 'Omborda ochish', path: '/warehouse', icon: Warehouse, roles: ['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse'] },
