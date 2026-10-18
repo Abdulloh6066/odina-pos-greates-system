@@ -14,10 +14,12 @@
 }
 
 /* The shop selector shares the viewport with POS instead of adding to its height. */
-.odina-pos-viewport {
+.odina-workspace.odina-pos-viewport {
   display: flex;
   flex-direction: column;
+  flex: none;
   height: 100dvh;
+  max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
@@ -34,7 +36,7 @@
   outline-offset: -2px;
 }
 @media (max-width: 1023px) {
-  .odina-pos-viewport:not(.odina-pos-screen) { height: calc(100dvh - 3.5rem); }
+  .odina-workspace.odina-pos-viewport:not(.odina-pos-screen) { height: calc(100dvh - 3.5rem); max-height: calc(100dvh - 3.5rem); }
 }
 .odina-pos-workbench .odina-pos-header {
   min-height: 72px;
