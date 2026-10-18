@@ -54,7 +54,8 @@ export default function Cart({
             <p className="text-xs text-muted-foreground mt-1">Buyurtmaga qo‘shish uchun mahsulotni bosing.</p>
           </div>
         ) : (
-          cart.map((item) => {
+          // Show newly added products first without changing the saved cart order.
+          cart.slice().reverse().map((item) => {
             const fallbackPhoto = !item.image_url && productPhotoFallbackFor(item.product_id);
             const imageSrc = item.image_url || fallbackPhoto;
             return (
