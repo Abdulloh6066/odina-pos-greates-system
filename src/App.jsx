@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Outlet, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import AdminShopProvider from '@/lib/AdminShopContext';
@@ -52,7 +52,8 @@ const ROUTE_TITLES = {
   '/orders': 'Buyurtmalar',
   '/tables': 'Stollar',
   '/customers': 'Mijozlar',
-  '/products': 'Mahsulotlar',
+  '/products': '3D +',
+  '/3d-plus': '3D +',
   '/categories': 'Kategoriyalar',
   '/users': 'Xodimlar',
   '/reports': 'Hisobotlar',
@@ -71,6 +72,11 @@ const ROUTE_TITLES = {
   '/security': 'Xavfsizlik',
   '/daily-export': 'Kunlik eksport',
 };
+
+function LegacyProductsRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: '/3d-plus', search, hash }} replace />;
+}
 
 function RouteTitle() {
   const { pathname } = useLocation();
@@ -141,7 +147,8 @@ function App() {
                 <Route path="/orders" element={<RoleRoute pageKey="orders"><Orders /></RoleRoute>} />
                 <Route path="/tables" element={<RoleRoute pageKey="tables"><RestaurantTables /></RoleRoute>} />
                 <Route path="/customers" element={<RoleRoute pageKey="customers"><Customers /></RoleRoute>} />
-                <Route path="/products" element={<RoleRoute pageKey="products"><Products /></RoleRoute>} />
+                <Route path="/products" element={<RoleRoute pageKey="products"><LegacyProductsRedirect /></RoleRoute>} />
+                <Route path="/3d-plus" element={<RoleRoute pageKey="products"><Products /></RoleRoute>} />
                 <Route path="/categories" element={<RoleRoute pageKey="categories"><Categories /></RoleRoute>} />
                 <Route path="/users" element={<RoleRoute pageKey="users"><Users /></RoleRoute>} />
                 <Route path="/reports" element={<RoleRoute pageKey="reports"><Reports /></RoleRoute>} />
