@@ -81,6 +81,8 @@ async function fixture({ pathname = '/warehouse', shopId = 'sex', role = 'admin'
 }
 const posLinks = tree => tree.root.findAllByType('a').filter(node => node.props.href?.split('?')[0] === '/pos');
 const kassaButtons = tree => tree.root.findAllByType('button').filter(node => node.props['aria-label'] === 'Kassa');
+const text = node => typeof node === 'string' || typeof node === 'number' ? String(node)
+  : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
 
 for (const mobileOpen of [false, true]) {
   for (const collapsed of [false, true]) {
@@ -91,7 +93,7 @@ for (const mobileOpen of [false, true]) {
         assert.equal(kassaButtons(f.tree).length, 0);
         assert.equal(posLinks(f.tree).length, 0);
         assert.ok(!f.tree.root.findAllByType('a').some(node => ['/sales', '/cash-outs', '/cash-recipients'].includes(node.props.href)));
-        assert.ok(f.tree.root.findAllByType('a').some(node => node.props.href === '/products'));
+        assert.ok(f.tree.root.findAllByType('a').some(node => node.props.href === '/3d-plus'));
         assert.ok(f.tree.root.findAllByType('a').some(node => node.props.href === '/warehouse?tab=production'));
         assert.ok(!f.preloads.includes('/pos'));
         assert.equal(f.serviceCalls.length, 0);
@@ -100,7 +102,7 @@ for (const mobileOpen of [false, true]) {
   }
 }
 test('production selection removes POS and retail shop changes restore it without a stale menu', async () => {
-  const f = await fixture({ pathname: '/products', shopId: 'sex', mobileOpen: true });
+  const f = await fixture({ pathname: '/3d-plus', shopId: 'sex', mobileOpen: true });
   try {
     await f.openScreens();
     assert.equal(kassaButtons(f.tree).length, 0);
@@ -139,4 +141,47 @@ test('cashier retail navigation remains available', async () => {
     assert.ok(posLinks(f.tree).length > 0);
   } finally { await f.close(); }
 });
+
+for (const mobileOpen of [false, true]) {
+  for (const role of ['admin', 'manager', 'accountant', 'production']) {
+    test(`3D + is a permitted top-level ${mobileOpen ? 'mobile' : 'desktop'} link for ${role}`, async () => {
+      const f = await fixture({ role, mobileOpen, pathname: '/3d-plus', shopId: 'branch' });
+      try {
+        const surface = mobileOpen ? f.tree.root.findByProps({ 'data-mobile-menu': true }) : f.tree.root.findByType('aside');
+        const links = surface.findAllByType('a').filter(node => node.props.href === '/3d-plus');
+        assert.equal(links.length, 1);
+        assert.equal(text(links[0]).trim(), '3D +');
+        assert.ok(links[0].props.className.split(/\s+/).includes('odina-nav-link'));
+        assert.equal(links[0].props.className.split(/\s+/).includes('odina-nav-child'), false);
+        let ancestor = links[0].parent;
+        while (ancestor && ancestor !== surface) {
+          assert.equal(String(ancestor.props.className || '').split(/\s+/).includes('odina-nav-children'), false,
+            '3D + must remain outside the Kassa collapsible');
+          ancestor = ancestor.parent;
+        }
+        const kassa = surface.findAllByType('button').find(node => node.props['aria-label'] === 'Kassa');
+        if (kassa) {
+          assert.equal(kassa.props['aria-expanded'], false, '3D + does not mark Kassa active');
+          await act(async () => kassa.props.onClick());
+          assert.equal(surface.findAllByType('a').filter(node => node.props.href === '/3d-plus').length, 1);
+          await act(async () => surface.findAllByType('button').find(node => node.props['aria-label'] === 'Kassa').props.onClick());
+          assert.equal(surface.findAllByType('a').filter(node => node.props.href === '/3d-plus').length, 1);
+        }
+        await act(async () => { links[0].props.onFocus(); links[0].props.onPointerEnter(); });
+        assert.ok(f.preloads.includes('/3d-plus'));
+        assert.equal(f.serviceCalls.length, 0);
+      } finally { await f.close(); }
+    });
+  }
+  for (const role of ['cashier', 'warehouse']) {
+    test(`3D + stays unavailable to ${role} in ${mobileOpen ? 'mobile' : 'desktop'} navigation`, async () => {
+      const f = await fixture({ role, mobileOpen, pathname: '/warehouse', shopId: 'branch' });
+      try {
+        assert.equal(f.tree.root.findAllByType('a').filter(node => node.props.href === '/3d-plus' || node.props.href === '/products').length, 0);
+        assert.equal(f.serviceCalls.length, 0);
+      } finally { await f.close(); }
+    });
+  }
+}
+
 
