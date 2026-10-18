@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 
 const UNIT_LABELS = { kg: "kg", l: "litr", g: "g", ml: "ml", piece: "dona" };
 const STATUS_LABELS = {
+  receiving: "Kirim yakunlanmoqda",
   unpaid: "To‘lanmagan",
   partial: "Qisman to‘langan",
   paid: "To‘langan",

@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
 import ShopDemandPanel from '@/components/shop-demand/ShopDemandPanel';
+import IngredientRequisitionsPanel from '@/components/warehouse/IngredientRequisitionsPanel';
 import SupplierLedgerPanel from '@/components/warehouse/SupplierLedgerPanel';
 import ProductionPanel from '@/components/warehouse/ProductionPanel';
 import StockCountPanel from '@/components/warehouse/StockCountPanel';
@@ -33,6 +34,7 @@ const TABS = [
   { id: 'transfers', label: 'Transferlar', icon: ArrowRightLeft, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { id: 'demands', label: 'Do‘kon talablari', icon: ClipboardList, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { id: 'count', label: 'Ombor sanog‘i', icon: ClipboardCheck, roles: ['admin', 'manager', 'cashier', 'accountant'] },
+  { id: 'ingredient_requests', label: 'Ertaga kerak', icon: ClipboardList },
   { id: 'history', label: 'Ombor tarixi', icon: History },
 ];
 
@@ -103,6 +105,19 @@ export default function Warehouse() {
   useEffect(() => shopScope?.registerGuard?.(() => ingredientOpen || adjusting
     ? 'Avval ombor oynasini yoping yoki saqlash tugashini kuting.' : ''),
   [shopScope?.registerGuard, ingredientOpen, adjusting]);
+
+  const reloadRequisitionStock = async () => {
+    try {
+      const [balances, history] = await Promise.all([
+        base44.entities.IngredientStock.filter({ location_id: selectedLocation }, '-updated_at', 500),
+        base44.entities.StockMovement.filter({ location_id: selectedLocation }, '-created_at', 500),
+      ]);
+      setIngredientStock(previous => [...previous.filter(row => row.location_id !== selectedLocation), ...balances]);
+      setMovements(previous => [...previous.filter(row => row.location_id !== selectedLocation), ...history]);
+    } catch {
+      setLoadWarning('Kirim saqlandi. Qoldiqni yangilash uchun ombor sahifasini qayta oching.');
+    }
+  };
 
   const loadAssignedTransfers = async () => {
     if (!assignedShopId) return [];
@@ -521,6 +536,8 @@ export default function Warehouse() {
               search={search}
               onReload={load}
             />
+          ) : tab === 'ingredient_requests' ? (
+            <IngredientRequisitionsPanel key={selectedLocation} user={user} location={selectedLocationRecord} adminShopScope={shopScope} onStockChanged={reloadRequisitionStock} />
           ) : tab === 'demands' ? (
             <ShopDemandPanel key={shopScope ? selectedLocation : 'legacy'} user={user} products={products} locations={locations} adminShopScope={shopScope} />
           ) : tab === 'count' ? (

@@ -8,7 +8,7 @@
       },
       "default": [],
       "maxItems": 5000,
-      "description": "Do\u2018kon kassasidagi mahsulotlar tartibi"
+      "description": "Do‘kon kassasidagi mahsulotlar tartibi"
     },
     "pos_product_order_version": {
       "type": "integer",
@@ -49,7 +49,7 @@
       "type": "integer",
       "minimum": 0,
       "default": 0,
-      "description": "Do\u2018konning joriy smenalar davridagi oshxona xizmat cheki raqami; savdo ID emas"
+      "description": "Do‘konning joriy smenalar davridagi oshxona xizmat cheki raqami; savdo ID emas"
     },
     "service_ticket_version": {
       "type": "integer",
@@ -60,18 +60,18 @@
     "service_ticket_cycle_active": {
       "type": "boolean",
       "default": false,
-      "description": "Shu do\u2018konda smenalar davri davom etmoqda; barcha smenalar yopilsa false"
+      "description": "Shu do‘konda smenalar davri davom etmoqda; barcha smenalar yopilsa false"
     },
     "restaurant_table_count": {
       "type": "integer",
       "minimum": 0,
       "maximum": 30,
       "default": 0,
-      "description": "Stollar soni: 0 = hali sozlanmagan yoki o\u2018chirilgan"
+      "description": "Stollar soni: 0 = hali sozlanmagan yoki o‘chirilgan"
     },
     "restaurant_entrance": {
       "type": "object",
-      "description": "Do\u2018kon zalidagi kirish eshigi: devor va devor bo\u2018ylab 0\u20131000 koordinata",
+      "description": "Do‘kon zalidagi kirish eshigi: devor va devor bo‘ylab 0–1000 koordinata",
       "properties": {
         "side": {
           "type": "string",
@@ -101,11 +101,11 @@
       "type": "integer",
       "minimum": 0,
       "default": 0,
-      "description": "Stollar bo\u2018yicha to\u2018lanmagan buyurtmalarni bir vaqtda tahrirlash nazorati"
+      "description": "Stollar bo‘yicha to‘lanmagan buyurtmalarni bir vaqtda tahrirlash nazorati"
     },
     "restaurant_table_groups": {
       "type": "array",
-      "description": "Birga o\u2018tirgan mehmonlar uchun vaqtincha birlashtirilgan stollar; hisob yopilganda guruh avtomatik yechiladi",
+      "description": "Birga o‘tirgan mehmonlar uchun vaqtincha birlashtirilgan stollar; hisob yopilganda guruh avtomatik yechiladi",
       "items": {
         "type": "object",
         "properties": {
@@ -143,7 +143,7 @@
     },
     "restaurant_table_orders": {
       "type": "array",
-      "description": "Do\u2018konning ochiq stol buyurtmalari; to\u2018lovgacha savdo yoki ombor harakati emas",
+      "description": "Do‘konning ochiq stol buyurtmalari; to‘lovgacha savdo yoki ombor harakati emas",
       "items": {
         "type": "object",
         "properties": {
@@ -178,7 +178,7 @@
           "ticket_number": {
             "type": "integer",
             "minimum": 1,
-            "description": "Stol buyurtmasi birinchi saqlanganda berilgan do\u2018kon bo\u2018yicha xizmat raqami"
+            "description": "Stol buyurtmasi birinchi saqlanganda berilgan do‘kon bo‘yicha xizmat raqami"
           },
           "revision": {
             "type": "integer",
@@ -243,7 +243,7 @@
                     "with",
                     "without"
                   ],
-                  "description": "Burger fri tanlovi; eski savdolarda bo\u2018sh qoladi"
+                  "description": "Burger fri tanlovi; eski savdolarda bo‘sh qoladi"
                 }
               },
               "required": [
@@ -288,7 +288,7 @@
     },
     "restaurant_outdoor_polygon": {
       "type": "array",
-      "description": "Admin chizgan ko\u2018cha/terassa hududi chegarasi, xaritada 0\u20131000 koordinatalar; bo\u2018sh ro\u2018yxat = hali belgilanmagan",
+      "description": "Admin chizgan ko‘cha/terassa hududi chegarasi, xaritada 0–1000 koordinatalar; bo‘sh ro‘yxat = hali belgilanmagan",
       "maxItems": 12,
       "items": {
         "type": "object",
@@ -319,7 +319,7 @@
     },
     "restaurant_table_layout": {
       "type": "array",
-      "description": "Stollarning do\u2018kon bo\u2018yicha 0\u20131000 koordinatadagi joylashuvi",
+      "description": "Stollarning do‘kon bo‘yicha 0–1000 koordinatadagi joylashuvi",
       "items": {
         "type": "object",
         "properties": {
@@ -342,7 +342,7 @@
             "type": "integer",
             "minimum": 80,
             "maximum": 140,
-            "description": "Stolning xaritadagi individual o\u2018lchami foizda; eski stollar 100%"
+            "description": "Stolning xaritadagi individual o‘lchami foizda; eski stollar 100%"
           }
         },
         "required": [
@@ -355,7 +355,12 @@
     },
     "instagram": {
       "type": "string",
-      "description": "Ushbu do\u2018konning chekida ko\u2018rsatiladigan Instagram username"
+      "description": "Ushbu do‘konning chekida ko‘rsatiladigan Instagram username"
+    },
+    "ingredient_request_creations_json": {
+      "type": "string",
+      "default": "",
+      "description": "Durable backend creation claims for ingredient requisitions."
     }
   },
   "required": [

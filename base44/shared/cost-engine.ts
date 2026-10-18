@@ -233,7 +233,7 @@ export async function loadIngredientCosts(
   }
   const validIds = new Set(
     (receipts || [])
-      .filter((r: any) => r.status !== "cancelled" && r.status !== "cancelling")
+      .filter((r: any) => r.status !== "cancelled" && r.status !== "cancelling" && r.status !== "receiving")
       .map((r: any) => r.id),
   );
   const byIngredient = new Map<string, any[]>();

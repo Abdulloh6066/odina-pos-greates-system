@@ -338,6 +338,15 @@ export default async function(req) {
       if (receipt.status === "cancelled") {
         return Response.json({ error: "Bu kirim avval bekor qilingan." }, { status: 409 });
       }
+      if (receipt.status === "receiving") {
+        return Response.json({ error: "Avval talabnomadagi qabulni yakunlang." }, { status: 409 });
+      }
+      if (receipt.requisition_id) {
+        const requisition = await service.entities.IngredientRequisition.get(receipt.requisition_id);
+        if (!requisition || requisition.pending_json) {
+          return Response.json({ error: "Avval talabnomadagi qabulni yakunlang." }, { status: 409 });
+        }
+      }
       if (receipt.status === "cancelling") {
         return Response.json({ error: "Bu kirim bekor qilinish jarayonida. Owner tekshirishi kerak." }, { status: 409 });
       }

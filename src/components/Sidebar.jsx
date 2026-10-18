@@ -34,6 +34,7 @@ const WAREHOUSE_CHILDREN = [
   { key: 'warehouse-transfers', label: 'Transferlar', path: '/warehouse?tab=transfers', icon: ArrowRightLeft, tab: 'transfers', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-demands', label: 'Do‘kon talablari', path: '/warehouse?tab=demands', icon: ClipboardList, tab: 'demands', roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { key: 'warehouse-count', label: 'Ombor sanog‘i', path: '/warehouse?tab=count', icon: ClipboardCheck, tab: 'count', roles: ['admin', 'manager', 'cashier', 'accountant'] },
+  { key: 'warehouse-ingredient-requests', label: 'Ertaga kerak', path: '/warehouse?tab=ingredient_requests', icon: ClipboardList, tab: 'ingredient_requests' },
   { key: 'warehouse-history', label: 'Ombor tarixi', path: '/warehouse?tab=history', icon: Clock, tab: 'history' },
 ];
 

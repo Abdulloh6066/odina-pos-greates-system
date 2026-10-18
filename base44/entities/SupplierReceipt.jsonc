@@ -39,7 +39,8 @@
         "partial",
         "unpaid",
         "cancelling",
-        "cancelled"
+        "cancelled",
+        "receiving"
       ],
       "default": "unpaid"
     },
@@ -75,6 +76,9 @@
     "payment_operations_json": {
       "type": "string",
       "description": "Backend-only markers for applied and compensated supplier payments."
+    },
+    "requisition_id": {
+      "type": "string"
     }
   },
   "required": [
