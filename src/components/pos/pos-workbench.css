@@ -13,7 +13,29 @@
   color: var(--pos-text);
 }
 
+/* The shop selector shares the viewport with POS instead of adding to its height. */
+.odina-pos-viewport {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.odina-pos-viewport > .odina-global-shop-bar { flex-shrink: 0; }
 .odina-pos.odina-pos-workbench { background: var(--pos-canvas); }
+.odina-pos-workbench .odina-product-scroll,
+.odina-workbench-receipt .odina-cart-items {
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
+}
+.odina-pos-workbench .odina-product-scroll:focus-visible,
+.odina-workbench-receipt .odina-cart-items:focus-visible {
+  outline: 2px solid var(--pos-olive);
+  outline-offset: -2px;
+}
+@media (max-width: 1023px) {
+  .odina-pos-viewport:not(.odina-pos-screen) { height: calc(100dvh - 3.5rem); }
+}
 .odina-pos-workbench .odina-pos-header {
   min-height: 72px;
   padding: 12px 20px;
