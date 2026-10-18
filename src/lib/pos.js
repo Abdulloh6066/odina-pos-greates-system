@@ -34,7 +34,7 @@ export const MENU_ITEMS = [
   { key: 'screens', label: 'Ekranlar', path: '/production-screen', icon: 'Monitor' },
   { key: 'waste', label: 'Chiqitlar', path: '/waste', icon: 'Trash2' },
   { key: 'warehouse', label: 'Ombor', path: '/warehouse', icon: 'Ombor' },
-  { key: 'products', label: 'Mahsulotlar', path: '/products', icon: 'Cake' },
+  { key: 'products', label: '3D +', path: '/3d-plus', icon: 'Cake' },
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },
   { key: 'profit', label: 'Tannarx va foyda', path: '/profit', icon: 'TrendingUp' },
