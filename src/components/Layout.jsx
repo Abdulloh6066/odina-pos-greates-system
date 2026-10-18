@@ -21,6 +21,7 @@ export default function Layout() {
     localStorage.setItem('odina-pos-density', next ? 'compact' : 'normal');
   };
   const screenMode = location.pathname === '/pos' && new URLSearchParams(location.search).get('screen') === '1';
+  const workspaceClassName = `odina-workspace odina-workbench flex-1 min-w-0${location.pathname === '/pos' ? ' odina-pos-viewport' : ''}${screenMode ? ' odina-pos-screen' : ''}`;
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname, location.search]);
 
@@ -59,7 +60,7 @@ export default function Layout() {
   if (screenMode) {
     return (
       <div className="odina-redesign-shell min-h-dvh bg-background flex flex-col">
-        <main className="odina-workspace odina-workbench flex-1 min-w-0" data-page={location.pathname}>
+        <main className={workspaceClassName} data-page={location.pathname}>
           <AdminShopSwitcher scope={adminShopScope} pathname={location.pathname} />
           <Suspense fallback={pageFallback}>
             <Outlet context={{ user, adminShopScope, sidebarCollapsed: false, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: true }} />
@@ -87,7 +88,7 @@ export default function Layout() {
           <OdinaBrand compact />
           <div className="w-9" />
         </div>
-        <main className="odina-workspace odina-workbench flex-1 min-w-0" data-page={location.pathname}>
+        <main className={workspaceClassName} data-page={location.pathname}>
           <AdminShopSwitcher scope={adminShopScope} pathname={location.pathname} />
           <Suspense fallback={pageFallback}>
             <Outlet context={{ user, adminShopScope, sidebarCollapsed: effectiveSidebarCollapsed, posCompact, togglePosCompact, reloadUser: checkUserAuth, screenMode: false }} />
