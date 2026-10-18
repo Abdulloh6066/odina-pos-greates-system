@@ -35,6 +35,7 @@ const ROUTE_KEYS = {
   '/tables': 'tables',
   '/customers': 'customers',
   '/products': 'products',
+  '/3d-plus': 'products',
   '/categories': 'categories',
   '/users': 'users',
   '/reports': 'reports',
