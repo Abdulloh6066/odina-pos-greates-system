@@ -1920,7 +1920,7 @@ export default function POS() {
   };
 
   return (
-    <div className={`odina-pos odina-pos-workbench ${posCompact ? 'odina-pos-compact' : ''} flex flex-col w-full max-w-full ${screenMode ? 'h-dvh' : 'h-[calc(100dvh-3.5rem)] lg:h-dvh'} bg-background overflow-x-hidden`}>
+    <div className={`odina-pos odina-pos-workbench ${posCompact ? 'odina-pos-compact' : ''} flex flex-1 flex-col min-h-0 w-full max-w-full bg-background overflow-hidden`}>
       {productOrderOpen && canEditProductOrder && catalogShopId && <ProductOrderDialog
         key={catalogShopId} shopId={catalogShopId}
         shopName={shops.find(shop => shop.id === catalogShopId)?.name || shift?.shop_name || user?.shop_name || 'Do‘kon'}
@@ -2101,7 +2101,7 @@ export default function POS() {
 
       <div className="odina-pos-body flex-1 flex min-h-0">
         {/* Center: categories + grid */}
-        <div className="flex-1 flex min-w-0">
+        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
           {/* Category rail */}
           <div className="odina-category-rail hidden md:flex w-36 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
             <p className="odina-category-title">KATEGORIYALAR</p>
@@ -2113,7 +2113,7 @@ export default function POS() {
             ))}
           </div>
 
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
             {/* Search + mobile categories */}
             <div className="odina-pos-search px-4 sm:px-5 pt-4 pb-2 space-y-3">
               <div className="odina-catalog-toolbar">
@@ -2133,7 +2133,7 @@ export default function POS() {
               </div>
             </div>
 
-            <div className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
+            <div role="region" aria-label="Kassadagi mahsulotlar" tabIndex={0} className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
               <ProductGrid products={filtered} shopId={catalogShopId}
                 stockByProduct={stockByProduct} showStock={Boolean(shopScope ? catalogShopId : shift)}
                 onAdd={addToCart} disabled={tableLocked || paying || payOpen || stockChecking}
@@ -2143,7 +2143,7 @@ export default function POS() {
         </div>
 
         {/* Cart */}
-        <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-w-0 shrink-0 border-l border-border overflow-hidden">
+        <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-h-0 min-w-0 shrink-0 border-l border-border overflow-hidden">
           <Cart
             cart={cart}
             isDelivery={isDelivery} onDeliveryChange={changeDelivery}
