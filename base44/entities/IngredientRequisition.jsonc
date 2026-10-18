@@ -1,0 +1,168 @@
+{
+  "name": "IngredientRequisition",
+  "type": "object",
+  "properties": {
+    "request_number": {
+      "type": "string"
+    },
+    "request_key": {
+      "type": "string"
+    },
+    "create_fingerprint": {
+      "type": "string"
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name": {
+      "type": "string"
+    },
+    "source_location_id": {
+      "type": "string"
+    },
+    "source_location_name": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "history_json": {
+      "type": "string"
+    },
+    "pending_json": {
+      "type": "string"
+    },
+    "lease_token": {
+      "type": "string"
+    },
+    "lease_until": {
+      "type": "string"
+    },
+    "approved_at": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "approved_by_name": {
+      "type": "string"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "cancelled_at": {
+      "type": "string"
+    },
+    "cancelled_by_name": {
+      "type": "string"
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": [
+        "purchase",
+        "warehouse"
+      ]
+    },
+    "required_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "partial",
+        "received",
+        "cancelled"
+      ],
+      "default": "waiting"
+    },
+    "version": {
+      "type": "integer",
+      "default": 0
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ingredient_id": {
+            "type": "string"
+          },
+          "ingredient_name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "purchase_unit": {
+            "type": "string"
+          },
+          "base_unit": {
+            "type": "string"
+          },
+          "conversion_to_base": {
+            "type": "number"
+          },
+          "requested_quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ingredient_id",
+          "ingredient_name",
+          "category",
+          "purchase_unit",
+          "base_unit",
+          "conversion_to_base",
+          "requested_quantity"
+        ]
+      }
+    }
+  },
+  "required": [
+    "request_number",
+    "request_key",
+    "create_fingerprint",
+    "location_id",
+    "location_name",
+    "source_kind",
+    "required_date",
+    "items",
+    "status",
+    "version",
+    "created_by",
+    "created_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
