@@ -44,7 +44,7 @@ export default function Cart({
         <span className="font-semibold">{isDelivery ? 'Dostavka' : 'Olib ketish'} #{takeawayOrder.ticket_number} · To‘lanmagan</span>
         <Button type="button" variant="ghost" className="min-h-11 text-xs" disabled={locked} onClick={onLeaveTakeaway}>Yangi buyurtma</Button>
       </div>}
-      <div className="odina-cart-items flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
+      <div role="region" tabIndex={0} className="odina-cart-items flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-3 py-1.5" aria-label="Buyurtmadagi mahsulotlar">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 py-16">
             <div className="odina-cart-empty-icon w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
