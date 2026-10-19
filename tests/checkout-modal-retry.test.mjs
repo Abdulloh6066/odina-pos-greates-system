@@ -8,11 +8,11 @@ import { transformSync } from 'esbuild';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-const methods = [
-  { id: 'cash', label: 'Naqd pul', group: 'cash' },
-  { id: 'bank_card', label: 'Bank card', group: 'card' },
-  { id: 'online', label: 'Online', group: 'online' },
-];
+// Use the actual picker configuration while keeping the live SDK out of tests.
+const methodDeclaration = readFileSync('src/lib/pos.js', 'utf8')
+  .match(/export const PAYMENT_METHODS = (\[[\s\S]*?\n\]);/);
+assert.ok(methodDeclaration, 'Expected the shared payment-method configuration');
+const methods = JSON.parse(JSON.stringify(vm.runInNewContext(methodDeclaration[1], {})));
 const text = node => typeof node === 'string' || typeof node === 'number'
   ? String(node) : (node.children || []).map(text).join('');
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -84,6 +84,48 @@ function fixture(initial = {}, preference = 'on') {
     confirm, split, confirmations, closed, storage, unmount: () => act(() => renderer.unmount()) };
 }
 
+test('Kassa offers separate HUMO and UZCARD choices without removing existing payment methods', () => {
+  assert.deepEqual(methods.map(method => method.id), ['cash', 'bank_card', 'uzcard', 'humo', 'online']);
+  assert.equal(new Set(methods.map(method => method.id)).size, methods.length);
+  const f = fixture();
+  try {
+    const picker = f.buttons().filter(button => button.props.className?.includes('odina-payment-method '));
+    assert.deepEqual(picker.map(text), methods.map(method => method.label));
+    assert.equal(methods.find(method => method.id === 'humo').label, 'HUMO');
+    assert.equal(methods.find(method => method.id === 'uzcard').label, 'UZCARD');
+  } finally { f.unmount(); }
+});
+
+for (const method of ['humo', 'uzcard']) {
+  test(`${method}: full payment reaches Yakunlash with its own method ID and exact amount`, () => {
+    const f = fixture({ total: 25000 });
+    try {
+      f.choose(method);
+      assert.deepEqual(f.rows(), [{ method, amount: 25000 }]);
+      f.click(f.confirm());
+      assert.deepEqual(f.confirmations, [[[{ method, amount: 25000 }], true]]);
+    } finally { f.unmount(); }
+  });
+}
+
+test('HUMO, UZCARD and cash split balances correctly and survives a same-attempt retry', () => {
+  const f = fixture({ total: 25000 });
+  try {
+    f.choose('cash'); f.choose('humo'); f.editAmount(1, 10000);
+    f.choose('uzcard'); f.editAmount(2, 5000); f.setReceipt(false);
+    const expected = [{ method: 'cash', amount: 10000 }, { method: 'humo', amount: 10000 }, { method: 'uzcard', amount: 5000 }];
+    assert.deepEqual(f.rows(), expected);
+    for (const select of f.renderer.root.findAllByType('select')) {
+      const choices = select.findAllByType('option').map(option => option.props.value);
+      assert.ok(expected.filter(row => row.method !== select.props.value).every(row => !choices.includes(row.method)));
+    }
+    f.update({ open: false }); f.update({ open: true, retryPending: true });
+    assert.deepEqual(f.rows(), expected);
+    f.click(f.confirm());
+    assert.deepEqual(f.confirmations, [[expected, false]]);
+  } finally { f.unmount(); }
+});
+
 test('same checkout attempt preserves split methods, amounts and receipt preference across close and reopen', () => {
   const f = fixture();
   try {
@@ -135,7 +177,7 @@ test('retryPending disables payment method, amount, add and remove controls with
     assert.equal(removal.length, 2); assert.ok(removal.every(button => button.props.disabled));
     assert.ok(f.buttons().find(button => button.props['aria-expanded'] !== undefined).props.disabled);
     const picker = f.buttons().filter(button => button.props.className?.includes('odina-payment-method '));
-    assert.equal(picker.length, 1); assert.ok(picker[0].props.disabled);
+    assert.equal(picker.length, methods.length - 2); assert.ok(picker.every(button => button.props.disabled));
     assert.ok(f.buttons().find(button => text(button) === 'Bekor qilish').props.disabled);
     assert.equal(f.confirm().props.disabled, false);
     assert.deepEqual(f.rows(), [{ method: 'cash', amount: 10000 }, { method: 'bank_card', amount: 5000 }]);
