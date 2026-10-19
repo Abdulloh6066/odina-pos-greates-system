@@ -4,6 +4,8 @@ import { uzbekistanDateKey } from './uzbekistan-time.js';
 export const PAYMENT_METHODS = [
   { id: 'cash', label: 'Naqd pul', short: 'Naqd pul', group: 'cash' },
   { id: 'bank_card', label: 'Bank card', short: 'Bank card', group: 'card' },
+  { id: 'uzcard', label: 'UZCARD', short: 'UZCARD', group: 'card' },
+  { id: 'humo', label: 'HUMO', short: 'HUMO', group: 'card' },
   { id: 'online', label: 'Online', short: 'Online', group: 'online' },
 ];
 
