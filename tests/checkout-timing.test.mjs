@@ -269,4 +269,3 @@ test('actual status shows seconds only after server confirmation and hides the l
   assert.equal(tree.toJSON(), null);
   act(() => tree.unmount());
 });
-
