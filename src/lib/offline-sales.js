@@ -31,6 +31,8 @@ export function startSaleRequest(request, send, { userId = '' } = {}) {
     if (existing.status !== 'rejected') return existing;
   }
   const snapshot = JSON.parse(fingerprint);
+  const startedAt = Date.now();
+  const startedMonotonic = globalThis.performance?.now?.();
   const flight = { cacheKey, fingerprint, request: snapshot, status: 'pending', response: null, error: null };
   // Invoke synchronously, preserving the immediate double-submit guard in POS.
   const sent = new Promise((resolve, reject) => {
@@ -39,6 +41,11 @@ export function startSaleRequest(request, send, { userId = '' } = {}) {
   flight.promise = sent.then((response) => {
     flight.status = 'fulfilled';
     flight.response = response;
+    // Capture receipt of the actual acknowledgment, even when the cashier
+    // has already continued and the queue consumes this response much later.
+    flight.receivedAt = Date.now();
+    flight.roundTripMs = Math.max(0, Math.round(Number.isFinite(startedMonotonic)
+      ? globalThis.performance.now() - startedMonotonic : flight.receivedAt - startedAt));
     return response;
   }, (error) => {
     flight.status = 'rejected';
@@ -436,7 +443,14 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
         synced += 1;
         // Reconcile only after the saved sale and queue removal are confirmed.
         // A presentation failure must never requeue an acknowledged payment.
-        try { void Promise.resolve(onConfirmed?.({ id: record.id, request: record.request, record, payload })).catch(() => {}); } catch { /* onSynced can refresh authoritative state. */ }
+        const checkoutStartedAt = Date.parse(record.checkout_started_at || '');
+        const confirmationTiming = {
+          totalMs: Number.isFinite(checkoutStartedAt) && flight.receivedAt >= checkoutStartedAt
+            ? flight.receivedAt - checkoutStartedAt : null,
+          apiRoundTripMs: flight.roundTripMs,
+          completedAt: new Date(flight.receivedAt).toISOString(),
+        };
+        try { void Promise.resolve(onConfirmed?.({ id: record.id, request: record.request, record, payload, confirmationTiming })).catch(() => {}); } catch { /* onSynced can refresh authoritative state. */ }
       } catch (error) {
         const status = Number(error?.response?.status || error?.status || 0);
         const sessionBlocked = status === 401 || status === 403;
