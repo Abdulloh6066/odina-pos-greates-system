@@ -27,7 +27,7 @@ let fixtureId = 0;
 function fixture(flags = {}) {
   const key = `pos-race-${++fixtureId}`;
   const network = deferred(), durable = deferred();
-  const requests = [], receipts = [], alerts = [], queued = [], stockReads = [], navigations = [];
+  const requests = [], receipts = [], alerts = [], queued = [], stockReads = [], navigations = [], timingReports = [];
   const timers = new Map(); let timerId = 0;
   const clock = {
     setTimeout: (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
@@ -54,7 +54,8 @@ function fixture(flags = {}) {
     console: { info: () => {}, error: () => {}, warn: () => {} },
     recordCheckoutTiming: value => { ctx.lastCheckoutTiming = value; },
     timingUserRef: { current: `cashier-${fixtureId}` },
-    createCheckoutTimingEventId: () => `diagnostic-${fixtureId}`, reportCheckoutTiming: () => Promise.resolve({}),
+    createCheckoutTimingEventId: () => `diagnostic-${fixtureId}`,
+    reportCheckoutTiming: event => { timingReports.push(event); return Promise.resolve({}); },
     useStableEvent: callback => callback,
     ...offline,
     waitForSaleResponse: (flight, options = {}) => offline.waitForSaleResponse(flight, { timers: clock, ...options }),
@@ -79,16 +80,16 @@ function fixture(flags = {}) {
       entities: { ProductStock: { filter: (...args) => { const gate = deferred(); stockReads.push({ args, ...gate }); return gate.promise; } } },
     },
   });
-  const names = ['loadCurrentShift', 'closePayment', 'finishSalePresentation', 'presentCompletedSale', 'finishQueuedSale',
+  const names = ['confirmQueuedSale', 'loadCurrentShift', 'closePayment', 'finishSalePresentation', 'presentCompletedSale', 'finishQueuedSale',
     'mergeUnreservedStock', 'refreshConfirmedStock', 'reconcileCompletedSale', 'applyCompletedSale', 'completeSale'];
   vm.runInNewContext(names.map(declaration).join('\n')
-    + '\nglobalThis.api={loadCurrentShift,completeSale,closePayment,reconcileCompletedSale,mergeUnreservedStock};', ctx);
+    + '\nglobalThis.api={confirmQueuedSale,loadCurrentShift,completeSale,closePayment,reconcileCompletedSale,mergeUnreservedStock};', ctx);
   const payload = (quantity = 9, orderCount = 1, extra = {}) => ({
     sale: { id: `sale-${key}`, shop_id: 'shop', items: [{ product_id: 'cake', quantity: 1 }] },
     shift: { id: 'shift', shop_id: 'shop', order_count: orderCount, expected_cash: orderCount * 1000 },
     stock_updates: [{ product_id: 'cake', quantity }], ...extra,
   });
-  return { ctx, key, network, durable, requests, receipts, alerts, queued, stockReads, navigations, payload,
+  return { ctx, key, network, durable, requests, receipts, alerts, queued, stockReads, navigations, timingReports, payload,
     ...ctx.api,
     async deadline(delay = offline.POS_CHECKOUT_RESPONSE_BUDGET_MS) {
       const due = [...timers].filter(([, timer]) => timer.delay === delay);
@@ -104,7 +105,7 @@ function fixture(flags = {}) {
 }
 const payments = [{ method: 'cash', amount: 1000 }];
 
-test('ordinary deadline waits only for durable storage; late original response never clears or prints the next cart', async () => {
+test('1s handoff later shows the real 6.2s server confirmation without clearing or printing the next cart', async t => {
   const f = fixture();
   const pending = f.completeSale(payments, true);
   await f.deadline();
@@ -117,18 +118,26 @@ test('ordinary deadline waits only for durable storage; late original response n
   assert.equal(f.queued[0].id, f.requests[0].idempotency_key);
   assert.deepEqual(JSON.parse(JSON.stringify(f.queued[0].request)), JSON.parse(JSON.stringify(f.requests[0])));
   f.ctx.cart = [{ product_id: 'tea', quantity: 2 }];
+  const actualStartedAt = Date.parse(f.queued[0].checkout_started_at);
+  assert.ok(Number.isFinite(actualStartedAt), 'submission origin survives the durable queue');
+  t.mock.method(Date, 'now', () => actualStartedAt + 6200);
   f.network.resolve({ data: f.payload() }); await tick();
   const rows = new Map(f.queued.map(row => [row.id, row])); let extraWrites = 0;
   const result = await offline.syncPendingSales({ userId: f.ctx.user.id,
     storage: { list: async () => [...rows.values()], update: async (id, patch) => Object.assign(rows.get(id), patch), remove: async id => rows.delete(id) },
     lock: work => work(), send: async () => { extraWrites++; return { data: f.payload() }; },
-    onConfirmed: ({ payload, id, record }) => f.reconcileCompletedSale(payload, id, record),
+    onConfirmed: ({ payload, id, record, confirmationTiming }) => f.confirmQueuedSale(payload, id, record, confirmationTiming),
   });
   assert.equal(result.synced, 1); assert.equal(extraWrites, 0, 'drain consumes the original successful flight');
   assert.equal(f.stockReads.length, 1); assert.equal(f.displayedQuantity(), 9);
   f.stockReads[0].resolve([{ id: 'stock', product_id: 'cake', location_id: 'shop', quantity: 9 }]); await tick();
   assert.equal(f.quantity(), 9); assert.equal(f.ctx.confirmedStockReservations.length, 0);
   assert.equal(f.ctx.cart[0].product_id, 'tea'); assert.equal(f.receipts.length, 1);
+  assert.equal(f.ctx.lastCheckoutTiming.outcome, 'confirmed');
+  assert.equal(f.ctx.lastCheckoutTiming.totalMs, 6200, 'server acknowledgment replaces the 1s local handoff metric');
+  assert.equal(f.ctx.lastCheckoutTiming.requestKey, f.key);
+  const confirmedReports = f.timingReports.filter(row => row.sale_id);
+  assert.equal(confirmedReports.length, 1); assert.equal(confirmedReports[0].total_ms, 6200);
 });
 
 test('storage handoff failure exits promptly and same-key retry reuses eventual success with original methods', async () => {
