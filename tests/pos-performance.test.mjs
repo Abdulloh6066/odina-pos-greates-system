@@ -281,7 +281,7 @@ test('supplier-payment UI distinguishes loading and errors from a genuinely empt
   const input = props => React.createElement('input', props);
   const Cash = component('src/components/pos/KassaActionDialogs.jsx', {
     react: React, '@/components/ui/odina-select': props => React.createElement('select', props),
-    'lucide-react': { ShieldCheck: Icon, Banknote: Icon, RotateCcw: Icon },
+    'lucide-react': { ShieldCheck: Icon, Banknote: Icon, RotateCcw: Icon, Keyboard: Icon },
     '@/components/ui/dialog': { Dialog: Wrapper, DialogContent: Wrapper, DialogHeader: Wrapper, DialogTitle: Wrapper, DialogFooter: Wrapper },
     '@/components/ui/button': { Button: props => React.createElement('button', props) },
     '@/components/ui/input': { Input: input }, '@/components/ui/label': { Label: Wrapper },
