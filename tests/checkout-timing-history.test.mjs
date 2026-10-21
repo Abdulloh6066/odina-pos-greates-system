@@ -280,7 +280,8 @@ test('real dialog labels queued/unconfirmed outcomes distinctly and formats rece
   const articles = h.tree().root.findAllByType('article');
   const queued = textOf(articles[2]);
   const unknown = textOf(articles[3]);
-  assert.match(queued, /Server tasdig‘i kutilmoqda/);
+  assert.match(queued, /Qurilmaga saqlash qaydi/);
+  assert.doesNotMatch(queued, /1,2\s+soniya/, 'local handoff duration cannot be displayed as server confirmation time');
   assert.doesNotMatch(queued, /Savdo tasdiqlandi|saqlandi/i);
   assert.match(unknown, /Yakunlash tasdiqlanmadi/);
   assert.doesNotMatch(unknown, /Savdo tasdiqlandi|saqlandi/i);
