@@ -670,6 +670,29 @@ export default function POS() {
     }
   };
 
+  const confirmQueuedSale = useStableEvent((payload, key, record, confirmationTiming) => {
+    // This callback follows the server's final sale acknowledgment. Timing
+    // never invokes checkout again or changes the already-committed sale.
+    const known = Number.isFinite(confirmationTiming?.totalMs) && confirmationTiming.totalMs >= 0;
+    const outcome = payload.already_processed ? 'rechecked' : 'confirmed';
+    try {
+      if (record.user_id === user?.id && record.shift_id === shift?.id) {
+        recordCheckoutTiming({ requestKey: key, onlyIfCurrent: true,
+          totalMs: known ? confirmationTiming.totalMs : 0, durationKnown: known, outcome });
+      }
+      if (known && confirmationTiming.totalMs <= 86400000) {
+        void reportCheckoutTiming({ event_id: `ct-server-${key}`, actor_id: record.user_id,
+          shift_id: record.shift_id, request_key: key, sale_id: payload.sale.id,
+          total_ms: confirmationTiming.totalMs, api_round_trip_ms: confirmationTiming.apiRoundTripMs,
+          outcome, client_completed_at: confirmationTiming.completedAt }, {
+          send: body => base44.functions.invoke('checkout-timing', body),
+          isCurrentUser: () => timingUserRef.current === record.user_id,
+        }).catch(() => console.warn('Server confirmation timing upload is pending.'));
+      }
+    } catch { /* Diagnostics cannot prevent stock reconciliation. */ }
+    return reconcileCompletedSale(payload, key, record);
+  });
+
   const {
     isOnline,
     browserOnline,
@@ -687,7 +710,7 @@ export default function POS() {
     shiftMutationRef.current++;
     setShift(currentShift);
     setShiftReadState('ready');
-  }, (payload, key, record) => reconcileCompletedSale(payload, key, record));
+  }, confirmQueuedSale);
   const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
     takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
 
@@ -1550,6 +1573,7 @@ export default function POS() {
     if (saleSubmittingRef.current || !cart.length || stockChecking || discountLoading || !checkoutReadyRef.current) return;
     saleSubmittingRef.current = true;
     const checkoutTimingStarted = performance.now();
+    const checkoutTimingStartedAt = new Date().toISOString();
     let checkoutServerMs = null;
     let checkoutBackendTiming = null;
     let checkoutOutcome = 'unconfirmed';
@@ -1563,6 +1587,7 @@ export default function POS() {
     setPaying(true);
     const idempotencyKey = checkoutAttemptRef.current?.key || checkoutRequestKeyRef.current || createSaleIdempotencyKey();
     checkoutRequestKeyRef.current = idempotencyKey;
+    try { recordCheckoutTiming({ requestKey: idempotencyKey, totalMs: 0, outcome: 'unconfirmed' }); } catch { /* Diagnostics only. */ }
     const recordedAt = checkoutAttemptRef.current?.request.recorded_at || checkoutRecordedAtRef.current || new Date().toISOString();
     checkoutRecordedAtRef.current = recordedAt;
     let attempt = checkoutAttemptRef.current;
@@ -1587,6 +1612,8 @@ export default function POS() {
           payments,
           isDelivery,
         });
+        // Separate payment submission time from the earlier payment-dialog time.
+        pendingRecord.checkout_started_at = checkoutTimingStartedAt;
       }
 
       if (!attempt) {
@@ -1611,7 +1638,7 @@ export default function POS() {
           recorded_at: recordedAt,
         };
         attempt = { key: idempotencyKey, request: JSON.parse(JSON.stringify(request)), pendingRecord,
-          uncertain: false, onlineStarted: false, flight: null };
+          checkoutStartedAt: checkoutTimingStartedAt, uncertain: false, onlineStarted: false, flight: null };
         checkoutAttemptRef.current = attempt;
       } else if (attempt.key !== idempotencyKey) {
         throw new Error('Avvalgi to‘lovning so‘rov kaliti o‘zgarmasligi kerak. Qayta pul olmang.');
@@ -1662,7 +1689,7 @@ export default function POS() {
         }
         const result = outcome.response;
         if (checkoutSessionRef.current === checkoutSession) reportRequestSuccess();
-        checkoutServerMs = Math.round(performance.now() - serverTimingStarted);
+        checkoutServerMs = flight.roundTripMs ?? Math.round(performance.now() - serverTimingStarted);
         const payload = result?.data || result;
         checkoutBackendTiming = payload?.backend_timing || null;
         if (!payload?.sale?.id) {
@@ -1724,8 +1751,13 @@ export default function POS() {
         saleSubmittingRef.current = false;
         setPaying(false);
       }
-      const checkoutTotalMs = Math.round(performance.now() - checkoutTimingStarted);
-      if (checkoutSessionRef.current === checkoutSession) recordCheckoutTiming({ totalMs: checkoutTotalMs, outcome: checkoutOutcome });
+      const confirmedAt = attempt?.flight?.receivedAt;
+      const startedAt = Date.parse(attempt?.checkoutStartedAt || checkoutTimingStartedAt);
+      const checkoutTotalMs = ['confirmed', 'rechecked'].includes(checkoutOutcome)
+        && Number.isFinite(confirmedAt) && confirmedAt >= startedAt
+        ? confirmedAt - startedAt : Math.round(performance.now() - checkoutTimingStarted);
+      if (checkoutSessionRef.current === checkoutSession) recordCheckoutTiming({ requestKey: idempotencyKey,
+        totalMs: checkoutTotalMs, outcome: checkoutOutcome });
       // Diagnostics are separate from financial completion and never delay or retry a sale.
       try {
         void reportCheckoutTiming({ event_id: createCheckoutTimingEventId(), actor_id: user?.id || '',
@@ -2377,7 +2409,7 @@ function OfflineSalesBanner({ isOnline, browserOnline = isOnline, connectionPaus
       ? `${connectionPaused && browserOnline ? 'Server bilan aloqa yo‘q' : 'Internet yo‘q'}${records.length ? ` · ${records.length} ta savdo navbatda` : ''}`
       : syncing
         ? `${records.length} ta savdo yuborilmoqda…`
-        : `${records.length} ta savdo serverga yuborilmagan`;
+        : `${records.length} ta savdo tasdig‘i kutilmoqda`;
   const description = error
     ? error
     : !isOnline
