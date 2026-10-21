@@ -43,6 +43,8 @@ import { canQueuePosSale } from '@/lib/pos-network';
 import CategoryIcon from '@/components/CategoryIcon';
 import '@/components/pos/pos-workbench.css';
 import {
+  POS_CHECKOUT_RESPONSE_BUDGET_MS,
+  POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS,
   buildPendingSale,
   createSaleIdempotencyKey,
   isRetryableSyncError,
@@ -1636,7 +1638,13 @@ export default function POS() {
             (request) => base44.functions.invoke('complete-sale', request), { userId: user.id });
         attempt.flight = flight;
         attempt.onlineStarted = true;
-        const outcome = await waitForSaleResponse(flight);
+        // Only an unchanged sale with a durable queue fallback can finish
+        // locally after 1s. Protected requests retain the 2.5s response budget.
+        const outcome = await waitForSaleResponse(flight, {
+          timeoutMs: pendingRecord
+            ? POS_CHECKOUT_RESPONSE_BUDGET_MS
+            : POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS,
+        });
         if (outcome.pending) {
           attempt.uncertain = true;
           if (!pendingRecord) {
