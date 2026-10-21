@@ -337,7 +337,7 @@ function createDraftDispatch({ owner, enabled = () => false, ownerChatEnabled = 
 
 // single-writer/draft-extension.ts
 var DRAFT_REVISION = "owner-draft-isolated-v1";
-var DRAFT_FLAGS = { ingress: true, relay: false, delivery: false, ownerChat: false };
+var DRAFT_FLAGS = { ingress: true, relay: false, delivery: false, ownerChat: true };
 var ownerStateId = "6ac41c139d2eedd404aac7ff";
 async function currentOwner(service) {
   if (secrets.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") !== draft_owner_default.telegramId) throw Error("configured_owner_changed");
@@ -2068,7 +2068,7 @@ async function ingress_default(req) {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v4", "x-odina-owner-chat": "owner-chat-gated-v1" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v4", "x-odina-owner-chat": "owner-chat-enabled-v1" } });
     draftTrace("webhook_auth_ok");
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
     diagnosticStage = "webhook_config";
