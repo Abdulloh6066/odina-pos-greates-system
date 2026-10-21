@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
-import { ShieldCheck, Banknote, RotateCcw } from 'lucide-react';
+import { ShieldCheck, Banknote, RotateCcw, Keyboard } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,10 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
 
 export function CashWithdrawalDialog({ open, shift, user, recipients = [], supplierDebts = {}, pendingSupplierPayment = null, onClose, onConfirm, loading, dataLoading = false, dataError = '', onRetryData }) {
   const [amount, setAmount] = useState('');
+  const [amountKeypadOpen, setAmountKeypadOpen] = useState(false);
+  const amountTapRef = useRef(null);
+  const amountReplaceRef = useRef(true);
+  const amountKeypadRef = useRef(null);
   const [reason, setReason] = useState('');
   const [expenseCategory, setExpenseCategory] = useState('shop_expense');
   const [recipientId, setRecipientId] = useState('');
@@ -62,6 +66,9 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
   useEffect(() => {
     if (open) {
       setAmount(pendingSupplierPayment?.payload ? String(pendingSupplierPayment.payload.amount) : '');
+      setAmountKeypadOpen(false);
+      amountTapRef.current = null;
+      amountReplaceRef.current = true;
       setReason(pendingSupplierPayment?.payload?.notes || '');
       setExpenseCategory(pendingSupplierPayment ? 'goods_payment' : 'shop_expense');
       setRecipientId(pendingSupplierPayment?.payload?.supplier_id || '');
@@ -86,6 +93,37 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
     && (!ownerPinRequired || /^\d{4,8}$/.test(ownerPin))
     && (!ownerRequired || ownerName);
   const employeeName = user?.full_name || user?.email || 'Joriy Kassa xodimi';
+
+  useEffect(() => {
+    if (amountKeypadOpen) amountKeypadRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [amountKeypadOpen]);
+
+  const openAmountKeypad = () => {
+    if (loading || retryPending) return;
+    amountReplaceRef.current = true;
+    setAmountKeypadOpen(true);
+  };
+  const handleAmountTap = (event) => {
+    if (!['touch', 'pen'].includes(event.pointerType) || loading || retryPending) return;
+    const tap = { at: event.timeStamp, x: event.clientX, y: event.clientY };
+    const previous = amountTapRef.current;
+    if (previous && tap.at >= previous.at && tap.at - previous.at <= 400
+      && Math.hypot(tap.x - previous.x, tap.y - previous.y) <= 24) {
+      event.preventDefault();
+      amountTapRef.current = null;
+      openAmountKeypad();
+    } else amountTapRef.current = tap;
+  };
+  const enterAmountKey = (key) => {
+    if (loading || retryPending) return;
+    const replace = amountReplaceRef.current;
+    amountReplaceRef.current = false;
+    setAmount((current) => {
+      if (key === 'clear') return '';
+      if (key === 'backspace') return current.slice(0, -1);
+      return `${replace ? '' : current}${key}`.replace(/^0+(?=\d)/, '');
+    });
+  };
 
   const submit = () => {
     if (!valid) return;
@@ -175,8 +213,39 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
           )}
 
           <div>
-            <Label className="text-xs mb-1.5 block">Miqdor</Label>
-            <Input disabled={loading || retryPending} autoFocus type="number" min="1" max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
+            <Label htmlFor="cash-withdrawal-amount" className="text-xs mb-1.5 block">Miqdor</Label>
+            <div className="relative">
+              <Input id="cash-withdrawal-amount" aria-label="Pul miqdori" aria-describedby="cash-withdrawal-keypad-hint"
+                disabled={loading || retryPending} autoFocus type="number" inputMode="none" min="1"
+                max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)}
+                value={amount} onChange={(event) => { amountReplaceRef.current = false; setAmount(event.target.value); }}
+                onDoubleClick={(event) => { event.preventDefault(); openAmountKeypad(); }} onPointerUp={handleAmountTap}
+                placeholder="0" className="h-11 rounded-xl pr-12 touch-manipulation" />
+              <Button type="button" variant="ghost" size="icon" disabled={loading || retryPending}
+                aria-label={amountKeypadOpen ? 'Raqamli klaviaturani yopish' : 'Raqamli klaviaturani ochish'}
+                aria-expanded={amountKeypadOpen} aria-controls="cash-withdrawal-keypad"
+                onClick={() => amountKeypadOpen ? setAmountKeypadOpen(false) : openAmountKeypad()}
+                className="absolute right-1 top-1 h-9 w-9 rounded-lg">
+                <Keyboard className="h-5 w-5" />
+              </Button>
+            </div>
+            <p id="cash-withdrawal-keypad-hint" className="mt-1.5 text-xs text-muted-foreground">Raqamli klaviatura uchun miqdorni ikki marta bosing.</p>
+            {amountKeypadOpen && (
+              <div id="cash-withdrawal-keypad" ref={amountKeypadRef} role="group" aria-label="Pul miqdori uchun raqamli klaviatura"
+                className="mt-3 rounded-2xl border border-border bg-secondary/40 p-3">
+                <div className="grid grid-cols-3 gap-2">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'backspace'].map((key) => (
+                    <Button key={key} type="button" variant="outline" disabled={loading || retryPending}
+                      aria-label={key === 'clear' ? 'Miqdorni tozalash' : key === 'backspace' ? 'Oxirgi raqamni o‘chirish' : key}
+                      onClick={() => enterAmountKey(key)}
+                      className={`h-14 rounded-xl touch-manipulation ${key === 'clear' ? 'text-sm' : 'text-2xl tabular-nums'}`}>
+                      {key === 'clear' ? 'Tozalash' : key === 'backspace' ? '⌫' : key}
+                    </Button>
+                  ))}
+                </div>
+                <Button type="button" onClick={() => setAmountKeypadOpen(false)} className="mt-2 h-11 w-full rounded-xl touch-manipulation">Tayyor</Button>
+              </div>
+            )}
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Izoh / sabab (ixtiyoriy)</Label>
