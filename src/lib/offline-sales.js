@@ -13,7 +13,8 @@ let fallbackSync = Promise.resolve();
 
 // This deadline changes presentation only. The original write is never aborted,
 // and its exact request is retained for the durable queue or an explicit retry.
-export const POS_CHECKOUT_RESPONSE_BUDGET_MS = 2500;
+export const POS_CHECKOUT_RESPONSE_BUDGET_MS = 1000;
+export const POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS = 2500;
 export const POS_QUEUE_RESPONSE_BUDGET_MS = 15000;
 const saleRequests = new Map();
 
