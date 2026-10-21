@@ -280,6 +280,10 @@ function privateOwner(update, owner) {
     return false;
   }
 }
+function isOwnerPlainText(update, owner) {
+  const text = update?.message?.text;
+  return !update?.callback_query && typeof text === "string" && text.trim().length > 0 && !text.trimStart().startsWith("/") && privateOwner(update, owner);
+}
 function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl = fetch }) {
   draftTrace("forward_url_start");
   const target = new URL(url);
@@ -303,13 +307,15 @@ function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl
       draftRedirectTrace(response, target);
       throw Error("transport_failed");
     }
-    if (!response.ok) throw Error("transport_failed");
-    return response.json();
+    if (!response.ok || response.status !== 200 && response.status !== 202) throw Error("transport_failed");
+    const acknowledgment = await response.json();
+    if (!acknowledgment || typeof acknowledgment !== "object" || Array.isArray(acknowledgment) || acknowledgment.accepted !== true || acknowledgment.durable !== true || Object.keys(acknowledgment).length !== 2) throw Error("durable_ack_required");
+    return acknowledgment;
   };
 }
-function createDraftDispatch({ owner, enabled = () => false, readOwner, forward }) {
+function createDraftDispatch({ owner, enabled = () => false, ownerChatEnabled = () => false, readOwner, forward }) {
   return async (update, legacy) => {
-    if (!isDraft(update)) return legacy();
+    if (!isDraft(update) && !(ownerChatEnabled() && isOwnerPlainText(update, owner))) return legacy();
     if (!enabled()) { draftTrace("draft_disabled", null, 200); return new Response("Draft disabled", { status: 200 }); }
     if (!privateOwner(update, owner) || !ownerMatches(await readOwner(), owner)) { draftTrace("owner_rejected", null, 403); return new Response("Forbidden", { status: 403 }); }
     const clean = structuredClone(update);
@@ -331,7 +337,7 @@ function createDraftDispatch({ owner, enabled = () => false, readOwner, forward 
 
 // single-writer/draft-extension.ts
 var DRAFT_REVISION = "owner-draft-isolated-v1";
-var DRAFT_FLAGS = { ingress: true, relay: false, delivery: false };
+var DRAFT_FLAGS = { ingress: true, relay: false, delivery: false, ownerChat: false };
 var ownerStateId = "6ac41c139d2eedd404aac7ff";
 async function currentOwner(service) {
   if (secrets.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") !== draft_owner_default.telegramId) throw Error("configured_owner_changed");
@@ -448,10 +454,11 @@ async function maybeDraft(req, service) {
     draftTrace("body_parse_failed", error);
     return null;
   }
-  draftTrace(isDraft(update) ? "draft_recognized" : "legacy_route");
+  draftTrace(isDraft(update) ? "draft_recognized" : DRAFT_FLAGS.ownerChat && isOwnerPlainText(update, draft_owner_default) ? "owner_chat_recognized" : "legacy_route");
   const response = await createDraftDispatch({
     owner: draft_owner_default,
     enabled: () => DRAFT_FLAGS.ingress,
+    ownerChatEnabled: () => DRAFT_FLAGS.ownerChat,
     readOwner: async () => {
       draftTrace("owner_read_start");
       try { const owner = await currentOwner(service); draftTrace("owner_read_ok"); return owner; }
@@ -2061,7 +2068,7 @@ async function ingress_default(req) {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v4" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v4", "x-odina-owner-chat": "owner-chat-gated-v1" } });
     draftTrace("webhook_auth_ok");
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
     diagnosticStage = "webhook_config";
