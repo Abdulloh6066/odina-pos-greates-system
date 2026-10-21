@@ -124,12 +124,12 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     }
   }, [userId, reportRequestSuccess, reportRequestError]);
 
-  const reconcileConfirmed = useCallback(({ id, payload, record }) => {
+  const reconcileConfirmed = useCallback(({ id, payload, record, confirmationTiming }) => {
     const session = sessionRef.current;
     if (!mountedRef.current || userRef.current !== userId || confirmedKeysRef.current.has(id)) return;
     const previous = reconcilingRef.current.get(id);
     if (previous?.running) return;
-    const entry = previous || { id, payload, record: { ...record, status: 'confirmed', last_error: '', last_error_status: 0 } };
+    const entry = previous || { id, payload, confirmationTiming, record: { ...record, status: 'confirmed', last_error: '', last_error_status: 0 } };
     entry.running = true;
     entry.record = { ...entry.record, next_retry_at: new Date(Date.now() + 15000).toISOString() };
     reconcilingRef.current.set(id, entry);
@@ -143,7 +143,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
       setRecords((current) => [...current.filter((row) => row.id !== id), entry.record]);
     };
     try {
-      void Promise.resolve(onConfirmedRef.current?.(payload, id, record)).then(() => {
+      void Promise.resolve(onConfirmedRef.current?.(entry.payload, id, entry.record, entry.confirmationTiming)).then(() => {
         if (!mountedRef.current || sessionRef.current !== session || userRef.current !== userId) return;
         confirmedKeysRef.current.add(id);
         reconcilingRef.current.delete(id);
