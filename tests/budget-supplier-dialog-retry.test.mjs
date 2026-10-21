@@ -95,6 +95,70 @@ test('warehouse supplier history keeps balances and receipt navigation without i
   await act(async () => { tree.unmount(); });
 });
 
+test('double-click opens a numeric amount keypad, edits the value and Done never submits a withdrawal', async () => {
+  const calls = [];
+  const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, {
+    open: true, shift: { id: 'shift', expected_cash: 100000 }, user: { id: 'cashier', role: 'cashier' },
+    onClose: () => {}, onConfirm: payload => calls.push(payload), loading: false,
+  })); });
+  const key = label => tree.root.findAllByType('button').find(node => node.props['aria-label'] === label);
+  await act(async () => { enter(input(tree, 'number'), '50000'); });
+  await act(async () => { input(tree, 'number').props.onDoubleClick({ preventDefault() {} }); });
+  assert.equal(tree.root.findAllByProps({ role: 'group' }).length, 1);
+  assert.equal(tree.root.findAllByType('button').filter(node => /^\d$/.test(node.props['aria-label'] || '')).length, 10);
+  await act(async () => { for (const digit of ['2', '0', '0', '0', '0']) key(digit).props.onClick(); });
+  assert.equal(input(tree, 'number').props.value, '20000', 'first digit replaces the old selected amount');
+  await act(async () => { key('Oxirgi raqamni o‘chirish').props.onClick(); });
+  assert.equal(input(tree, 'number').props.value, '2000');
+  await act(async () => { key('Miqdorni tozalash').props.onClick(); key('0').props.onClick(); key('1').props.onClick(); key('2').props.onClick(); });
+  assert.equal(input(tree, 'number').props.value, '12');
+  await act(async () => { tree.root.findAllByType('button').find(node => node.children.includes('Tayyor')).props.onClick(); });
+  assert.equal(tree.root.findAllByProps({ role: 'group' }).length, 0);
+  assert.equal(calls.length, 0, 'closing the keypad is separate from saving money');
+  await act(async () => { submit(tree); });
+  assert.equal(calls[0].amount, 12); assert.equal(calls[0].reason, '');
+  await act(async () => { tree.unmount(); });
+});
+
+test('nearby touch and pen double-taps open the keypad, while slow taps and scrolling do not', async () => {
+  const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
+  for (const pointerType of ['touch', 'pen']) {
+    let tree;
+    await act(async () => { tree = create(React.createElement(Component, {
+      open: true, shift: { id: 'shift', expected_cash: 100000 }, user: { role: 'cashier' },
+      onClose: () => {}, onConfirm: () => assert.fail('a tap cannot withdraw money'), loading: false,
+    })); });
+    const tap = async (timeStamp, clientX = 40) => act(async () => {
+      input(tree, 'number').props.onPointerUp({ pointerType, timeStamp, clientX, clientY: 40, preventDefault() {} });
+    });
+    await tap(1000); await tap(1600);
+    assert.equal(tree.root.findAllByProps({ role: 'group' }).length, 0);
+    await tap(1800, 200);
+    assert.equal(tree.root.findAllByProps({ role: 'group' }).length, 0, 'separated touches cannot act as a double-tap');
+    await tap(2000, 205);
+    assert.equal(tree.root.findAllByProps({ role: 'group' }).length, 1);
+    await act(async () => { tree.unmount(); });
+  }
+});
+
+test('a frozen supplier retry or saving state cannot open a keypad to alter the amount', async () => {
+  const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
+  for (const extra of [{ loading: true }, { pendingSupplierPayment: { key: 'frozen-payment',
+    payload: { shift_id: 'shift', supplier_id: 'supplier', amount: 20000, notes: '' } } }]) {
+    let tree;
+    await act(async () => { tree = create(React.createElement(Component, {
+      open: true, shift: { id: 'shift', expected_cash: 100000 }, user: { role: 'cashier' },
+      onClose: () => {}, onConfirm: () => assert.fail('read-only amount'), loading: false, ...extra,
+    })); });
+    assert.equal(input(tree, 'number').props.disabled, true);
+    await act(async () => { input(tree, 'number').props.onDoubleClick({ preventDefault() {} }); });
+    assert.equal(tree.root.findAllByProps({ role: 'group' }).length, 0);
+    await act(async () => { tree.unmount(); });
+  }
+});
+
 test('cash withdrawal can submit without a reason and preserves an optional entered note', async () => {
   const calls = [];
   const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
