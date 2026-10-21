@@ -1,4 +1,4 @@
-// Browser-local last attempt only. Never store sale, payment or request data here.
+// Browser-local last attempt metadata only. Never store items, payments or credentials here.
 const VERSION = 1;
 const OUTCOMES = new Set(['confirmed', 'rechecked', 'queued', 'unconfirmed']);
 const validId = value => typeof value === 'string' && value.length > 0 && value.length <= 256
@@ -28,7 +28,9 @@ function storedTiming(value, scope) {
     || typeof value.completedAt !== 'string') return null;
   const date = new Date(value.completedAt);
   if (!Number.isFinite(date.getTime()) || date.toISOString() !== value.completedAt) return null;
-  return { version: VERSION, ...checkedScope, totalMs: value.totalMs, outcome: value.outcome, completedAt: value.completedAt };
+  return { version: VERSION, ...checkedScope, totalMs: value.totalMs, outcome: value.outcome, completedAt: value.completedAt,
+    ...(validId(value.requestKey) ? { requestKey: value.requestKey } : {}),
+    ...(value.durationKnown === false ? { durationKnown: false } : {}) };
 }
 
 export function readCheckoutTiming(scope, storage) {
@@ -46,7 +48,9 @@ export function saveCheckoutTiming(scope, measurement, storage) {
     const checkedScope = checkoutTimingScope(scope?.userId, scope?.shopId, scope?.shiftId);
     if (!checkedScope || !validMeasurement(measurement)) return null;
     value = { version: VERSION, ...checkedScope, totalMs: measurement.totalMs,
-      outcome: measurement.outcome, completedAt: new Date().toISOString() };
+      outcome: measurement.outcome, completedAt: new Date().toISOString(),
+      ...(validId(measurement.requestKey) ? { requestKey: measurement.requestKey } : {}),
+      ...(measurement.durationKnown === false ? { durationKnown: false } : {}) };
   } catch { return null; }
   try {
     const target = storage === undefined ? globalThis.localStorage : storage;
