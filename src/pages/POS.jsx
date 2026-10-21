@@ -24,6 +24,7 @@ import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
 import usePosProductOrder from '@/hooks/usePosProductOrder';
 import { sortByShopOrder } from '@/lib/pos-product-order';
+import { preloadPosThumbnails } from '@/lib/pos-thumbnail-preload';
 import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
 import TakeawayCancelAction from '@/components/pos/TakeawayCancelAction';
@@ -1070,6 +1071,11 @@ export default function POS() {
     () => shopScope && !catalogShopId ? { categories, products } : catalogForShop(products, categories, catalogShopId),
     [products, categories, catalogShopId, Boolean(shopScope)],
   );
+  // Kassa chizilgach, do‘kondagi kichik rasmlar bo‘sh vaqtda jimgina keshlanadi.
+  useEffect(() => {
+    if (loadingData) return undefined;
+    return preloadPosThumbnails(catalogProducts);
+  }, [catalogProducts, loadingData]);
   useEffect(() => {
     if (activeCat !== 'all' && categories.length && !visibleCategories.some(c => c.id === activeCat)) setActiveCat('all');
   }, [activeCat, categories.length, visibleCategories]);

@@ -1,7 +1,14 @@
 {
   "name": "Product",
   "properties": {
-    "available_shop_ids": {"type":"array","items":{"type":"string"},"default":[],"description":"Bo‘sh bo‘lsa barcha do‘konlarda, aks holda faqat sanalgan do‘konlarda sotiladi"},
+    "available_shop_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Bo\u2018sh bo\u2018lsa barcha do\u2018konlarda, aks holda faqat sanalgan do\u2018konlarda sotiladi"
+    },
     "display_before_product_id": {
       "type": "string",
       "description": "Kassada shu mahsulotdan oldin ko\u2018rsatish"
@@ -33,9 +40,11 @@
     },
     "shop_category_ids": {
       "type": "object",
-      "additionalProperties": { "type": "string" },
+      "additionalProperties": {
+        "type": "string"
+      },
       "default": {},
-      "description": "Do‘kon ID bo‘yicha kassadagi kategoriya; belgilanmasa umumiy category_id ishlatiladi"
+      "description": "Do\u2018kon ID bo\u2018yicha kassadagi kategoriya; belgilanmasa umumiy category_id ishlatiladi"
     },
     "category_id": {
       "type": "string"
@@ -48,6 +57,14 @@
     },
     "image_url": {
       "type": "string"
+    },
+    "pos_thumbnail_url": {
+      "type": "string",
+      "description": "Kassa uchun kichraytirilgan WebP rasm manzili; asl image_url o\u2018zgartirilmaydi"
+    },
+    "pos_thumbnail_source": {
+      "type": "string",
+      "description": "pos_thumbnail_url qaysi image_url dan tayyorlanganini ko\u2018rsatadi; mos kelmasa kassa asl rasmni ishlatadi"
     },
     "is_favorite": {
       "default": false,

@@ -11,6 +11,7 @@ import PageHeader from '@/components/PageHeader';
 import TestCatalogCleanup from '@/components/TestCatalogCleanup';
 import CakeStockShelf from '@/components/products/CakeStockShelf';
 import CakeSheetYieldDialog from '@/components/warehouse/CakeSheetYieldDialog';
+import PosThumbnailOptimizer from '@/components/products/PosThumbnailOptimizer';
 import { loadAllInventoryItems } from '@/lib/cake-stock-shelf';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,6 +120,7 @@ export default function Products() {
         icon={Cake}
         actions={canManageCatalog && (
           <div className="flex flex-wrap items-center gap-2">
+            <PosThumbnailOptimizer products={products} canRun={role === 'admin'} onSaved={load} />
             <Button type="button" variant="outline" disabled={loading || Boolean(loadError)} onClick={() => setCakeSheetYieldOpen(true)} className="min-h-11 rounded-xl">
               <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> Tort listlari
             </Button>

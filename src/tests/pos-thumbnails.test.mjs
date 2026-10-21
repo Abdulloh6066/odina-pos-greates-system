@@ -60,6 +60,33 @@ test('new products and missing images safely retain the existing original-image 
   assert.equal(posThumbnailFor({ id: 'new-product', image_url: '/new.jpg' }), null);
 });
 
+test('product-level optimized thumbnail is used only for its own source image', () => {
+  const imageUrl = 'https://cdn.example.com/photos/hot-dog.png';
+  const product = {
+    id: 'optimized-product',
+    image_url: imageUrl,
+    pos_thumbnail_url: 'https://cdn.example.com/photos/hot-dog-512.webp',
+    pos_thumbnail_source: imageUrl,
+  };
+  assert.equal(posThumbnailFor(product), 'https://cdn.example.com/photos/hot-dog-512.webp');
+  // Rasm almashtirilsa eski kichik nusxa ishlatilmaydi.
+  assert.equal(posThumbnailFor({ ...product, image_url: imageUrl + '?v=2' }), null);
+  // Manba ko‘rsatilmagan yoki mos kelmagan kichik rasm ishonchsiz.
+  assert.equal(posThumbnailFor({ id: 'p2', image_url: imageUrl, pos_thumbnail_url: 'https://cdn.example.com/x.webp' }), null);
+  assert.equal(posThumbnailFor({ id: 'p3', image_url: imageUrl, pos_thumbnail_url: 'https://cdn.example.com/x.webp', pos_thumbnail_source: imageUrl + '?other' }), null);
+});
+
+test('an existing manifest thumbnail keeps priority over the product thumbnail', () => {
+  const [id, entry] = entries[0];
+  const product = {
+    id,
+    image_url: entry.source,
+    pos_thumbnail_url: 'https://cdn.example.com/own.webp',
+    pos_thumbnail_source: entry.source,
+  };
+  assert.equal(posThumbnailFor(product), entry.thumbnail);
+});
+
 test('POS images decode asynchronously, prioritize only the first eight and retain error fallback', () => {
   const card = readFileSync(new URL('src/components/pos/ProductCard.jsx', root), 'utf8');
   const grid = readFileSync(new URL('src/components/pos/ProductGrid.jsx', root), 'utf8');
