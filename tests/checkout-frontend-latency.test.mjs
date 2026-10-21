@@ -120,8 +120,10 @@ test('1s handoff later shows the real 6.2s server confirmation without clearing 
   f.ctx.cart = [{ product_id: 'tea', quantity: 2 }];
   const actualStartedAt = Date.parse(f.queued[0].checkout_started_at);
   assert.ok(Number.isFinite(actualStartedAt), 'submission origin survives the durable queue');
-  t.mock.method(Date, 'now', () => actualStartedAt + 6200);
+  let wallNow = actualStartedAt + 6200;
+  t.mock.method(Date, 'now', () => wallNow);
   f.network.resolve({ data: f.payload() }); await tick();
+  wallNow += 3000; // A delayed drain must retain the earlier acknowledgment time.
   const rows = new Map(f.queued.map(row => [row.id, row])); let extraWrites = 0;
   const result = await offline.syncPendingSales({ userId: f.ctx.user.id,
     storage: { list: async () => [...rows.values()], update: async (id, patch) => Object.assign(rows.get(id), patch), remove: async id => rows.delete(id) },
