@@ -289,7 +289,7 @@ function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl
     if (!enabled()) throw Error("disabled");
     const signedRequest = signDraftRequest({ key: key(), purpose, value });
     draftTrace("forward_signed");
-    const requestOptions = { ...signedRequest, redirect: "error", signal: AbortSignal.timeout(5e3) };
+    const requestOptions = { ...signedRequest, redirect: "manual", signal: AbortSignal.timeout(5e3) };
     draftTrace("forward_fetch_start");
     let response;
     try {
@@ -299,6 +299,10 @@ function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl
       throw error;
     }
     draftTrace("forward_http", null, response.status);
+    if (response.type === "opaqueredirect" || response.status === 0 || response.status >= 300 && response.status < 400) {
+      draftRedirectTrace(response, target);
+      throw Error("transport_failed");
+    }
     if (!response.ok) throw Error("transport_failed");
     return response.json();
   };
@@ -340,6 +344,23 @@ async function currentOwner(service) {
   if (user.owner_shop_choices?.length !== 2 || user.active !== true) throw Error("owner_disabled");
   return { ...draft_owner_default, active: true, isOwner: user.is_owner === true };
 }
+function draftRedirectTrace(response, target) {
+  try {
+    const location = response.headers.get("location");
+    let destination = null;
+    try { if (location) destination = new URL(location, target); } catch {}
+    console.info(JSON.stringify({
+      diagnostic: "owner-draft-stage-v4",
+      stage: "forward_redirect_rejected",
+      status: response.status,
+      opaqueRedirect: response.type === "opaqueredirect",
+      locationPresent: Boolean(location),
+      sameOrigin: destination ? destination.origin === target.origin : null,
+      destinationClass: !destination ? "invalid_or_absent" : destination.username || destination.password ? "userinfo_present" : destination.origin === target.origin ? "same_origin" : destination.protocol === "https:" ? "other_https" : "other_protocol",
+      pathClass: !destination ? "unknown" : destination.pathname === "/draft" ? "draft" : destination.pathname === "/" ? "root" : destination.pathname.startsWith("/cdn-cgi/access") ? "cloudflare_access" : "other"
+    }));
+  } catch {}
+}
 function draftFetchFailure(error, target, options) {
   try {
     const codes = ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH", "EACCES", "EPERM", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID", "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET", "ERR_INVALID_ARG_TYPE", "ERR_INVALID_CHAR", "ERR_INVALID_URL"];
@@ -357,6 +378,7 @@ function draftFetchFailure(error, target, options) {
     let category = "unclassified_fetch_failure";
     if (/enotfound|eai_again|dns|failed to lookup|name or service not known|name resolution/.test(detail)) category = "dns";
     else if (/certificate|cert_has_expired|err_tls|self.signed|unknown issuer|tls|ssl|handshake/.test(detail)) category = "tls";
+    else if (/invalid.*redirect|unsupported.*redirect|redirect.*not supported|redirect.*unsupported/.test(detail)) category = "redirect_mode_unsupported";
     else if (/redirect/.test(detail)) category = "redirect";
     else if (/notcapable|permissiondenied|permission denied|eacces|eperm|network access.*denied|egress.*denied|not allowed to.*fetch/.test(detail)) category = "network_permission";
     else if (/invalid receiver|illegal invocation|incompatible receiver/.test(detail)) category = "invalid_receiver";
@@ -371,7 +393,7 @@ function draftFetchFailure(error, target, options) {
     else if (/ehostunreach|enetunreach|unreachable/.test(detail)) category = "network_unreachable";
     else if (/fetch failed|failed to fetch|network request failed|error sending request|connection|network/.test(detail)) category = "network_other";
     console.info(JSON.stringify({
-      diagnostic: "owner-draft-stage-v3",
+      diagnostic: "owner-draft-stage-v4",
       stage: "forward_fetch_failure_detail",
       category,
       errorType: safeName,
@@ -387,7 +409,7 @@ function draftTrace(stage, error = null, status = null) {
   const safeNames = ["Error", "TypeError", "ReferenceError", "SyntaxError", "AbortError", "TimeoutError"];
   try {
     console.info(JSON.stringify({
-      diagnostic: "owner-draft-stage-v3",
+      diagnostic: "owner-draft-stage-v4",
       stage,
       ...(safeCodes.includes(error?.message) ? { code: error.message } : {}),
       ...(safeNames.includes(error?.name) ? { errorType: error.name } : {}),
@@ -2039,7 +2061,7 @@ async function ingress_default(req) {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v3" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v4" } });
     draftTrace("webhook_auth_ok");
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
     diagnosticStage = "webhook_config";
