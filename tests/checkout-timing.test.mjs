@@ -210,3 +210,63 @@ test('actual hook safely recovers from corrupted storage and read failures, then
   assert.equal(reopened.record(measurement).persisted, true, 'a read failure must not prevent a later successful write');
   storage.getItem = get; reopened.unmount();
 });
+
+test('late confirmation upgrades its pending metric and cannot overwrite the next checkout or be downgraded by local handoff', t => {
+  const storage = memoryStorage(); useStorage(t, storage); const f = mountHook();
+  f.record({ requestKey: 'pos-first-checkout', totalMs: 1000, outcome: 'queued' });
+  const confirmed = f.record({ requestKey: 'pos-first-checkout', onlyIfCurrent: true, totalMs: 6200, outcome: 'confirmed' });
+  assert.equal(confirmed.totalMs, 6200);
+  assert.equal(f.record({ requestKey: 'pos-first-checkout', totalMs: 1001, outcome: 'queued' }), confirmed);
+  f.record({ requestKey: 'pos-next-checkout', totalMs: 0, outcome: 'unconfirmed' });
+  const writes = storage.writes.length;
+  assert.equal(f.record({ requestKey: 'pos-first-checkout', onlyIfCurrent: true, totalMs: 9000, outcome: 'confirmed' }), null);
+  assert.equal(storage.writes.length, writes);
+  assert.equal(f.value().timing.requestKey, 'pos-next-checkout');
+  assert.equal(timing.readCheckoutTiming(scope, storage).requestKey, 'pos-next-checkout');
+  f.unmount();
+});
+
+test('reopening preserves the pending request identity and an unknown duration never becomes an invented zero-second confirmation', t => {
+  const storage = memoryStorage(); useStorage(t, storage); const useHook = loadHook();
+  const first = mountHook(useHook);
+  first.record({ requestKey: 'pos-persisted-checkout', totalMs: 1000, outcome: 'queued' }); first.unmount();
+  const reopened = mountHook(useHook);
+  assert.equal(reopened.value().timing.requestKey, 'pos-persisted-checkout');
+  const saved = reopened.record({ requestKey: 'pos-persisted-checkout', onlyIfCurrent: true,
+    totalMs: 0, durationKnown: false, outcome: 'confirmed' });
+  assert.equal(saved.durationKnown, false);
+  assert.equal(timing.readCheckoutTiming(scope, storage).durationKnown, false);
+  reopened.unmount();
+});
+
+test('actual status shows seconds only after server confirmation and hides the local one-second handoff', () => {
+  const code = transformSync(readFileSync('src/components/pos/CheckoutTimingStatus.jsx', 'utf8'), { loader: 'jsx', format: 'cjs' }).code;
+  const module = { exports: {} };
+  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, {})(name => {
+    if (name === 'react') return React;
+    if (name === '@/lib/uzbekistan-time') return { formatUzbekistanDateTime: value => value };
+    throw new Error('Unexpected status dependency: ' + name);
+  }, module, module.exports);
+  const View = module.exports.default;
+  const text = node => !node ? '' : typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join(' ') : text(node.children);
+  let tree;
+  const show = props => act(() => {
+    const element = React.createElement(View, { userRole: 'admin', ...props });
+    if (tree) tree.update(element); else tree = TestRenderer.create(element);
+  });
+  show({ timing: { outcome: 'queued', totalMs: 1000 } });
+  assert.match(text(tree.toJSON()), /Server tasdig‘i kutilmoqda/);
+  assert.doesNotMatch(text(tree.toJSON()), /1,0 soniya/);
+  show({ timing: { outcome: 'confirmed', totalMs: 6200 } });
+  assert.match(text(tree.toJSON()), /6,2 soniya/);
+  assert.match(text(tree.toJSON()), /qoldiq hisobi tasdiqlandi/);
+  show({ timing: { outcome: 'confirmed', totalMs: 6200 }, pending: true });
+  assert.doesNotMatch(text(tree.toJSON()), /6,2 soniya/);
+  show({ timing: { outcome: 'confirmed', totalMs: 0, durationKnown: false } });
+  assert.match(text(tree.toJSON()), /aniq vaqti o‘lchanmagan/);
+  assert.doesNotMatch(text(tree.toJSON()), /0,0 soniya/);
+  show({ userRole: 'cashier', timing: { outcome: 'confirmed', totalMs: 6200 } });
+  assert.equal(tree.toJSON(), null);
+  act(() => tree.unmount());
+});
+
