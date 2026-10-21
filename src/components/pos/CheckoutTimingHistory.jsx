@@ -23,6 +23,9 @@ function TimingResult({ record }) {
 }
 
 function TimingDuration({ record }) {
+  if (!['confirmed', 'rechecked'].includes(record.outcome)) {
+    return <p className="text-xs text-muted-foreground">Server tasdig‘i vaqti hali o‘lchanmagan</p>;
+  }
   return <div>
     <p className="font-semibold tabular-nums whitespace-nowrap">{seconds(record.total_ms)}</p>
     {typeof record.api_round_trip_ms === 'number' && Number.isFinite(record.api_round_trip_ms) && record.api_round_trip_ms >= 0
@@ -45,7 +48,7 @@ export default function CheckoutTimingHistory({ open, onOpenChange, userRole, sh
     <DialogContent className="sm:max-w-4xl max-h-[92dvh]">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-brand-ink" /> Xodimlarning yakunlash vaqti</DialogTitle>
-        <DialogDescription>Barcha qurilmalardan yuborilgan yakunlash vaqtlari va har bir urinish natijasi.</DialogDescription>
+        <DialogDescription>Server tasdig‘igacha ketgan vaqt internet va navbatdagi kutishni ham o‘z ichiga oladi. Qurilmaga saqlash server tasdig‘i hisoblanmaydi.</DialogDescription>
       </DialogHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-border bg-secondary/30 p-3">
@@ -91,7 +94,7 @@ export default function CheckoutTimingHistory({ open, onOpenChange, userRole, sh
           <table className="w-full min-w-[660px] text-sm">
             <thead className="bg-secondary/60 text-xs text-muted-foreground"><tr>
               <th className="px-3 py-3 text-left font-medium">Xodim va do‘kon</th>
-              <th className="px-3 py-3 text-left font-medium">Yakunlash vaqti</th>
+              <th className="px-3 py-3 text-left font-medium">Server tasdig‘igacha</th>
               <th className="px-3 py-3 text-left font-medium">Natija</th>
               <th className="px-3 py-3 text-left font-medium">Qabul vaqti</th>
             </tr></thead>
