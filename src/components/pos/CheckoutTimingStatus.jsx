@@ -4,13 +4,14 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 export default function CheckoutTimingStatus({ timing, pending, userRole, onOpenHistory }) {
   if (userRole !== 'admin') return null;
   const outcomes = {
-    confirmed: ['Yakunlash', 'Savdo saqlandi.'],
-    rechecked: ['Qayta tekshirish', 'Saqlangan savdo tasdiqlandi.'],
+    confirmed: ['Server tasdig‘i', 'Savdo va qoldiq hisobi tasdiqlandi.'],
+    rechecked: ['Server tasdig‘i', 'Saqlangan savdo va qoldiq hisobi tasdiqlandi.'],
     queued: ['Qurilmaga saqlash', 'Server tasdig‘i kutilmoqda.'],
     unconfirmed: ['Yakunlash tasdiqlanmadi', 'Savdo holatini tekshiring.'],
   };
   const result = outcomes[timing?.outcome];
-  const measured = !pending && result && Number.isFinite(timing?.totalMs);
+  const confirmed = ['confirmed', 'rechecked'].includes(timing?.outcome);
+  const measured = !pending && confirmed && timing.durationKnown !== false && Number.isFinite(timing?.totalMs);
 
   return (
     <div role="status" aria-live="polite" aria-atomic="true"
@@ -24,7 +25,11 @@ export default function CheckoutTimingStatus({ timing, pending, userRole, onOpen
         </time>}
         {timing.persisted === false && <span className="text-muted-foreground">Vaqt faqat shu oynada: qurilmaga saqlab bo‘lmadi.</span>}
       </> : <span className="text-muted-foreground">
-        {pending ? 'Yakunlash vaqti o‘lchanmoqda…' : 'Yakunlashdan so‘ng vaqt shu yerda ko‘rinadi.'}
+        {pending || timing?.outcome === 'queued'
+          ? 'Server tasdig‘i kutilmoqda. Tasdiq kelganda haqiqiy vaqt ko‘rinadi.'
+          : confirmed ? 'Server tasdiqladi. Bu savdoning aniq vaqti o‘lchanmagan.'
+            : timing?.outcome === 'unconfirmed' ? 'Savdo holatini tekshiring. Server tasdig‘i hali olinmadi.'
+              : 'Savdodan so‘ng server tasdig‘igacha ketgan vaqt shu yerda ko‘rinadi.'}
       </span>}
       {onOpenHistory && <button type="button" onClick={onOpenHistory}
         className="ml-auto min-h-9 rounded-lg border border-border px-3 py-1.5 font-medium touch-manipulation hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-olive">
