@@ -271,7 +271,7 @@ function createDraftRelay({ owner, key, enabled = () => false, deliveryEnabled =
 
 // single-writer/draft-extension.ts
 var DRAFT_REVISION = "owner-draft-isolated-v1";
-var DRAFT_FLAGS = { ingress: false, relay: true, delivery: false };
+var DRAFT_FLAGS = { ingress: false, relay: true, delivery: true };
 var ownerStateId = "6ac41c139d2eedd404aac7ff";
 async function currentOwner(service) {
   if (secrets.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") !== draft_owner_default.telegramId) throw Error("configured_owner_changed");
