@@ -82,7 +82,6 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
   const valid = Number(amount) > 0
     && retryShiftMatches
     && (retryPending || Number(amount) <= Number(shift?.expected_cash || 0))
-    && reason.trim()
     && (!recipientRequired || (recipientId && (retryPending || (!dataLoading && !dataError && Number(amount) <= selectedDebt))))
     && (!ownerPinRequired || /^\d{4,8}$/.test(ownerPin))
     && (!ownerRequired || ownerName);
@@ -180,8 +179,8 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
             <Input disabled={loading || retryPending} autoFocus type="number" min="1" max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" className="h-11 rounded-xl" />
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Izoh / sabab</Label>
-            <Textarea disabled={loading || retryPending} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Pul nima uchun berildi?" rows={2} />
+            <Label className="text-xs mb-1.5 block">Izoh / sabab (ixtiyoriy)</Label>
+            <Textarea disabled={loading || retryPending} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Istasangiz, sababini yozing" rows={2} />
           </div>
           <div className="rounded-xl bg-muted/60 px-3 py-2.5">
             <p className="text-xs text-muted-foreground">Operatsiyani bajarayotgan xodim</p>
