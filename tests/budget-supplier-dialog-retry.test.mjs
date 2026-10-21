@@ -95,6 +95,29 @@ test('warehouse supplier history keeps balances and receipt navigation without i
   await act(async () => { tree.unmount(); });
 });
 
+test('cash withdrawal can submit without a reason and preserves an optional entered note', async () => {
+  const calls = [];
+  const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, {
+    open: true, shift: { id: 'shift', expected_cash: 100000 }, user: { id: 'cashier', role: 'cashier' },
+    onClose: () => {}, onConfirm: payload => calls.push(payload), loading: false,
+  })); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true);
+  await act(async () => { enter(input(tree, 'number'), '20000'); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, false);
+  await act(async () => { submit(tree); });
+  assert.equal(calls[0].amount, 20000); assert.equal(calls[0].reason, '');
+  await act(async () => { enter(tree.root.findByType('textarea'), '   '); submit(tree); });
+  assert.equal(calls[1].reason, '');
+  await act(async () => { enter(tree.root.findByType('textarea'), '  Transport xarajati  '); });
+  await act(async () => { submit(tree); });
+  assert.equal(calls[2].reason, 'Transport xarajati');
+  await act(async () => { enter(input(tree, 'number'), '100001'); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true);
+  await act(async () => { tree.unmount(); });
+});
+
 test('actual cash dialog restores a pending supplier intent without applying current cash/debt limits', async () => {
   const calls = [];
   const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
