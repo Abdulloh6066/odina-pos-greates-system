@@ -281,15 +281,17 @@ function privateOwner(update, owner) {
   }
 }
 function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl = fetch }) {
+  draftTrace("forward_url_start");
   const target = new URL(url);
   if (target.protocol !== "https:" || target.username || target.password || target.hash) throw Error("https_endpoint_required");
+  draftTrace("forward_url_valid");
   return async (value) => {
     if (!enabled()) throw Error("disabled");
-    const response = await fetchImpl(target.href, {
-      ...signDraftRequest({ key: key(), purpose, value }),
-      redirect: "error",
-      signal: AbortSignal.timeout(5e3)
-    });
+    const signedRequest = signDraftRequest({ key: key(), purpose, value });
+    draftTrace("forward_signed");
+    const requestOptions = { ...signedRequest, redirect: "error", signal: AbortSignal.timeout(5e3) };
+    draftTrace("forward_fetch_start");
+    const response = await fetchImpl(target.href, requestOptions);
     draftTrace("forward_http", null, response.status);
     if (!response.ok) throw Error("transport_failed");
     return response.json();
@@ -337,7 +339,7 @@ function draftTrace(stage, error = null, status = null) {
   const safeNames = ["Error", "TypeError", "ReferenceError", "SyntaxError", "AbortError", "TimeoutError"];
   try {
     console.info(JSON.stringify({
-      diagnostic: "owner-draft-stage-v1",
+      diagnostic: "owner-draft-stage-v2",
       stage,
       ...(safeCodes.includes(error?.message) ? { code: error.message } : {}),
       ...(safeNames.includes(error?.name) ? { errorType: error.name } : {}),
@@ -1989,7 +1991,7 @@ async function ingress_default(req) {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v1" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v2" } });
     draftTrace("webhook_auth_ok");
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
     diagnosticStage = "webhook_config";
