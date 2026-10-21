@@ -68,8 +68,7 @@
     "user_id",
     "employee_name",
     "type",
-    "amount",
-    "reason"
+    "amount"
   ],
   "rls": {
     "create": {
