@@ -34,6 +34,10 @@ Savdo, to‘lov, smena, ombor, narx, retsept, buyurtma va hisobot logikasi; `ima
 - `npm run build` — exit 0.
 - `pos-thumbnails` funksiyasi bo‘sh payload bilan 400 «Mahsulot tanlanmadi.» — validatsiya ishlaydi (yozuv bajarilmadi).
 
+## Tuzatish (2026-10-22, kech)
+
+- `src/lib/pos-thumbnail-tool.js` 77-qator: asl rasm `cache: 'force-cache'` → `cache: 'no-store'` (`mode: 'cors'`, `credentials: 'omit'` o‘zgarmadi) — nashr etilgan saytda 127 rasmning 114 tasi CORS bilan yiqilgan edi.
+
 ## Eslatma
 
 `UploadFile` bilan saqlangan kichik rasmlar doimiy ommaviy havolada (stored publicly — havolasi bor har kim ocha oladi). Bu kassa tezligi uchun tanlangan: asl rasmlar ham shu turdagi havolalarda.

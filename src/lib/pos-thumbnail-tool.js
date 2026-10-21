@@ -74,7 +74,7 @@ export async function optimizePosThumbnail(product, deps = {}) {
   if (!isHttpImageUrl(source)) throw new Error('Rasm manzili http(s) emas.');
 
   const fetchImpl = deps.fetchImpl || fetch;
-  const response = await fetchImpl(source, { mode: 'cors', credentials: 'omit', cache: 'force-cache' });
+  const response = await fetchImpl(source, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
   if (!response?.ok) throw new Error(`Asl rasm yuklanmadi (${response?.status || 'xato'}).`);
   const original = await response.blob();
   if (!String(original?.type || '').startsWith('image/')) throw new Error('Fayl rasm emas.');
