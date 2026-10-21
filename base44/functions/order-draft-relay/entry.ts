@@ -261,8 +261,9 @@ function createDraftRelay({ owner, key, enabled = () => false, deliveryEnabled =
       return new Response("Invalid reply", { status: 400 });
     if (!deliveryEnabled()) return new Response("Disabled", { status: 503 });
     try {
-      await sendReply(owner.telegramId, r);
-      return Response.json({ acknowledged: true });
+      const messageId = await sendReply(owner.telegramId, r);
+      if (!Number.isSafeInteger(messageId) || messageId <= 0) throw Error("receipt_invalid");
+      return Response.json({ acknowledged: true, recipient: owner.telegramId, messageId });
     } catch {
       return new Response("Outcome unknown", { status: 502 });
     }
@@ -303,6 +304,7 @@ async function relay(req) {
       }).sendReply(id, response2)
     })(req);
     response.headers.set("x-odina-draft-revision", DRAFT_REVISION);
+    response.headers.set("x-odina-draft-receipt", "owner-receipt-v1");
     return response;
   } catch {
     return new Response("Unavailable", { status: 503 });
