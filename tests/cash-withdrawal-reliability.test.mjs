@@ -12,6 +12,28 @@ const make = () => memoryBackend({
 const body = (amount = 20000, key = 'withdrawal-test-one') => ({ action: 'cash_withdrawal', shift_id: 'shift',
   amount, reason: 'Mock expense', expense_category: 'shop_expense', idempotency_key: key });
 
+test('withdrawal reason may be omitted, blank or whitespace, while supplied notes are preserved and replays debit once', async () => {
+  for (const [reason, expected] of [[undefined, ''], ['', ''], ['   ', ''], ['  Transport xarajati  ', 'Transport xarajati']]) {
+    const f = make();
+    const request = { ...body(), reason };
+    const result = await f.invoke(file, request);
+    assert.equal(result.status, 200, JSON.stringify(result));
+    assert.equal(f.db.CashMovement[0].reason, expected);
+    assert.equal(f.db.Shift[0].expected_cash, 80000);
+    const replay = await f.invoke(file, { ...request, reason: expected });
+    assert.equal(replay.status, 200); assert.equal(replay.data.already_processed, true);
+    assert.equal(f.db.CashMovement.length, 1); assert.equal(f.db.Shift[0].expected_cash, 80000);
+  }
+});
+
+test('an optional blank reason cannot bypass amount, category or available cash validation', async () => {
+  const f = make();
+  assert.equal((await f.invoke(file, { ...body(0), reason: '' })).status, 400);
+  assert.equal((await f.invoke(file, { ...body(), reason: '', expense_category: 'invalid' })).status, 400);
+  assert.equal((await f.invoke(file, { ...body(100001), reason: '' })).status, 409);
+  assert.equal(f.db.CashMovement.length, 0); assert.equal(f.db.Shift[0].expected_cash, 100000);
+});
+
 test('two overlapping withdrawals preserve both debits and the complete ledger', async () => {
   const f = make();
   const results = await Promise.all([f.invoke(file, body(20000, 'first-request')), f.invoke(file, body(30000, 'second-request'))]);
