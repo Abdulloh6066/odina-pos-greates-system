@@ -291,7 +291,13 @@ function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl
     draftTrace("forward_signed");
     const requestOptions = { ...signedRequest, redirect: "error", signal: AbortSignal.timeout(5e3) };
     draftTrace("forward_fetch_start");
-    const response = await fetchImpl(target.href, requestOptions);
+    let response;
+    try {
+      response = await fetchImpl(target.href, requestOptions);
+    } catch (error) {
+      draftFetchFailure(error, target, requestOptions);
+      throw error;
+    }
     draftTrace("forward_http", null, response.status);
     if (!response.ok) throw Error("transport_failed");
     return response.json();
@@ -334,12 +340,54 @@ async function currentOwner(service) {
   if (user.owner_shop_choices?.length !== 2 || user.active !== true) throw Error("owner_disabled");
   return { ...draft_owner_default, active: true, isOwner: user.is_owner === true };
 }
+function draftFetchFailure(error, target, options) {
+  try {
+    const codes = ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH", "EACCES", "EPERM", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID", "DEPTH_ZERO_SELF_SIGNED_CERT", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET", "ERR_INVALID_ARG_TYPE", "ERR_INVALID_CHAR", "ERR_INVALID_URL"];
+    const names = ["Error", "TypeError", "AbortError", "TimeoutError", "NotCapable", "PermissionDenied", "InvalidData", "BadResource", "Http", "ConnectionRefused", "ConnectionReset", "TimedOut"];
+    const chain = [];
+    let item = error;
+    for (let i = 0; i < 3 && item; i++) {
+      chain.push(item);
+      item = typeof item === "object" ? item.cause : null;
+    }
+    const knownCode = chain.map((item) => item?.code).find((code) => codes.includes(code)) || null;
+    const safeName = names.includes(error?.name) ? error.name : "Other";
+    const causeType = names.includes(error?.cause?.name) ? error.cause.name : null;
+    const detail = chain.map((item) => typeof item === "string" ? item : [item?.name, item?.code, item?.message].filter((value) => typeof value === "string").join(" ")).join(" ").toLowerCase();
+    let category = "unclassified_fetch_failure";
+    if (/enotfound|eai_again|dns|failed to lookup|name or service not known|name resolution/.test(detail)) category = "dns";
+    else if (/certificate|cert_has_expired|err_tls|self.signed|unknown issuer|tls|ssl|handshake/.test(detail)) category = "tls";
+    else if (/redirect/.test(detail)) category = "redirect";
+    else if (/notcapable|permissiondenied|permission denied|eacces|eperm|network access.*denied|egress.*denied|not allowed to.*fetch/.test(detail)) category = "network_permission";
+    else if (/invalid receiver|illegal invocation|incompatible receiver/.test(detail)) category = "invalid_receiver";
+    else if (/header.*invalid|invalid.*header|err_invalid_char|bytestring/.test(detail)) category = "invalid_header";
+    else if (/body.*used|body.*consumed|body.*unusable|duplex|readablestream|invalid.*body/.test(detail)) category = "invalid_body";
+    else if (/invalid url|err_invalid_url/.test(detail)) category = "invalid_url";
+    else if (/signal.*invalid|invalid.*signal|expected.*abortsignal|err_invalid_arg_type|invalid.*argument/.test(detail)) category = "invalid_request_option";
+    else if (/timeouterror|timedout|etimedout|connect_timeout|timed out/.test(detail)) category = "timeout";
+    else if (/aborterror|aborted/.test(detail)) category = "aborted";
+    else if (/econnrefused|connectionrefused|connection refused/.test(detail)) category = "connection_refused";
+    else if (/econnreset|connectionreset|connection reset|und_err_socket|broken pipe|connection closed/.test(detail)) category = "connection_reset";
+    else if (/ehostunreach|enetunreach|unreachable/.test(detail)) category = "network_unreachable";
+    else if (/fetch failed|failed to fetch|network request failed|error sending request|connection|network/.test(detail)) category = "network_other";
+    console.info(JSON.stringify({
+      diagnostic: "owner-draft-stage-v3",
+      stage: "forward_fetch_failure_detail",
+      category,
+      errorType: safeName,
+      causeType,
+      knownCode,
+      targetMatchesExpected: target.href === "https://deserve-animals-atmospheric-requirement.trycloudflare.com/draft",
+      requestShapeValid: options.method === "POST" && typeof options.body === "string" && Object.entries(options.headers).every(([key, value]) => typeof value === "string" && [...key, ...value].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) <= 126)) && options.signal instanceof AbortSignal
+    }));
+  } catch {}
+}
 function draftTrace(stage, error = null, status = null) {
   const safeCodes = ["configured_owner_changed", "owner_activation_changed", "owner_binding_changed", "owner_disabled", "control", "transport_key_required", "https_endpoint_required", "transport_failed", "disabled"];
   const safeNames = ["Error", "TypeError", "ReferenceError", "SyntaxError", "AbortError", "TimeoutError"];
   try {
     console.info(JSON.stringify({
-      diagnostic: "owner-draft-stage-v2",
+      diagnostic: "owner-draft-stage-v3",
       stage,
       ...(safeCodes.includes(error?.message) ? { code: error.message } : {}),
       ...(safeNames.includes(error?.name) ? { errorType: error.name } : {}),
@@ -1991,7 +2039,7 @@ async function ingress_default(req) {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v2" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v3" } });
     draftTrace("webhook_auth_ok");
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
     diagnosticStage = "webhook_config";
