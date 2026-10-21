@@ -12,6 +12,8 @@ export default function useCheckoutTiming(userId, shopId, shiftId) {
   const owner = useRef({});
   const mounted = useRef(true);
   const [saved, setSaved] = useState(() => readCheckoutTiming(scope));
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
 
   useEffect(() => {
     mounted.current = true;
@@ -19,13 +21,23 @@ export default function useCheckoutTiming(userId, shopId, shiftId) {
     return () => { mounted.current = false; };
   }, [scope]);
 
-  useEffect(() => { setSaved(readCheckoutTiming(scope)); }, [scope]);
+  useEffect(() => {
+    savedRef.current = readCheckoutTiming(scope);
+    setSaved(savedRef.current);
+  }, [scope]);
 
   const recordTiming = useCallback(measurement => {
     // A request may finish after the cashier changes user/shop/shift or leaves.
     // Its old callback must not overwrite the new scope's local last result.
     if (!scope || activeScope.current !== scope || latestOwners.get(scope.userId) !== owner.current) return null;
+    const current = savedRef.current;
+    // Late confirmation updates its own attempt, never the next customer's.
+    if (measurement?.onlyIfCurrent && current?.requestKey !== measurement.requestKey) return null;
+    if (measurement?.requestKey && current?.requestKey === measurement.requestKey
+      && ['confirmed', 'rechecked'].includes(current.outcome)
+      && !['confirmed', 'rechecked'].includes(measurement.outcome)) return current;
     const next = saveCheckoutTiming(scope, measurement);
+    if (next) savedRef.current = next;
     if (next && mounted.current && activeScope.current === scope) setSaved(next);
     return next;
   }, [scope]);
