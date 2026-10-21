@@ -290,6 +290,7 @@ function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl
       redirect: "error",
       signal: AbortSignal.timeout(5e3)
     });
+    draftTrace("forward_http", null, response.status);
     if (!response.ok) throw Error("transport_failed");
     return response.json();
   };
@@ -297,17 +298,20 @@ function createDraftClient({ url, key, purpose, enabled = () => false, fetchImpl
 function createDraftDispatch({ owner, enabled = () => false, readOwner, forward }) {
   return async (update, legacy) => {
     if (!isDraft(update)) return legacy();
-    if (!enabled()) return new Response("Draft disabled", { status: 200 });
-    if (!privateOwner(update, owner) || !ownerMatches(await readOwner(), owner)) return new Response("Forbidden", { status: 403 });
+    if (!enabled()) { draftTrace("draft_disabled", null, 200); return new Response("Draft disabled", { status: 200 }); }
+    if (!privateOwner(update, owner) || !ownerMatches(await readOwner(), owner)) { draftTrace("owner_rejected", null, 403); return new Response("Forbidden", { status: 403 }); }
     const clean = structuredClone(update);
     if (clean.message) {
       for (const field of ["text", "caption"]) if (typeof clean.message[field] === "string")
         clean.message[field] = clean.message[field].replace(/^\/draft@odina_buyurtmalar_bot(?=\s|$)/u, "/draft");
     }
     try {
+      draftTrace("forward_start");
       await forward(clean);
+      draftTrace("forward_ok", null, 200);
       return new Response("OK");
-    } catch {
+    } catch (error) {
+      draftTrace("forward_failed", error, 503);
       return new Response("Draft unavailable", { status: 503 });
     }
   };
@@ -328,9 +332,23 @@ async function currentOwner(service) {
   if (user.owner_shop_choices?.length !== 2 || user.active !== true) throw Error("owner_disabled");
   return { ...draft_owner_default, active: true, isOwner: user.is_owner === true };
 }
+function draftTrace(stage, error = null, status = null) {
+  const safeCodes = ["configured_owner_changed", "owner_activation_changed", "owner_binding_changed", "owner_disabled", "control", "transport_key_required", "https_endpoint_required", "transport_failed", "disabled"];
+  const safeNames = ["Error", "TypeError", "ReferenceError", "SyntaxError", "AbortError", "TimeoutError"];
+  try {
+    console.info(JSON.stringify({
+      diagnostic: "owner-draft-stage-v1",
+      stage,
+      ...(safeCodes.includes(error?.message) ? { code: error.message } : {}),
+      ...(safeNames.includes(error?.name) ? { errorType: error.name } : {}),
+      ...(Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : {})
+    }));
+  } catch {}
+}
 async function maybeDraft(req, service) {
+  draftTrace("body_read_start");
   const reader = req.clone().body?.getReader();
-  if (!reader) return null;
+  if (!reader) { draftTrace("body_missing"); return null; }
   const chunks = [];
   let size = 0;
   try {
@@ -340,11 +358,13 @@ async function maybeDraft(req, service) {
       size += part.value.length;
       if (size > 32768) {
         void reader.cancel();
+        draftTrace("body_oversize");
         return null;
       }
       chunks.push(Buffer.from(part.value));
     }
-  } catch {
+  } catch (error) {
+    draftTrace("body_read_failed", error);
     return null;
   } finally {
     reader.releaseLock();
@@ -352,13 +372,19 @@ async function maybeDraft(req, service) {
   let update;
   try {
     update = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
+  } catch (error) {
+    draftTrace("body_parse_failed", error);
     return null;
   }
+  draftTrace(isDraft(update) ? "draft_recognized" : "legacy_route");
   const response = await createDraftDispatch({
     owner: draft_owner_default,
     enabled: () => DRAFT_FLAGS.ingress,
-    readOwner: () => currentOwner(service),
+    readOwner: async () => {
+      draftTrace("owner_read_start");
+      try { const owner = await currentOwner(service); draftTrace("owner_read_ok"); return owner; }
+      catch (error) { draftTrace("owner_read_failed", error); throw error; }
+    },
     forward: (value) => createDraftClient({
       url: secrets.get("ODINA_DRAFT_WORKER_URL") || "",
       key: () => secrets.get("ODINA_DRAFT_INGRESS_KEY") || "",
@@ -1957,21 +1983,33 @@ function prepareHostedOrderBot({ service, canonicalIds = {}, approvedPhotoHosts 
 
 // ../odina-editor-baseline-2026-10-20/base44/functions/telegram-order-webhook/ingress.ts
 async function ingress_default(req) {
+  let diagnosticStage = "webhook_auth";
+  draftTrace("webhook_received");
   try {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-header-probe-v1" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-stage-v1" } });
+    draftTrace("webhook_auth_ok");
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
+    diagnosticStage = "webhook_config";
     const ownerId = secrets2.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") || "";
     const token = secrets2.get("ODINA_ORDER_BOT_TOKEN") || "";
     if (!/^[1-9]\d*$/.test(ownerId) || !Number.isSafeInteger(Number(ownerId)) || !/^\d+:[A-Za-z0-9_-]+$/.test(token)) return new Response("Sozlamalar tekshirilsin.", { status: 503 });
+    diagnosticStage = "webhook_client";
     const client = createClientFromRequest2(req), service = client.asServiceRole;
+    diagnosticStage = "webhook_control";
+    draftTrace("control_read_start");
     const control = await controlRow(service.entities.TelegramOrderBotState);
+    diagnosticStage = "webhook_control_parse";
     const state = JSON.parse(control.payload_json);
-    if (control.phase !== "complete" || state.probe?.passed !== true || !state.ownerStateId || state.activation !== "active") return new Response("Bot hali yoqilmagan.", { status: 503 });
+    if (control.phase !== "complete" || state.probe?.passed !== true || !state.ownerStateId || state.activation !== "active") { draftTrace("activation_rejected", null, 503); return new Response("Bot hali yoqilmagan.", { status: 503 }); }
+    draftTrace("activation_ok");
+    diagnosticStage = "webhook_draft";
     const draftResponse = await maybeDraft(req, service);
-    if (draftResponse) return draftResponse;
+    if (draftResponse) { draftTrace("draft_response", null, draftResponse.status); return draftResponse; }
+    diagnosticStage = "webhook_legacy";
+    draftTrace("legacy_start");
     return await prepareHostedOrderBot({
       service,
       canonicalIds: { [ownerId]: state.ownerStateId },
@@ -1984,7 +2022,8 @@ async function ingress_default(req) {
       submissionEnabled: true,
       atomicVerified: true
     }).handler(req);
-  } catch {
+  } catch (error) {
+    draftTrace(diagnosticStage, error, 503);
     return new Response("So\u2018rov yakunlanmadi.", { status: 503 });
   }
 }
