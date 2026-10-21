@@ -104,7 +104,9 @@ test('lost acknowledgment retries the real server handler without creating a sec
     Shift: [{ id: 'shift', user_id: 'cashier', shop_id: 'shop', shop_name: 'Shop', status: 'open', opened_at: '2026-10-12T06:00:00Z',
       expected_cash: 0, total_sales: 0, order_count: 0, sale_request_keys: [] }],
     Shop: [{ id: 'shop', name: 'Shop', active: true, location_type: 'shop', allows_pos: true }],
-    Product: [{ id: 'cake', name: 'Cake', active: true, track_stock: false, price: 1000 }], Settings: [{ allow_negative_stock: false }],
+    Product: [{ id: 'cake', name: 'Cake', active: true, source_type: 'central_produced', track_stock: true, price: 1000 }],
+    ProductStock: [{ id: 'cake-stock', product_id: 'cake', product_name: 'Cake', location_id: 'shop', unit: 'piece', quantity: 10 }],
+    Settings: [{ allow_negative_stock: false }],
     Sale: [], SaleItem: [], Payment: [], StockMovement: [], ActionHistory: [] }, { now: '2026-10-13T07:00:00Z' });
   const q = memoryQueue([record(0)]); let first = true;
   const send = async request => { const reply = await f.invoke('base44/functions/complete-sale/entry.ts', request);
@@ -116,6 +118,8 @@ test('lost acknowledgment retries the real server handler without creating a sec
   const result = await run({ retryFailed: true });
   assert.equal(result.synced, 1, JSON.stringify(result)); assert.equal(q.rows().length, 0);
   assert.equal(f.db.Sale.length, 1); assert.equal(f.db.Payment.length, 1); assert.equal(f.db.SaleItem.length, 1);
+  assert.equal(f.db.ProductStock[0].quantity, 9, 'lost acknowledgment and replay deduct stock exactly once');
+  assert.equal(f.db.StockMovement.filter(row => row.movement_type === 'sale').length, 1);
   assert.equal(f.db.Shift[0].order_count, 1); assert.equal(f.db.Shift[0].expected_cash, 1000);
   assert.equal(f.db.Sale[0].business_date, '2026-10-12', 'upload day cannot change the original business day');
 });
@@ -197,7 +201,10 @@ function declaration(source, name) {
 }
 function checkout({ pending = [], syncing = false, online = true, ...flags } = {}) {
   const alerts = [], requests = [], saved = [], printed = []; const gate = deferred();
-  const ctx = { selectedTable: null, takeawayOrder: null, takeawayRequestIdRef: { current: '' }, tableSelectionError: '', tableShop: null,
+  const ctx = { posScopeReadOnly: false,
+    POS_CHECKOUT_RESPONSE_BUDGET_MS: offline.POS_CHECKOUT_RESPONSE_BUDGET_MS,
+    POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS: offline.POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS,
+    selectedTable: null, takeawayOrder: null, takeawayRequestIdRef: { current: '' }, tableSelectionError: '', tableShop: null,
     shift: { id: 'shift', shop_id: 'shop' }, user: { id: 'cashier' }, shiftReadState: 'ready',
     cart: [{ product_id: 'cake', product_name: 'Cake', price: 1000, quantity: 1, subtotal: 1000 }], subtotal: 1000, total: 1000,
     payOpen: false, paying: false, isDelivery: false, discountPct: 0, stockChecking: false, offlineSyncing: syncing, tableLocked: false,
@@ -291,7 +298,7 @@ test('the actual POS checkout preserves its delivery marker in both the offline 
 test('unknown local storage state cannot be mistaken for an empty queue when closing a shift', async () => {
   const alerts = [], calls = [];
   const source = readFileSync('src/pages/POS.jsx', 'utf8');
-  const ctx = { offlineStorageError: 'Read failed', isOnline: true, navigator: { onLine: true },
+  const ctx = { posScopeReadOnly: false, offlineStorageError: 'Read failed', isOnline: true, navigator: { onLine: true },
     closingShiftRef: { current: false }, shiftToClose: { id: 'shift' }, offlineSales: [],
     odinaAlert: async message => alerts.push(message), base44: { functions: { invoke: async () => calls.push('write') } } };
   vm.runInNewContext(declaration(source, 'requestCloseShift') + '\n' + declaration(source, 'closeShift') + '\nglobalThis.api={requestCloseShift, closeShift};', ctx);
