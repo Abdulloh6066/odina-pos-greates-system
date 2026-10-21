@@ -846,8 +846,8 @@ export default async function(req) {
       const allowedCategories = new Set(["shop_expense", "goods_payment", "owner_withdrawal", "other_expense"]);
       const employeeName = user.full_name || user.email || "Noma’lum xodim";
 
-      if (!shiftId || !Number.isSafeInteger(amount) || amount <= 0 || !reason || !allowedCategories.has(expenseCategory)) {
-        return Response.json({ error: "Miqdor, chiqim turi va izoh majburiy." }, { status: 400 });
+      if (!shiftId || !Number.isSafeInteger(amount) || amount <= 0 || !allowedCategories.has(expenseCategory)) {
+        return Response.json({ error: "Miqdor va chiqim turi majburiy." }, { status: 400 });
       }
 
       let recipientName = "";
