@@ -1961,7 +1961,7 @@ async function ingress_default(req) {
     const secret = secrets2.get("ODINA_ORDER_BOT_WEBHOOK_SECRET") || "";
     const supplied = req.headers.get("x-telegram-bot-api-secret-token") || "";
     const a = new TextEncoder().encode(secret), b = new TextEncoder().encode(supplied);
-    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8" } });
+    if (!a.length || a.length !== b.length || !timingSafeEqual3(a, b)) return new Response("Ruxsat yo\u2018q. (order-intake-v8)", { status: 403, headers: { "x-odina-order-revision": "order-intake-v8", "x-odina-draft-build": "owner-draft-header-probe-v1" } });
     if (req.method !== "POST") return new Response("Amal noto\u2018g\u2018ri.", { status: 405 });
     const ownerId = secrets2.get("ODINA_ORDER_BOT_OWNER_TELEGRAM_ID") || "";
     const token = secrets2.get("ODINA_ORDER_BOT_TOKEN") || "";
