@@ -10,7 +10,7 @@ import useCheckoutTimingHistory, { checkoutTimingRecordKey } from '@/hooks/useCh
 const OUTCOMES = {
   confirmed: { label: 'Savdo tasdiqlandi', className: 'bg-emerald-50 text-emerald-800' },
   rechecked: { label: 'Qayta tekshirib tasdiqlandi', className: 'bg-emerald-50 text-emerald-800' },
-  queued: { label: 'Server tasdig‘i kutilmoqda', className: 'bg-amber-50 text-amber-900' },
+  queued: { label: 'Qurilmaga saqlash qaydi', className: 'bg-amber-50 text-amber-900' },
   unconfirmed: { label: 'Yakunlash tasdiqlanmadi', className: 'bg-red-50 text-red-800' },
 };
 const seconds = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0
@@ -24,7 +24,7 @@ function TimingResult({ record }) {
 
 function TimingDuration({ record }) {
   if (!['confirmed', 'rechecked'].includes(record.outcome)) {
-    return <p className="text-xs text-muted-foreground">Server tasdig‘i vaqti hali o‘lchanmagan</p>;
+    return <p className="text-xs text-muted-foreground">Bu qaydda server tasdig‘i vaqti o‘lchanmagan</p>;
   }
   return <div>
     <p className="font-semibold tabular-nums whitespace-nowrap">{seconds(record.total_ms)}</p>
