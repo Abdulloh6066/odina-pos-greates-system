@@ -42,6 +42,7 @@ function fixture(flags = {}) {
     shiftMutationRef: { current: 0 }, shiftReadGenerationRef: { current: 0 }, setShiftReadState: () => {},
     stockUserRef: { current: `cashier-${fixtureId}` }, takeawayRequestIdRef: { current: '' },
     cart: [{ product_id: 'cake', product_name: 'Tort', quantity: 1, subtotal: 1000, price: 1000 }],
+    posScopeReadOnly: false,
     stockChecking: false, discountLoading: false, selectedTable: null, tableCartDirty: false,
     tableOrder: null, takeawayOrder: null, takeawayDirty: false, checkoutOffline: false,
     isDelivery: false, isOnline: true, queueEligible: true,
@@ -164,7 +165,7 @@ test('protected table deadline retains cart/order/key and later acknowledgment c
   const table = { id: 'table-order', revision: 7, state: 'occupied' };
   const f = fixture({ selectedTable: { shopId: 'shop', number: 4 }, tableOrder: table, queueEligible: false });
   const pending = f.completeSale(payments, false);
-  await f.deadline(); await pending;
+  await f.deadline(offline.POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS); await pending;
   assert.equal(f.ctx.paying, false); assert.equal(f.ctx.checkoutRetryPending, true);
   assert.equal(f.ctx.lastCheckoutTiming.outcome, 'unconfirmed');
   assert.equal(f.ctx.cart.length, 1); assert.equal(f.ctx.tableOrder, table);
@@ -185,7 +186,7 @@ test('takeaway, rounding, discount and PIN deadlines require real online acknowl
     { discountPct: 100, discountOwnerPin: '1234' },
   ]) {
     const f = fixture(protectedFlags); const pending = f.completeSale(payments, true);
-    await f.deadline(); await pending;
+    await f.deadline(offline.POS_PROTECTED_CHECKOUT_RESPONSE_BUDGET_MS); await pending;
     assert.equal(f.queued.length, 0); assert.equal(f.receipts.length, 0); assert.equal(f.ctx.cart.length, 1);
     assert.equal(f.ctx.checkoutRetryPending, true); assert.equal(f.ctx.checkoutRequestKeyRef.current, f.key);
     f.network.resolve({ data: f.payload() }); await tick();
