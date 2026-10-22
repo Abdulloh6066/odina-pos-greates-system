@@ -12,6 +12,7 @@ import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { clearOrderRequest, orderRequestScope, readOrderRequest, retainOrderRequest } from '@/lib/order-request-retry';
 import { REQUISITION_UNITS, REQUISITION_STATUSES, requisitionNumber, requisitionReceiptLines, requisitionReceiptTotal, tomorrowRequisitionDate } from '@/lib/ingredient-requisitions';
 import IngredientRequisitionTicket, { IngredientRequisitionTicketContent } from './IngredientRequisitionTicket';
+import SupplierProductsDialog from './SupplierProductsDialog';
 import './ingredient-requisitions.css';
 
 const textError = e => e?.response?.data?.error || e?.data?.error || e?.message || 'Amal bajarilmadi.';
@@ -47,6 +48,7 @@ export default function IngredientRequisitionsPanel({ user, location, adminShopS
   const [selected, setSelected] = useState(null);
   const [values, setValues] = useState({});
   const [supplierId, setSupplierId] = useState('');
+  const [editingSupplier, setEditingSupplier] = useState(null);
   const [paymentState, setPaymentState] = useState('unpaid');
   const [invoiceReference, setInvoiceReference] = useState('');
   const [verified, setVerified] = useState(false);
@@ -138,6 +140,7 @@ export default function IngredientRequisitionsPanel({ user, location, adminShopS
     });
   };
   const receive = async () => execute(async () => {
+    if (!pendingReceipt && (receiptInvalid || !verified)) return;
     try {
       const result = await persistCall(receiptScope, pendingReceipt || { action: 'receive', request_id: selected.id,
         idempotency_key: newKey('ir-receive'), expected_version: selected.version, verified,
@@ -175,10 +178,18 @@ export default function IngredientRequisitionsPanel({ user, location, adminShopS
   const canReceiveNow = receivePermission && !['received', 'cancelled'].includes(selected.status) && !selected.cancellation_pending
     && (selected.source_kind === 'purchase' || selected.approved_by);
   const receivingLocked = busy || Boolean(selected?.pending_receipt || pendingReceipt);
+  const receiptSupplier = catalog.suppliers.find(supplier => supplier.id === supplierId);
+  const supplierIngredientIds = new Set(Array.isArray(receiptSupplier?.supplied_ingredient_ids) ? receiptSupplier.supplied_ingredient_ids : []);
+  const canSupply = item => selected?.source_kind !== 'purchase' || (receiptSupplier && supplierIngredientIds.has(item.ingredient_id) && ingredientMap.has(item.ingredient_id));
+  const receiveItems = selected?.items.filter(canSupply) || [];
+  // A requisition keeps all requested items. Only the new receipt editor is narrowed by supplier.
+  const tableItems = selected && canReceiveNow && !receivingLocked && selected.source_kind === 'purchase' && supplierId
+    ? receiveItems : selected?.items || [];
+  const changeReceiptSupplier = value => { setSupplierId(value); setValues({}); setVerified(false); };
   const selectedLines = selected ? requisitionReceiptLines(selected, values) : [];
   const receiptInvalid = selectedLines.length === 0 || selectedLines.some(line => {
     const item = selected.items.find(row => row.ingredient_id === line.ingredient_id);
-    return Number(line.quantity) > item.remaining_quantity || (item.base_unit === 'piece' && !Number.isInteger(Number(line.quantity)))
+    return !canSupply(item) || Number(line.quantity) > item.remaining_quantity || (item.base_unit === 'piece' && !Number.isInteger(Number(line.quantity)))
       || (selected.source_kind === 'purchase' && !/^\d+$/.test(String(line.unit_price)));
   });
 
@@ -237,11 +248,13 @@ export default function IngredientRequisitionsPanel({ user, location, adminShopS
         {selected.source_kind === 'warehouse' && !selected.approved_by && selected.status !== 'cancelled' && <div className="ir-warning">Markaziy ombor mas’uli shu talabni tasdiqlashi kerak. {selected.source_location_id === location.id && catalog.can_purchase_receive && <Button type="button" disabled={busy} onClick={() => approve(selected)}>Ombor nomidan tasdiqlash</Button>}</div>}
         {selected.approved_by && <p className="ir-muted">Ombor tasdig‘i: {selected.approved_by_name} · {formatUzbekistanDateTime(selected.approved_at)}</p>}
         {selected.cancellation_pending && <p className="ir-warning">Oldingi kirim bekor qilinmoqda. Qabul qilishdan oldin tugashini kuting.</p>}
-        <div className="ir-table-scroll"><table className="ir-data-table"><thead><tr><th>Mahsulot</th><th>So‘ralgan</th><th>Qabul qilingan</th><th>Qolgan</th>{canReceiveNow && <><th>Hozir kelgan</th>{selected.source_kind === 'purchase' && <th>1 birlik narxi</th>}</>}</tr></thead><tbody>{selected.items.map(item => <tr key={item.ingredient_id}><td className="font-medium">{item.ingredient_name}<div className="ir-muted">{REQUISITION_UNITS[item.purchase_unit]}</div></td><td>{requisitionNumber(item.requested_quantity)}</td><td>{requisitionNumber(item.received_quantity)}</td><td>{requisitionNumber(item.remaining_quantity)}</td>{canReceiveNow && <><td><Input disabled={receivingLocked || item.remaining_quantity === 0} aria-label={`${item.ingredient_name}: kelgan miqdor`} type="number" min={0} max={item.remaining_quantity} step={item.base_unit === 'piece' ? 1 : 0.001} value={values[item.ingredient_id]?.quantity ?? ''} placeholder="0" onChange={e => setValues(previous => ({ ...previous, [item.ingredient_id]: { ...previous[item.ingredient_id], quantity: e.target.value } }))} /></td>{selected.source_kind === 'purchase' && <td><Input disabled={receivingLocked || item.remaining_quantity === 0} aria-label={`${item.ingredient_name}: birlik narxi`} type="number" min={0} max={1000000000} step={1} value={values[item.ingredient_id]?.unit_price ?? ''} placeholder="so‘m" onChange={e => setValues(previous => ({ ...previous, [item.ingredient_id]: { ...previous[item.ingredient_id], unit_price: e.target.value } }))} /></td>}</>}</tr>)}</tbody></table></div>
-        {canReceiveNow && !selected.pending_receipt && <><Button type="button" variant="outline" disabled={receivingLocked} onClick={() => { setValues(previous => Object.fromEntries(selected.items.map(item => [item.ingredient_id, { ...previous[item.ingredient_id], quantity: item.remaining_quantity > 0 ? String(item.remaining_quantity) : '' }]))); setVerified(false); }}>Hammasi so‘ralgandek keldi</Button>
-          {selected.source_kind === 'purchase' && <fieldset disabled={receivingLocked} className="space-y-3"><div className="ir-form-grid"><label className="ir-field">Yetkazib beruvchi<OdinaSelect aria-label="Yetkazib beruvchi" value={supplierId} onChange={e => setSupplierId(e.target.value)}><option value="">Yetkazib beruvchini tanlang</option>{catalog.suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</OdinaSelect></label>
+        <div className="ir-table-scroll"><table className="ir-data-table"><thead><tr><th>Mahsulot</th><th>So‘ralgan</th><th>Qabul qilingan</th><th>Qolgan</th>{canReceiveNow && <><th>Hozir kelgan</th>{selected.source_kind === 'purchase' && <th>1 birlik narxi</th>}</>}</tr></thead><tbody>{tableItems.map(item => <tr key={item.ingredient_id}><td className="font-medium">{item.ingredient_name}<div className="ir-muted">{REQUISITION_UNITS[item.purchase_unit]}</div></td><td>{requisitionNumber(item.requested_quantity)}</td><td>{requisitionNumber(item.received_quantity)}</td><td>{requisitionNumber(item.remaining_quantity)}</td>{canReceiveNow && <><td><Input disabled={receivingLocked || !canSupply(item) || item.remaining_quantity === 0} aria-label={`${item.ingredient_name}: kelgan miqdor`} type="number" min={0} max={item.remaining_quantity} step={item.base_unit === 'piece' ? 1 : 0.001} value={values[item.ingredient_id]?.quantity ?? ''} placeholder="0" onChange={e => setValues(previous => ({ ...previous, [item.ingredient_id]: { ...previous[item.ingredient_id], quantity: e.target.value } }))} /></td>{selected.source_kind === 'purchase' && <td><Input disabled={receivingLocked || !canSupply(item) || item.remaining_quantity === 0} aria-label={`${item.ingredient_name}: birlik narxi`} type="number" min={0} max={1000000000} step={1} value={values[item.ingredient_id]?.unit_price ?? ''} placeholder="so‘m" onChange={e => setValues(previous => ({ ...previous, [item.ingredient_id]: { ...previous[item.ingredient_id], unit_price: e.target.value } }))} /></td>}</>}</tr>)}</tbody></table></div>
+        {canReceiveNow && !selected.pending_receipt && <><Button type="button" variant="outline" disabled={receivingLocked || !receiveItems.length} onClick={() => { setValues(previous => Object.fromEntries(receiveItems.map(item => [item.ingredient_id, { ...previous[item.ingredient_id], quantity: item.remaining_quantity > 0 ? String(item.remaining_quantity) : '' }]))); setVerified(false); }}>Hammasi so‘ralgandek keldi</Button>
+          {selected.source_kind === 'purchase' && <fieldset disabled={receivingLocked} className="space-y-3"><div className="ir-form-grid"><label className="ir-field">Yetkazib beruvchi<OdinaSelect aria-label="Yetkazib beruvchi" value={supplierId} onChange={e => changeReceiptSupplier(e.target.value)}><option value="">Yetkazib beruvchini tanlang</option>{catalog.suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</OdinaSelect></label>
             <label className="ir-field">To‘lov holati<OdinaSelect aria-label="To‘lov holati" value={paymentState} onChange={e => setPaymentState(e.target.value)}><option value="unpaid">To‘lanmagan — qarzga</option><option value="paid_external">Oldin to‘langan</option></OdinaSelect></label></div>
             {!catalog.suppliers.length && <p className="ir-warning">Avval “Qabul qiluvchilar” bo‘limiga yetkazib beruvchini qo‘shing.</p>}
+            <div className="rounded-xl border border-border p-3 space-y-2"><p className="text-sm" role="status">{!receiptSupplier ? 'Qabul qilish uchun yetkazib beruvchini tanlang.' : !receiveItems.length ? 'Bu yetkazib beruvchiga talabnomadagi mahsulotlar biriktirilmagan. Admin ro‘yxatni belgilashi kerak.' : 'Faqat tanlangan yetkazib beruvchining mahsulotlari qabul qilinadi. Qolgan talablar saqlanadi.'}</p>
+              {receiptSupplier && user?.role === 'admin' && <Button type="button" variant="outline" onClick={() => setEditingSupplier(receiptSupplier)}>Mahsulotlarni belgilash</Button>}</div>
             <label className="ir-field">Xarid cheki / hisob raqami (ixtiyoriy)<Input maxLength={200} value={invoiceReference} onChange={e => setInvoiceReference(e.target.value)} /></label>
             <p className="ir-muted">Narxni har bir qatorda ko‘rsatilgan 1 kg, litr yoki dona uchun kiriting. “Oldin to‘langan” tanlovi kassadan yoki budjetdan yana pul yechmaydi.</p>
           </fieldset>}
@@ -259,6 +272,11 @@ export default function IngredientRequisitionsPanel({ user, location, adminShopS
     </DialogContent></Dialog>
 
     <Dialog open={Boolean(preview)} onOpenChange={open => !open && setPreview(null)}><DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>80 mm chek ko‘rinishi</DialogTitle></DialogHeader>{preview && <><div className="ir-ticket-preview"><IngredientRequisitionTicketContent request={preview} /></div><Button type="button" disabled={Boolean(printing)} onClick={() => { setPrinting(preview); setPreview(null); }}><Printer className="w-4 h-4 mr-2" />Chek chiqarish</Button></>}</DialogContent></Dialog>
+    <SupplierProductsDialog supplier={editingSupplier} user={user} onClose={() => setEditingSupplier(null)} onSaved={updated => {
+      setCatalog(previous => ({ ...previous, suppliers: previous.suppliers.map(item => item.id === updated.id ? updated : item) }));
+      setValues({}); setVerified(false); setEditingSupplier(null);
+    }} />
     <IngredientRequisitionTicket request={printing} onAfterPrint={() => setPrinting(null)} onWarning={setError} />
   </section>;
 }
+
