@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SupplierProductsDialog from "./SupplierProductsDialog";
 
 const UNIT_LABELS = { kg: "kg", l: "litr", g: "g", ml: "ml", piece: "dona" };
 const STATUS_LABELS = {
@@ -405,6 +406,7 @@ export default function SupplierLedgerPanel({
 
       <ReceiptDialog
         open={dialogOpen}
+        user={user}
         location={location}
         ingredients={ingredients}
         recipients={recipients}
@@ -820,29 +822,66 @@ function DetailRow({ label, value }) {
   );
 }
 
-function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSaved }) {
+function ReceiptDialog({ open, user, location, ingredients, recipients, onClose, onSaved }) {
   const [supplierId, setSupplierId] = useState("");
   const [invoiceReference, setInvoiceReference] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState([{ ingredient_id: "", purchase_quantity: "", unit_price: "" }]);
   const [saving, setSaving] = useState(false);
+  const [supplierRecords, setSupplierRecords] = useState(recipients);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
+  const [suppliersError, setSuppliersError] = useState("");
+  const [supplierReload, setSupplierReload] = useState(0);
+  const [editingSupplier, setEditingSupplier] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setSuppliersLoading(true);
+    setSuppliersError("");
+    (async () => {
+      const rows = [];
+      const seen = new Set();
+      for (let skip = 0; ; skip += 500) {
+        const page = await base44.entities.CashRecipient.list("id", 500, skip);
+        if (!Array.isArray(page) || page.some(item => !item.id || seen.has(item.id))) {
+          throw new Error("Yetkazib beruvchilar ro‘yxati to‘liq yuklanmadi.");
+        }
+        for (const item of page) { seen.add(item.id); rows.push(item); }
+        if (page.length < 500) break;
+      }
+      if (active) setSupplierRecords(rows);
+    })().catch(error => { if (active) setSuppliersError(errorText(error)); })
+      .finally(() => { if (active) setSuppliersLoading(false); });
+    return () => { active = false; };
+  }, [open, supplierReload]);
 
   useEffect(() => {
     if (open) {
       setSupplierId("");
       setInvoiceReference("");
       setNotes("");
+      setEditingSupplier(null);
       setLines([{ ingredient_id: "", purchase_quantity: "", unit_price: "" }]);
     }
   }, [open]);
 
-  const supplierList = recipients.filter(
+  const supplierList = supplierRecords.filter(
     (recipient) => recipient.active !== false && ["supplier", "company"].includes(recipient.recipient_type),
   );
+  const supplier = supplierList.find(item => item.id === supplierId);
+  const assignedIds = new Set(Array.isArray(supplier?.supplied_ingredient_ids) ? supplier.supplied_ingredient_ids : []);
+  const availableIngredients = !suppliersLoading && !suppliersError && supplier
+    ? ingredients.filter(item => item.active !== false && assignedIds.has(item.id)) : [];
+  const availableIds = new Set(availableIngredients.map(item => item.id));
+  const changeSupplier = value => {
+    setSupplierId(value);
+    setLines([{ ingredient_id: "", purchase_quantity: "", unit_price: "" }]);
+  };
   const lineTotal = (line) => Number(line.purchase_quantity || 0) * Number(line.unit_price || 0);
   const total = lines.reduce((sum, line) => sum + lineTotal(line), 0);
-  const valid = supplierId && location?.id && lines.length > 0 && lines.every((line) =>
-    line.ingredient_id && Number(line.purchase_quantity) > 0 && Number(line.unit_price) >= 0
+  const valid = !suppliersLoading && !suppliersError && supplier && location?.id && lines.length > 0 && lines.every((line) =>
+    availableIds.has(line.ingredient_id) && Number(line.purchase_quantity) > 0 && Number(line.unit_price) >= 0
   ) && total > 0 && new Set(lines.map((line) => line.ingredient_id)).size === lines.length;
 
   const updateLine = (index, key, value) => {
@@ -878,7 +917,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
   };
 
   return (
-    <Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
+    <><Dialog open={open} onOpenChange={(value) => !value && !saving && onClose()}>
       <DialogContent className="warehouse-dialog warehouse-receipt-drawer sm:max-w-2xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Yetkazib beruvchidan yangi kirim</DialogTitle>
@@ -893,7 +932,9 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
               <Label className="text-xs mb-1.5 block">Yetkazib beruvchi</Label>
               <OdinaSelect
                 value={supplierId}
-                onChange={(event) => setSupplierId(event.target.value)}
+                aria-label="Yetkazib beruvchi"
+                disabled={saving || suppliersLoading || Boolean(suppliersError)}
+                onChange={(event) => changeSupplier(event.target.value)}
                 className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
               >
                 <option value="">Ro‘yxatdan tanlang</option>
@@ -901,7 +942,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                   <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                 ))}
               </OdinaSelect>
-              {supplierList.length === 0 && (
+              {!suppliersLoading && !suppliersError && supplierList.length === 0 && (
                 <p className="text-xs text-amber-700 mt-1.5">
                   Egasi avval yetkazib beruvchini ro‘yxatga kiritishi kerak.
                 </p>
@@ -918,9 +959,20 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
             </div>
           </div>
 
+          {suppliersLoading && <p className="text-sm text-muted-foreground" role="status">Yetkazib beruvchilar yuklanmoqda…</p>}
+          {suppliersError && <div className="rounded-xl border border-destructive/30 p-3 text-sm" role="alert">
+            <p>{suppliersError}</p><Button type="button" variant="outline" className="min-h-11 mt-2" onClick={() => setSupplierReload(value => value + 1)}>Qayta yuklash</Button>
+          </div>}
+          {!suppliersLoading && !suppliersError && <div className="rounded-xl border border-border bg-secondary/30 p-3 space-y-2">
+            <p className="text-sm" role="status">{!supplier ? "Avval yetkazib beruvchini tanlang. Faqat uning mahsulotlari ko‘rsatiladi."
+              : availableIngredients.length ? `${supplier.name}: ${availableIngredients.length} ta masalliq yoki qadoq.`
+                : "Bu yetkazib beruvchiga ushbu ombor uchun faol mahsulot biriktirilmagan. Admin ro‘yxatni belgilashi kerak."}</p>
+            {supplier && user?.role === "admin" && <Button type="button" variant="outline" disabled={saving} className="min-h-11 rounded-xl" onClick={() => setEditingSupplier(supplier)}>Mahsulotlarni belgilash</Button>}
+          </div>}
+
           <div className="space-y-3">
             {lines.map((line, index) => {
-              const ingredient = ingredients.find((item) => item.id === line.ingredient_id);
+              const ingredient = availableIngredients.find((item) => item.id === line.ingredient_id);
               return (
                 <div key={index} className="rounded-2xl border border-border bg-secondary/30 p-3">
                   <div className="warehouse-receipt-line grid sm:grid-cols-[1fr_130px_160px_auto] gap-2 items-end">
@@ -928,11 +980,13 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                       <Label className="text-xs mb-1.5 block">Masalliq yoki qadoq</Label>
                       <OdinaSelect
                         value={line.ingredient_id}
+                        aria-label="Masalliq yoki qadoq"
+                        disabled={saving || availableIngredients.length === 0}
                         onChange={(event) => updateLine(index, "ingredient_id", event.target.value)}
                         className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
                       >
                         <option value="">Tanlang</option>
-                        {ingredients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        {availableIngredients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                       </OdinaSelect>
                     </div>
                     <div>
@@ -944,6 +998,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                         min="0.001"
                         step="0.001"
                         value={line.purchase_quantity}
+                        disabled={saving || !availableIds.has(line.ingredient_id)}
                         onChange={(event) => updateLine(index, "purchase_quantity", event.target.value)}
                         placeholder="0"
                         className="h-11 rounded-xl"
@@ -956,6 +1011,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                         min="0"
                         step="1"
                         value={line.unit_price}
+                        disabled={saving || !availableIds.has(line.ingredient_id)}
                         onChange={(event) => updateLine(index, "unit_price", event.target.value)}
                         placeholder="0 UZS"
                         className="h-11 rounded-xl"
@@ -965,7 +1021,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
                       type="button"
                       variant="ghost"
                       size="icon"
-                      disabled={lines.length === 1}
+                      disabled={saving || lines.length === 1}
                       onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}
                       className="h-11 w-11 text-destructive"
                     >
@@ -981,6 +1037,7 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
             <Button
               type="button"
               variant="outline"
+              disabled={saving || availableIngredients.length === 0}
               onClick={() => setLines((current) => [
                 ...current,
                 { ingredient_id: "", purchase_quantity: "", unit_price: "" },
@@ -1024,5 +1081,10 @@ function ReceiptDialog({ open, location, ingredients, recipients, onClose, onSav
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <SupplierProductsDialog supplier={editingSupplier} user={user} onClose={() => setEditingSupplier(null)} onSaved={updated => {
+      setSupplierRecords(current => current.map(item => item.id === updated.id ? updated : item));
+      setLines([{ ingredient_id: "", purchase_quantity: "", unit_price: "" }]);
+      setEditingSupplier(null);
+    }} /></>
   );
 }
