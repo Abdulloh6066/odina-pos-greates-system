@@ -279,4 +279,3 @@ export default function IngredientRequisitionsPanel({ user, location, adminShopS
     <IngredientRequisitionTicket request={printing} onAfterPrint={() => setPrinting(null)} onWarning={setError} />
   </section>;
 }
-
