@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import SupplierProductsDialog from '@/components/warehouse/SupplierProductsDialog';
 
 export default function CashRecipients() {
   const { user } = useOutletContext();
@@ -18,6 +19,7 @@ export default function CashRecipients() {
   const [recipients, setRecipients] = useState([]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
+  const [productsSupplier, setProductsSupplier] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -84,6 +86,10 @@ export default function CashRecipients() {
                   <Button aria-label={`${item.name} — tahrirlash`} variant="outline" size="icon" onClick={() => setEditing(item)} className="h-10 w-10 rounded-xl shrink-0"><Pencil className="w-4 h-4" /></Button>
                 )}
               </div>
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground">{new Set(Array.isArray(item.supplied_ingredient_ids) ? item.supplied_ingredient_ids.filter(id => typeof id === 'string' && id) : []).size} ta mahsulot biriktirilgan</p>
+                {canManage && <Button type="button" variant="outline" className="min-h-11 rounded-xl" aria-label={`${item.name} — mahsulotlar`} onClick={() => setProductsSupplier(item)}>Mahsulotlar</Button>}
+              </div>
             </article>
           ))}
         </div>
@@ -96,6 +102,10 @@ export default function CashRecipients() {
         onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); load(); }}
       />
+      <SupplierProductsDialog supplier={productsSupplier} user={user} onClose={() => setProductsSupplier(null)} onSaved={updated => {
+        setRecipients(previous => previous.map(item => item.id === updated.id ? { ...item, ...updated } : item));
+        setProductsSupplier(null);
+      }} />
     </div>
   );
 }
