@@ -97,6 +97,21 @@ const unitSnapshot = (ingredient: any) => {
     purchase_unit: ingredient.purchase_unit, base_unit: ingredient.base_unit, conversion_to_base: factor };
 };
 
+// An absent field preserves older supplier records during the preview rollout.
+// Once configured, even an empty list is authoritative for NEW purchase receipts.
+// Call only before a receipt claim; pending operations retain their saved snapshot.
+export function assertSupplierIngredientAssignment(supplier: any, ingredientIds: string[]) {
+  const configured = supplier.supplied_ingredient_ids;
+  if (configured === undefined) return;
+  if (!Array.isArray(configured) || configured.some((id: any) => typeof id !== "string" || !id.trim() || id !== id.trim())) {
+    throw fail("Yetkazib beruvchining mahsulot ro‘yxatini egasi tekshirishi kerak.", 409);
+  }
+  const allowed = new Set(configured);
+  if (ingredientIds.some(id => !allowed.has(id))) {
+    throw fail("Tanlangan mahsulot bu yetkazib beruvchiga biriktirilmagan. Yetkazib beruvchi yoki mahsulotni tekshiring.");
+  }
+}
+
 async function receiptMap(service: any, requests: any[]) {
   const ids = [...new Set(requests.flatMap(r => json(r.history_json, []).map((h: any) => h.supplier_receipt_id).filter(Boolean)))];
   const map = new Map();
@@ -398,7 +413,8 @@ export async function handleIngredientRequest(service: any, user: any, body: any
         catch { unavailable.push(ingredient.name); }
       }
       return { ingredients: available, unavailable_ingredients: unavailable,
-        warehouses: warehouses.map((s: any) => ({ id: s.id, name: s.name })), suppliers: suppliers.map((s: any) => ({ id: s.id, name: s.name })),
+        warehouses: warehouses.map((s: any) => ({ id: s.id, name: s.name })), suppliers: suppliers.map((s: any) => ({ id: s.id, name: s.name,
+          ...(s.supplied_ingredient_ids !== undefined ? { supplied_ingredient_ids: s.supplied_ingredient_ids } : {}) })),
         can_create: CREATE_ROLES.has(role), can_purchase_receive: PURCHASE_ROLES.has(role), can_transfer_receive: TRANSFER_RECEIVE_ROLES.has(role) };
     }
     const skip = Number.isSafeInteger(body.skip) && body.skip >= 0 ? body.skip : 0;
@@ -461,6 +477,7 @@ export async function handleIngredientRequest(service: any, user: any, body: any
     if (!["unpaid", "paid_external"].includes(input.payment_state)) throw fail("To‘lov holatini tanlang.");
     supplier = input.supplier_id ? await get(service.entities.CashRecipient, input.supplier_id) : null;
     if (!supplier || supplier.active === false || !["supplier", "company"].includes(supplier.recipient_type)) throw fail("Faol yetkazib beruvchini tanlang.");
+    assertSupplierIngredientAssignment(supplier, input.items.map((item: any) => item.ingredient_id));
   }
   const items = [];
   for (const row of input.items) {
