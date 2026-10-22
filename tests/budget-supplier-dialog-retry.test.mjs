@@ -25,6 +25,7 @@ function dialog(file, name, backend) {
     if (specifier === '@/lib/pos') return { formatUZS: value => `${value} UZS`, formatNum: value => String(value) };
     if (specifier === '@/lib/uzbekistan-time') return { formatUzbekistanDateTime: () => '', uzbekistanDateKey: () => '2026-10-15', uzbekistanMonthStartKey: () => '2026-10-01' };
     if (specifier.endsWith('.css')) return {};
+    if (specifier.endsWith('/SupplierProductsDialog')) return { default: () => null };
     if (specifier.endsWith('/odina-select')) return { default: wrapper('select') };
     if (specifier === '@/components/PageHeader') return { default: wrapper('div') };
     if (specifier === 'lucide-react') return new Proxy({}, { get: () => wrapper('span') });
