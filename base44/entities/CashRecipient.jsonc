@@ -15,6 +15,13 @@
     "notes": {
       "type": "string"
     },
+    "supplied_ingredient_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Yetkazib beruvchiga biriktirilgan masalliq va qadoq IDlari; bo\u2018sh ro\u2018yxat yangi xarid kirimlarini cheklaydi."
+    },
     "active": {
       "type": "boolean",
       "default": true
