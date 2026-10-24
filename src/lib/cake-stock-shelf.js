@@ -117,8 +117,15 @@ export function assignedStockShop(user) {
 }
 
 export function stockShops(shops, user) {
-  return (shops || []).filter((shop) => shop.active !== false && shop.location_type !== 'production'
+  const listed = (shops || []).filter((shop) => shop.active !== false && shop.location_type !== 'production'
     && (user?.role === 'admin' || shop.id === assignedStockShop(user)));
+  if (listed.length || user?.role === 'admin' || user?.role === 'production') return listed;
+  // The Shop read rule can hide a worker's own shop from the browser list. Fall back to the shop
+  // already assigned on the account; the warehouse-stock backend still validates every read and write.
+  const assigned = assignedStockShop(user);
+  const known = (shops || []).find((shop) => shop.id === assigned);
+  if (!assigned || known) return listed;
+  return [{ id: assigned, name: user?.shop_name || user?.data?.shop_name || 'Do‘kon', active: true, location_type: 'shop' }];
 }
 
 export function cakeProducts(products, categories, shopId) {
