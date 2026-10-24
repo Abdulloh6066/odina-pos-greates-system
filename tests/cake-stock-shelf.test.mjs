@@ -163,3 +163,17 @@ await test('ingredient receipt and count validation preserve units, whole pieces
   assert.equal(missing.db.StockMovement.length, 1);
 });
 console.log(checks + ' stock checks passed.');
+
+test('manager balances fall back to the server when direct read is blocked', async () => {
+  const { loadCakeBalancesWithServer } = await import('../src/lib/cake-stock-shelf.js');
+  const empty = { filter: async () => [] };
+  const calls = [];
+  const invoke = async (name, payload) => { calls.push([name, payload]); return { data: { rows: [{ id: 'a', location_id: 's1', product_id: 'p', quantity: 5 }, { id: 'b', location_id: 's2', quantity: 9 }] } }; };
+  const rows = await loadCakeBalancesWithServer(empty, 's1', 'product', invoke);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].quantity, 5);
+  assert.deepEqual(calls[0], ['warehouse-stock', { action: 'list_balances', location_id: 's1', item_kind: 'product' }]);
+  const direct = { filter: async () => [{ id: 'x', location_id: 's1', quantity: 2 }] };
+  const directRows = await loadCakeBalancesWithServer(direct, 's1', 'product', async () => { throw new Error('should not call'); });
+  assert.equal(directRows[0].id, 'x');
+});
