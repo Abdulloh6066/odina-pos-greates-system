@@ -75,8 +75,8 @@ function harness({ component = false, initial = {} } = {}) {
     close: () => act(() => tree.unmount()) };
 }
 
-test('closed dialogs and every non-admin role make no history requests and expose no rows', () => {
-  for (const userRole of ['cashier', 'manager', 'accountant', 'production', 'warehouse', 'Admin', '', undefined]) {
+test('closed dialogs and every role except owner/manager make no history requests and expose no rows', () => {
+  for (const userRole of ['cashier', 'accountant', 'production', 'warehouse', 'Admin', '', undefined]) {
     const h = harness({ initial: { userRole } });
     assert.equal(h.requests.length, 0);
     assert.equal(h.state().records.length, 0);

@@ -112,7 +112,7 @@ export default function ProfitReport() {
     }
   };
 
-  if (role && role !== 'admin' && role !== 'accountant') {
+  if (role && role !== 'admin' && role !== 'accountant' && !(role === 'manager' && user?.shop_id)) {
     return <Navigate to="/" replace />;
   }
 

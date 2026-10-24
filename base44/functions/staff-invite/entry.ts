@@ -114,13 +114,18 @@ Deno.serve(async (req) => {
 
     if (action === "invite") {
       const admin = await resolveStoredAppUser(base44.asServiceRole, currentUser);
-      if (!admin || userRole(admin) !== "admin" || admin.active === false || admin.data?.active === false) {
-        return Response.json({ error: "Faqat faol Egasi/Admin xodim taklif qila oladi." }, { status: 403 });
+      const inviterRole = admin ? userRole(admin) : "";
+      if (!admin || !["admin", "manager"].includes(inviterRole) || admin.active === false || admin.data?.active === false) {
+        return Response.json({ error: "Faqat faol Egasi/Admin yoki do‘kon boshqaruvchisi xodim taklif qila oladi." }, { status: 403 });
       }
 
       const email = String(body?.email || "").trim().toLowerCase();
       const desiredRole = String(body?.role || "");
-      const shopId = String(body?.shop_id || "");
+      // A manager invites only cashier/warehouse staff, always into his own shop (browser shop is ignored).
+      const shopId = inviterRole === "manager" ? String(admin.shop_id || admin.data?.shop_id || "") : String(body?.shop_id || "");
+      if (inviterRole === "manager" && (!["cashier", "warehouse"].includes(desiredRole) || !shopId)) {
+        return Response.json({ error: "Boshqaruvchi faqat o‘z do‘koniga kassir yoki omborchi taklif qila oladi." }, { status: 403 });
+      }
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return Response.json({ error: "To‘g‘ri email manzilini kiriting." }, { status: 400 });

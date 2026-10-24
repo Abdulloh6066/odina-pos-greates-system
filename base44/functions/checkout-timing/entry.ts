@@ -134,7 +134,8 @@ function pageInteger(value: unknown, defaultValue: number, min: number, max: num
 }
 async function list(service: any, user: any, body: any) {
   // Check the stored role before any timing query, including malformed filters.
-  if (user.role !== "admin") throw problem("Yakunlash vaqtlari faqat egasi uchun ochiq.", 403);
+  const managerShopId = user.role === "manager" ? String(user.shop_id || user.data?.shop_id || "") : "";
+  if (user.role !== "admin" && !managerShopId) throw problem("Yakunlash vaqtlari faqat egasi va do‘kon boshqaruvchisi uchun ochiq.", 403);
   const limit = pageInteger(body.limit, 50, 1, 100);
   const skip = pageInteger(body.skip, 0, 0, 100_000);
   const query: any = { source: "browser" };
@@ -142,6 +143,8 @@ async function list(service: any, user: any, body: any) {
     const value = id(body[input], label, true);
     if (value) query[field] = value;
   }
+  // A manager only ever sees his own shop's timings, whatever shop the browser asks for.
+  if (managerShopId) query.shop_id = managerShopId;
   if (body.outcome !== undefined && body.outcome !== "") {
     if (typeof body.outcome !== "string" || !OUTCOMES.has(body.outcome)) throw problem("Urinish natijasi filtri noto‘g‘ri.");
     query.outcome = body.outcome;

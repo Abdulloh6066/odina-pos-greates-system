@@ -8,7 +8,7 @@ const empty = (version = 0) => ({ version, records: [], loading: false, loadingM
 const errorText = (error) => error?.response?.data?.error || error?.data?.error || error?.message || 'Vaqtlar tarixini yuklab bo‘lmadi.';
 
 export default function useCheckoutTimingHistory({ open, userRole, shopId = '', fromDate = '', toDate = '' }) {
-  const enabled = open === true && userRole === 'admin';
+  const enabled = open === true && (userRole === 'admin' || userRole === 'manager');
   const filterKey = JSON.stringify([shopId, fromDate, toDate]);
   const scope = `${enabled ? 'open' : 'closed'}:${filterKey}`;
   const control = useRef({ scope: '', version: 0, serial: 0, busy: false, skip: 0, retryAppend: false, allowed: false, hasMore: false });

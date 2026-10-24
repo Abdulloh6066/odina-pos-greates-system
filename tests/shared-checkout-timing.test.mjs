@@ -231,8 +231,18 @@ test('blocked storage service returns a sanitized retryable error and never touc
   assert.equal(privateFailure.status, 503); assert.doesNotMatch(JSON.stringify(privateFailure.data), /private-token/);
 });
 
+test('manager timing history is always forced to his own shop', async () => {
+  const f = make(); f.db.User[0].role = 'manager';
+  const queries = []; const filter = f.entities.CheckoutTiming.filter;
+  f.entities.CheckoutTiming.filter = async (...args) => { queries.push(structuredClone(args)); return filter(...args); };
+  const result = await f.invoke(file, { action: 'list', shop_id: 'other-shop' });
+  assert.equal(result.status, 200);
+  assert.ok(queries.length > 0);
+  for (const [query] of queries) assert.equal(query.shop_id, 'branch');
+});
+
 test('workers, unknown users and deactivated admins cannot query timing rows even with malformed filters', async () => {
-  for (const role of ['cashier', 'manager', 'accountant', 'production', 'warehouse']) {
+  for (const role of ['cashier', 'accountant', 'production', 'warehouse']) {
     const f = make(); f.db.User[0].role = role;
     f.entities.CheckoutTiming.filter = async () => { throw new Error('Forbidden timing query reached'); };
     const result = await f.invoke(file, { action: 'list', limit: 'all', shop_id: { $ne: '' }, role: 'admin' });

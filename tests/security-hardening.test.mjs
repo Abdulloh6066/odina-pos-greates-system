@@ -46,10 +46,13 @@ test('staff access changes use an active stored admin backend and no direct brow
   assert.match(panel, /functions\.invoke\(['"]security-admin['"]/);
   assert.match(users, /functions\.invoke\(['"]security-admin['"]/);
   assert.match(backend, /resolveStoredAppUser/);
-  assert.match(backend, /userRole\(admin\) !== ["']admin["']/);
+  assert.match(backend, /\["admin", "manager"\]\.includes\(actorRole\)/);
   assert.match(backend, /admin\.active === false/);
+  // Managers are limited to their own shop's cashier/warehouse staff.
+  assert.match(backend, /MANAGER_MANAGEABLE_ROLES = new Set\(\["cashier", "warehouse"\]\)/);
   assert.match(invite, /resolveStoredAppUser/);
-  assert.match(invite, /userRole\(admin\) !== ["']admin["']/);
+  assert.match(invite, /\["admin", "manager"\]\.includes\(inviterRole\)/);
+  assert.match(invite, /inviterRole === "manager" \? String\(admin\.shop_id/);
   assert.equal(inviteConfig.is_public, false);
 });
 

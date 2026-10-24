@@ -2,6 +2,8 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-helpers.ts";
 
 const STAFF_ROLES = new Set(["manager", "cashier", "accountant", "production", "warehouse"]);
+// A shop manager may manage only these roles, and only inside his own shop.
+const MANAGER_MANAGEABLE_ROLES = new Set(["cashier", "warehouse"]);
 
 // Hisob egasi — boshqa adminlar tomonidan o'chirilishi yoki o'zgartirilishi mumkin emas.
 const isOwner = (user: any) => user?.is_owner === true || user?.data?.is_owner === true;
@@ -38,8 +40,17 @@ Deno.serve(async (req) => {
 
     const service = client.asServiceRole;
     const admin = await resolveStoredAppUser(service, auth);
-    if (!admin || userRole(admin) !== "admin" || admin.active === false || admin.data?.active === false) {
-      return Response.json({ error: "Faqat Egasi/Admin uchun." }, { status: 403 });
+    const actorRole = admin ? userRole(admin) : "";
+    if (!admin || !["admin", "manager"].includes(actorRole) || admin.active === false || admin.data?.active === false) {
+      return Response.json({ error: "Faqat Egasi/Admin yoki do‘kon boshqaruvchisi uchun." }, { status: 403 });
+    }
+    const isManager = actorRole === "manager";
+    const managerShopId = isManager ? userShopId(admin) : "";
+    if (isManager) {
+      const managerShop = managerShopId ? await service.entities.Shop.get(managerShopId).catch(() => null) : null;
+      if (!managerShop || managerShop.active === false) {
+        return Response.json({ error: "Boshqaruvchiga faol do‘kon biriktirilmagan." }, { status: 403 });
+      }
     }
 
     // The existing protected owner identity is checked against both the
@@ -54,6 +65,11 @@ Deno.serve(async (req) => {
         service.entities.SecuritySettings.filter({ key: "owner_approval_pin" }, "-updated_date", 2),
         service.entities.ActionHistory.list("-created_date", 30),
       ]);
+      if (isManager) {
+        // Managers see only their own shop's staff and never owner/admin accounts or the owner audit feed.
+        const own = (users || []).map(safeUser).filter((row: any) => row.id === String(admin.id) || (row.shop_id === managerShopId && row.role !== "admin" && !row.is_owner));
+        return Response.json({ pin_set: false, can_manage_admins: false, manager_scope: { shop_id: managerShopId, roles: [...MANAGER_MANAGEABLE_ROLES] }, users: own, audit: [] });
+      }
       return Response.json({
         pin_set: Boolean(securityRows?.[0]?.pin_hash && securityRows?.[0]?.pin_salt),
         can_manage_admins: canManageAdmins,
@@ -85,6 +101,16 @@ Deno.serve(async (req) => {
     // Other admins retain their existing staff-management privileges.
     if (userRole(target) === "admin" && !canManageAdmins) {
       return Response.json({ error: "Boshqa Admin hisobini faqat hisob egasi boshqaradi." }, { status: 403 });
+    }
+    if (isManager) {
+      // Never trust browser shop/role values: the target must already be this shop's cashier/warehouse staff,
+      // and the result must stay inside this shop with a manageable role.
+      const nextRoleForManager = Object.prototype.hasOwnProperty.call(body, "role") ? String(body.role || "") : userRole(target);
+      const shopChange = Object.prototype.hasOwnProperty.call(body, "shop_id") && String(body.shop_id || "") !== managerShopId;
+      if (userShopId(target) !== managerShopId || !MANAGER_MANAGEABLE_ROLES.has(userRole(target))
+        || !MANAGER_MANAGEABLE_ROLES.has(nextRoleForManager) || shopChange) {
+        return Response.json({ error: "Boshqaruvchi faqat o‘z do‘konidagi kassir va omborchilarni boshqaradi." }, { status: 403 });
+      }
     }
 
     if (action === "update_user_name") {

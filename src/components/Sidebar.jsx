@@ -20,7 +20,7 @@ const ICONS = {
 
 const KASSA_CHILD_KEYS = ['categories', 'sales', 'cashouts', 'recipients'];
 const SCREENS_CHILDREN = [
-  { key: 'launch-pos', label: 'Kassada ochish', path: '/pos?screen=1', icon: ShoppingCart, roles: ['admin', 'cashier'] },
+  { key: 'launch-pos', label: 'Kassada ochish', path: '/pos?screen=1', icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
   { key: 'launch-warehouse', label: 'Omborda ochish', path: '/warehouse', icon: Warehouse, roles: ['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse'] },
   { key: 'launch-production', label: 'Ishlab chiqarish ekranini ochish', path: '/production-screen', icon: ChefHat, roles: ['admin', 'production'] },
 ];

@@ -48,7 +48,7 @@ const preloader = () => evaluate('src/lib/route-preload.js', { './pos.js': permi
 test('renaming the product route preserves every role permission and role home', () => {
   assert.deepEqual(clone(permissions.ROLE_MENU), {
     admin: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
-    manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients'],
+    manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
     cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
     accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
     production: ['warehouse', 'products', 'customers', 'screens'], warehouse: ['warehouse'],

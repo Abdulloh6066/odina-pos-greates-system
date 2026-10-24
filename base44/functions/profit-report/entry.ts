@@ -36,13 +36,16 @@ export default async function (req) {
     const service = base44.asServiceRole;
     const user = await resolveAppUser(service, authenticatedUser);
     const role = user.role;
-    if (role !== "admin" && role !== "accountant") {
+    const managerShopId = role === "manager" ? String(user.shop_id || user.data?.shop_id || "") : "";
+    if (role !== "admin" && role !== "accountant" && !managerShopId) {
       return Response.json(
-        { error: "Tannarx va foyda hisoboti faqat egasi va hisobchi uchun." },
+        { error: "Tannarx va foyda hisoboti faqat egasi, hisobchi va do‘kon boshqaruvchisi uchun." },
         { status: 403 },
       );
     }
     const body = await req.json();
+    // A manager's report is always limited to his own shop.
+    if (managerShopId && body && typeof body === "object") body.shop_id = managerShopId;
     const action = String(body?.action || "report");
     const today = reportDate(new Date().toISOString());
     const dateFrom = String(body?.date_from || `${today.slice(0, 7)}-01`);

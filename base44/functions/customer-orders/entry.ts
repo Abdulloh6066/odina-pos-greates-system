@@ -75,7 +75,7 @@ export default async function(req: Request): Promise<Response> {
     // Production staff may change production status only, never create orders
     // or accept payments. Authorize the requested action before any writes.
     const allowedRoles = action === "update_production_status"
-      ? ["admin", "production"] : ["admin", "manager", "cashier"];
+      ? ["admin", "manager", "production"] : ["admin", "manager", "cashier"];
     if (!allowedRoles.includes(user.role)) {
       return Response.json({ error: "Bu buyurtma amali uchun ruxsat yo‘q." }, { status: 403 });
     }
@@ -99,12 +99,16 @@ export default async function(req: Request): Promise<Response> {
       if (!orderId) {
         return Response.json({ error: "Buyurtma ID majburiy." }, { status: 400 });
       }
-      if (!["admin", "production"].includes(user.role)) {
+      if (!["admin", "manager", "production"].includes(user.role)) {
         return Response.json({ error: "Ishlab chiqarish ekrani uchun ruxsat yo‘q." }, { status: 403 });
       }
       const order = await service.entities.CustomerOrder.get(orderId);
       if (!order) {
         return Response.json({ error: "Buyurtma topilmadi." }, { status: 404 });
+      }
+      // assertManagerRequestScope above already checked order_id; repeat it here so a manager never touches another shop's order.
+      if (user.role === "manager" && order.shop_id !== user.shop_id) {
+        return Response.json({ error: "Faqat biriktirilgan do‘kon buyurtmalari uchun ruxsat berilgan." }, { status: 403 });
       }
       if (user.role === "production") {
         const assigned = user.shop_id ? await service.entities.Shop.get(user.shop_id).catch(() => null) : null;

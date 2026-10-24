@@ -208,7 +208,7 @@ export default function AuditExport() {
     }
   };
 
-  if (user?.role !== "admin") return <Navigate to="/" replace />;
+  if (user?.role !== "admin" && !(user?.role === "manager" && user?.shop_id)) return <Navigate to="/" replace />;
 
   const summary = data.summary || {};
 

@@ -40,7 +40,7 @@ export default function CheckoutTimingHistory({ open, onOpenChange, userRole, sh
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const history = useCheckoutTimingHistory({ open, userRole, shopId, fromDate, toDate });
-  if (userRole !== 'admin') return null;
+  if (userRole !== 'admin' && userRole !== 'manager') return null;
   const availableShops = [...new Map((shopScope?.shops || shops || []).filter((shop) => shop?.id)
     .map((shop) => [shop.id, shop])).values()];
 

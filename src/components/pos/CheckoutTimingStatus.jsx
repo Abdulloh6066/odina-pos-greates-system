@@ -2,7 +2,7 @@ import React from 'react';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 
 export default function CheckoutTimingStatus({ timing, pending, userRole, onOpenHistory }) {
-  if (userRole !== 'admin') return null;
+  if (userRole !== 'admin' && userRole !== 'manager') return null;
   const outcomes = {
     confirmed: ['Server tasdig‘i', 'Savdo va qoldiq hisobi tasdiqlandi.'],
     rechecked: ['Server tasdig‘i', 'Saqlangan savdo va qoldiq hisobi tasdiqlandi.'],

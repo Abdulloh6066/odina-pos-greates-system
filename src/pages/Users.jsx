@@ -32,8 +32,13 @@ const ROLE_LABELS = {
   warehouse: 'Omborchi',
 };
 
+// A shop manager manages only these roles, only in his own shop (the server enforces the same rule).
+const MANAGER_ROLES = ['cashier', 'warehouse'];
+
 export default function Users() {
   const { user, adminShopScope } = useOutletContext();
+  const isManager = user?.role === 'manager';
+  const managerShopId = isManager ? user?.shop_id || '' : '';
   const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
   const [users, setUsers] = useState([]);
   const [shops, setShops] = useState([]);
@@ -69,7 +74,9 @@ export default function Users() {
   }, [user?.role, adminShopScope?.registerGuard, nameTarget, inviteOpen, pendingDemotion]);
   const visibleUsers = users.filter((item) => !scopedShopId || item.shop_id === scopedShopId || item.role === 'admin' || !item.shop_id);
 
-  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+  if (user?.role !== 'admin' && !(isManager && managerShopId)) return <Navigate to="/" replace />;
+  const managerShop = shops.find((shop) => shop.id === managerShopId);
+  const canEdit = (u) => isManager ? u.shop_id === managerShopId && MANAGER_ROLES.includes(u.role) : (u.role !== 'admin' || canManageAdmins);
 
   const updateAccess = async (payload) => {
     try {
@@ -147,12 +154,12 @@ export default function Users() {
       <PageHeader
         title="Xodimlar"
         eyebrow="JAMOA BOSHQARUVI"
-        subtitle={`${visibleUsers.length} ta xodim · lavozim, ish joyi va kirish ruxsatlari`}
+        subtitle={isManager ? `${managerShop?.name || 'Do‘koningiz'} · ${visibleUsers.length} ta xodim` : `${visibleUsers.length} ta xodim · lavozim, ish joyi va kirish ruxsatlari`}
         icon={UsersIcon}
         actions={<Button onClick={() => setInviteOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary-strong"><UserPlus className="w-4 h-4 mr-1.5" /> Xodim qo‘shish</Button>}
       />
 
-      <p className="odina-operations-note mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi biriktirilgan faol ish joyida kassa, buyurtmalar, stollar, ombor, kirim va do‘kon narxlarini boshqaradi. Budget, global katalog va sozlamalar hamda xodim ruxsatlari egasi boshqaruvida qoladi. Qaytarish va 100% chegirma egasi PIN kodi bilan tasdiqlanadi. Yordam: @Abdulloh1100.</p>
+      {isManager ? <p className="odina-operations-note mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Siz faqat o‘z do‘koningizdagi kassir va omborchilarni qo‘sha, o‘chira va ismini o‘zgartira olasiz. Boshqa lavozimlar va do‘konlar egasi boshqaruvida.</p> : <p className="odina-operations-note mb-5 rounded-xl bg-secondary p-4 text-sm text-muted-foreground">Boshqaruvchi biriktirilgan faol ish joyida kassa, buyurtmalar, stollar, ombor, kirim va do‘kon narxlarini boshqaradi. Budget, global katalog va sozlamalar hamda xodim ruxsatlari egasi boshqaruvida qoladi. Qaytarish va 100% chegirma egasi PIN kodi bilan tasdiqlanadi. Yordam: @Abdulloh1100.</p>}
       {loading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : (
@@ -179,22 +186,26 @@ export default function Users() {
                   <Shield className="w-4 h-4 text-brand-olive" />
                   Himoyalangan hisob — o‘chirilishi yoki o‘zgartirilishi mumkin emas.
                 </div>
-              ) : u.id !== user.id && (u.role !== 'admin' || canManageAdmins) ? (
+              ) : u.id !== user.id && canEdit(u) ? (
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr] gap-2 w-full min-w-0">
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ruxsat darajasi</span>
                     <OdinaSelect value={u.role} onChange={(e) => updateRole(u, e.target.value)} className="h-11 rounded-lg border border-input bg-card px-2 text-sm font-medium">
-                      {(canManageAdmins || u.role === 'admin') && <option value="admin" disabled={!canManageAdmins}>Admin</option>}
-                      <option value="manager">Boshqaruvchi</option>
-                      <option value="cashier">Kassir</option>
-                      <option value="accountant">Hisobchi</option>
-                      <option value="production">Ishlab chiqarish xodimi</option>
-                      <option value="warehouse">Omborchi</option>
+                      {isManager ? MANAGER_ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>) : <>
+                        {(canManageAdmins || u.role === 'admin') && <option value="admin" disabled={!canManageAdmins}>Admin</option>}
+                        <option value="manager">Boshqaruvchi</option>
+                        <option value="cashier">Kassir</option>
+                        <option value="accountant">Hisobchi</option>
+                        <option value="production">Ishlab chiqarish xodimi</option>
+                        <option value="warehouse">Omborchi</option>
+                      </>}
                     </OdinaSelect>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ish joyi</span>
-                    {u.role === 'admin' ? (
+                    {isManager ? (
+                      <p className="min-h-11 flex items-center text-sm font-medium">{managerShop?.name || u.shop_name || 'Do‘koningiz'}</p>
+                    ) : u.role === 'admin' ? (
                       <p className="min-h-11 flex items-center text-xs text-muted-foreground">Barcha do‘konlar · lavozimni o‘zgartirishda ish joyi tanlanadi</p>
                     ) : (
                       <OdinaSelect value={u.shop_id || ''} onChange={(e) => updateShop(u.id, e.target.value)} className="h-11 rounded-lg border border-input bg-card px-2 text-sm font-medium">
@@ -239,7 +250,8 @@ export default function Users() {
           {visibleUsers.length === 0 && <p className="text-sm text-muted-foreground text-center py-16">Xodimlar topilmadi.</p>}
         </div>
       )}
-      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} canManageAdmins={canManageAdmins} />
+      <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={() => { setInviteOpen(false); load(); }} user={user} shops={shops} canManageAdmins={canManageAdmins}
+        managerShop={isManager ? (managerShop || { id: managerShopId, name: user?.shop_name || 'Do‘koningiz' }) : null} />
       {nameTarget && <StaffNameDialog target={nameTarget} onClose={() => setNameTarget(null)} onDone={(updated) => {
         setUsers((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
         setNameTarget(null);
@@ -336,10 +348,11 @@ function StaffNameDialog({ target, onClose, onDone }) {
   );
 }
 
-function InviteDialog({ open, onClose, onDone, user, shops = [], canManageAdmins = false }) {
+function InviteDialog({ open, onClose, onDone, user, shops = [], canManageAdmins = false, managerShop = null }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('cashier');
-  const [shopId, setShopId] = useState('');
+  const [chosenShopId, setShopId] = useState('');
+  const shopId = managerShop ? managerShop.id : chosenShopId;
   const [saving, setSaving] = useState(false);
   const needsShop = role !== 'admin';
   const activeShops = shops.filter((shop) => shop.active !== false);
@@ -408,19 +421,27 @@ function InviteDialog({ open, onClose, onDone, user, shops = [], canManageAdmins
               disabled={saving}
               className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"
             >
-              {canManageAdmins && <option value="admin">Admin (to‘liq huquq)</option>}
-              <option value="manager">Boshqaruvchi</option>
-              <option value="cashier">Kassir</option>
-              <option value="accountant">Hisobchi</option>
-              <option value="production">Ishlab chiqarish xodimi</option>
-              <option value="warehouse">Omborchi</option>
+              {managerShop ? MANAGER_ROLES.map((item) => <option key={item} value={item}>{ROLE_LABELS[item]}</option>) : <>
+                {canManageAdmins && <option value="admin">Admin (to‘liq huquq)</option>}
+                <option value="manager">Boshqaruvchi</option>
+                <option value="cashier">Kassir</option>
+                <option value="accountant">Hisobchi</option>
+                <option value="production">Ishlab chiqarish xodimi</option>
+                <option value="warehouse">Omborchi</option>
+              </>}
             </OdinaSelect>
           </div>
-          {needsShop && (
+          {managerShop && (
+            <div>
+              <Label className="text-xs mb-1.5 block">Ish joyi</Label>
+              <p className="min-h-10 flex items-center text-sm font-medium">{managerShop.name}</p>
+            </div>
+          )}
+          {needsShop && !managerShop && (
             <div>
               <Label className="text-xs mb-1.5 block">Ish joyi</Label>
               <OdinaSelect
-                value={shopId}
+                value={chosenShopId}
                 onChange={(e) => setShopId(e.target.value)}
                 disabled={saving}
                 className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium"

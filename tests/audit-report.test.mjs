@@ -310,13 +310,17 @@ test("frontend helpers use a seven-day Tashkent range and strip all-filter senti
   });
 });
 
-test("audit route and menu are admin-only", () => {
+test("audit route and menu are for the owner and shop managers only", () => {
   const app = readFileSync("src/App.jsx", "utf8");
   const pos = readFileSync("src/lib/pos.js", "utf8");
+  const backend = readFileSync("base44/functions/audit-report/entry.ts", "utf8");
 
   assert.match(app, /path="\/audit".*pageKey="audit"/);
   assert.match(pos, /admin:\s*\[[^\]]*'audit'/);
-  for (const role of ["manager", "cashier", "accountant", "production", "warehouse"]) {
+  assert.match(pos, /manager:\s*\[[^\]]*'audit'/);
+  // A manager's audit is always forced to his own shop on the server.
+  assert.match(backend, /shop_id: managerShopId \|\| str\(body\.shop_id\)/);
+  for (const role of ["cashier", "accountant", "production", "warehouse"]) {
     const match = pos.match(new RegExp(role + ":\\s*\\[([^\\]]*)\\]"));
     assert.ok(match, role + " menu missing");
     assert.doesNotMatch(match[1], /'audit'/);

@@ -448,9 +448,10 @@ export default async function(req) {
 
     const service = base44.asServiceRole;
     const user = await resolveAppUser(service, authenticatedUser);
-    if (user?.active === false || user?.role !== "admin") {
+    const managerShopId = user?.role === "manager" ? str(user?.shop_id || user?.data?.shop_id) : "";
+    if (user?.active === false || !(user?.role === "admin" || (user?.role === "manager" && managerShopId))) {
       return Response.json(
-        { error: "Nazorat va eksport faqat egasi uchun ochiq." },
+        { error: "Nazorat va eksport faqat egasi va do‘kon boshqaruvchisi uchun ochiq." },
         { status: 403 },
       );
     }
@@ -466,7 +467,8 @@ export default async function(req) {
       date_to: str(body.date_to),
       category: str(body.category),
       user_id: str(body.user_id),
-      shop_id: str(body.shop_id),
+      // A manager always sees only his own shop; rows without a shop (owner-wide actions) are excluded by the filter.
+      shop_id: managerShopId || str(body.shop_id),
       query: str(body.query).slice(0, 120),
     };
     if (!validDateKey(filters.date_from) || !validDateKey(filters.date_to)) {
@@ -541,13 +543,13 @@ export default async function(req) {
       rows,
       total: matched.length,
       summary: summarize(matched),
-      users: sourceRows.users.map((item: any) => ({
+      users: sourceRows.users.filter((item: any) => !managerShopId || str(item.shop_id || item?.data?.shop_id) === managerShopId).map((item: any) => ({
         id: str(item.id),
         name: userLabel(item),
         role: str(item.role || item?.data?.role),
         shop_id: str(item.shop_id || item?.data?.shop_id),
       })),
-      shops: sourceRows.shops.map((item: any) => ({
+      shops: sourceRows.shops.filter((item: any) => !managerShopId || str(item.id) === managerShopId).map((item: any) => ({
         id: str(item.id),
         name: str(item.name),
         active: item.active !== false,

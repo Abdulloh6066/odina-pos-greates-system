@@ -236,10 +236,14 @@ test('name changes require an active stored admin and preserve protected-account
   );
   const run = loadHandler('base44/functions/security-admin/entry.ts', f);
   const rename = (target_user_id = 'cashier') => run({ action: 'update_user_name', target_user_id, full_name: 'Mahkam' });
-  for (const actor of ['cashier', 'manager', 'disabled', 'disabled-admin', 'nested-disabled-admin']) {
+  for (const actor of ['cashier', 'disabled', 'disabled-admin', 'nested-disabled-admin']) {
     f.as(actor);
     assert.equal((await rename()).status, 403, actor);
   }
+  // A shop manager may rename his own shop's cashier, but never an admin/owner.
+  f.as('manager');
+  assert.equal((await rename('other')).status, 403, 'manager cannot touch an admin');
+  assert.equal((await rename('owner')).status, 403, 'manager cannot touch the owner');
   f.as('missing');
   assert.equal((await rename()).status, 401);
   f.as('cashier');
