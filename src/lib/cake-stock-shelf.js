@@ -174,6 +174,25 @@ export async function loadAllCakeBalances(entity, shopId) {
   throw new Error('Qoldiqlar to‘liq yuklanmadi. Qayta yangilang.');
 }
 
+// Non-admin roles may be blocked by row-level read rules; when the direct read is empty,
+// ask the warehouse-stock backend, which checks the user's assigned shop itself.
+export async function loadCakeBalancesWithServer(entity, shopId, itemKind, invoke) {
+  let rows = [];
+  let directError = null;
+  try { rows = await loadAllCakeBalances(entity, shopId); } catch (error) { directError = error; }
+  if (rows.length || typeof invoke !== 'function') {
+    if (directError) throw directError;
+    return rows;
+  }
+  try {
+    const response = await invoke('warehouse-stock', { action: 'list_balances', location_id: shopId, item_kind: itemKind });
+    const payload = response?.data || response;
+    if (Array.isArray(payload?.rows)) return payload.rows.filter((row) => row?.location_id === shopId);
+  } catch { /* fall through to the direct result */ }
+  if (directError) throw directError;
+  return rows;
+}
+
 export function mergeCakeStockEvent(rows, event, shopId, itemIdField = 'product_id') {
   const data = event?.data;
   if (!data?.id) return null;
