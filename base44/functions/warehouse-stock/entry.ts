@@ -24,6 +24,26 @@ export default async function(req) {
     const body = await req.json();
     const action = String(body?.action || "");
 
+    if (action === "list_balances") {
+      const locationId = String(body?.location_id || "");
+      const itemKind = String(body?.item_kind || "");
+      if (!locationId || !["ingredient", "product"].includes(itemKind)) {
+        return Response.json({ error: "Location and stock kind are required." }, { status: 400 });
+      }
+      if (user.role !== "admin" && (!user.shop_id || user.shop_id !== locationId)) {
+        return Response.json({ error: "You can view stock only for your assigned location." }, { status: 403 });
+      }
+      const entity = itemKind === "ingredient" ? service.entities.IngredientStock : service.entities.ProductStock;
+      const rows = [];
+      for (let skip = 0; skip < 10000; skip += 500) {
+        const page = await entity.filter({ location_id: locationId }, "-updated_at", 500, skip);
+        if (!Array.isArray(page)) break;
+        rows.push(...page.filter((row) => row?.location_id === locationId));
+        if (page.length < 500) return Response.json({ rows });
+      }
+      return Response.json({ error: "Qoldiqlar to‘liq yuklanmadi." }, { status: 500 });
+    }
+
     if (action !== "adjust_stock") {
       return Response.json({ error: "Unknown warehouse action." }, { status: 400 });
     }
