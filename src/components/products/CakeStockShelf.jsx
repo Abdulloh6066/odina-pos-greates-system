@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import { formatUzbekistanDateTime, formatUzbekistanTime } from '@/lib/uzbekistan-time';
-import { CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, allStockProducts, formatStockQuantity, INGREDIENT_SHELF_CATEGORIES, inventoryStockChange, inventoryStockInfo, inventoryUnits, loadAllCakeBalances, mergeCakeStockEvent, shelfIngredients, stockShops } from '@/lib/cake-stock-shelf';
+import { CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, allStockProducts, formatStockQuantity, INGREDIENT_SHELF_CATEGORIES, inventoryStockChange, inventoryStockInfo, inventoryUnits, loadAllCakeBalances, loadCakeBalancesWithServer, mergeCakeStockEvent, shelfIngredients, stockShops } from '@/lib/cake-stock-shelf';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ function useLiveCakeBalances(shopId, itemKind = 'product') {
       setData((state) => ({ ...state, loading: true }));
       inflight = (async () => {
         try {
-          let rows = await loadAllCakeBalances(base44.entities[entityName], shopId);
+          let rows = await loadCakeBalancesWithServer(base44.entities[entityName], shopId, itemKind, (name, payload) => base44.functions.invoke(name, payload));
           for (const event of queuedEvents) rows = mergeCakeStockEvent(rows, event, shopId, itemIdField) || rows;
           queuedEvents = [];
           if (!disposed) setData({ shopId: balanceKey, rows, ready: true, loading: false, error: '', updatedAt: new Date().toISOString() });
@@ -74,7 +74,7 @@ function useLiveCakeBalances(shopId, itemKind = 'product') {
       window.removeEventListener('online', resume); window.removeEventListener('offline', offline);
       refreshRef.current = async () => false;
     };
-  }, [shopId, entityName, itemIdField, balanceKey]);
+  }, [shopId, entityName, itemIdField, balanceKey, itemKind]);
   return { ...(data.shopId === balanceKey ? data : { rows: [], ready: false, loading: Boolean(shopId), error: '', updatedAt: null }), online, refresh: useCallback(() => refreshRef.current(), []) };
 }
 
