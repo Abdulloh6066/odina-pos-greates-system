@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
 import { formatUzbekistanDateTime, formatUzbekistanTime } from '@/lib/uzbekistan-time';
-import { CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, allStockProducts, formatStockQuantity, INGREDIENT_SHELF_CATEGORIES, inventoryStockChange, inventoryStockInfo, inventoryUnits, loadAllCakeBalances, loadCakeBalancesWithServer, mergeCakeStockEvent, shelfIngredients, stockShops } from '@/lib/cake-stock-shelf';
+import { CAKE_STOCK_ROLES, cakeProducts, cakeStockColumns, allStockProducts, formatStockQuantity, INGREDIENT_SHELF_CATEGORIES, inventoryStockChange, inventoryStockInfo, inventoryUnits, loadCakeBalancesWithServer, mergeCakeStockEvent, shelfIngredients, stockShops } from '@/lib/cake-stock-shelf';
 import OdinaSelect from '@/components/ui/odina-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
