@@ -54,6 +54,11 @@ await test('cake scope excludes milk, drinks, archived cakes and other shops', (
   assert.deepEqual(cakeProducts(products, [{ id: 'hidden-category', hidden_shop_ids: ['branch'] }], 'branch').map((p) => p.id), ['cake', 'croissant']);
   const shops = [{ id: 'branch' }, { id: 'other' }, { id: 'production', location_type: 'production' }];
   assert.deepEqual(stockShops(shops, { role: 'manager', data: { shop_id: 'branch' } }).map((s) => s.id), ['branch']);
+  // A hidden (unlisted) own shop falls back to the account's assigned shop, never another shop.
+  assert.deepEqual(stockShops([], { role: 'manager', shop_id: 'branch', shop_name: 'Odina Branch' }), [{ id: 'branch', name: 'Odina Branch', active: true, location_type: 'shop' }]);
+  assert.deepEqual(stockShops([], { role: 'cashier', shop_id: '' }), []);
+  assert.deepEqual(stockShops([], { role: 'admin', shop_id: 'branch' }), []);
+  assert.deepEqual(stockShops([], { role: 'production', shop_id: 'center' }), []);
 });
 await test('missing, zero, negative, duplicate and invalid units stay distinct', () => {
   assert.equal(cakeStockInfo([], 'cake').status, 'missing');
