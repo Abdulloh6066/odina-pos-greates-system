@@ -382,7 +382,7 @@ test('milk litres and coffee kilograms submit base-unit deltas to the existing i
   } finally { await f.close(); }
 });
 
-test('ingredient counts repair negatives and shop or scope changes close stale forms', async () => {
+test('ingredient receipts reduce negatives, counts stay optional and scope changes close stale forms', async () => {
   const f = await fixture({ role: 'admin', ingredients: [milk], ingredientRows: [
     { id: 'im', ingredient_id: 'milk', location_id: 'branch', quantity: -350, unit: 'ml' },
     { id: 'om', ingredient_id: 'milk', location_id: 'other', quantity: 24000, unit: 'ml' },
@@ -391,13 +391,20 @@ test('ingredient counts repair negatives and shop or scope changes close stale f
     await act(async () => button(f.tree, 'Sut, kofe va masalliqlar').props.onClick());
     await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
     await act(async () => tile(f.tree, milk.name).props.onClick());
-    assert.equal(f.tree.root.findAllByType('form').length, 0);
+    assert.equal(f.tree.root.findAllByType('form').length, 1);
+    await changeQuantity(f.tree, '0.1');
+    assert.equal(button(f.tree, 'Kirimni saqlash').props.disabled, false);
+    await act(async () => submit(f.tree));
+    assert.equal(f.sent[0].payload.quantity_change, 100);
+    assert.equal(f.sent[0].payload.expected_quantity, -350);
+    assert.equal('counted_quantity' in f.sent[0].payload, false);
+    assert.equal(f.rows.find(row => row.id === 'im').quantity, -250);
     await act(async () => button(f.tree, 'Haqiqiy sanoq').props.onClick());
     await changeQuantity(f.tree, '3.25');
     await act(async () => f.tree.root.findByProps({ id: 'cake-operation-reason' }).props.onChange({ target: { value: 'Haqiqiy sanoq' } }));
     await act(async () => submit(f.tree));
-    assert.equal(f.sent[0].payload.counted_quantity, 3250);
-    assert.equal(f.sent[0].payload.expected_quantity, -350);
+    assert.equal(f.sent[1].payload.counted_quantity, 3250);
+    assert.equal(f.sent[1].payload.expected_quantity, -250);
     assert.equal(f.rows.find(row => row.id === 'im').quantity, 3250);
     await act(async () => tile(f.tree, milk.name).props.onClick());
     assert.equal(f.tree.root.findAllByType('form').length, 1);
@@ -406,7 +413,7 @@ test('ingredient counts repair negatives and shop or scope changes close stale f
     assert.ok(tile(f.tree, milk.name).props['aria-label'].includes('24 litr'));
     await act(async () => button(f.tree, 'Tortlar').props.onClick());
     assert.equal(tile(f.tree, milk.name), undefined);
-    assert.equal(f.sent.length, 1);
+    assert.equal(f.sent.length, 2);
     assert.equal(f.rows.find(row => row.id === 'om').quantity, 24000);
   } finally { await f.close(); }
 });
