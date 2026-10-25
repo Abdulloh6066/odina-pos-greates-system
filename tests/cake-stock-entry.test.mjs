@@ -138,15 +138,43 @@ test('rapid duplicate submit sends only one incoming request', async () => {
   } finally { await f.close(); }
 });
 
-test('negative and missing balances cannot become an incoming receipt; inactive products are absent', async () => {
+for (const entryMode of [false, true]) {
+  for (const [received, after] of [[1, -2], [3, 0], [5, 2]]) {
+    test((entryMode ? 'incoming tile' : 'detail Kirim') + ' adds ' + received + ' to negative stock without a count', async () => {
+      const f = await fixture();
+      try {
+        if (entryMode) await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
+        await act(async () => tile(f.tree, 'Negative').props.onClick());
+        if (entryMode) assert.ok(text(tile(f.tree, 'Negative')).includes('+ Kirim'));
+        else {
+          assert.equal(button(f.tree, 'Kirim').props.disabled, false);
+          await act(async () => button(f.tree, 'Kirim').props.onClick());
+        }
+        assert.equal(button(f.tree, 'Chiqim').props.disabled, true);
+        assert.equal(text(f.tree.toJSON()).includes('Kirimdan oldin'), false);
+        await changeQuantity(f.tree, String(received));
+        assert.equal(button(f.tree, 'Kirimni saqlash').props.disabled, false);
+        assert.ok(text(f.tree.toJSON()).includes('Keyingi: ' + after + ' dona'));
+        await act(async () => submit(f.tree));
+        assert.equal(f.sent.length, 1);
+        assert.equal(f.sent[0].payload.expected_quantity, -3);
+        assert.equal(f.sent[0].payload.quantity_change, received);
+        assert.equal('counted_quantity' in f.sent[0].payload, false);
+        assert.equal(f.rows.find(row => row.id === 'sn').quantity, after);
+        assert.equal(f.rows.find(row => row.id === 'other-a').quantity, 17);
+        assert.equal(f.tree.root.findAllByType('form').length, 0);
+      } finally { await f.close(); }
+    });
+  }
+}
+
+test('missing balances still need a count; inactive products are absent', async () => {
   const f = await fixture();
   try {
     await act(async () => button(f.tree, 'Kirim kiritish').props.onClick());
     assert.equal(tile(f.tree, 'Inactive'), undefined);
-    for (const name of ['Negative', 'Missing']) {
-      await act(async () => tile(f.tree, name).props.onClick());
-      assert.equal(f.tree.root.findAllByType('form').length, 0);
-    }
+    await act(async () => tile(f.tree, 'Missing').props.onClick());
+    assert.equal(f.tree.root.findAllByType('form').length, 0);
     assert.equal(f.sent.length, 0);
     await act(async () => tile(f.tree, 'Zero').props.onClick());
     assert.equal(f.tree.root.findAllByType('form').length, 1);
