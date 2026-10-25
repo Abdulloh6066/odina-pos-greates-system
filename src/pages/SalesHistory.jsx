@@ -2,6 +2,7 @@ import '@/styles/operations-workbench.css';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { loadOperationalSettings } from '@/lib/operational-config';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { ReceiptText, Search, Eye, RotateCcw, Truck, Printer } from 'lucide-react';
 import { formatUZS, formatNum, saleBusinessDate, saleOccurredAt } from '@/lib/pos';
@@ -45,8 +46,7 @@ export default function SalesHistory({ embedded = false, settings = null }) {
     try {
       // Reprints use the original sale snapshot; settings load only on demand.
       if (!settings && !receiptSettings) {
-        const rows = await base44.entities.Settings.list('-created_date', 1);
-        setReceiptSettings(rows?.[0] || {});
+        setReceiptSettings(await loadOperationalSettings(base44));
       }
       setReceiptPrintSale(sale);
     } catch (error) {

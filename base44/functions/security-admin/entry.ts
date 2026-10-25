@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const managerShopId = isManager ? userShopId(admin) : "";
     if (isManager) {
       const managerShop = managerShopId ? await service.entities.Shop.get(managerShopId).catch(() => null) : null;
-      if (!managerShop || managerShop.active === false) {
+      if (!managerShop || managerShop.active === false || managerShop.location_type === "production") {
         return Response.json({ error: "Boshqaruvchiga faol do‘kon biriktirilmagan." }, { status: 403 });
       }
     }
@@ -60,16 +60,17 @@ Deno.serve(async (req) => {
     const action = String(body?.action || "");
 
     if (action === "status") {
+      if (isManager) {
+        // The staff view must not read owner PIN material or the global audit feed.
+        const users = await service.entities.User.list("-created_date", 500);
+        const own = (users || []).map(safeUser).filter((row: any) => row.id === String(admin.id) || (row.shop_id === managerShopId && row.role !== "admin" && !row.is_owner));
+        return Response.json({ pin_set: false, can_manage_admins: false, manager_scope: { shop_id: managerShopId, roles: [...MANAGER_MANAGEABLE_ROLES] }, users: own, audit: [] });
+      }
       const [users, securityRows, auditRows] = await Promise.all([
         service.entities.User.list("-created_date", 500),
         service.entities.SecuritySettings.filter({ key: "owner_approval_pin" }, "-updated_date", 2),
         service.entities.ActionHistory.list("-created_date", 30),
       ]);
-      if (isManager) {
-        // Managers see only their own shop's staff and never owner/admin accounts or the owner audit feed.
-        const own = (users || []).map(safeUser).filter((row: any) => row.id === String(admin.id) || (row.shop_id === managerShopId && row.role !== "admin" && !row.is_owner));
-        return Response.json({ pin_set: false, can_manage_admins: false, manager_scope: { shop_id: managerShopId, roles: [...MANAGER_MANAGEABLE_ROLES] }, users: own, audit: [] });
-      }
       return Response.json({
         pin_set: Boolean(securityRows?.[0]?.pin_hash && securityRows?.[0]?.pin_salt),
         can_manage_admins: canManageAdmins,

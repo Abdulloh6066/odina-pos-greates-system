@@ -44,13 +44,16 @@ export default async function (req) {
       );
     }
     const body = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return Response.json({ error: "So‘rov noto‘g‘ri." }, { status: 400 });
+    }
     // A manager's report is always limited to his own shop.
     if (managerShopId && body && typeof body === "object") body.shop_id = managerShopId;
     const action = String(body?.action || "report");
     const today = reportDate(new Date().toISOString());
     const dateFrom = String(body?.date_from || `${today.slice(0, 7)}-01`);
     const dateTo = String(body?.date_to || today);
-    const shopId = String(body?.shop_id || "");
+    const shopId = managerShopId || String(body?.shop_id || "");
     const productId = String(body?.product_id || "");
     const categoryId = String(body?.category_id || "");
 

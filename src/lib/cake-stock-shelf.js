@@ -176,21 +176,28 @@ export async function loadAllCakeBalances(entity, shopId) {
 
 // Non-admin roles may be blocked by row-level read rules; when the direct read is empty,
 // ask the warehouse-stock backend, which checks the user's assigned shop itself.
-export async function loadCakeBalancesWithServer(entity, shopId, itemKind, invoke) {
+export async function loadCakeBalancesWithServer(entity, shopId, itemKind, invoke, { requireServer = false } = {}) {
+  if (!shopId || !['product', 'ingredient'].includes(itemKind)) throw new Error('Do‘kon va qoldiq turini tekshiring.');
   let rows = [];
   let directError = null;
-  try { rows = await loadAllCakeBalances(entity, shopId); } catch (error) { directError = error; }
-  if (rows.length || typeof invoke !== 'function') {
+  if (!requireServer) {
+    try { rows = await loadAllCakeBalances(entity, shopId); } catch (error) { directError = error; }
+  }
+  if (!requireServer && (rows.length || typeof invoke !== 'function')) {
     if (directError) throw directError;
     return rows;
   }
+  if (typeof invoke !== 'function') throw new Error('Qoldiq serveriga ulanish mavjud emas.');
   try {
     const response = await invoke('warehouse-stock', { action: 'list_balances', location_id: shopId, item_kind: itemKind });
     const payload = response?.data || response;
-    if (Array.isArray(payload?.rows)) return payload.rows.filter((row) => row?.location_id === shopId);
-  } catch { /* fall through to the direct result */ }
-  if (directError) throw directError;
-  return rows;
+    if (response?.status >= 400 || payload?.error) throw new Error(payload?.error || 'Qoldiq serveri so‘rovni rad etdi.');
+    if (!Array.isArray(payload?.rows)) throw new Error('Qoldiq serveri javobi noto‘g‘ri.');
+    return payload.rows.filter((row) => row?.location_id === shopId);
+  } catch (error) {
+    const message = error?.response?.data?.error || error?.response?.data?.message || error?.message;
+    throw new Error(message || 'Qoldiqni serverdan yuklab bo‘lmadi. Qayta yangilang.', { cause: error });
+  }
 }
 
 export function mergeCakeStockEvent(rows, event, shopId, itemIdField = 'product_id') {

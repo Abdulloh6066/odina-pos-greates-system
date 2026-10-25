@@ -125,7 +125,7 @@ function permits(rule, user, row) {
   });
 }
 test('entity RLS rejects other shops even when manager is the row creator', () => {
-  for (const [entity, field] of Object.entries({Shop:'id', Sale:'shop_id', SaleItem:'shop_id', Payment:'shop_id', Refund:'shop_id', Shift:'shop_id', CashMovement:'shop_id', CustomerOrder:'shop_id', CustomerOrderItem:'shop_id', OrderPayment:'shop_id', DailyShopReport:'shop_id', ShiftProductSnapshot:'shop_id', StockMovement:'location_id', ProductionBatch:'location_id', SupplierReceipt:'location_id'})) {
+  for (const [entity, field] of Object.entries({Shop:'id', Sale:'shop_id', SaleItem:'shop_id', Payment:'shop_id', Refund:'shop_id', Shift:'shop_id', CashMovement:'shop_id', CustomerOrder:'shop_id', CustomerOrderItem:'shop_id', OrderPayment:'shop_id', ShiftProductSnapshot:'shop_id', StockMovement:'location_id', ProductionBatch:'location_id', SupplierReceipt:'location_id'})) {
     const schema = JSON.parse(readFileSync('base44/entities/' + entity + '.jsonc', 'utf8'));
     const row = { [field]: 'shop-a', user_id: manager.id, cashier_id: manager.id };
     assert.equal(permits(schema.rls.read, manager, row), true, entity + ' own');

@@ -167,7 +167,7 @@ const fixtureProducts = [{ id: 'napoleon', name: 'Napoleon', category_id: 'cakes
   active: true, track_stock: true, production_unit: 'piece', sale_unit: 'piece', pieces_per_sheet: 1, price: 18000 }];
 const fixtureShops = [{ id: 'branch', name: 'Odina Branch', active: true, location_type: 'shop' }];
 
-async function productsFixture(role = 'admin') {
+async function productsFixture(role = 'admin', { allowShopActions = false } = {}) {
   const reads = [], writes = [], guards = new Set();
   const scope = { isAdmin: true, ready: true, shopId: 'branch', specificShopId: 'branch', shops: fixtureShops,
     registerGuard(callback) { guards.add(callback); return () => guards.delete(callback); } };
@@ -181,7 +181,14 @@ async function productsFixture(role = 'admin') {
     if (key in target) return target[key];
     return async (...args) => { writes.push({ entity: name, action: String(key), args }); throw Error('No mutation allowed in page-opening tests'); };
   } })]));
-  const backend = { entities, functions: { invoke: async (...args) => { writes.push(args); throw Error('No function writes allowed'); } } };
+  const backend = { entities, functions: { invoke: async (...args) => {
+    writes.push(args);
+    const [name, body] = args;
+    if (allowShopActions && name === 'manager-shop' && body.action === 'set_product_category') {
+      return { data: { ok: true, product_id: body.product_id, category_id: body.category_id, shop_id: 'branch' } };
+    }
+    throw Error('No function writes allowed');
+  } } };
   const dialogService = { odinaAlert: async () => {}, odinaConfirm: async () => false };
   const helper = evaluate('src/lib/cake-sheet-yield.js');
   const YieldDialog = evaluate('src/components/warehouse/CakeSheetYieldDialog.jsx', {
@@ -199,6 +206,7 @@ async function productsFixture(role = 'admin') {
     '@/components/PageHeader': { default: ({ title, subtitle, actions }) => React.createElement('header', {},
       React.createElement('h1', {}, title), React.createElement('p', {}, subtitle), actions) },
     '@/components/TestCatalogCleanup': { default: () => null },
+    '@/components/products/PosThumbnailOptimizer': { default: () => null },
     '@/components/products/CakeStockShelf': { default: props => React.createElement('stock-shelf', { 'data-role': props.user.role }) },
     '@/components/warehouse/CakeSheetYieldDialog': { default: YieldDialog },
   }).default;
@@ -221,6 +229,20 @@ test('3D + opens catalog for admin/accountant and inventory for manager/producti
       assert.deepEqual(f.reads.map(read => read.entity).sort(), ['Category', 'Ingredient', 'Product', 'Shop']);
     } finally { await f.close(); }
   }
+});
+
+test('manager changes only the shop product category from the actual catalog dialog', async () => {
+  const f = await productsFixture('manager', { allowShopActions: true });
+  try {
+    await act(async () => { button(f.tree, 'Mahsulotlar katalogi').props.onClick(); });
+    await act(async () => { button(f.tree, 'Do‘kon kategoriyasi').props.onClick(); });
+    const select = f.tree.root.findByProps({ id: 'manager-product-category' });
+    await act(async () => { select.props.onChange({ target: { value: 'cakes' } }); });
+    await act(async () => { button(f.tree, 'Saqlash').props.onClick(); });
+    assert.deepEqual(clone(f.writes), [['manager-shop', { action: 'set_product_category', product_id: 'napoleon', category_id: 'cakes' }]]);
+    assert.equal(f.tree.root.findAllByType('dialog').length, 0);
+    assert.equal(fixtureProducts[0].category_id, 'cakes');
+  } finally { await f.close(); }
 });
 
 test('new product and moved sheet-yield dialogs open/close from 3D + without writes and guard global shop switching', async () => {

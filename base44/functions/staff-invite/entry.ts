@@ -1,7 +1,8 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { resolveStoredAppUser, userRole } from "../../shared/user-helpers.ts";
+import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-helpers.ts";
 
 const STAFF_ROLES = ["manager", "cashier", "accountant", "production", "warehouse"];
+const MANAGER_ROLES = new Set(["cashier", "warehouse"]);
 // Match the protected owner flag used by security-admin and User RLS.
 const isOwner = (user: any) => user?.is_owner === true || user?.data?.is_owner === true;
 
@@ -46,12 +47,30 @@ Deno.serve(async (req) => {
       if (!invite) return Response.json({ applied: false });
 
       const desiredRole = String(invite.desired_role || "");
+      // Revalidate the stored inviter at claim time: pending invites are not enduring authority.
+      const inviter = invite.invited_by_id
+        ? await base44.asServiceRole.entities.User.get(invite.invited_by_id).catch(() => null)
+        : null;
+      const inviterRole = inviter ? userRole(inviter) : "";
+      if (!inviter || !["admin", "manager"].includes(inviterRole)
+        || inviter.active === false || inviter.data?.active === false) {
+        return Response.json({ error: "Taklif yuborgan xodimning faol ruxsati topilmadi." }, { status: 403 });
+      }
+      if (inviterRole === "manager") {
+        const ownShopId = userShopId(inviter);
+        const ownShop = ownShopId ? await base44.asServiceRole.entities.Shop.get(ownShopId).catch(() => null) : null;
+        const targetRole = userRole(storedInvitee);
+        const targetShop = userShopId(storedInvitee);
+        if (!ownShop || ownShop.active === false || ownShop.location_type === "production"
+          || String(invite.shop_id || "") !== ownShopId || !MANAGER_ROLES.has(desiredRole)
+          || (targetShop && targetShop !== ownShopId)
+          || (targetRole && targetRole !== "user" && !MANAGER_ROLES.has(targetRole))) {
+          return Response.json({ error: "Boshqaruvchi taklifi faqat o‘z do‘konidagi kassir yoki omborchi uchun." }, { status: 403 });
+        }
+      }
       if (desiredRole === "admin") {
         // An admin invite may only have originated from the protected owner.
         // Never trust the desired_role or invited_by_id in an unverified record.
-        const inviter = invite.invited_by_id
-          ? await base44.asServiceRole.entities.User.get(invite.invited_by_id).catch(() => null)
-          : null;
         if (!inviter || !isOwner(inviter) || userRole(inviter) !== "admin"
             || inviter.active === false || inviter.data?.active === false) {
           return Response.json({ error: "Admin taklifini faqat hisob egasi tasdiqlaydi." }, { status: 403 });
@@ -141,6 +160,11 @@ Deno.serve(async (req) => {
       if ((matchingUsers || []).some((user: any) => isOwner(user))) {
         return Response.json({ error: "Himoyalangan egasi hisobiga xodim taklifi yuborilmaydi." }, { status: 403 });
       }
+      if (inviterRole === "manager" && (matchingUsers || []).some((user: any) =>
+        userShopId(user) !== shopId || !MANAGER_ROLES.has(userRole(user))
+        || user.active === false || user.data?.active === false)) {
+        return Response.json({ error: "Bu hisobni boshqaruvchi taklifi orqali o‘zgartirish mumkin emas." }, { status: 403 });
+      }
 
       let shopName = "";
       if (desiredRole !== "admin") {
@@ -148,7 +172,7 @@ Deno.serve(async (req) => {
           return Response.json({ error: "Xodim ishlaydigan joyni tanlang." }, { status: 400 });
         }
         const shop = await base44.asServiceRole.entities.Shop.get(shopId);
-        if (!shop || shop.active === false) {
+        if (!shop || shop.active === false || (inviterRole === "manager" && shop.location_type === "production")) {
           return Response.json({ error: "Tanlangan joy topilmadi yoki faol emas." }, { status: 400 });
         }
         shopName = shop.name;
@@ -158,8 +182,12 @@ Deno.serve(async (req) => {
       const previous = await base44.asServiceRole.entities.PendingStaffInvite.filter(
         { email, status: "pending" },
         "-created_date",
-        1,
+        500,
       );
+      if (inviterRole === "manager" && (previous || []).some((invite: any) =>
+        String(invite.shop_id || "") !== shopId || !MANAGER_ROLES.has(String(invite.desired_role || "")))) {
+        return Response.json({ error: "Boshqa do‘kon yoki himoyalangan lavozim taklifini o‘zgartirish mumkin emas." }, { status: 403 });
+      }
 
       const inviteData = {
         email,

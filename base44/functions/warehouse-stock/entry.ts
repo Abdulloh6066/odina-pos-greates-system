@@ -3,6 +3,7 @@ import { resolveAppUser } from "../../shared/user-helpers.ts";
 
 const ALLOWED_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const ALLOWED_TYPES = new Set(["opening", "adjustment"]);
+const BALANCE_READER_VERSION = "2026-10-25-manager-stock-1";
 
 const number = (value: unknown) => {
   const parsed = Number(value);
@@ -37,9 +38,11 @@ export default async function(req) {
       const rows = [];
       for (let skip = 0; skip < 10000; skip += 500) {
         const page = await entity.filter({ location_id: locationId }, "-updated_at", 500, skip);
-        if (!Array.isArray(page)) break;
+        if (!Array.isArray(page)) return Response.json({ error: "Qoldiq serveri javobi noto‘g‘ri." }, { status: 502 });
         rows.push(...page.filter((row) => row?.location_id === locationId));
-        if (page.length < 500) return Response.json({ rows });
+        if (page.length < 500) return Response.json({ rows, location_id: locationId,
+          stock_source: itemKind === "ingredient" ? "IngredientStock" : "ProductStock",
+          reader_version: BALANCE_READER_VERSION });
       }
       return Response.json({ error: "Qoldiqlar to‘liq yuklanmadi." }, { status: 500 });
     }

@@ -19,6 +19,8 @@ const ICONS = ['🎂', '🧁', '🥐', '🍮', '☕', '🍵', '💧', '🧊', '�
 export default function Categories() {
   const { user } = useOutletContext();
   const canManage = ['admin', 'accountant'].includes(user?.role);
+  const isManager = user?.role === 'manager';
+  const [savingVisibilityId, setSavingVisibilityId] = useState('');
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -38,6 +40,21 @@ export default function Categories() {
     if (!q) return categories;
     return categories.filter((c) => (c.name || '').toLowerCase().includes(q));
   }, [categories, query]);
+
+  const setShopVisibility = async (category) => {
+    if (!isManager || savingVisibilityId) return;
+    setSavingVisibilityId(category.id);
+    try {
+      const hidden = !category.hidden_shop_ids?.includes(user.shop_id);
+      const response = await base44.functions.invoke('manager-shop', { action: 'set_category_visibility', category_id: category.id, hidden });
+      const result = response?.data || response;
+      if (!result?.ok || result.shop_id !== user.shop_id) throw new Error(result?.error || 'Kategoriya ko‘rinishi saqlanmadi.');
+      setCategories(rows => rows.map(row => row.id === result.category_id ? { ...row, hidden_shop_ids: result.hidden
+        ? [...new Set([...(row.hidden_shop_ids || []), user.shop_id])]
+        : (row.hidden_shop_ids || []).filter(id => id !== user.shop_id) } : row));
+    } catch (error) { void odinaAlert(error?.response?.data?.error || error?.message || 'Kategoriya ko‘rinishi saqlanmadi.'); }
+    finally { setSavingVisibilityId(''); }
+  };
 
   const remove = async (cat) => {
     const accepted = await odinaConfirm(`“${cat.name}” kategoriyasini o‘chirasizmi?`, {
@@ -107,7 +124,8 @@ export default function Categories() {
           ) : (
             <div className="cat-grid">
               {filtered.map((c) => (
-                <CategoryCard key={c.id} category={c} canManage={canManage} onEdit={() => { setEditing(c); setOpen(true); }} onRemove={() => remove(c)} />
+                <CategoryCard key={c.id} category={c} canManage={canManage} onEdit={() => { setEditing(c); setOpen(true); }} onRemove={() => remove(c)}
+                  shopVisibility={isManager ? { hidden: c.hidden_shop_ids?.includes(user.shop_id), disabled: Boolean(savingVisibilityId), onChange: () => setShopVisibility(c) } : null} />
               ))}
             </div>
           )}
@@ -119,7 +137,7 @@ export default function Categories() {
   );
 }
 
-function CategoryCard({ category: c, canManage, onEdit, onRemove }) {
+function CategoryCard({ category: c, canManage, onEdit, onRemove, shopVisibility }) {
   const active = c.active !== false;
   return (
     <article className={`cat-card${active ? '' : ' is-inactive'}`}>
@@ -132,6 +150,9 @@ function CategoryCard({ category: c, canManage, onEdit, onRemove }) {
           <span className="cat-dot" /> {active ? 'Faol' : 'Nofaol'}
         </span>
       </div>
+      {shopVisibility && <div className="cat-actions"><button className="cat-act" disabled={shopVisibility.disabled} onClick={shopVisibility.onChange}>
+        {shopVisibility.hidden ? 'Do‘konimda ko‘rsatish' : 'Do‘konimda yashirish'}
+      </button></div>}
       {canManage && (
         <div className="cat-actions">
           <button className="cat-act" onClick={onEdit}><Pencil size={15} aria-hidden="true" /> Tahrirlash</button>

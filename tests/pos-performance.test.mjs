@@ -12,6 +12,7 @@ import { mergePosStockEvent } from '../src/lib/pos-stock-events.js';
 import { startSaleRequest, waitForSaleResponse, releaseSaleRequest } from '../src/lib/offline-sales.js';
 import { formatUzbekistanDateTime } from '../src/lib/uzbekistan-time.js';
 import * as checkoutTimingStorage from '../src/lib/checkout-timing.js';
+import { loadOperationalSettings } from '../src/lib/operational-config.js';
 
 const read = path => readFileSync(path, 'utf8');
 const deferred = () => {
@@ -65,9 +66,13 @@ function loadingHarness({ productPromise = Promise.resolve([{ id: 'cake', name: 
   const ctx = {
     base44: {
       entities,
-      functions: { invoke: (name) => { calls.push(name); return optional(name); } },
+      functions: { invoke: (name, body) => { calls.push(name);
+        if (name === 'manager-shop' && body?.action === 'get_operational_settings') return Promise.resolve({ data: { settings: { allow_negative_stock: true } } });
+        return optional(name);
+      } },
     },
     loadCurrentShift: async () => ({ id: 'shift', shop_id: 'branch' }),
+    loadOperationalSettings,
     setLoadingData: value => { state.loading = value; },
     setCategories: value => { state.categories = value; },
     setProducts: value => { state.products = value; },
@@ -153,6 +158,7 @@ function gridFixture() {
     '@/components/ui/image': { Image: props => React.createElement('img', props) },
     '@/lib/pos': { formatUZS: amount => `${amount} UZS` },
     '@/lib/pos-thumbnails': { posThumbnailFor: () => null },
+    '@/lib/product-photos': { productPhotoFallbackFor: () => null },
   });
   const Grid = component('src/components/pos/ProductGrid.jsx', {
     react: React,
@@ -312,6 +318,7 @@ test('supplier-payment UI distinguishes loading and errors from a genuinely empt
 function checkoutHarness({ clock = performance } = {}) {
   const gate = deferred(); const calls = []; const alerts = []; const receipts = []; const timings = []; const logs = []; const diagnostics = [];
   const ctx = {
+    posScopeReadOnly: false, shopScope: null,
     saleSubmittingRef: { current: false }, checkoutReadyRef: { current: true },
     checkoutAttemptRef: { current: null }, checkoutSessionRef: { current: {} }, reconciledSaleKeysRef: { current: new Set() },
     stockReadGenerationRef: { current: 0 }, confirmedStockRef: { current: new Map() },
@@ -592,7 +599,7 @@ function checkoutStatusFixture() {
   };
   visit(ast); assert.ok(element, 'the real POS must render its checkout timing status');
   const code = transformSync(`globalThis.ScopedStatus = ({ lastCheckoutTiming, shift, paying, user = { role: 'admin' } }) => (${element});`, { loader: 'jsx', jsx: 'transform' }).code;
-  const ctx = { React, CheckoutTimingStatus: Status }; vm.runInNewContext(code, ctx);
+  const ctx = { React, CheckoutTimingStatus: Status, shopScope: null }; vm.runInNewContext(code, ctx);
   return props => renderToStaticMarkup(React.createElement(ctx.ScopedStatus, props));
 }
 

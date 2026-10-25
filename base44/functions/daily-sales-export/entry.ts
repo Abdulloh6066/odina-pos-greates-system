@@ -11,6 +11,9 @@ const CONFIG_KEY = "daily-export";
 
 const VIEW_ROLES = ["admin", "manager", "accountant"];
 const ADMIN_ROLES = ["admin"];
+const MANAGER_HISTORY_FIELDS = ["id", "business_date", "shop_id", "shop_name", "total_revenue", "total_cost", "real_profit",
+  "margin", "sale_count", "refund_count", "cash_total", "uzcard_total", "humo_total", "online_total", "bank_transfer_total",
+  "order_payment_total", "collections_total", "expenses_total", "sent_at", "sheet_appended", "email_sent", "email_delivery_state"];
 
 const readAll = readReportRows;
 
@@ -56,7 +59,7 @@ async function getConfig(service: any) {
 async function computeReportsForDate(service: any, businessDate: string, scopedShopId = "") {
   const allShops = await readAll(service.entities.Shop, {}, "name");
   const shops = allShops.filter((s: any) => s.active !== false && (!scopedShopId || s.id === scopedShopId));
-  const activity = scopeReportActivity(await loadReportActivity(service, businessDate, businessDate), scopedShopId);
+  const activity = scopeReportActivity(await loadReportActivity(service, businessDate, businessDate, scopedShopId ? [scopedShopId] : []), scopedShopId);
   const sales = activity.sales;
 
   const reports: any[] = [];
@@ -99,7 +102,7 @@ async function computeReportsForRange(service: any, dateFrom: string, dateTo: st
     f = t;
     t = tmp;
   }
-  const activity = scopeReportActivity(await loadReportActivity(service, f, t), scopedShopId);
+  const activity = scopeReportActivity(await loadReportActivity(service, f, t, scopedShopId ? [scopedShopId] : []), scopedShopId);
   const sales = activity.sales;
 
   const dateSet = new Set<string>();
@@ -570,15 +573,24 @@ export default async function(req: Request): Promise<Response> {
     const scopedShopId = role === "manager" ? userShopId(stored) : "";
     if (role === "manager") {
       const assigned = scopedShopId ? await service.entities.Shop.get(scopedShopId).catch(() => null) : null;
-      if (!assigned || assigned.active === false) return Response.json({ error: "Faol ish joyi kerak." }, { status: 403 });
+      if (!assigned || assigned.active === false || assigned.location_type === "production") return Response.json({ error: "Faol ish joyi kerak." }, { status: 403 });
     }
     const body = await req.json().catch(() => ({}));
+    if (!body || typeof body !== "object" || Array.isArray(body)) return Response.json({ error: "So‘rov noto‘g‘ri." }, { status: 400 });
     const action = String(body.action || "getConfig");
     const ctx = {
       userId: String(stored.id || auth.id || ""),
       userName: String(stored.full_name || auth.full_name || auth.email || "Egasi"),
     };
 
+    if (action === "history") {
+      if (role !== "manager" || !scopedShopId) return Response.json({ error: "Do‘kon boshqaruvchisi ruxsati kerak." }, { status: 403 });
+      const rows = await service.entities.DailyShopReport.filter({ shop_id: scopedShopId }, "-business_date", 100);
+      if (!Array.isArray(rows)) return Response.json({ error: "Hisobot tarixi javobi noto‘g‘ri." }, { status: 502 });
+      const reports = rows.filter(row => row?.shop_id === scopedShopId).map(row =>
+        Object.fromEntries(MANAGER_HISTORY_FIELDS.filter(key => row[key] !== undefined).map(key => [key, row[key]])));
+      return Response.json({ reports, shop_id: scopedShopId });
+    }
     if (!["getConfig", "saveConfig", "preview", "range", "send", "autoSend", "reminder"].includes(action)) {
       return Response.json({ error: "Noma’lum amal." }, { status: 400 });
     }

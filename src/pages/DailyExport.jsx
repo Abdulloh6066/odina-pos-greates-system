@@ -1,6 +1,7 @@
 import '@/styles/operations-workbench.css';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { loadExportHistory } from '@/lib/operational-config';
 import { useAuth } from '@/lib/AuthContext';
 import PageHeader from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,15 +109,15 @@ export default function DailyExport() {
 
   const loadHistory = async () => {
     try {
-      const rows = await base44.entities.DailyShopReport.list('-business_date', 100);
+      const rows = await loadExportHistory(base44, role);
       setHistory(rows || []);
-    } catch {
-      setHistory([]);
+    } catch (error) {
+      toast({ title: 'Hisobot tarixi yuklanmadi', description: error?.message, variant: 'destructive' });
     }
   };
 
   useEffect(() => {
-    loadConfig();
+    if (role !== 'manager') loadConfig();
     loadPreview(tashkentDateKey());
     loadHistory();
     return () => { previewRequest.current += 1; };

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
 import './cake-stock-shelf.css';
 
-function useLiveCakeBalances(shopId, itemKind = 'product') {
+function useLiveCakeBalances(shopId, itemKind = 'product', requireServer = false) {
   const entityName = itemKind === 'ingredient' ? 'IngredientStock' : 'ProductStock';
   const itemIdField = itemKind === 'ingredient' ? 'ingredient_id' : 'product_id';
   const balanceKey = entityName + ':' + shopId;
@@ -31,7 +31,7 @@ function useLiveCakeBalances(shopId, itemKind = 'product') {
       setData((state) => ({ ...state, loading: true }));
       inflight = (async () => {
         try {
-          let rows = await loadCakeBalancesWithServer(base44.entities[entityName], shopId, itemKind, (name, payload) => base44.functions.invoke(name, payload));
+          let rows = await loadCakeBalancesWithServer(base44.entities[entityName], shopId, itemKind, (name, payload) => base44.functions.invoke(name, payload), { requireServer });
           for (const event of queuedEvents) rows = mergeCakeStockEvent(rows, event, shopId, itemIdField) || rows;
           queuedEvents = [];
           if (!disposed) setData({ shopId: balanceKey, rows, ready: true, loading: false, error: '', updatedAt: new Date().toISOString() });
@@ -74,7 +74,7 @@ function useLiveCakeBalances(shopId, itemKind = 'product') {
       window.removeEventListener('online', resume); window.removeEventListener('offline', offline);
       refreshRef.current = async () => false;
     };
-  }, [shopId, entityName, itemIdField, balanceKey, itemKind]);
+  }, [shopId, entityName, itemIdField, balanceKey, itemKind, requireServer]);
   return { ...(data.shopId === balanceKey ? data : { rows: [], ready: false, loading: Boolean(shopId), error: '', updatedAt: null }), online, refresh: useCallback(() => refreshRef.current(), []) };
 }
 
@@ -143,7 +143,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const noun = scope === 'cakes' ? 'Tort' : 'Mahsulot';
   const plural = scope === 'cakes' ? 'Tortlar' : 'Mahsulotlar';
   const shelfCategories = isIngredient ? INGREDIENT_SHELF_CATEGORIES : categories;
-  const balances = useLiveCakeBalances(shop?.id || '', isIngredient ? 'ingredient' : 'product');
+  const balances = useLiveCakeBalances(shop?.id || '', isIngredient ? 'ingredient' : 'product', user?.role === 'manager');
   const scopedProducts = useMemo(() => {
     if (isIngredient) return shelfIngredients(ingredients);
     // Production inventory is independent of the destinations where products are sold.

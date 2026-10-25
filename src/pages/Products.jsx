@@ -24,7 +24,7 @@ import '@/styles/catalog-workbench.css';
 export default function Products() {
   const { user, adminShopScope } = useOutletContext();
   const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
-  const scopedShopId = shopScope?.specificShopId || '';
+  const scopedShopId = shopScope?.specificShopId || (user?.role === 'manager' ? user.shop_id : '') || '';
   const role = user?.role || 'cashier';
   const canManageCatalog = role === 'admin' || role === 'accountant';
   const [products, setProducts] = useState([]);
@@ -43,6 +43,9 @@ export default function Products() {
   const [shopPriceProduct, setShopPriceProduct] = useState(null);
   const [shopPrice, setShopPrice] = useState('');
   const [savingShopPrice, setSavingShopPrice] = useState(false);
+  const [shopCategoryProduct, setShopCategoryProduct] = useState(null);
+  const [shopCategoryId, setShopCategoryId] = useState('');
+  const [savingShopCategory, setSavingShopCategory] = useState(false);
   useEffect(() => shopScope?.registerGuard?.(() => open || shopPriceProduct || savingShopPrice || cakeSheetYieldOpen
     ? 'Avval mahsulot oynasini yoping yoki saqlash tugashini kuting.' : ''),
   [shopScope?.registerGuard, open, shopPriceProduct, savingShopPrice, cakeSheetYieldOpen]);
@@ -62,6 +65,19 @@ export default function Products() {
       setShopPriceProduct(null);
     } catch (error) { void odinaAlert(error?.response?.data?.error || error?.message || 'Narx saqlanmadi.'); }
     finally { setSavingShopPrice(false); }
+  };
+
+  const saveShopCategory = async () => {
+    if (savingShopCategory || !shopCategoryProduct || !shopCategoryId) return;
+    setSavingShopCategory(true);
+    try {
+      const response = await base44.functions.invoke('manager-shop', { action: 'set_product_category', product_id: shopCategoryProduct.id, category_id: shopCategoryId });
+      const result = response?.data || response;
+      if (!result?.ok) throw new Error(result?.error || 'Kategoriya saqlanmadi.');
+      setProducts(rows => rows.map(row => row.id === result.product_id ? { ...row, shop_category_ids: { ...(row.shop_category_ids || {}), [result.shop_id]: result.category_id } } : row));
+      setShopCategoryProduct(null);
+    } catch (error) { void odinaAlert(error?.response?.data?.error || error?.message || 'Kategoriya saqlanmadi.'); }
+    finally { setSavingShopCategory(false); }
   };
 
   const load = async () => {
@@ -207,6 +223,7 @@ export default function Products() {
               <div className="catalog-product-actions">
                 {canManageCatalog && <Button variant="outline" size="sm" onClick={() => openEdit(p)} aria-label={`${p.name} mahsulotini umumiy katalogda tahrirlash`}><Pencil className="w-4 h-4" aria-hidden="true" /> {shopScope ? 'Umumiy katalogni tahrirlash' : 'Tahrirlash'}</Button>}
                 {role === 'manager' && <Button variant="outline" size="sm" onClick={() => { setShopPriceProduct(p); setShopPrice(String(priceForShop(p, user.shop_id))); }}>Do‘kon narxi: {formatUZS(priceForShop(p, user.shop_id))}</Button>}
+                {role === 'manager' && <Button variant="outline" size="sm" onClick={() => { setShopCategoryProduct(p); setShopCategoryId(categoryForShop(p, user.shop_id) || ''); }}>Do‘kon kategoriyasi</Button>}
                 {(role === 'production' || canManageCatalog) && (
                   <Button variant="outline" size="sm" className="catalog-availability" onClick={() => setAvailability(p)}>
                     {shopScope ? (p.active === false ? 'Barcha do‘konlarda sotuvga chiqarish' : 'Barcha do‘konlarda sotuvdan olish') : p.active === false ? 'Sotuvga chiqarish' : 'Sotuvdan olish'}
@@ -225,6 +242,16 @@ export default function Products() {
           <p className="text-sm text-muted-foreground">{user?.shop_name} uchun sotuv narxi</p>
           <Label>Narx (so‘m)</Label><Input type="number" min="0" step="1000" value={shopPrice} onChange={(event) => setShopPrice(event.target.value)} />
           <DialogFooter><Button disabled={savingShopPrice || !shopPrice.trim() || !Number.isSafeInteger(Number(shopPrice)) || Number(shopPrice) < 0} onClick={saveShopPrice}>{savingShopPrice ? 'Saqlanmoqda…' : 'Saqlash'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(shopCategoryProduct)} onOpenChange={value => { if (!value && !savingShopCategory) setShopCategoryProduct(null); }}>
+        <DialogContent><DialogHeader><DialogTitle>{shopCategoryProduct?.name} — do‘kon kategoriyasi</DialogTitle></DialogHeader>
+          <Label htmlFor="manager-product-category">{user?.shop_name} uchun kategoriya</Label>
+          <OdinaSelect id="manager-product-category" value={shopCategoryId} onChange={event => setShopCategoryId(event.target.value)}>
+            <option value="">Kategoriyani tanlang</option>
+            {categories.filter(category => category.active !== false).map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </OdinaSelect>
+          <DialogFooter><Button disabled={savingShopCategory || !shopCategoryId} onClick={saveShopCategory}>{savingShopCategory ? 'Saqlanmoqda…' : 'Saqlash'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       {cakeSheetYieldOpen && <CakeSheetYieldDialog

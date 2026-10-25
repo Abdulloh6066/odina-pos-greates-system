@@ -50,7 +50,7 @@ export const resolveAppUser = async (service: any, authenticatedUser: any) => {
   const shopId = userShopId(storedUser);
   if (storedRole === "manager") {
     const shop = shopId ? await service.entities.Shop.get(shopId).catch(() => null) : null;
-    if (!shop || shop.active === false) {
+    if (!shop || shop.active === false || shop.location_type === "production") {
       throw Object.assign(new Error("Boshqaruvchiga faol ish joyi biriktirilishi kerak."), { status: 403 });
     }
   }

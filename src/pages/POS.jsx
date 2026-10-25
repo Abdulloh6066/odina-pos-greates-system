@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { loadOperationalSettings } from '@/lib/operational-config';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from '@/lib/order-request-retry';
 import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
@@ -611,11 +612,11 @@ export default function POS() {
     const stockGeneration = stockReadGenerationRef.current;
     if (showLoading) setLoadingData(true);
     try {
-      const [cats, prods, shopList, settingsList, , stockList] = await Promise.all([
+      const [cats, prods, shopList, operationalSettings, , stockList] = await Promise.all([
         base44.entities.Category.list(),
         base44.entities.Product.list(),
         base44.entities.Shop.list(),
-        base44.entities.Settings.list(),
+        loadOperationalSettings(base44),
         loadCurrentShift().catch(() => null),
         base44.entities.ProductStock.list('-updated_at', 500),
       ]);
@@ -661,7 +662,7 @@ export default function POS() {
         setProductStock((current) => mergeUnreservedStock(current, stockList || []));
       }
       setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
-      setSettings(settingsList?.[0] || null);
+      setSettings(operationalSettings);
       // Auxiliary data never holds the product grid behind a loading screen.
       void loadCashData(generation);
       void loadWasteAlerts(generation);
