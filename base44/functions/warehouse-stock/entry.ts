@@ -138,7 +138,10 @@ export default async function(req) {
       && ((existing && existing.unit !== "piece") || !Number.isSafeInteger(balanceBefore) || !Number.isSafeInteger(balanceAfter))) {
       return Response.json({ error: "Qavat qoldig‘i yoki uning birligi noto‘g‘ri." }, { status: 409 });
     }
-    if (!Number.isFinite(balanceAfter) || Math.abs(balanceAfter) > Number.MAX_SAFE_INTEGER / 1000 || balanceAfter < 0) {
+    // Receiving stock can reduce an existing deficit without clearing it.
+    const receiptFromNegativeStock = !hasCount && movementType === "adjustment" && balanceBefore < 0 && quantityChange > 0;
+    if (!Number.isFinite(balanceAfter) || Math.abs(balanceAfter) > Number.MAX_SAFE_INTEGER / 1000
+      || (balanceAfter < 0 && !receiptFromNegativeStock)) {
       return Response.json({ error: "This change would make stock negative." }, { status: 409 });
     }
 
