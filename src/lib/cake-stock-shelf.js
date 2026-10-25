@@ -56,7 +56,7 @@ export function inventoryStockInfo(rows, item, ready = true) {
     return { status: 'invalid', quantity: null, unit: base, label: 'Birlik yoki qoldiq xatosi' };
   }
   return { row, quantity, unit: base, status: quantity < 0 ? 'negative' : quantity === 0 ? 'zero' : 'positive',
-    label: quantity < 0 ? 'Sanoq kerak' : quantity === 0 ? 'Qoldiq yo‘q' : 'Mavjud' };
+    label: quantity < 0 ? 'Manfiy qoldiq' : quantity === 0 ? 'Qoldiq yo‘q' : 'Mavjud' };
 }
 
 export function inventoryStockChange(mode, value, current, item) {
@@ -71,7 +71,7 @@ export function inventoryStockChange(mode, value, current, item) {
   const round = n => Math.round(n * 1000) / 1000;
   const quantity = round(input * factor), before = current == null ? 0 : Number(current);
   const after = mode === 'count' ? quantity : round(before + (mode === 'out' ? -quantity : quantity));
-  if (!Number.isFinite(before) || !Number.isSafeInteger(Math.round(after * 1000)) || after < 0) {
+  if (!Number.isFinite(before) || !Number.isSafeInteger(Math.round(after * 1000)) || (after < 0 && mode !== 'in')) {
     return { error: 'Qoldiq manfiy bo‘la olmaydi. Haqiqiy sanoqni kiriting.' };
   }
   return { quantity, before, after, delta: round(after - before) };
@@ -148,7 +148,7 @@ export function cakeStockInfo(rows, productId, ready = true) {
     return { status: 'invalid', quantity: null, unit: row.unit, label: 'Birlik yoki qoldiq xatosi' };
   }
   return { row, quantity, unit: 'piece', status: quantity < 0 ? 'negative' : quantity === 0 ? 'zero' : 'positive',
-    label: quantity < 0 ? 'Sanoq kerak' : quantity === 0 ? 'Qoldiq yo‘q' : 'Mavjud' };
+    label: quantity < 0 ? 'Manfiy qoldiq' : quantity === 0 ? 'Qoldiq yo‘q' : 'Mavjud' };
 }
 
 export function stockChange(mode, value, current) {
@@ -159,7 +159,7 @@ export function stockChange(mode, value, current) {
   const before = current == null ? 0 : Number(current);
   if (!Number.isSafeInteger(before)) return { error: 'Qoldiqni avval tekshiring.' };
   const after = mode === 'count' ? quantity : before + (mode === 'out' ? -quantity : quantity);
-  if (!Number.isSafeInteger(after) || after < 0) return { error: 'Qoldiq manfiy bo‘la olmaydi. Haqiqiy sanoqni kiriting.' };
+  if (!Number.isSafeInteger(after) || (after < 0 && mode !== 'in')) return { error: 'Qoldiq manfiy bo‘la olmaydi. Haqiqiy sanoqni kiriting.' };
   return { quantity, before, after, delta: after - before };
 }
 
