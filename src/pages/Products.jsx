@@ -24,7 +24,7 @@ import '@/styles/catalog-workbench.css';
 export default function Products() {
   const { user, adminShopScope } = useOutletContext();
   const shopScope = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope : null;
-  const scopedShopId = shopScope?.specificShopId || (user?.role === 'manager' ? user.shop_id : '') || '';
+  const scopedShopId = shopScope?.specificShopId || (['manager', 'cashier'].includes(user?.role) ? user.shop_id : '') || '';
   const role = user?.role || 'cashier';
   const canManageCatalog = role === 'admin' || role === 'accountant';
   const [products, setProducts] = useState([]);
