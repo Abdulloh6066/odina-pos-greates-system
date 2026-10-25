@@ -45,11 +45,11 @@ const permissions = evaluate('src/lib/pos.js', {
 });
 const preloader = () => evaluate('src/lib/route-preload.js', { './pos.js': permissions });
 
-test('renaming the product route preserves every role permission and role home', () => {
+test('3D + grants cashier stock access and preserves every role home', () => {
   assert.deepEqual(clone(permissions.ROLE_MENU), {
     admin: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
     manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
-    cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'sales', 'shifts', 'cashouts'],
+    cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'sales', 'shifts', 'cashouts'],
     accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
     production: ['warehouse', 'products', 'customers', 'screens'], warehouse: ['warehouse'],
   });
@@ -62,11 +62,11 @@ test('new and legacy product URLs share one cached loader and identical permissi
   const tools = preloader(); let loads = 0;
   const module = { default: () => null };
   tools.PAGE_LOADERS.products = async () => { loads += 1; return module; };
-  for (const role of ['admin', 'manager', 'accountant', 'production']) {
+  for (const role of ['admin', 'manager', 'cashier', 'accountant', 'production']) {
     assert.equal(tools.getPreloadKey('/3d-plus?view=stock#cake', role), 'products');
     assert.equal(tools.getPreloadKey('/products?view=stock#cake', role), 'products');
   }
-  for (const role of ['cashier', 'warehouse', 'unknown']) {
+  for (const role of ['warehouse', 'unknown']) {
     assert.equal(tools.getPreloadKey('/3d-plus', role), null);
     assert.equal(tools.getPreloadKey('/products', role), null);
     assert.equal(await tools.preloadRoute('/3d-plus', role), null);
@@ -122,7 +122,7 @@ async function routeFixture({ pathname, role, search = '', hash = '', active = t
 }
 
 test('legacy URL redirects permitted roles with search/hash and replace, without loading product data', async () => {
-  for (const role of ['admin', 'manager', 'accountant', 'production']) {
+  for (const role of ['admin', 'manager', 'cashier', 'accountant', 'production']) {
     const f = await routeFixture({ pathname: '/products', search: '?view=stock&shop=branch', hash: '#cake-123', role });
     try {
       const redirect = f.tree.root.findByType('redirect');
@@ -134,7 +134,7 @@ test('legacy URL redirects permitted roles with search/hash and replace, without
 });
 
 test('canonical URL mounts the existing Products chunk under the original role guard', async () => {
-  for (const role of ['admin', 'manager', 'accountant', 'production']) {
+  for (const role of ['admin', 'manager', 'cashier', 'accountant', 'production']) {
     const f = await routeFixture({ pathname: '/3d-plus', role });
     try {
       assert.equal(f.tree.root.findByType('fixture-page').props['data-page'], 'products');
@@ -143,12 +143,12 @@ test('canonical URL mounts the existing Products chunk under the original role g
   }
 });
 
-test('both product URLs deny cashier/warehouse and keep inactive/unassigned manager safeguards', async () => {
+test('both product URLs deny warehouse and keep inactive/unassigned manager safeguards', async () => {
   for (const pathname of ['/products', '/3d-plus']) {
-    for (const role of ['cashier', 'warehouse']) {
+    for (const role of ['warehouse']) {
       const f = await routeFixture({ pathname, role });
       try {
-        assert.equal(f.tree.root.findByType('redirect').props.to, role === 'cashier' ? '/pos' : '/warehouse');
+        assert.equal(f.tree.root.findByType('redirect').props.to, '/warehouse');
         assert.deepEqual(f.loads, []);
       } finally { await f.close(); }
     }
@@ -167,7 +167,7 @@ const fixtureProducts = [{ id: 'napoleon', name: 'Napoleon', category_id: 'cakes
   active: true, track_stock: true, production_unit: 'piece', sale_unit: 'piece', pieces_per_sheet: 1, price: 18000 }];
 const fixtureShops = [{ id: 'branch', name: 'Odina Branch', active: true, location_type: 'shop' }];
 
-async function productsFixture(role = 'admin', { allowShopActions = false } = {}) {
+async function productsFixture(role = 'admin', { allowShopActions = false, products = fixtureProducts } = {}) {
   const reads = [], writes = [], guards = new Set();
   const scope = { isAdmin: true, ready: true, shopId: 'branch', specificShopId: 'branch', shops: fixtureShops,
     registerGuard(callback) { guards.add(callback); return () => guards.delete(callback); } };
@@ -175,7 +175,7 @@ async function productsFixture(role = 'admin', { allowShopActions = false } = {}
   const entities = Object.fromEntries(['Product', 'Ingredient', 'Category', 'Shop'].map(name => [name, new Proxy({
     list: async (...args) => {
       reads.push({ entity: name, args });
-      return clone(({ Product: fixtureProducts, Ingredient: [], Category: [{ id: 'cakes', name: 'Tortlar' }], Shop: fixtureShops })[name]);
+      return clone(({ Product: products, Ingredient: [], Category: [{ id: 'cakes', name: 'Tortlar' }], Shop: fixtureShops })[name]);
     },
   }, { get(target, key) {
     if (key in target) return target[key];
@@ -198,9 +198,8 @@ async function productsFixture(role = 'admin', { allowShopActions = false } = {}
     'react-router-dom': { useOutletContext: () => ({ user, adminShopScope: scope }) },
     '@/api/base44Client': { base44: backend }, '@/lib/odina-dialog': dialogService,
     '@/lib/pos': { formatUZS: String, logAction: async () => { throw Error('Page-opening tests must not log mutations'); } },
-    '@/lib/shop-pricing': { priceForShop: product => product.price },
-    '@/lib/shop-category': { categoryForShop: product => product.category_id,
-      catalogForShop: (products, categories) => ({ products, categories }) },
+    '@/lib/shop-pricing': evaluate('src/lib/shop-pricing.js'),
+    '@/lib/shop-category': evaluate('src/lib/shop-category.js'),
     '@/lib/cake-stock-shelf': { loadAllInventoryItems: entity => entity.list('name', 500, 0) },
     '@/lib/product-photos': { productPhotoFallbackFor: () => null },
     '@/components/PageHeader': { default: ({ title, subtitle, actions }) => React.createElement('header', {},
@@ -214,8 +213,8 @@ async function productsFixture(role = 'admin', { allowShopActions = false } = {}
   return { tree, reads, writes, guards, close: async () => act(async () => tree.unmount()) };
 }
 
-test('3D + opens catalog for admin/accountant and inventory for manager/production without mutations', async () => {
-  for (const role of ['admin', 'accountant', 'manager', 'production']) {
+test('3D + opens catalog for admin/accountant and inventory for manager/cashier/production without mutations', async () => {
+  for (const role of ['admin', 'accountant', 'manager', 'cashier', 'production']) {
     const f = await productsFixture(role);
     try {
       assert.equal(text(f.tree.root.findByType('h1')), '3D +');
@@ -229,6 +228,28 @@ test('3D + opens catalog for admin/accountant and inventory for manager/producti
       assert.deepEqual(f.reads.map(read => read.entity).sort(), ['Category', 'Ingredient', 'Product', 'Shop']);
     } finally { await f.close(); }
   }
+});
+
+test('cashier stock access shows only own-shop catalog prices and no catalog mutations', async () => {
+  const f = await productsFixture('cashier', { products: [
+    { ...fixtureProducts[0], shop_prices: { branch: 19000, other: 22000 } },
+    { ...fixtureProducts[0], id: 'foreign', name: 'Other shop cake', available_shop_ids: ['other'] },
+  ] });
+  try {
+    assert.equal(f.tree.root.findByType('stock-shelf').props['data-role'], 'cashier');
+    assert.equal(button(f.tree, 'Yangi mahsulot turi'), undefined);
+    assert.equal(button(f.tree, 'Tort listlari'), undefined);
+    await act(async () => button(f.tree, 'Mahsulotlar katalogi').props.onClick());
+    const catalog = text(f.tree.toJSON());
+    assert.ok(catalog.includes('Napoleon'));
+    assert.ok(catalog.includes('19000'));
+    assert.equal(catalog.includes('Other shop cake'), false);
+    assert.equal(catalog.includes('22000'), false);
+    assert.equal(button(f.tree, 'Tahrirlash'), undefined);
+    assert.equal(button(f.tree, 'Sotuvdan olish'), undefined);
+    assert.equal(button(f.tree, 'Do‘kon kategoriyasi'), undefined);
+    assert.deepEqual(f.writes, []);
+  } finally { await f.close(); }
 });
 
 test('manager changes only the shop product category from the actual catalog dialog', async () => {
