@@ -86,6 +86,44 @@ await test('realtime updates cannot replace a newer quantity or mix shops', () =
   assert.equal(mergeCakeStockEvent(rows, { type: 'update', data: { id: 's', quantity: 6, updated_at: '2026-10-16T08:01:00Z' } }, 'branch')[0].quantity, 6);
   assert.equal(mergeCakeStockEvent(rows, { type: 'create', data: { id: 'x', location_id: 'other', quantity: 99 } }, 'branch').length, 1);
 });
+for (const itemKind of ['product', 'ingredient']) {
+  for (const [received, after] of [[5, -7], [12, 0], [20, 8]]) {
+    await test(itemKind + ' receipt adds to negative stock and records only the received amount: -12 + ' + received, async () => {
+      const f = fixture({ quantity: -12 });
+      const body = request({
+        item_kind: itemKind, item_id: itemKind === 'product' ? 'cake' : 'ingredient',
+        quantity_change: received, expected_quantity: -12,
+      });
+      const result = await f.call(body);
+      assert.equal(result.status, 200, JSON.stringify(result));
+      const entity = itemKind === 'product' ? 'ProductStock' : 'IngredientStock';
+      assert.equal(f.db[entity][0].quantity, after);
+      assert.equal(f.db.StockMovement.length, 1);
+      assert.equal(f.db.StockMovement[0].quantity_change, received);
+      assert.equal(f.db.StockMovement[0].balance_before, -12);
+      assert.equal(f.db.StockMovement[0].balance_after, after);
+      assert.equal(f.db.StockMovement[0].item_kind, itemKind);
+      assert.equal((await f.call(body)).status, 409);
+      assert.equal(f.db[entity][0].quantity, after);
+      assert.equal(f.db.StockMovement.length, 1);
+    });
+  }
+}
+await test('negative stock still rejects outgoing changes, negative counts and invalid receipt units', async () => {
+  for (const itemKind of ['product', 'ingredient']) {
+    const f = fixture({ quantity: -12 });
+    const item = { item_kind: itemKind, item_id: itemKind === 'product' ? 'cake' : 'ingredient', expected_quantity: -12 };
+    for (const fields of [{ quantity_change: -1 }, { counted_quantity: -1 }, { quantity_change: 0 }]) {
+      assert.ok((await f.call(request({ ...item, ...fields }))).status >= 400);
+    }
+    assert.equal(f.db.StockMovement.length, 0);
+  }
+  const f = fixture({ quantity: -12 });
+  assert.equal((await f.call(request({ quantity_change: 1.5, expected_quantity: -12 }))).status, 400);
+  assert.equal(f.db.ProductStock[0].quantity, -12);
+  assert.equal(f.db.StockMovement.length, 0);
+});
+
 await test('physical count repairs a negative balance and keeps one ledger movement', async () => {
   const f = fixture({ quantity: -761 });
   const r = await f.call(request({ counted_quantity: 8, expected_quantity: -761 }));
