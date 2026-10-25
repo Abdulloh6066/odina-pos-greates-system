@@ -242,7 +242,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const openOperation = (mode, product = selected) => {
     const info = product ? inventoryStockInfo(balances.rows, product, balances.ready) : null;
     if (!product || !canChange || product.active === false || info.status === 'invalid') return;
-    if (mode !== 'count' && (info.quantity == null || info.quantity < 0)) return;
+    if (mode !== 'count' && info.quantity == null) return;
     if (mode === 'out' && !(info.quantity > 0)) return;
     setNotice('');
     setOperation({ product, shop, mode, scope, current: info.quantity, stockStatus: info.status });
@@ -325,7 +325,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
                       if (!adjacent?.products[nextColumn]) return;
                       e.preventDefault();
                       shelfRef.current?.querySelector('[data-column="' + nextColumn + '"][data-row="' + nextRow + '"]')?.focus();
-                    }}><InventorySymbol product={p} /><strong title={p.name}>{p.name}</strong><span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatStockQuantity(info.quantity, p)}<small>{info.quantity == null ? '' : ' ' + inventoryUnits(p).label}</small></span>{entryMode ? <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span> : <span className="cake-stock-cell-note">{['negative', 'missing', 'invalid'].includes(info.status) ? info.label : '\u00a0'}</span>}</button>;
+                    }}><InventorySymbol product={p} /><strong title={p.name}>{p.name}</strong><span className="cake-stock-cell-quantity">{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatStockQuantity(info.quantity, p)}<small>{info.quantity == null ? '' : ' ' + inventoryUnits(p).label}</small></span>{entryMode ? <span className="cake-stock-entry-badge">{p.active === false ? 'Sotuvda emas' : ['positive', 'zero', 'negative'].includes(info.status) ? '+ Kirim' : 'Sanoq kerak'}</span> : <span className="cake-stock-cell-note">{['negative', 'missing', 'invalid'].includes(info.status) ? info.label : '\u00a0'}</span>}</button>;
                   })}
                 </div>
               </section>)}
@@ -338,11 +338,12 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
             <span className="cake-stock-eyebrow">{shop.name}</span><InventorySymbol product={selected} large /><h3>{selected.name}</h3><p className="cake-stock-detail-category">{categoryName(selected)}</p>{isIngredient ? <p className="cake-stock-detail-price"><small>Hisob birligi: </small>{inventoryUnits(selected).label}</p> : <p className="cake-stock-detail-price">{formatUZS(priceForShop(selected, shop.id))}<small> / dona yoki bo‘lak</small></p>}
             <div className={'cake-stock-balance ' + selectedStock.status}><span>Do‘kondagi qoldiq</span><strong>{selectedStock.quantity == null ? '—' : formatStockQuantity(selectedStock.quantity, selected)}<small>{selectedStock.quantity == null ? '' : ' ' + inventoryUnits(selected).label}</small></strong><p>{selectedStock.label}</p></div>
             {canChange && selectedStock.status !== 'invalid' && <div className="cake-stock-operations">
-              <Button type="button" onClick={() => openOperation('in')} disabled={selected.active === false || selectedStock.quantity == null || selectedStock.quantity < 0}><ArrowDownLeft className="mr-1.5 h-4 w-4" />Kirim</Button>
+              <Button type="button" onClick={() => openOperation('in')} disabled={selected.active === false || selectedStock.quantity == null}><ArrowDownLeft className="mr-1.5 h-4 w-4" />Kirim</Button>
               <Button type="button" variant="outline" onClick={() => openOperation('out')} disabled={selected.active === false || !(selectedStock.quantity > 0)}><ArrowUpRight className="mr-1.5 h-4 w-4" />Chiqim</Button>
               <Button type="button" variant="outline" onClick={() => openOperation('count')} disabled={selected.active === false} className="cake-stock-count-action"><ClipboardCheck className="mr-2 h-4 w-4" />Haqiqiy sanoq</Button>
             </div>}
-            {entryMode && ['negative', 'missing'].includes(selectedStock.status) && <p className="cake-stock-help cake-stock-entry-warning">Kirimdan oldin “Haqiqiy sanoq” orqali hozir mavjud miqdorni kiriting. Keyin kelgan mahsulotlarni alohida kirim qiling.</p>}
+            {entryMode && selectedStock.status === 'negative' && <p className="cake-stock-help">Kirim mavjud manfiy qoldiqqa qo‘shiladi. Haqiqiy sanoq kiritish shart emas.</p>}
+            {entryMode && selectedStock.status === 'missing' && <p className="cake-stock-help cake-stock-entry-warning">Kirimdan oldin “Haqiqiy sanoq” orqali hozir mavjud miqdorni kiriting. Keyin kelgan mahsulotlarni alohida kirim qiling.</p>}
             {selected.active === false && <p className="cake-stock-help">Sotuvdan olingan mahsulot. O‘zgartirish uchun katalogdagi holatini tekshiring.</p>}
             <p className="cake-stock-help">{isIngredient ? 'Bu qoldiq ombordagi masalliq bilan bir xil. Yetkazib beruvchi, narx va to‘lov bilan kirimni Ombor → Kirim va qarzlar orqali kiriting. Bir kirimni qayta kiritmang.' : 'Kassa savdolari avtomatik kamayadi. Markazdan transfer kelgan bo‘lsa, “Kelgan transferlar”dan qabul qiling. Bir kirimni qayta kiritmang.'}</p>
             <Button type="button" variant="outline" onClick={() => setShowHistory((value) => !value)} aria-expanded={showHistory} className="w-full min-h-11"><History className="mr-2 h-4 w-4" />Kirim-chiqim tarixi</Button>
@@ -393,7 +394,7 @@ export function CakeStockOperation({ operation, onClose, onSaved, onRefresh, onl
     <DialogContent className="cake-stock-dialog sm:max-w-md max-h-[90dvh] overflow-y-auto">
       <DialogHeader><DialogTitle>{labels[operation.mode]}</DialogTitle><p className="text-sm text-muted-foreground">{operation.product.name} · {operation.shop.name}</p></DialogHeader>
       <form onSubmit={save} className="space-y-4">
-        <p className="cake-stock-operation-note">{operation.mode === 'in' ? 'Kelgan miqdorni ' + units.label + 'da kiriting. Shu miqdor mavjud qoldiqqa qo‘shiladi. Hisob-faktura bilan kirimni Ombor → Kirim va qarzlar orqali, yuborilgan transferni “Kelgan transferlar” orqali qabul qiling.' : operation.mode === 'count' ? 'Hozir mavjud haqiqiy miqdorni ' + units.label + 'da kiriting. Eski qoldiq shu miqdorga tuzatiladi.' : 'Qo‘lda chiqim qoldiqni kamaytiradi va tarixga yoziladi. Kassa savdosi yoki qabul qilingan transferni qayta kiritmang.'}</p>
+        <p className="cake-stock-operation-note">{operation.mode === 'in' ? 'Kelgan miqdorni ' + units.label + 'da kiriting. Kelgan miqdor joriy qoldiqqa qo‘shiladi, qoldiq manfiy bo‘lsa ham. Hisob-faktura bilan kirimni Ombor → Kirim va qarzlar orqali, yuborilgan transferni “Kelgan transferlar” orqali qabul qiling.' : operation.mode === 'count' ? 'Hozir mavjud haqiqiy miqdorni ' + units.label + 'da kiriting. Eski qoldiq shu miqdorga tuzatiladi.' : 'Qo‘lda chiqim qoldiqni kamaytiradi va tarixga yoziladi. Kassa savdosi yoki qabul qilingan transferni qayta kiritmang.'}</p>
         <div><Label htmlFor="cake-operation-quantity">{(operation.mode === 'in' ? 'Kelgan miqdor' : operation.mode === 'count' ? 'Hozir mavjud' : 'Miqdor') + ' (' + units.label + ')'}</Label><Input id="cake-operation-quantity" autoFocus type="number" min={operation.mode === 'count' ? 0 : units.step} step={units.step} inputMode={units.step === 1 ? 'numeric' : 'decimal'} value={quantity} onChange={(e) => setQuantity(e.target.value)} required disabled={saving || needsReview} /></div>
         <div><Label htmlFor="cake-operation-reason">Sabab / izoh</Label><Textarea id="cake-operation-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} placeholder="Masalan: ertalabki sanoq" required disabled={saving || needsReview} /></div>
         <div className="cake-stock-operation-preview"><span>Oldingi: {operation.current == null ? 'kiritilmagan' : formatStockQuantity(operation.current, operation.product) + ' ' + units.label}</span><strong>Keyingi: {change.error ? '—' : formatStockQuantity(change.after, operation.product) + ' ' + units.label}</strong></div>
