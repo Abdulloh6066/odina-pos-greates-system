@@ -29,7 +29,8 @@ test('manager direct routes deny Budget, Settings and owner Security while owner
     assert.equal(route(manager, key).type, Navigate);
     assert.equal(route({ role: 'admin' }, key), 'allowed');
   }
-  for (const key of ['users', 'audit', 'profit', 'products', 'warehouse', 'dailyexport']) assert.equal(route(manager, key), 'allowed');
+  for (const key of permissions.ROLE_MENU.manager) assert.equal(route(manager, key), 'allowed', key);
+  assert.equal(route(manager, 'shifts'), 'allowed');
   assert.notEqual(route({ ...manager, active: false }, 'products'), 'allowed');
   assert.notEqual(route({ ...manager, shop_id: '' }, 'products'), 'allowed');
 });

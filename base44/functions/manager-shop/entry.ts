@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveAppUser } from "../../shared/user-helpers.ts";
+import { readManagerShiftHistory } from "../../shared/manager-shift-history.ts";
 
 export default async function(req) {
   try {
@@ -29,6 +30,9 @@ export default async function(req) {
     }
     if (user.role !== "manager" || !user.shop_id) return Response.json({ error: "Boshqaruvchi ruxsati kerak." }, { status: 403 });
     if (body.shop_id && body.shop_id !== user.shop_id) return Response.json({ error: "Boshqa do‘konga ruxsat yo‘q." }, { status: 403 });
+    if (['list_shift_history', 'get_shift_detail'].includes(body.action)) {
+      return Response.json(await readManagerShiftHistory(service, user, body));
+    }
     if (body.action === "set_category_visibility") {
       if (Object.keys(body).some(key => !["action", "category_id", "hidden", "shop_id"].includes(key)) || typeof body.hidden !== "boolean") {
         return Response.json({ error: "Faqat do‘kon kategoriyasi ko‘rinishini o‘zgartirish mumkin." }, { status: 400 });

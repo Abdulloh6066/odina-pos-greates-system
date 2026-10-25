@@ -35,6 +35,7 @@ import {
 } from "@/lib/shift-history";
 import { readAllEntityPages, shiftsHistoryQuery } from "@/lib/history-pagination";
 import { useEntityHistory } from "@/hooks/useEntityHistory";
+import { managerShiftHistoryEntity, loadManagerShiftDetail } from "@/lib/manager-shift-history";
 
 const PAYMENT_LABELS = {
   cash: "Naqd pul",
@@ -93,8 +94,10 @@ export default function Shifts() {
   });
   const effectiveFilters = useMemo(() => shopScope ? { ...filters, shop_id: shopScope.shopId } : filters, [filters, shopScope?.shopId]);
 
+  const shiftHistory = useMemo(() => role === 'manager'
+    ? managerShiftHistoryEntity(base44, effectiveFilters) : base44.entities.Shift, [role, effectiveFilters]);
   const { rows: shifts, loading, loadingMore, error: loadError, hasMore, reload: load, loadMore } = useEntityHistory(
-    base44.entities.Shift, shiftsHistoryQuery({ user, ...effectiveFilters }), "-opened_at",
+    shiftHistory, shiftsHistoryQuery({ user, ...effectiveFilters }), "-opened_at",
   );
   useEffect(() => {
     let current = true;
@@ -142,6 +145,18 @@ export default function Shifts() {
     setDetail(EMPTY_DETAIL);
     setDetailError("");
     setDetailLoading(true);
+
+    if (role === 'manager') {
+      try {
+        const result = await loadManagerShiftDetail(base44, shift.id);
+        if (isCurrent()) { setSelectedShift(result.shift); setDetail(result.detail); }
+      } catch (error) {
+        if (isCurrent()) setDetailError(errorText(error));
+      } finally {
+        if (isCurrent()) setDetailLoading(false);
+      }
+      return;
+    }
 
     const canViewMovements = role === "admin" || role === "manager" || role === "cashier";
     const requests = [
