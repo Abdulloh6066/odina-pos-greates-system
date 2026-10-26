@@ -75,7 +75,7 @@ export async function ingredientPreparation(service: any, user: any, body: any) 
   const preparing = body.action === "prepare_ingredient";
   const quantity = body.quantity;
   const requestId = String(body.request_id || "");
-  const key = "IP:" + user.id + ":" + requestId;
+  const key = "IP:" + locationId + ":" + ingredientId + ":" + user.id + ":" + requestId;
   if (preparing && (!/^[a-zA-Z0-9-]{8,80}$/.test(requestId) || !checked(quantity, output.base_unit, true))) {
     throw fail("Musbat miqdor va tayyorlash raqami kerak.", 400);
   }
