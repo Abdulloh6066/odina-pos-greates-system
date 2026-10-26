@@ -45,6 +45,75 @@
       "type": "boolean",
       "default": false,
       "description": "Pishirilgan biskvit/korj qavati. Markaziy ishlab chiqarishda butun list/qavat soni bilan yuritiladi; asosiy va xarid birligi piece."
+    },
+    "preparation_shop_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Do\u2018konda tayyorlash yoqilgan joylar."
+    },
+    "preparation_recipe": {
+      "type": "object",
+      "properties": {
+        "confirmed": {
+          "type": "boolean",
+          "default": false
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "output_quantity": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output_unit": {
+          "type": "string",
+          "enum": [
+            "g",
+            "ml",
+            "piece"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ingredient_id": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "g",
+                  "ml",
+                  "piece"
+                ]
+              }
+            },
+            "required": [
+              "ingredient_id",
+              "quantity",
+              "unit"
+            ]
+          }
+        }
+      },
+      "required": [
+        "confirmed",
+        "version",
+        "output_quantity",
+        "output_unit",
+        "items"
+      ],
+      "description": "Tasdiqlangan chiqish miqdori va asosiy birlikdagi masalliqlar. Chiqish miqdori taxmin qilinmaydi."
     }
   },
   "required": [
