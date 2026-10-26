@@ -82,6 +82,47 @@
     },
     "user_name": {
       "type": "string"
+    },
+    "preparation_snapshot": {
+      "type": "object",
+      "description": "Tayyorlash paytidagi tasdiqlangan retsept va haqiqiy sarfning o\u2018zgarmas nusxasi.",
+      "properties": {
+        "recipe_version": {
+          "type": "integer"
+        },
+        "recipe_output_quantity": {
+          "type": "number"
+        },
+        "recipe_output_unit": {
+          "type": "string"
+        },
+        "prepared_quantity": {
+          "type": "number"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ingredient_id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "recipe_quantity": {
+                "type": "number"
+              },
+              "used_quantity": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "required": [
