@@ -44,6 +44,24 @@
       "type": "string",
       "default": "",
       "description": "Durable receipt and transfer markers written atomically with the balance."
+    },
+    "preparation_pending_key": {
+      "type": "string",
+      "default": ""
+    },
+    "preparation_completed_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "preparation_input_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
     }
   },
   "required": [
