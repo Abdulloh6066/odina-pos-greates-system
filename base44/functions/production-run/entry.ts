@@ -1,4 +1,5 @@
 import { resolveAppUser } from "../../shared/user-helpers.ts";
+import { ingredientPreparation } from "../../shared/ingredient-preparation.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { loadIngredientCosts, recipeCostFromMap } from "../../shared/cost-engine.ts";
@@ -45,6 +46,10 @@ export default async function(req) {
     const body = await req.json();
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "");
+
+    if (action === "preview_ingredient_preparation" || action === "prepare_ingredient") {
+      return Response.json(await ingredientPreparation(service, user, body));
+    }
 
     if (action === "save_recipe") {
       if (!RECIPE_ROLES.has(user.role)) {
