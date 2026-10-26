@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Cake, Check, ClipboardCheck, History, Loader2, RefreshCw, Search, Truck, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Cake, Check, ChefHat, ClipboardCheck, History, Loader2, RefreshCw, Search, Truck, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import TransfersPanel from '@/components/warehouse/TransfersPanel';
+import IngredientPreparationDialog from './IngredientPreparationDialog';
 import './cake-stock-shelf.css';
 
 function useLiveCakeBalances(shopId, itemKind = 'product', requireServer = false) {
@@ -156,12 +157,13 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const [stockFilter, setStockFilter] = useState('all');
   const [selectedId, setSelectedId] = useState('');
   const [operation, setOperation] = useState(null);
+  const [preparation, setPreparation] = useState(null);
   const [finishingSave, setFinishingSave] = useState(false);
   const shelfIdentity = (shop?.id || '') + ':' + scope;
   const currentShelfIdentity = useRef(shelfIdentity);
   currentShelfIdentity.current = shelfIdentity;
-  useEffect(() => shopScope?.registerGuard?.(() => operation || finishingSave ? 'Avval qoldiq oynasini yoping yoki saqlash tugashini kuting.' : ''),
-  [shopScope?.registerGuard, operation, finishingSave]);
+  useEffect(() => shopScope?.registerGuard?.(() => operation || preparation || finishingSave ? 'Avval qoldiq oynasini yoping yoki saqlash tugashini kuting.' : ''),
+  [shopScope?.registerGuard, operation, preparation, finishingSave]);
   const [showHistory, setShowHistory] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const shelfRef = useRef(null);
@@ -238,7 +240,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
   const selectedStock = selected ? inventoryStockInfo(balances.rows, selected, balances.ready) : null;
   const counts = cakes.reduce((result, p) => { const s = inventoryStockInfo(balances.rows, p, balances.ready); if (s.status === 'positive') result.inStock++; if (['negative', 'missing', 'invalid'].includes(s.status)) result.needsCount++; return result; }, { inStock: 0, needsCount: 0 });
   const canChange = !stockReadOnly && !finishingSave && CAKE_STOCK_ROLES.has(user?.role) && balances.online && balances.ready && !balances.error;
-  useEffect(() => { setSelectedId(''); setOperation(null); setShowHistory(false); setEntryMode(false); setNotice(''); setCategory('all'); setSearch(''); setStockFilter('all'); setView('shelf'); }, [shop?.id, scope]);
+  useEffect(() => { setSelectedId(''); setOperation(null); setPreparation(null); setShowHistory(false); setEntryMode(false); setNotice(''); setCategory('all'); setSearch(''); setStockFilter('all'); setView('shelf'); }, [shop?.id, scope]);
   const openOperation = (mode, product = selected) => {
     const info = product ? inventoryStockInfo(balances.rows, product, balances.ready) : null;
     if (!product || !canChange || product.active === false || info.status === 'invalid') return;
@@ -264,6 +266,19 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
         setSelectedId(stock.ingredient_id || stock.product_id);
         setNotice((savedOperation?.product?.name || 'Mahsulot') + ': qoldiq ' + formatStockQuantity(stock.quantity, savedOperation?.product) + ' ' + inventoryUnits(savedOperation?.product).label + '. ' + (savedOperation?.mode === 'in' ? 'Kirim tarixga yozildi.' : 'Qoldiq saqlandi.'));
       }
+    } finally { setFinishingSave(false); }
+  };
+
+  const onPrepared = async (stock) => {
+    const identity = shelfIdentity;
+    const item = preparation?.item;
+    setFinishingSave(true); setPreparation(null);
+    try {
+      await balances.refresh();
+      if (currentShelfIdentity.current !== identity) return;
+      setHistoryVersion(version => version + 1);
+      setSelectedId(stock.ingredient_id);
+      setNotice((item?.name || 'Sous') + ': tayyorlash tarixga yozildi. Qoldiq ' + formatStockQuantity(stock.quantity, item) + ' ' + inventoryUnits(item).label + '.');
     } finally { setFinishingSave(false); }
   };
 
@@ -342,6 +357,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
               <Button type="button" variant="outline" onClick={() => openOperation('out')} disabled={selected.active === false || !(selectedStock.quantity > 0)}><ArrowUpRight className="mr-1.5 h-4 w-4" />Chiqim</Button>
               <Button type="button" variant="outline" onClick={() => openOperation('count')} disabled={selected.active === false} className="cake-stock-count-action"><ClipboardCheck className="mr-2 h-4 w-4" />Haqiqiy sanoq</Button>
             </div>}
+            {isIngredient && selected.preparation_shop_ids?.includes(shop.id) && ['admin', 'manager', 'production'].includes(user?.role) && !stockReadOnly && <Button type="button" className="w-full min-h-11 mt-2" variant="outline" disabled={!canChange || selectedStock.quantity == null || selectedStock.status === 'invalid'} onClick={() => { setNotice(''); setPreparation({ item: selected, shop }); }}><ChefHat className="mr-2 h-4 w-4" />Tayyorlash</Button>}
             {entryMode && selectedStock.status === 'negative' && <p className="cake-stock-help">Kirim mavjud manfiy qoldiqqa qo‘shiladi. Haqiqiy sanoq kiritish shart emas.</p>}
             {entryMode && selectedStock.status === 'missing' && <p className="cake-stock-help cake-stock-entry-warning">Kirimdan oldin “Haqiqiy sanoq” orqali hozir mavjud miqdorni kiriting. Keyin kelgan mahsulotlarni alohida kirim qiling.</p>}
             {selected.active === false && <p className="cake-stock-help">Sotuvdan olingan mahsulot. O‘zgartirish uchun katalogdagi holatini tekshiring.</p>}
@@ -353,6 +369,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
       </div>
       <p className="cake-stock-footnote"><Check className="h-4 w-4" aria-hidden="true" />{isIngredient ? 'Sut litrda, og‘irlik kg yoki grammda, qadoqlar donada hisoblanadi. Qoldiq mavjud ombor bilan bir xil.' : 'Retseptli ichimlik va taomlar uchun masalliqlar qoldig‘ini “Sut, kofe va masalliqlar” bo‘limida kiriting.'}</p>
     </>}
+    {preparation && <IngredientPreparationDialog key={preparation.shop.id + preparation.item.id} item={preparation.item} shop={preparation.shop} userId={user.id} online={balances.online} onClose={() => setPreparation(null)} onSaved={onPrepared} />}
     <CakeStockOperation key={operation ? operation.shop.id + (operation.product.stock_kind || 'product') + operation.product.id + operation.mode : 'closed'} operation={operation} onClose={() => setOperation(null)} onSaved={onSaved} onRefresh={balances.refresh} online={balances.online} />
   </section>;
 }
@@ -407,7 +424,7 @@ export function CakeStockOperation({ operation, onClose, onSaved, onRefresh, onl
   </Dialog>;
 }
 
-const MOVEMENTS = { adjustment: 'Qo‘lda tuzatish', opening: 'Boshlang‘ich qoldiq', transfer_in: 'Kelgan transfer', transfer_out: 'Ketgan transfer', sale: 'Kassa savdosi', refund: 'Qaytarish', waste: 'Chiqit', waste_cancel: 'Chiqit bekor qilindi', production_output: 'Ishlab chiqarildi', receipt: 'Kirim', receipt_cancel: 'Kirim bekor qilindi' };
+const MOVEMENTS = { adjustment: 'Qo‘lda tuzatish', opening: 'Boshlang‘ich qoldiq', transfer_in: 'Kelgan transfer', transfer_out: 'Ketgan transfer', sale: 'Kassa savdosi', refund: 'Qaytarish', waste: 'Chiqit', waste_cancel: 'Chiqit bekor qilindi', production_output: 'Ishlab chiqarildi', production_use: 'Tayyorlash uchun sarf', receipt: 'Kirim', receipt_cancel: 'Kirim bekor qilindi' };
 function CakeMovementHistory({ shopId, productId, item, refreshVersion }) {
   const [state, setState] = useState({ rows: [], loading: true, error: '' });
   useEffect(() => {
