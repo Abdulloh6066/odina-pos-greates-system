@@ -1,5 +1,7 @@
 import { displayOrderNumber } from '@/lib/orders';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { useOrderUpdates } from '@/hooks/useOrderUpdates';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import OrderForm from '@/components/orders/OrderForm';
@@ -13,7 +15,7 @@ import OrderLedgerCard from '@/components/orders/OrderLedgerCard';
 import { useOrderAlerts } from '@/hooks/useOrderAlerts';
 import { shiftDateKey, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import { useToast } from '@/components/ui/use-toast';
-import { FINISHED_ORDER_STATUSES, ordersHistoryQuery, readAllEntityPages } from '@/lib/history-pagination';
+import { FINISHED_ORDER_STATUSES, ordersHistoryQuery, readAllEntityPages, orderQueueScope } from '@/lib/history-pagination';
 import { useEntityHistory } from '@/hooks/useEntityHistory';
 import '@/styles/orders-premium-ledger.css';
 
@@ -53,7 +55,8 @@ export default function Orders() {
   const [query, setQuery] = useState('');
   const [localShopFilter, setLocalShopFilter] = useState('');
   const sharedScope = isAdmin && adminShopScope?.isAdmin === true;
-  const shopFilter = sharedScope ? adminShopScope.specificShopId : localShopFilter;
+  const selectedShopId = sharedScope ? adminShopScope.specificShopId : localShopFilter;
+  const { shopFilter, warehouseQueue } = orderQueueScope(selectedShopId, sharedScope ? adminShopScope.shops : shops);
   const setShopFilter = (id) => sharedScope ? adminShopScope.selectShop(id || 'all') : setLocalShopFilter(id);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -66,8 +69,10 @@ export default function Orders() {
   const [repeatLoading, setRepeatLoading] = useState(false);
   const repeatRequest = useRef(0);
   const repeatLoadingRef = useRef(false);
-  const repeatScopeRef = useRef(shopFilter);
-  repeatScopeRef.current = shopFilter;
+  const repeatScopeRef = useRef(selectedShopId);
+  repeatScopeRef.current = selectedShopId;
+  const detailRef = useRef(detailOrder);
+  detailRef.current = detailOrder;
   const scopedActiveOrders = useMemo(() => activeOrders.filter((order) => !shopFilter || order.shop_id === shopFilter), [activeOrders, shopFilter]);
   const { alerts, counts } = useOrderAlerts(scopedActiveOrders);
   useEffect(() => {
@@ -80,18 +85,18 @@ export default function Orders() {
     repeatLoadingRef.current = false;
     setRepeatLoading(false);
     return () => { repeatRequest.current += 1; repeatLoadingRef.current = false; };
-  }, [user?.id, shopFilter]);
+  }, [user?.id, selectedShopId]);
   const today = uzbekistanDateKey();
   const tomorrow = shiftDateKey(today, 1);
-  const { rows: orders, loading, loadingMore, error: loadError, hasMore, reload, loadMore } = useEntityHistory(
+  const { rows: orders, loading, loadingMore, error: loadError, hasMore, reload, refresh, loadMore } = useEntityHistory(
     base44.entities.CustomerOrder,
     ordersHistoryQuery({ view, today, tomorrow, query, shop: shopFilter, type: typeFilter, status: statusFilter, pay: payFilter, date: dateFilter }),
     view === 'history' ? '-required_date' : 'required_date',
   );
 
-  const loadActiveOrders = async () => {
+  const loadActiveOrders = async (quiet = false) => {
     const request = ++activeRequest.current;
-    setActiveLoading(true);
+    if (!quiet) setActiveLoading(true);
     setActiveError('');
     try {
       const list = await readAllEntityPages(base44.entities.CustomerOrder, { order_status: { $nin: FINISHED } }, 'id', () => request === activeRequest.current);
@@ -103,6 +108,19 @@ export default function Orders() {
     }
   };
   const loadOrders = async () => { await Promise.all([reload(), loadActiveOrders()]); };
+  useOrderUpdates(async () => {
+    const scope = selectedShopId;
+    const detailId = detailRef.current?.id;
+    await Promise.all([
+      refresh ? refresh() : reload(),
+      loadActiveOrders(true),
+      detailId ? base44.entities.CustomerOrder.get(detailId).then((updated) => {
+        if (scope === repeatScopeRef.current && detailRef.current?.id === detailId && updated) {
+          setDetailOrder(updated);
+        }
+      }).catch(() => {}) : Promise.resolve(),
+    ]);
+  }, `${user?.id || ''}:${selectedShopId || ''}`);
 
   const loadShops = async () => {
     if (!isAdmin) return;
@@ -169,7 +187,7 @@ export default function Orders() {
   const handleRepeat = async (order, items) => {
     if (repeatLoadingRef.current) return;
     const request = ++repeatRequest.current;
-    const scopeAtStart = shopFilter;
+    const scopeAtStart = selectedShopId;
     repeatLoadingRef.current = true;
     setRepeatLoading(true);
     try {
@@ -196,6 +214,10 @@ export default function Orders() {
   return (
     <div className="opl-page opl-compact">
       <div className="opl-workspace">
+        {warehouseQueue && <div role="status" className="mb-3 rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm">
+          <strong>Markaziy ombor navbati</strong>
+          <p className="mt-1 text-muted-foreground">Barcha filial va Central buyurtmalari avtomatik shu yerda. To‘lovlar buyurtma olingan do‘konda saqlanadi.</p>
+        </div>
         <div className="opl-toolbar">
         <nav className="opl-tabs" aria-label="Buyurtma sanalari">
           {tabs.map((tab) => (
@@ -205,13 +227,15 @@ export default function Orders() {
             </button>
           ))}
         </nav>
-        <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />
+        {warehouseQueue ? <div><h1 className="sr-only">Buyurtmalar</h1>
+          <Link to="/production-screen" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">Ishlab chiqarish ekranini ochish</Link>
+        </div> : <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />}
         </div>
         {repeatLoading && <p role="status" className="p-3 text-sm text-muted-foreground">Buyurtma ma’lumotlari yuklanmoqda…</p>}
         <OrderFilterRail
           isAdmin={isAdmin}
           shops={shops}
-          filters={{ query, shop: shopFilter, type: typeFilter, status: statusFilter, pay: payFilter, date: dateFilter }}
+          filters={{ query, shop: selectedShopId, type: typeFilter, status: statusFilter, pay: payFilter, date: dateFilter }}
           setters={{
             query: (value) => { setQuery(value); if (value.trim()) { setDateFilter(''); setView('all'); } },
             shop: setShopFilter, type: setTypeFilter,
@@ -247,7 +271,7 @@ export default function Orders() {
                   <th scope="col">Holat</th><th scope="col"><span className="sr-only">Amallar</span></th>
                 </tr></thead>
                 <tbody>{filtered.map((order) => (
-                  <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} today={today} />
+                  <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={warehouseQueue ? null : handleRepeat} today={today} />
                 ))}</tbody>
               </table>
             </div>
