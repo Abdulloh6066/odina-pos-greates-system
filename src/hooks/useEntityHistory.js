@@ -57,5 +57,37 @@ export function useEntityHistory(entity, query, sort) {
     return () => { clearTimeout(timer); state.current.generation += 1; };
   }, [load]);
 
-  return { rows, loading, loadingMore, error, hasMore, reload: () => load(), loadMore: () => load(true) };
+  // Keep the loaded page window and current controls visible during realtime refresh.
+  const refresh = useCallback(async () => {
+    if (state.current.busy || state.current.key !== key) return;
+    const generation = ++state.current.generation;
+    const target = Math.max(100, state.current.skip);
+    const freshQuery = { $and: [JSON.parse(key), { created_date: { $lte: new Date().toISOString() } }] };
+    state.current.busy = true;
+    try {
+      let skip = 0;
+      let more = false;
+      const fresh = new Map();
+      do {
+        const page = await readEntityPage(entityRef.current, freshQuery, sort, skip);
+        if (generation !== state.current.generation || state.current.key !== key) return;
+        const before = fresh.size;
+        page.rows.forEach((row) => fresh.set(row.id, row));
+        if (page.hasMore && fresh.size === before) throw new Error('Tarix sahifasini yuklab bo‘lmadi.');
+        skip = page.nextSkip;
+        more = page.hasMore;
+      } while (more && skip < target);
+      state.current.query = freshQuery;
+      state.current.skip = skip;
+      setRows([...fresh.values()]);
+      setHasMore(more);
+      setError('');
+    } catch (failure) {
+      if (generation === state.current.generation) setError(failure?.response?.data?.error || failure?.message || 'Buyurtmalar yangilanmadi.');
+    } finally {
+      if (generation === state.current.generation) state.current.busy = false;
+    }
+  }, [key, sort]);
+
+  return { rows, loading, loadingMore, error, hasMore, reload: () => load(), refresh, loadMore: () => load(true) };
 }
