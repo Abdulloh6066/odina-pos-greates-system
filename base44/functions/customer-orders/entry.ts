@@ -7,7 +7,7 @@ import {
 } from "../../shared/order-ready-production.ts";
 import { createCustomerOrder, PAYMENT_METHODS, tashkentStamp, findOpenShift, recordCustomerOrderPayment, orderRequestFingerprint } from "../../shared/customer-order-create.ts";
 
-const ORDER_RUNTIME_VERSION = "customer-orders-v6-2026-10-15";
+const ORDER_RUNTIME_VERSION = "customer-orders-v7-2026-10-29";
 // Owner requested status-only readiness until customer order recipes are set up.
 // This server policy cannot be overridden by a browser request.
 const ORDER_RECIPE_ACCOUNTING_ENABLED = false;
@@ -122,6 +122,31 @@ export default async function(req: Request): Promise<Response> {
       }
       if (order.completion_key && order.completion_phase !== "completed") {
         return Response.json({ error: "Buyurtmani yakunlash davom etmoqda. Avval shu amalni tekshiring.", operation_pending: true }, { status: 409 });
+      }
+
+      if (step === "preparing") {
+        const previous = String(order.order_status || "qabul_qilindi");
+        if (previous === "tayyorlanmoqda") {
+          return Response.json({ order, already_started: true, runtime_version: ORDER_RUNTIME_VERSION });
+        }
+        if (previous !== "qabul_qilindi" || ["processing", "completed"].includes(order.ready_inventory_state)) {
+          return Response.json({ error: "Faqat qabul qilingan buyurtmani tayyorlashni boshlash mumkin." }, { status: 409 });
+        }
+        const claim = await service.entities.CustomerOrder.updateMany({
+          id: order.id, order_status: previous,
+          ready_inventory_state: { $nin: ["processing", "completed"] },
+          $or: [{ completion_key: { $exists: false } }, { completion_key: "" }, { completion_key: null }],
+        }, { $set: { order_status: "tayyorlanmoqda", updated_at: new Date().toISOString() } });
+        if (!claim?.success || Number(claim.updated || 0) !== 1) {
+          return Response.json({ error: "Buyurtma holati o‘zgardi. Yangilang va qayta urinib ko‘ring." }, { status: 409 });
+        }
+        await service.entities.ActionHistory.create({
+          user_id: user.id, user_name: user.full_name || user.email,
+          action: "production_status_change",
+          details: `${order.order_number} · ${order.shop_name_snapshot} · ${previous} → tayyorlanmoqda`,
+        }).catch(() => {});
+        return Response.json({ order: { ...order, order_status: "tayyorlanmoqda" },
+          previous_status: previous, runtime_version: ORDER_RUNTIME_VERSION });
       }
 
       if (step === "ready") {
