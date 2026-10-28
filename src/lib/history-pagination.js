@@ -2,6 +2,12 @@ import { shiftDateKey } from './uzbekistan-time.js';
 
 export const HISTORY_PAGE_SIZE = 100;
 export const FINISHED_ORDER_STATUSES = ['yakunlandi', 'bekor_qilindi'];
+
+// A production location is the shared destination; shop_id remains the sales/payment owner.
+export function orderQueueScope(shopId, shops = []) {
+  const warehouseQueue = shops.some((shop) => shop.id === shopId && shop.location_type === 'production' && shop.active !== false);
+  return { warehouseQueue, shopFilter: warehouseQueue ? '' : shopId || '' };
+}
 const and = (parts) => parts.length ? { $and: parts } : {};
 const absent = (field) => ({ $or: [{ [field]: { $exists: false } }, { [field]: '' }, { [field]: null }] });
 const textSearch = (fields, value) => {
