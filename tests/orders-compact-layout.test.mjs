@@ -130,3 +130,26 @@ test('worker filter toolbar has no shop selector and create remains a single exi
   try { await act(async () => tree.root.findByType('button').props.onClick()); assert.equal(created, 1); }
   finally { await act(async () => tree.unmount()); }
 });
+
+test('payment-only warnings collapse without losing their order action', async () => {
+  const Alerts = load('OrderAlertSummary'), opened = [];
+  let tree; await act(async () => { tree = create(React.createElement(Alerts, {
+    alerts: [{ order: snapshot, deadline: {}, unpaid: true }], counts: { total: 1, overdue: 0, due_soon: 0, unpaid: 1 }, onOpen: order => opened.push(order), loading: false,
+  })); });
+  try {
+    assert.equal(tree.root.findByType('details').props.open, false);
+    await act(async () => tree.root.findByType('details').props.onToggle({ currentTarget: { open: true } }));
+    assert.equal(tree.root.findByType('details').props.open, true);
+    await act(async () => tree.root.findByType('button').props.onClick());
+    assert.deepEqual(opened, [snapshot]);
+  } finally { await act(async () => tree.unmount()); }
+});
+test('urgent deadline warnings are expanded by default', async () => {
+  const Alerts = load('OrderAlertSummary');
+  let tree; await act(async () => { tree = create(React.createElement(Alerts, {
+    alerts: [{ order: snapshot, deadline: { kind: 'overdue' }, unpaid: true }], counts: { total: 1, overdue: 1, due_soon: 0, unpaid: 1 }, onOpen() {}, loading: false,
+  })); });
+  try { assert.equal(tree.root.findByType('details').props.open, true); assert.match(text(tree.toJSON()), /Kechikdi/); }
+  finally { await act(async () => tree.unmount()); }
+});
+
