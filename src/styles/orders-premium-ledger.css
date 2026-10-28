@@ -104,6 +104,16 @@
 .opl-compact .opl-empty button { min-height: 44px; padding: 9px 14px; margin-top: 8px; border: 1px solid var(--opl-line); border-radius: 9px; background: var(--opl-selection); color: var(--opl-olive); }
 .opl-compact .opl-spinner { width: 24px; height: 24px; border: 3px solid var(--opl-line); border-top-color: #aca95d; border-radius: 50%; animation: opl-spin .7s linear infinite; }
 @keyframes opl-spin { to { transform: rotate(360deg); } }
+/* Payment-only warnings stay one line; urgent deadlines expand automatically. */
+.opl-compact .opl-alert-box.opl-alert-collapsible { padding: 0; background: transparent; border: 0; border-bottom: 1px solid var(--opl-line); border-radius: 0; }
+.opl-compact .opl-alert-collapsible > summary { min-height: 44px; padding: 6px 0 12px; cursor: pointer; list-style: none; }
+.opl-compact .opl-alert-collapsible > summary::-webkit-details-marker { display: none; }
+.opl-compact .opl-alert-collapsible > summary:focus-visible { outline: 3px solid #aca95d; outline-offset: 2px; }
+.opl-compact .opl-alert-collapsible .opl-alert-heading { display: inline-flex; align-items: center; gap: 7px; }
+.opl-compact .opl-alert-collapsible[open] { padding-bottom: 12px; }
+.opl-compact .opl-alert-chevron { color: var(--opl-muted); transition: transform .15s ease; }
+.opl-compact .opl-alert-collapsible[open] .opl-alert-chevron { transform: rotate(180deg); }
+
 /* Keep the existing actionable deadline/payment alerts, without a dashboard header. */
 .opl-compact .opl-alert-box { border: 1px solid var(--opl-line); border-radius: 10px; background: var(--opl-selection); padding: 12px 14px; margin-bottom: 14px; }
 .opl-compact .opl-alert-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
