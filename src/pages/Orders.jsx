@@ -194,10 +194,9 @@ export default function Orders() {
   };
 
   return (
-    <div className="opl-page">
-      <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />
-      {repeatLoading && <p role="status" className="p-3 text-sm text-muted-foreground">Buyurtma ma’lumotlari yuklanmoqda…</p>}
+    <div className="opl-page opl-compact">
       <div className="opl-workspace">
+        <div className="opl-toolbar">
         <nav className="opl-tabs" aria-label="Buyurtma sanalari">
           {tabs.map((tab) => (
             <button key={tab.key} type="button" className={`opl-tab ${view === tab.key ? 'is-active' : ''}`}
@@ -206,6 +205,9 @@ export default function Orders() {
             </button>
           ))}
         </nav>
+        <OrderLedgerHero user={user} onCreate={() => setFormOpen(true)} />
+        </div>
+        {repeatLoading && <p role="status" className="p-3 text-sm text-muted-foreground">Buyurtma ma’lumotlari yuklanmoqda…</p>}
         <OrderFilterRail
           isAdmin={isAdmin}
           shops={shops}
@@ -228,13 +230,7 @@ export default function Orders() {
         </div>}
         {view === 'today' && !query && !activeError && <OrderAlertSummary alerts={alerts} counts={counts} onOpen={setDetailOrder} loading={activeLoading} />}
         <section className="opl-ledger" aria-live="polite">
-          <div className="opl-ledger-head">
-            <div>
-              <h2 className="opl-ledger-title">{view === 'date' ? `${dateFilter} dagi buyurtmalar` : tabs.find((tab) => tab.key === view)?.label}</h2>
-              <p className="opl-ledger-subtitle">{view === 'history' ? 'Yakunlangan va bekor qilingan buyurtmalar' : 'Olish yoki yetkazish vaqti bo‘yicha tartiblangan'}</p>
-            </div>
-            <span className="opl-ledger-count">Ko‘rsatilgan: {filtered.length} ta{hasMore ? '+' : ''}</span>
-          </div>
+          <h2 className="sr-only">{view === 'date' ? `${dateFilter} dagi buyurtmalar` : tabs.find((tab) => tab.key === view)?.label}</h2>
           {loading ? <div className="opl-loading"><div className="opl-spinner" /><p>Buyurtmalar yuklanmoqda…</p></div> : !loadError && filtered.length === 0 ? (
             <div className="opl-empty">
               <strong>{hasFilters ? 'Mos buyurtma topilmadi' : 'Bu bo‘limda buyurtma yo‘q'}</strong>
@@ -242,10 +238,24 @@ export default function Orders() {
               {hasFilters && <button type="button" onClick={clearFilters}>Filtrlarni tozalash</button>}
             </div>
           ) : (
-            <div className="opl-order-list">{filtered.map((order) => (
-              <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} />
-            ))}</div>
+            <div className="opl-table-wrap">
+              <table className="opl-ledger-table">
+                <caption className="sr-only">Buyurtmalar, mijozlar, topshirish va to‘lov holati</caption>
+                <thead><tr>
+                  <th scope="col">Buyurtma</th><th scope="col">Mijoz</th>
+                  <th scope="col">Topshirish</th><th scope="col">To‘lov</th>
+                  <th scope="col">Holat</th><th scope="col"><span className="sr-only">Amallar</span></th>
+                </tr></thead>
+                <tbody>{filtered.map((order) => (
+                  <OrderLedgerCard key={order.id} order={order} isAdmin={isAdmin} onOpen={setDetailOrder} onRepeat={handleRepeat} today={today} />
+                ))}</tbody>
+              </table>
+            </div>
           )}
+          {!loading && !loadError && <div className="opl-ledger-foot">
+            <span>Ko‘rsatilgan: {filtered.length} ta{hasMore ? '+' : ''}</span>
+            <p>{view === 'history' ? 'Yakunlangan va bekor qilingan buyurtmalar' : 'Buyurtmalar topshirish vaqti bo‘yicha tartiblangan.'}</p>
+          </div>}
           {!loading && hasMore && <div className="text-center mt-4">
             <button type="button" className="min-h-11 rounded-xl border border-border px-5 text-sm" disabled={loadingMore} onClick={loadMore}>
               {loadingMore ? 'Yuklanmoqda…' : 'Yana buyurtmalarni ko‘rsatish'}
