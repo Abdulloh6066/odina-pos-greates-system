@@ -3,6 +3,7 @@ import { canAccess } from './pos.js';
 // Share the exact same lazy loaders between React routes and navigation preloading.
 // Preloading downloads code only: it never fetches or modifies business records.
 export const PAGE_LOADERS = {
+  admin: () => import('@/pages/AdminPanel'),
   dashboard: () => import('@/pages/Dashboard'),
   pos: () => import('@/pages/POS'),
   orders: () => import('@/pages/Orders'),
@@ -29,6 +30,7 @@ export const PAGE_LOADERS = {
 };
 
 const ROUTE_KEYS = {
+  '/admin': 'admin',
   '/': 'dashboard',
   '/pos': 'pos',
   '/orders': 'orders',
