@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
 import { rememberOfflineStaff, readOfflineStaff, clearOfflineRestart, savePosRestart, readPosRestart,
-  saveShiftRestart, readShiftRestart, restartRead, restartCatalog, OFFLINE_MAX_AGE } from '../lib/offline-restart.js';
+  saveShiftRestart, readShiftRestart, restartRead, restartCatalog, updateRestartStock, OFFLINE_MAX_AGE } from '../lib/offline-restart.js';
 import offlineRestartPlugin from '../offline/build-plugin.js';
 const user = { id: 'staff-a', role: 'cashier', shop_id: 'shop-a', active: true };
 function storage() {
@@ -45,6 +45,32 @@ test('catalogs are isolated by cashier, role and assigned shop', () => {
   storage(); savePosRestart(user, { prods: [{ id: 'p' }] });
   assert.equal(readPosRestart(user).prods.length, 1);
   for (const change of [{ id: 'staff-b' }, { shop_id: 'shop-b' }, { role: 'admin' }]) assert.equal(readPosRestart({ ...user, ...change }), null);
+});
+test('confirmed stock survives a module reload without copying queued deductions into the base', async () => {
+  storage();
+  savePosRestart(user, { prods: [], stockList: [
+    { product_id: 'cake', location_id: 'shop-a', quantity: 10 },
+    { product_id: 'cake', location_id: 'shop-b', quantity: 30 },
+  ] });
+  assert.equal(updateRestartStock(user, 'shop-a', [{ product_id: 'cake', quantity: 8 }]), true);
+  const restarted = await import('../lib/offline-restart.js?stock-restart');
+  assert.equal(restarted.readPosRestart(user).stockList.find(r => r.location_id === 'shop-a').quantity, 8);
+  assert.equal(restarted.readPosRestart(user).stockList.find(r => r.location_id === 'shop-b').quantity, 30);
+  // Pending units are deducted once from the recovered authoritative base.
+  const pendingQuantity = 2;
+  assert.equal(restarted.readPosRestart(user).stockList[0].quantity - pendingQuantity, 6);
+  updateRestartStock(user, 'shop-a', [{ product_id: 'cake', quantity: 0 }, { product_id: 'tea', quantity: 4 }]);
+  assert.equal(readPosRestart(user).stockList.find(r => r.product_id === 'cake' && r.location_id === 'shop-a').quantity, 0);
+  assert.equal(readPosRestart(user).stockList.filter(r => r.product_id === 'tea').length, 1);
+});
+test('stock persistence failure is reported and cannot cross cashier cache boundaries', () => {
+  storage();
+  savePosRestart(user, { stockList: [{ product_id: 'cake', location_id: 'shop-a', quantity: 10 }] });
+  assert.equal(updateRestartStock({ ...user, id: 'other' }, 'shop-a', [{ product_id: 'cake', quantity: 0 }]), false);
+  assert.equal(readPosRestart(user).stockList[0].quantity, 10);
+  globalThis.localStorage = { getItem: key => key.includes('pos:') ? JSON.stringify({ savedAt: Date.now(), data: { stockList: [] } }) : null,
+    setItem: () => { throw new Error('QuotaExceededError'); } };
+  assert.equal(updateRestartStock(user, 'shop-a', [{ product_id: 'cake', quantity: 1 }]), false);
 });
 test('confirmed close invalidates cached open shift', () => {
   storage(); saveShiftRestart(user, { id: 's', user_id: user.id, status: 'open' });
