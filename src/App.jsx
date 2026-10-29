@@ -10,6 +10,7 @@ import OdinaDialogProvider from '@/components/ui/odina-dialog-provider';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import RoleRoute from '@/components/RoleRoute';
+import AdminAccessProvider from '@/components/admin/AdminAccessProvider';
 import { preloadPage } from '@/lib/route-preload';
 // Auth pages
 import Login from '@/pages/Login';
@@ -19,6 +20,7 @@ import ResetPassword from '@/pages/ResetPassword';
 // App shell stays eager; feature pages load only when their route is opened.
 import Layout from '@/components/Layout';
 const Dashboard = lazy(() => preloadPage('dashboard'));
+const AdminPanel = lazy(() => preloadPage('admin'));
 const POS = lazy(() => preloadPage('pos'));
 const Orders = lazy(() => preloadPage('orders'));
 const RestaurantTables = lazy(() => preloadPage('tables'));
@@ -44,6 +46,7 @@ const DailyExport = lazy(() => preloadPage('dailyexport'));
 
 const ROUTE_TITLES = {
   '/': 'Bosh sahifa',
+  '/admin': 'Admin panel',
   '/login': 'Kirish',
   '/register': 'Ro‘yxatdan o‘tish',
   '/forgot-password': 'Parolni tiklash',
@@ -137,6 +140,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <OdinaDialogProvider>
         <Router>
+          <AdminAccessProvider>
           <RouteTitle />
           <ScrollToTop />
           <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center"><div className="w-8 h-8 border-4 border-secondary border-t-primary rounded-full animate-spin" /></div>}>
@@ -149,6 +153,7 @@ function App() {
               <Route path="/production-screen" element={<RoleRoute pageKey="screens"><ProductionScreen /></RoleRoute>} />
               <Route element={<Layout />}>
                 <Route path="/" element={<RoleRoute pageKey="dashboard"><Dashboard /></RoleRoute>} />
+                <Route path="/admin" element={<RoleRoute pageKey="admin"><AdminPanel /></RoleRoute>} />
                 <Route path="/pos" element={<RoleRoute pageKey="pos"><POS /></RoleRoute>} />
                 <Route path="/orders" element={<RoleRoute pageKey="orders"><Orders /></RoleRoute>} />
                 <Route path="/tables" element={<RoleRoute pageKey="tables"><RestaurantTables /></RoleRoute>} />
@@ -176,6 +181,7 @@ function App() {
             <Route path="*" element={<PageNotFound />} />
           </Routes>
           </Suspense>
+          </AdminAccessProvider>
         </Router>
         <Toaster />
         </OdinaDialogProvider>
