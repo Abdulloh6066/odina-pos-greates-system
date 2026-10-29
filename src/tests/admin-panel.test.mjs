@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { pbkdf2Sync } from 'node:crypto';
-import { handleAdminPanel } from '../../base44/shared/admin-panel.ts';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+// Resolve Deno's npm: specifiers for Node while executing the actual backend source.
+const helperUrl = new URL('../../base44/shared/admin-panel.ts', import.meta.url);
+const source = readFileSync(helperUrl, 'utf8')
+  .replace('"./user-helpers.ts"', JSON.stringify(new URL('./user-helpers.ts', helperUrl).href))
+  .replaceAll('"npm:@noble/hashes@2.4.0/pbkdf2.js"', JSON.stringify(import.meta.resolve('@noble/hashes/pbkdf2.js')))
+  .replaceAll('"npm:@noble/hashes@2.4.0/sha2.js"', JSON.stringify(import.meta.resolve('@noble/hashes/sha2.js')));
+const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const { handleAdminPanel } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 
 const testPassword = 'isolated-test-password';
 const salt = '12'.repeat(32);
