@@ -86,6 +86,7 @@ async function renderPage(path, { role = 'admin', shopId = 'branch', custom = {}
     if (specifier === '@/lib/order-request-retry') return { orderRequestScope: () => 'offline', readOrderRequest: () => pending, retainOrderRequest: value => value, clearOrderRequest: empty };
     if (specifier === '@/lib/odina-dialog') return { odinaAlert: empty, odinaConfirm: async () => false };
     if (specifier === '@/lib/staff-order-ticket') return { isStaffTicketEnabled: () => false };
+    if (specifier === '@/hooks/useOrderUpdates') return load('src/hooks/useOrderUpdates.js');
     if (specifier === '@/hooks/useEntityHistory') return { useEntityHistory: (_entity, query) => { queries.push(query); return { rows: orders, reload: empty, loadMore: empty }; } };
     if (specifier === '@/hooks/useOrderAlerts') return { useOrderAlerts: rows => { alertInputs.push(rows); return { alerts: [], counts: {} }; } };
     if (specifier === '@/components/ui/use-toast') return { useToast: () => ({ toast: empty }) };
