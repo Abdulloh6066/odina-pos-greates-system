@@ -131,6 +131,7 @@ export default function AdminAccessProvider({ children }) {
       navigate('/admin');
     } catch (failure) {
       if (currentGeneration === generation.current) {
+        console.warn('Admin panel verification reference:', failure?.response?.data?.reference || 'request');
         const retryAfter = Number(failure?.response?.data?.retry_after);
         setError((failure?.response?.data?.error || 'Kirishni tekshirib bo‘lmadi. Internet aloqasini tekshiring.')
           + (retryAfter > 2 ? ' Taxminan ' + Math.ceil(retryAfter / 60) + ' daqiqadan keyin urinib ko‘ring.' : ''));
