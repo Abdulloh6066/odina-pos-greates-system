@@ -1,5 +1,6 @@
 // Password material stays in Base44 secrets; this module is backend-only.
 import { userRole } from "./user-helpers.ts";
+import { pbkdf2 } from "node:crypto";
 const encoder = new TextEncoder();
 const SESSION_MS = 15 * 60 * 1000;
 const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;
@@ -65,11 +66,12 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
       return failure("Ko‘p noto‘g‘ri urinish. Keyinroq qayta urinib ko‘ring.", 429, { retry_after: retryAfter });
     }
     stage = "password_verification";
-    const passwordKey = await crypto.subtle.importKey("raw", encoder.encode(body.password), "PBKDF2", false, ["deriveBits"]);
-    const derived = await crypto.subtle.deriveBits({
-      name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(config.salt), iterations: config.iterations,
-    }, passwordKey, 256);
-    const actual = hex(new Uint8Array(derived));
+    // The preview runtime does not implement WebCrypto PBKDF2. Deno supports
+    // node:crypto; retain the full configured work factor in both environments.
+    const derived = await new Promise<Uint8Array>((resolve, reject) => {
+      pbkdf2(body.password, config.salt, config.iterations, 32, "sha256", (error, key) => error ? reject(error) : resolve(key));
+    });
+    const actual = hex(derived);
     let difference = 0;
     for (let i = 0; i < 64; i++) difference |= actual.charCodeAt(i) ^ config.hash.charCodeAt(i);
     const audit = { user_id: String(admin.id), user_name: String(admin.display_name || admin.full_name || auth.email || "Egasi") };
