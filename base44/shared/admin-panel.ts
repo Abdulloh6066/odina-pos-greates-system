@@ -1,6 +1,7 @@
 // Password material stays in Base44 secrets; this module is backend-only.
 import { userRole } from "./user-helpers.ts";
-import { pbkdf2 } from "node:crypto";
+import { pbkdf2Async } from "npm:@noble/hashes@2.4.0/pbkdf2.js";
+import { sha256 } from "npm:@noble/hashes@2.4.0/sha2.js";
 const encoder = new TextEncoder();
 const SESSION_MS = 15 * 60 * 1000;
 const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;
@@ -66,10 +67,10 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
       return failure("Ko‘p noto‘g‘ri urinish. Keyinroq qayta urinib ko‘ring.", 429, { retry_after: retryAfter });
     }
     stage = "password_verification";
-    // The preview runtime does not implement WebCrypto PBKDF2. Deno supports
-    // node:crypto; retain the full configured work factor in both environments.
-    const derived = await new Promise<Uint8Array>((resolve, reject) => {
-      pbkdf2(body.password, config.salt, config.iterations, 32, "sha256", (error, key) => error ? reject(error) : resolve(key));
+    // Use the audited portable implementation: the preview runtime rejects
+    // native PBKDF2. Keep the same work factor and verifier in every runtime.
+    const derived = await pbkdf2Async(sha256, encoder.encode(body.password), encoder.encode(config.salt), {
+      c: config.iterations, dkLen: 32,
     });
     const actual = hex(derived);
     let difference = 0;
