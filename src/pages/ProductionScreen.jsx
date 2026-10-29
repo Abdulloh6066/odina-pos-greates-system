@@ -716,7 +716,7 @@ function OrderCard({ order, items, busy, onStart, onReady, onShip, onPreview }) 
           {order.order_status === 'qabul_qilindi' && <Button variant="outline" onClick={onStart} disabled={busy}
             aria-label={`Buyurtma ${displayOrderNumber(order)}: Tayyorlashni boshlash`} className="h-11 bg-card font-semibold">
             <ChefHat className="w-4 h-4" /> Tayyorlashni boshlash
-          </Button>
+          </Button>}
           <Button
             variant="outline"
             onClick={() => setExpanded((open) => !open)}
