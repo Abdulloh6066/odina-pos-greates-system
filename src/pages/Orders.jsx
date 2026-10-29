@@ -217,7 +217,7 @@ export default function Orders() {
         {warehouseQueue && <div role="status" className="mb-3 rounded-xl border border-border bg-secondary/50 px-4 py-3 text-sm">
           <strong>Markaziy ombor navbati</strong>
           <p className="mt-1 text-muted-foreground">Barcha filial va Central buyurtmalari avtomatik shu yerda. To‘lovlar buyurtma olingan do‘konda saqlanadi.</p>
-        </div>
+        </div>}
         <div className="opl-toolbar">
         <nav className="opl-tabs" aria-label="Buyurtma sanalari">
           {tabs.map((tab) => (
