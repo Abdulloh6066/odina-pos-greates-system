@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
@@ -55,10 +55,12 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [offlineSession, setOfflineSession] = useState(false);
+  const identityEpoch = useRef(0);
 
   const restoreOffline = async () => {
+    const epoch = identityEpoch.current;
     const saved = await readOfflineStaff(appParams.appId);
-    if (!saved) return false;
+    if (!saved || epoch !== identityEpoch.current) return false;
     setUser(saved);
     setOfflineSession(true);
     setIsAuthenticated(false); // Local continuity is not a new authenticated session.
@@ -71,10 +73,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (!offlineSession) return undefined;
-    const reconnect = () => { if (navigator.onLine !== false) void checkUserAuth(true); };
+    let checking = false;
+    const reconnect = async () => {
+      if (checking || navigator.onLine === false) return;
+      checking = true;
+      try { await checkUserAuth(true); } finally { checking = false; }
+    };
+    const timer = window.setInterval(reconnect, 15000);
     window.addEventListener('online', reconnect);
     window.addEventListener('focus', reconnect);
-    return () => { window.removeEventListener('online', reconnect); window.removeEventListener('focus', reconnect); };
+    return () => { window.clearInterval(timer); window.removeEventListener('online', reconnect); window.removeEventListener('focus', reconnect); };
   }, [offlineSession]);
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
@@ -159,11 +167,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const checkUserAuth = async (background = false) => {
+    const epoch = identityEpoch.current;
     try {
       // Reconnection must not unmount an in-progress local cart.
       if (!background) setIsLoadingAuth(true);
       if (navigator.onLine === false && await restoreOffline()) return;
       let currentUser = await restartRead(() => base44.auth.me());
+      if (epoch !== identityEpoch.current) return;
+      const previous = await readOfflineStaff(appParams.appId);
+      if (epoch !== identityEpoch.current) return;
+      // Cookie sessions can change identity without a readable token changing.
+      if (previous && previous.id !== currentUser?.id) clearOfflineRestart();
 
       // Taklif qilingan xodim birinchi kirganda Odina ichidagi lavozimi
       // va ish joyini xavfsiz backend orqali avtomatik oladi.
@@ -183,6 +197,7 @@ export const AuthProvider = ({ children }) => {
       // enumeration while keeping the staff allowlist enforced after auth.
       try {
         const accessResponse = await restartRead(() => base44.functions.invoke('staff-email-check', {}));
+        if (epoch !== identityEpoch.current) return;
         const access = accessResponse?.data || accessResponse;
         if (!access?.allowed) {
           clearOfflineRestart();
@@ -196,18 +211,22 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (accessError) {
         console.warn('Staff access verification failed:', accessError);
+        if (epoch !== identityEpoch.current) return;
         if (isPosNetworkError(accessError) && await restoreOffline()) return;
         clearOfflineRestart();
         setOfflineSession(false);
         setUser(null);
         setIsAuthenticated(false);
-        setAuthError({ type: 'user_not_registered', message: 'Xodim ruxsatini tekshirib bo‘lmadi' });
+        setAuthError(isPosNetworkError(accessError)
+          ? { type: 'offline_unavailable', message: 'Internet yo‘q va ushbu hisob uchun offline kassa tayyor emas. Internetga ulanib qayta kiring.' }
+          : { type: 'user_not_registered', message: 'Xodim ruxsatini tekshirib bo‘lmadi' });
         setIsLoadingAuth(false);
         setAuthChecked(true);
         return;
       }
 
       const hydrated = await restartRead(() => hydrateAppUser(currentUser));
+      if (epoch !== identityEpoch.current) return;
       // O'z-o'zidan ro'yxatdan o'tgan (role="user") yoki lavozimi xodimlarga
       // kirmaydigan hisoblar xodimlar ro'yxatida yo'q — ularga ilova ochilmaydi.
       if (!APP_ROLES.has(hydrated?.role)) {
@@ -234,6 +253,7 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       await rememberOfflineStaff(hydrated, appParams.appId);
+      if (epoch !== identityEpoch.current) return;
       setOfflineSession(false);
       setAuthError(null);
       setUser(hydrated);
@@ -242,6 +262,7 @@ export const AuthProvider = ({ children }) => {
       setAuthChecked(true);
     } catch (error) {
       console.error('User auth check failed:', error);
+      if (epoch !== identityEpoch.current) return;
       if (isPosNetworkError(error) && await restoreOffline()) return;
       clearOfflineRestart();
       setOfflineSession(false);
@@ -250,6 +271,9 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       setAuthChecked(true);
       
+      if (isPosNetworkError(error)) {
+        setAuthError({ type: 'offline_unavailable', message: 'Offline kassa tayyor emas yoki seans muddati tugagan. Internetga ulanib qayta kiring.' });
+      }
       // If user auth fails, it might be an expired token
       if ([401, 403].includes(Number(error.status || error.response?.status))) {
         setAuthError({ type: 'auth_required', message: 'Authentication required' });
@@ -260,6 +284,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = (shouldRedirect = true) => {
+    identityEpoch.current++;
     clearOfflineRestart();
     setOfflineSession(false);
     setUser(null);
