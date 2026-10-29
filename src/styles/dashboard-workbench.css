@@ -103,6 +103,8 @@
   .odina-home .odina-home-placeholder:first-child { grid-column: 1; grid-row: 1 / span 3; min-height: 280px; }
 }
 @media screen and (max-width: 767px) {
+  /* Match the full-width action breakpoint so the title cannot collapse beside it. */
+  .odina-home .odina-page-header { flex-direction: column; align-items: stretch; }
   .odina-home .odina-home-filter { grid-template-columns: minmax(0,1fr); gap: 9px; padding: 14px 16px; margin-bottom: 20px; }
   .odina-home .odina-home-filter-scope { text-align: left; }
   .odina-home .odina-home-expiry { padding: 14px; margin-bottom: 20px; }
