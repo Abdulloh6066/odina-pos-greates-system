@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { displayOrderNumber, typeLabel, tashkentNowParts, pad2 } from '@/lib/orders';
 import { ROLE_HOME } from '@/lib/pos';
+import { orderQueueScope, readAllEntityPages } from '@/lib/history-pagination';
 import { formatUzbekistanTime, uzbekistanDateKey } from '@/lib/uzbekistan-time';
 import DemandSection from '@/components/production/DemandSection';
 import TomorrowIngredientForecast from '@/components/production/TomorrowIngredientForecast';
@@ -127,7 +128,8 @@ function ScreenCrashFallback({ error, onReset }) {
 
 function ProductionScreenInner() {
   const { user, adminShopScope } = useAuth();
-  const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
+  const selectedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
+  const { shopFilter: scopedShopId, warehouseQueue } = orderQueueScope(selectedShopId, adminShopScope?.shops || []);
   const { toast } = useToast();
   const [active, setActive] = useState([]);
   const [shippedToday, setShippedToday] = useState([]);
@@ -142,6 +144,7 @@ function ProductionScreenInner() {
   const [forecastLoading, setForecastLoading] = useState(true);
   const [forecastError, setForecastError] = useState('');
   const loadedOnce = useRef(false);
+  const loadedOrders = useRef([]);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
   const refreshInFlight = useRef(null);
@@ -156,11 +159,20 @@ function ProductionScreenInner() {
 
   const loadOrders = async () => {
     try {
-      const all = await base44.entities.CustomerOrder.list('-created_date', 200);
-      if (!Array.isArray(all)) throw new Error('Buyurtmalar javobi noto‘g‘ri.');
-      const list = all;
-      setActive(list.filter((o) => ACTIVE_STATUSES.includes(o.order_status)));
       const today = todayStr();
+      const list = await readAllEntityPages(base44.entities.CustomerOrder, {
+        creation_state: { $ne: 'pending' },
+        $or: [
+          { order_status: { $in: ACTIVE_STATUSES } },
+          { order_status: 'yuborildi_olib_ketildi', shipped_at: {
+            $gte: new Date(today + 'T00:00:00+05:00').toISOString(),
+            $lt: new Date(dateOffsetStr(1) + 'T00:00:00+05:00').toISOString(),
+          } },
+        ],
+      }, 'id');
+      if (!Array.isArray(list)) throw new Error('Buyurtmalar javobi noto‘g‘ri.');
+      loadedOrders.current = list;
+      setActive(list.filter((o) => ACTIVE_STATUSES.includes(o.order_status)));
       setShippedToday(
         list.filter((o) => o.order_status === 'yuborildi_olib_ketildi' && uzbekistanDateKey(o.shipped_at) === today),
       );
@@ -175,12 +187,15 @@ function ProductionScreenInner() {
 
   const loadItems = async () => {
     try {
-      const rows = await base44.entities.CustomerOrderItem.list('-created_date', 500);
+      const ids = loadedOrders.current.map((order) => order.id);
       const map = {};
-      (rows || []).forEach((it) => {
-        if (!map[it.order_id]) map[it.order_id] = [];
-        map[it.order_id].push(it);
-      });
+      for (let start = 0; start < ids.length; start += 50) {
+        const rows = await readAllEntityPages(base44.entities.CustomerOrderItem, { order_id: { $in: ids.slice(start, start + 50) } }, 'id');
+        rows.forEach((it) => {
+          if (!map[it.order_id]) map[it.order_id] = [];
+          map[it.order_id].push(it);
+        });
+      }
       setItemsByOrder(map);
       return true;
     } catch (e) {
@@ -223,7 +238,8 @@ function ProductionScreenInner() {
         refreshQueued.current = false;
         forecastQueued.current = false;
         const results = await Promise.allSettled([
-          loadOrders(), loadItems(), ...(withForecast ? [loadForecast()] : []),
+          (async () => { const ok = await loadOrders(); if (ok) await loadItems(); return ok; })(),
+          ...(withForecast ? [loadForecast()] : []),
         ]);
         if (results[0].status === 'fulfilled' && results[0].value === true) {
           loadedOnce.current = true;
@@ -304,7 +320,7 @@ function ProductionScreenInner() {
       const data = res?.data || res;
       if (data?.order) {
         toast({
-          title: step === 'ready' ? 'Tayyor bo‘ldi' : 'Yuborildi',
+          title: step === 'preparing' ? 'Tayyorlash boshlandi' : step === 'ready' ? 'Tayyor bo‘ldi' : 'Yuborildi',
           description: step === 'ready' && data.production_applied
             ? `${displayOrderNumber(data.order)} · Masalliqlar ombordan kamaydi`
             : displayOrderNumber(data.order),
@@ -330,9 +346,14 @@ function ProductionScreenInner() {
     };
     const ordersFor = (date) => scopedActive.filter((o) => o.required_date === date).sort(sortByTime);
 
+    const overdue = scopedActive.filter((order) => !order.required_date || order.required_date < today)
+      .sort((a, b) => (a.required_date || '').localeCompare(b.required_date || '') || sortByTime(a, b));
+    const laterDates = [...new Set(scopedActive.map((order) => order.required_date).filter((date) => date > tomorrow))].sort();
     return [
+      ...(overdue.length ? [{ key: 'overdue', title: 'Muddati o‘tgan buyurtmalar', date: '', orders: overdue }] : []),
       { key: 'today', title: 'Bugungi buyurtmalar', date: today, orders: ordersFor(today) },
       { key: 'tomorrow', title: 'Ertangi buyurtmalar', date: tomorrow, orders: ordersFor(tomorrow) },
+      ...laterDates.map((date) => ({ key: date, title: 'Keyingi buyurtmalar', date, orders: ordersFor(date) })),
     ];
   }, [scopedActive, clock]);
 
@@ -376,6 +397,7 @@ function ProductionScreenInner() {
       {/* Body — always one of loading / error / empty / orders */}
       <main className="odina-production-content flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 sm:p-6">
         <AdminShopSwitcher scope={adminShopScope} pathname="/production-screen" />
+        {warehouseQueue && <p className="mb-4 rounded-xl bg-secondary p-3 text-sm text-muted-foreground">Markaziy ombor navbati: barcha filial va Central buyurtmalari. Holat do‘konda ham avtomatik yangilanadi; to‘lovlar asl do‘konda qoladi.</p>}
         {scopedShopId && <p className="mb-4 rounded-xl bg-secondary p-3 text-sm text-muted-foreground">Buyurtmalar tanlangan do‘kon bo‘yicha. Ertangi masalliq hisobi va ishlab chiqarish talablari barcha do‘konlar uchun umumiy.</p>}
         {loading ? (
           <div className="h-[60vh] flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -410,6 +432,7 @@ function ProductionScreenInner() {
                 orders={day.orders}
                 itemsByOrder={itemsByOrder}
                 busyId={busyId}
+                onStart={(order) => setConfirm({ order, step: 'preparing' })}
                 onReady={(order) => setConfirm({ order, step: 'ready' })}
                 onShip={(order) => setConfirm({ order, step: 'shipped' })}
                 onPreview={(order) => setPreview(order.reference_image)}
@@ -464,10 +487,11 @@ function ProductionScreenInner() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {confirm.step === 'ready' ? 'Tayyor bo‘ldi?' : 'Yuborildi?'}
+                {confirm.step === 'preparing' ? 'Tayyorlashni boshlash?' : confirm.step === 'ready' ? 'Tayyor bo‘ldi?' : 'Yuborildi?'}
               </DialogTitle>
               <DialogDescription>
-                {confirm.step === 'ready'
+                {confirm.step === 'preparing'
+                  ? `${displayOrderNumber(confirm.order)} buyurtmasini tayyorlash boshlanadi.` : confirm.step === 'ready'
                   ? `${displayOrderNumber(confirm.order)} buyurtmasini tayyor deb belgilaysiz.`
                   : `${displayOrderNumber(confirm.order)} buyurtmasini yuborilgan deb belgilaysiz.`}
               </DialogDescription>
@@ -579,7 +603,7 @@ function ProductionPlanSummary({ orders, itemsByOrder }) {
 }
 
 function OrderDaySection({
-  title, date, orders, itemsByOrder, busyId, onReady, onShip, onPreview, forecast,
+  title, date, orders, itemsByOrder, busyId, onStart, onReady, onShip, onPreview, forecast,
 }) {
   return (
     <section className="odina-production-day">
@@ -611,6 +635,7 @@ function OrderDaySection({
                 order={order}
                 items={itemsByOrder[order.id] || []}
                 busy={busyId === order.id}
+                onStart={() => onStart(order)}
                 onReady={() => onReady(order)}
                 onShip={() => onShip(order)}
                 onPreview={() => onPreview(order)}
@@ -625,7 +650,7 @@ function OrderDaySection({
   );
 }
 
-function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
+function OrderCard({ order, items, busy, onStart, onReady, onShip, onPreview }) {
   const [expanded, setExpanded] = useState(false);
   const summaryId = `order-summary-${order.id}`;
   const detailsId = `order-details-${order.id}`;
@@ -686,7 +711,11 @@ function OrderCard({ order, items, busy, onReady, onShip, onPreview }) {
           </span>
           <ChevronDown aria-hidden="true" className={`odina-production-summary-chevron w-5 h-5 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
-        <div className="grid grid-cols-2 gap-2 px-3 py-2.5 border-t xl:border-t-0 xl:border-l border-border bg-secondary/20 xl:shrink-0">
+        <div className="flex flex-wrap gap-2 px-3 py-2.5 border-t xl:border-t-0 xl:border-l border-border bg-secondary/20 xl:shrink-0">
+          {order.order_status === 'qabul_qilindi' && <Button variant="outline" onClick={onStart} disabled={busy}
+            aria-label={`Buyurtma ${displayOrderNumber(order)}: Tayyorlashni boshlash`} className="h-11 bg-card font-semibold">
+            <ChefHat className="w-4 h-4" /> Tayyorlashni boshlash
+          </Button>
           <Button
             variant="outline"
             onClick={() => setExpanded((open) => !open)}
