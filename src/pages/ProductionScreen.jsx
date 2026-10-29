@@ -165,8 +165,9 @@ function ProductionScreenInner() {
         $or: [
           { order_status: { $in: ACTIVE_STATUSES } },
           { order_status: 'yuborildi_olib_ketildi', shipped_at: {
-            $gte: new Date(today + 'T00:00:00+05:00').toISOString(),
-            $lt: new Date(dateOffsetStr(1) + 'T00:00:00+05:00').toISOString(),
+            // Cover both legacy UTC and +05:00 stamps; the business-day check below is exact.
+            $gte: dateOffsetStr(-1),
+            $lt: dateOffsetStr(1),
           } },
         ],
       }, 'id');
