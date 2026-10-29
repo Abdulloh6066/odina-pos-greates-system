@@ -90,7 +90,7 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
     return Response.json({ ok: true, token: payload + "." + signature, expires_at: expiresAt });
   } catch (error) {
     console.error("Admin panel verification failed", { stage, error_type: error instanceof Error ? error.name : "unknown" });
-    return failure("Admin kirishini tekshirib bo‘lmadi. Qayta urinib ko‘ring.", 503, { reference: stage + ":" + (error instanceof Error ? error.name : "unknown") });
+    return failure("Admin kirishini tekshirib bo‘lmadi. Qayta urinib ko‘ring.", 503);
   } finally {
     unlocking.delete(identity);
   }
