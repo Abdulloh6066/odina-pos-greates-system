@@ -1,4 +1,5 @@
 // Password material stays in Base44 secrets; this module is backend-only.
+import { userRole } from "./user-helpers.ts";
 const encoder = new TextEncoder();
 const SESSION_MS = 15 * 60 * 1000;
 const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;
@@ -14,7 +15,8 @@ async function signingKey(secret: string) {
 }
 
 export async function handleAdminPanel({ body, service, auth, admin, passwordConfig, signingSecret, now = Date.now() }: any) {
-  if (!admin || (admin.role || admin.data?.role) !== "admin" || admin.active === false || admin.data?.active === false) {
+  if (!auth?.id) return failure("Avval tizimga kiring.", 401);
+  if (!admin || userRole(admin) !== "admin" || admin.active === false || admin.data?.active === false) {
     return failure("Faqat faol Egasi / Admin uchun.", 403);
   }
   const identity = String(auth.id) + ":" + String(admin.id);
