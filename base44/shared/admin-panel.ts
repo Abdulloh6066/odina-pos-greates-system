@@ -44,6 +44,7 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
   }
   if (unlocking.has(identity)) return failure("Kirish tekshirilmoqda. Biroz kuting.", 429, { retry_after: 2 });
   unlocking.add(identity);
+  let stage = "configuration";
   try {
     const config = JSON.parse(passwordConfig || "{}");
     if (config.algorithm !== "PBKDF2-SHA256" || !Number.isInteger(config.iterations)
@@ -51,7 +52,9 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
       || !/^[a-f0-9]{64}$/.test(config.salt || "") || !/^[a-f0-9]{64}$/.test(config.hash || "")) {
       return failure("Admin paroli hali sozlanmagan. Hisob egasiga murojaat qiling.", 503);
     }
+    stage = "signing_key";
     const key = await signingKey(signingSecret);
+    stage = "attempt_history";
     // Durable history makes the cooldown survive function restarts.
     const failures = await service.entities.ActionHistory.filter({
       user_id: String(admin.id), action: "admin_panel_password_failed",
@@ -61,6 +64,7 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
       const retryAfter = Math.max(1, Math.ceil((Date.parse(recent[recent.length - 1].created_date || recent[recent.length - 1].created_at) + ATTEMPT_WINDOW_MS - now) / 1000));
       return failure("Ko‘p noto‘g‘ri urinish. Keyinroq qayta urinib ko‘ring.", 429, { retry_after: retryAfter });
     }
+    stage = "password_verification";
     const passwordKey = await crypto.subtle.importKey("raw", encoder.encode(body.password), "PBKDF2", false, ["deriveBits"]);
     const derived = await crypto.subtle.deriveBits({
       name: "PBKDF2", hash: "SHA-256", salt: encoder.encode(config.salt), iterations: config.iterations,
@@ -70,15 +74,19 @@ export async function handleAdminPanel({ body, service, auth, admin, passwordCon
     for (let i = 0; i < 64; i++) difference |= actual.charCodeAt(i) ^ config.hash.charCodeAt(i);
     const audit = { user_id: String(admin.id), user_name: String(admin.display_name || admin.full_name || auth.email || "Egasi") };
     if (difference !== 0) {
+      stage = "failed_attempt_audit";
       await service.entities.ActionHistory.create({ ...audit, action: "admin_panel_password_failed", details: "Admin panelga noto‘g‘ri parol bilan kirish urinishi." });
       return failure("Admin paroli noto‘g‘ri.", 401);
     }
+    stage = "session_issue";
     const expiresAt = now + SESSION_MS;
     const payload = encode(encoder.encode(JSON.stringify({ purpose: "odina-admin-panel-v1", subject: identity, issued_at: now, expires_at: expiresAt })));
     const signature = encode(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(payload))));
+    stage = "unlock_audit";
     await service.entities.ActionHistory.create({ ...audit, action: "admin_panel_unlocked", details: "Admin panelga parol bilan kirildi." });
     return Response.json({ ok: true, token: payload + "." + signature, expires_at: expiresAt });
-  } catch {
+  } catch (error) {
+    console.error("Admin panel verification failed", { stage, error_type: error instanceof Error ? error.name : "unknown" });
     return failure("Admin kirishini tekshirib bo‘lmadi. Qayta urinib ko‘ring.", 503);
   } finally {
     unlocking.delete(identity);
