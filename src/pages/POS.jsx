@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { loadOperationalSettings } from '@/lib/operational-config';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from '@/lib/order-request-retry';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, CloudOff, CloudUpload, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
+import { AlertTriangle, Search, Star, Clock, Building2, Banknote, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
@@ -40,7 +40,10 @@ import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActi
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
-import { canQueuePosSale } from '@/lib/pos-network';
+import { canQueuePosSale, isPosNetworkError } from '@/lib/pos-network';
+import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, restartCatalog, restartRead } from '@/lib/offline-restart';
+import OfflineRestartStatus from '@/components/pos/OfflineRestartStatus';
+import OfflineSalesBanner from '@/components/pos/OfflineSalesBanner';
 import CategoryIcon from '@/components/CategoryIcon';
 import '@/components/pos/pos-workbench.css';
 import {
@@ -110,6 +113,9 @@ export default function POS() {
   const loadGenerationRef = useRef(0);
   const wasteAlertGenerationRef = useRef(0);
   const [loadingData, setLoadingData] = useState(true);
+  const [restartSaved, setRestartSaved] = useState(false);
+  const [restartError, setRestartError] = useState('');
+  const [catalogOffline, setCatalogOffline] = useState(false);
   const [stockChecking, setStockChecking] = useState(false);
   const [wasteAlerts, setWasteAlerts] = useState([]);
 
@@ -562,15 +568,26 @@ export default function POS() {
     const session = checkoutSessionRef.current;
     setShiftReadState('loading');
     try {
-      const currentShift = await fetchCurrentPosShift(base44);
+      const currentShift = await restartRead(() => fetchCurrentPosShift(base44));
       if (checkoutSessionRef.current !== session || stockUserRef.current !== ownerId || generation !== shiftReadGenerationRef.current
         || mutation !== shiftMutationRef.current) {
         throw new Error('Smena ma’lumoti yangilandi. Tekshiruvni qayta bajaring.');
       }
+      saveShiftRestart(user, currentShift);
       setShift(currentShift);
       setShiftReadState('ready');
       return currentShift;
     } catch (error) {
+      if (isPosNetworkError(error) && checkoutSessionRef.current === session
+        && generation === shiftReadGenerationRef.current && mutation === shiftMutationRef.current) {
+        const cached = readShiftRestart(user);
+        if (cached?.shift?.status === 'open' && cached.shift.user_id === user.id
+          && (user.role === 'admin' || cached.shift.shop_id === user.shop_id)) {
+          setShift(cached.shift);
+          setShiftReadState('ready');
+          return cached.shift;
+        }
+      }
       // A stale read cannot undo a confirmed sale, withdrawal or shift close.
       if (checkoutSessionRef.current === session && stockUserRef.current === ownerId && generation === shiftReadGenerationRef.current
         && mutation === shiftMutationRef.current) setShiftReadState('error');
@@ -612,15 +629,28 @@ export default function POS() {
     const stockGeneration = stockReadGenerationRef.current;
     if (showLoading) setLoadingData(true);
     try {
-      const [cats, prods, shopList, operationalSettings, , stockList] = await Promise.all([
-        base44.entities.Category.list(),
-        base44.entities.Product.list(),
-        base44.entities.Shop.list(),
-        loadOperationalSettings(base44),
-        loadCurrentShift().catch(() => null),
-        base44.entities.ProductStock.list('-updated_at', 500),
-      ]);
+      const shiftRead = loadCurrentShift().catch(() => null);
+      let catalog;
+      let fromCache = false;
+      try {
+        const [cats, prods, shopList, operationalSettings, stockList] = await restartRead(() => Promise.all([
+          base44.entities.Category.list(), base44.entities.Product.list(), base44.entities.Shop.list(),
+          loadOperationalSettings(base44), base44.entities.ProductStock.list('-updated_at', 500),
+        ]));
+        catalog = { cats, prods, shopList, operationalSettings, stockList };
+      } catch (error) {
+        if (!isPosNetworkError(error)) throw error;
+        catalog = readPosRestart(user);
+        if (!catalog) throw new Error('Offline katalog topilmadi yoki muddati tugagan. Internet borida Kassani oching.');
+        fromCache = true;
+      }
+      await shiftRead;
+      const { cats, prods, shopList, operationalSettings, stockList } = catalog;
       if (generation !== loadGenerationRef.current) return;
+      setCatalogOffline(fromCache);
+      const saved = fromCache || savePosRestart(user, restartCatalog(catalog));
+      setRestartSaved(saved);
+      setRestartError(saved ? '' : 'Kassa nusxasi qurilmaga saqlanmadi. Offline qayta ochish tayyor emas.');
       const categoryPriority = {
         '15 somlik': 1,
         '18 somlik': 2,
@@ -664,8 +694,10 @@ export default function POS() {
       setShops((shopList || []).filter((shop) => shop.active !== false && shop.allows_pos !== false));
       setSettings(operationalSettings);
       // Auxiliary data never holds the product grid behind a loading screen.
-      void loadCashData(generation);
-      void loadWasteAlerts(generation);
+      if (!fromCache) { void loadCashData(generation); void loadWasteAlerts(generation); }
+    } catch (error) {
+      if (generation === loadGenerationRef.current) setRestartError(syncErrorMessage(error));
+      throw error;
     } finally {
       if (generation === loadGenerationRef.current) setLoadingData(false);
     }
@@ -695,7 +727,7 @@ export default function POS() {
   });
 
   const {
-    isOnline,
+    isOnline: queueOnline,
     browserOnline,
     connectionPaused,
     authorizationBlocked: queueAuthorizationError,
@@ -708,10 +740,12 @@ export default function POS() {
     enqueue: enqueueOfflineSale,
     syncNow: syncOfflineSales,
   } = useOfflineSaleQueue(user?.id, () => loadAll({ showLoading: false }).catch(() => {}), (currentShift) => {
+    saveShiftRestart(user, currentShift);
     shiftMutationRef.current++;
     setShift(currentShift);
     setShiftReadState('ready');
   }, confirmQueuedSale);
+  const isOnline = queueOnline && !catalogOffline;
   const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
     takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
 
@@ -719,6 +753,14 @@ export default function POS() {
     if (user) void loadAll().catch(() => {});
     return () => { loadGenerationRef.current++; wasteAlertGenerationRef.current++; };
   }, [user]);
+
+  useEffect(() => {
+    const refreshOnline = () => { void loadAll({ showLoading: false }).catch(() => {}); };
+    const refreshStale = () => { if (catalogOffline && navigator.onLine !== false) refreshOnline(); };
+    window.addEventListener('online', refreshOnline);
+    window.addEventListener('focus', refreshStale);
+    return () => { window.removeEventListener('online', refreshOnline); window.removeEventListener('focus', refreshStale); };
+  }, [user?.id, catalogOffline]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -1795,6 +1837,7 @@ export default function POS() {
     setShiftLoading(true);
     try {
       const currentShift = await openPosShift(base44, { shopId: shop?.id, startingCash: starting_cash });
+      saveShiftRestart(user, currentShift);
       shiftMutationRef.current++;
       setShift(currentShift);
       setShiftReadState('ready');
@@ -1876,6 +1919,7 @@ export default function POS() {
       const payload = result?.data || result;
       if (!payload?.shift) throw new Error(payload?.error || 'Smenani yopib bo‘lmadi.');
       setShiftReport(payload.shift);
+      saveShiftRestart(user, null);
       shiftMutationRef.current++;
       setShift(null);
       setCloseShiftOpen(false);
@@ -2060,6 +2104,7 @@ export default function POS() {
         </div>
       )}
 
+      <OfflineRestartStatus saved={restartSaved && Boolean(shift) && readShiftRestart(user)?.shift?.id === shift?.id} error={restartError} offline={catalogOffline || !isOnline} />
       <OfflineSalesBanner
         browserOnline={browserOnline} connectionPaused={connectionPaused}
         isOnline={isOnline}
@@ -2390,56 +2435,6 @@ export default function POS() {
         onConfirm={recordCashWithdrawal}
         loading={cashWithdrawalLoading}
       />
-    </div>
-  );
-}
-
-function OfflineSalesBanner({ isOnline, browserOnline = isOnline, connectionPaused = false, records, syncing, storageError, syncError, onRetry }) {
-  const failed = records.find((record) => record.status === 'failed');
-  const error = storageError || failed?.last_error || syncError;
-  if (isOnline && !records.length && !syncing && !error) return null;
-
-  const danger = Boolean(storageError || failed);
-  const tone = danger
-    ? 'border-red-200 bg-red-50 text-red-900'
-    : 'border-amber-200 bg-amber-50 text-amber-900';
-  const Icon = !isOnline ? CloudOff : syncing ? RefreshCw : CloudUpload;
-  const title = storageError
-    ? 'Offline xotira ishlamayapti'
-    : !isOnline
-      ? `${connectionPaused && browserOnline ? 'Server bilan aloqa yo‘q' : 'Internet yo‘q'}${records.length ? ` · ${records.length} ta savdo navbatda` : ''}`
-      : syncing
-        ? `${records.length} ta savdo yuborilmoqda…`
-        : `${records.length} ta savdo tasdig‘i kutilmoqda`;
-  const description = error
-    ? error
-    : !isOnline
-      ? 'Oddiy savdolar shu qurilmada xavfsiz saqlanadi.'
-      : 'Savdolar navbat bilan serverga yuboriladi. Oddiy savdoni davom ettirishingiz mumkin.';
-
-  return (
-    <div className={`mx-3 sm:mx-5 mt-3 shrink-0 flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${tone}`}>
-      <span className="w-9 h-9 rounded-xl bg-white/60 flex items-center justify-center shrink-0">
-        <Icon className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="block text-xs opacity-80 mt-0.5 truncate">{description}</span>
-      </span>
-      {browserOnline && records.length > 0 && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={syncing}
-          onClick={() => { void onRetry(); }}
-          aria-label={isOnline ? 'Navbatdagi savdolarni yuborish' : 'Server aloqasini tekshirish'}
-          className="h-10 shrink-0 bg-white/70"
-        >
-          <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">{isOnline ? 'Qayta yuborish' : 'Aloqani tekshirish'}</span>
-        </Button>
-      )}
     </div>
   );
 }

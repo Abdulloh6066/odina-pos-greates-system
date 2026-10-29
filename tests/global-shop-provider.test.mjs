@@ -36,7 +36,13 @@ async function fixture({ user = admin, saved = {}, read, storageBlocked = false 
     requests.push(args);
     return read ? read() : structuredClone(locations);
   } } } };
+  const restart = compile('src/lib/offline-restart.js', () => { throw Error('Unexpected restart import'); }, '', {
+    localStorage: storage, setTimeout, clearTimeout,
+  });
+  const network = compile('src/lib/pos-network.js', () => { throw Error('Unexpected network import'); });
   const authModule = compile('src/lib/AuthContext.jsx', id => {
+    if (id === '@/lib/offline-restart') return restart;
+    if (id === '@/lib/pos-network') return network;
     if (id === 'react') return { ...React, default: React };
     if (id === '@/api/base44Client') return { base44: client };
     if (id === '@/lib/app-params') return { appParams: {} };
@@ -44,6 +50,8 @@ async function fixture({ user = admin, saved = {}, read, storageBlocked = false 
     throw Error('Unexpected auth import: ' + id);
   }, '\nexport { AuthContext };');
   const provider = compile('src/lib/AdminShopContext.jsx', id => {
+    if (id === '@/lib/offline-restart') return restart;
+    if (id === '@/lib/pos-network') return network;
     if (id === 'react') return { ...React, default: React };
     if (id === '@/api/base44Client') return { base44: client };
     if (id === '@/lib/AuthContext') return authModule;

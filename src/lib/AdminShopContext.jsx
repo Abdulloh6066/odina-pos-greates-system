@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { AdminShopScopeContext, useAuth } from '@/lib/AuthContext';
+import { readPosRestart, restartRead } from '@/lib/offline-restart';
+import { isPosNetworkError } from '@/lib/pos-network';
 
 export const adminShopStorageKey = (userId) => 'odina-admin-shop:' + String(userId || '');
 const readSelection = (userId) => {
@@ -34,7 +36,11 @@ export default function AdminShopProvider({ children }) {
     }
     setSelection({ userId, shopId: readSelection(userId) });
     setCatalog({ userId, shops: [], ready: false, error: '' });
-    void base44.entities.Shop.list('name', 500).then((rows) => {
+    void restartRead(() => base44.entities.Shop.list('name', 500)).catch(error => {
+      const saved = isPosNetworkError(error) ? readPosRestart(user) : null;
+      if (!saved) throw error;
+      return saved.shopList;
+    }).then((rows) => {
       if (!active) return;
       const permitted = (rows || []).filter((shop) => shop.active !== false);
       setCatalog({ userId, shops: permitted, ready: true, error: '' });

@@ -8,6 +8,7 @@ import {
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
 import { base44 } from '@/api/base44Client';
+import { clearOfflineRestart } from '@/lib/offline-restart';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
 import { likelyRoutesForRole, preloadRoute } from '@/lib/route-preload';
@@ -96,6 +97,7 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
   };
 
   const handleLogout = async () => {
+    clearOfflineRestart();
     await base44.auth.logout();
   };
 

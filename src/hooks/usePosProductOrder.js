@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { readRestartValue, saveRestartValue } from '@/lib/offline-restart';
 
 const EMPTY_ORDER = Object.freeze([]);
 
@@ -9,8 +10,11 @@ export default function usePosProductOrder(shopId, userId) {
     if (!shopId || !userId) return undefined;
     let stopped = false;
     let timer;
+    const cacheKey = `product-order:${userId}:${shopId}`;
+    setSnapshot(readRestartValue(cacheKey));
     const accept = (next) => {
       if (stopped || next?.shop_id !== shopId) return;
+      saveRestartValue(cacheKey, next);
       setSnapshot(current => current?.shop_id === shopId && current.version > next.version ? current : next);
     };
     const reload = () => base44.functions.invoke('pos-product-order', { action: 'get', shop_id: shopId })

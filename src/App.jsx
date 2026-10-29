@@ -90,7 +90,7 @@ function RouteTitle() {
 }
 
 const AuthGate = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, checkAppState } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -101,6 +101,12 @@ const AuthGate = () => {
   }
 
   if (authError) {
+    if (authError.type === 'offline_unavailable' || authError.type === 'unknown') {
+      return <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <p>{authError.message}</p>
+        <button className="rounded-xl bg-primary px-5 py-3 text-primary-foreground" onClick={() => void checkAppState()}>Qayta tekshirish</button>
+      </div>;
+    }
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'user_disabled') {
