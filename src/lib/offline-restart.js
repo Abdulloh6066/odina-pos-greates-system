@@ -48,6 +48,24 @@ export async function readOfflineStaff(appId) {
 }
 export const readPosRestart = user => readRestartValue('pos:' + scope(user));
 export const savePosRestart = (user, data) => saveRestartValue('pos:' + scope(user), data);
+
+/** Persist only authoritative stock; queued deductions remain in the sale queue. */
+export function updateRestartStock(user, shopId, updates) {
+  const snapshot = readPosRestart(user);
+  if (!snapshot || !Array.isArray(snapshot.stockList) || !Array.isArray(updates)) return false;
+  const incoming = new Map(updates.filter(row => row?.product_id && Number.isFinite(Number(row.quantity)))
+    .map(row => [row.product_id, { ...row, location_id: shopId }]));
+  if (!incoming.size) return true;
+  const stockList = snapshot.stockList.map(row => {
+    const next = row.location_id === shopId ? incoming.get(row.product_id) : null;
+    if (!next) return row;
+    incoming.delete(row.product_id);
+    return { ...row, ...next };
+  });
+  stockList.push(...incoming.values());
+  return savePosRestart(user, { ...snapshot, stockList });
+}
+
 export const readShiftRestart = user => readRestartValue('shift:' + scope(user));
 export function saveShiftRestart(user, shift) {
   if (!user?.id) return false;
