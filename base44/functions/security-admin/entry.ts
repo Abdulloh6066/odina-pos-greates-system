@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId } from "../../shared/user-helpers.ts";
+import { handleAdminPanel } from "../../shared/admin-panel.ts";
 
 const STAFF_ROLES = new Set(["manager", "cashier", "accountant", "production", "warehouse"]);
 // A shop manager may manage only these roles, and only inside his own shop.
@@ -58,6 +59,13 @@ Deno.serve(async (req) => {
     const canManageAdmins = String(auth.id) === String(admin.id) && isOwner(admin);
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || "");
+
+    if (action === "admin_panel_unlock" || action === "admin_panel_session") {
+      return await handleAdminPanel({ body, service, auth, admin,
+        passwordConfig: Deno.env.get("ODINA_ADMIN_PANEL_PASSWORD"),
+        signingSecret: Deno.env.get("ODINA_ADMIN_PANEL_SIGNING_KEY"),
+      });
+    }
 
     if (action === "status") {
       if (isManager) {
