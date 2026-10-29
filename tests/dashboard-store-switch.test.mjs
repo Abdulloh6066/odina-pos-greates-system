@@ -33,11 +33,12 @@ const expired = [
   { id: 'central-old-2', location_id: 'central' },
 ];
 
-async function fixture({ role = 'admin', reportRows = reports, pendingCatalog = false } = {}) {
+async function fixture({ role = 'admin', reportRows = reports, pendingCatalog = false, adminShopScope = null } = {}) {
   const calls = [], navigations = [], timers = new Map(), listeners = new Map();
   let timerId = 0, resolveCatalog;
   const catalogPromise = pendingCatalog ? new Promise(resolve => { resolveCatalog = resolve; }) : Promise.resolve(sales);
   const user = { id: 'viewer', role, shop_id: 'branch', shop_name: 'Odina Branch' };
+  const context = { user, adminShopScope };
   const navigate = (...args) => navigations.push(structuredClone(args));
   const backend = {
     entities: {
@@ -60,7 +61,7 @@ async function fixture({ role = 'admin', reportRows = reports, pendingCatalog = 
   const wrapper = tag => ({ children, ...props }) => React.createElement(tag, props, children);
   const require = specifier => {
     if (specifier === 'react') return { ...React, default: React };
-    if (specifier === 'react-router-dom') return { useOutletContext: () => ({ user }), useNavigate: () => navigate };
+    if (specifier === 'react-router-dom') return { useOutletContext: () => context, useNavigate: () => navigate };
     if (specifier === '@/api/base44Client') return { base44: backend };
     if (specifier === '@/lib/pos') return {
       formatUZS: value => '$' + value,
@@ -90,6 +91,10 @@ async function fixture({ role = 'admin', reportRows = reports, pendingCatalog = 
     tree, calls, navigations, timers, listeners,
     finishCatalog: async () => act(async () => resolveCatalog?.(structuredClone(sales))),
     switchStore: async label => act(async () => storeButton(tree, label).props.onClick()),
+    updateGlobalShop: async shopId => {
+      context.adminShopScope = { ...context.adminShopScope, shopId, specificShopId: shopId === 'all' ? '' : shopId };
+      await act(async () => tree.update(React.createElement(module.exports.default)));
+    },
     close: async () => act(async () => tree.unmount()),
   };
 }
@@ -106,6 +111,31 @@ const collections = tree => text(tree.root.findByProps({ className: 'odina-home-
 const panel = (tree, title) => text(tree.root.findByProps({ 'aria-label': title }));
 const scope = tree => text(tree.root.findByProps({ className: 'odina-home-filter-scope' }));
 const expiry = tree => tree.root.findAllByType('button').find(button => text(button).includes('tur mahsulot 3 kundan oshgan'));
+
+test('shared shop scope avoids a duplicate dashboard picker and updates indicators without extra reads or writes', async () => {
+  const f = await fixture({ adminShopScope: { isAdmin: true, shopId: 'branch', specificShopId: 'branch', ready: true,
+    shops: [{ id: 'branch', name: 'Odina Branch' }, { id: 'central', name: 'Odina Central' }],
+    selectShop: () => { throw new Error('Dashboard must use the existing global picker'); },
+  } });
+  try {
+    assert.equal(groups(f.tree).length, 0, 'the layout already supplies the shop selector');
+    assert.equal(f.tree.root.findAllByType('select').length, 0);
+    assert.equal(collections(f.tree), '$1200');
+    assert.equal(stat(f.tree, 'Kassa savdolari'), '2');
+    assert.match(panel(f.tree, 'Bugungi Kassa mahsulotlari'), /Branch torti/);
+    assert.doesNotMatch(panel(f.tree, 'Bugungi Kassa mahsulotlari'), /Central torti/);
+    const reads = structuredClone(f.calls);
+    await f.updateGlobalShop('central');
+    assert.equal(collections(f.tree), '$3500');
+    assert.equal(stat(f.tree, 'Kassa savdolari'), '3');
+    assert.match(panel(f.tree, 'Bugungi Kassa mahsulotlari'), /Central torti/);
+    assert.doesNotMatch(panel(f.tree, 'Bugungi Kassa xodimlari'), /Branch kassiri/);
+    await f.updateGlobalShop('all');
+    assert.equal(collections(f.tree), '$4700');
+    assert.equal(stat(f.tree, 'Kassa savdolari'), '5');
+    assert.deepEqual(f.calls, reads, 'changing scope only filters already-authorized data');
+  } finally { await f.close(); }
+});
 
 test('admin buttons switch every home indicator between all stores, Branch and Central without a request or write', async () => {
   const f = await fixture();
