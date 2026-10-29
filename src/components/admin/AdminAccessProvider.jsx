@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 
 const AdminAccessContext = createContext(null);
 const IDLE_MS = 5 * 60 * 1000;
-export const isAdminShortcut = (event) => event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey
-  && !event.repeat && !event.isComposing && (event.code === 'KeyA' || String(event.key).toLowerCase() === 'a');
+export const isAdminShortcut = (event) => Boolean(event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey
+  && !event.repeat && !event.isComposing && (event.code === 'KeyA' || String(event.key).toLowerCase() === 'a'));
 
 export const useAdminAccess = () => useContext(AdminAccessContext);
 
