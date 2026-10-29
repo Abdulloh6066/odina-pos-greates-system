@@ -41,7 +41,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
 import { canQueuePosSale, isPosNetworkError } from '@/lib/pos-network';
-import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, restartCatalog, restartRead } from '@/lib/offline-restart';
+import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, restartCatalog, restartRead, updateRestartStock } from '@/lib/offline-restart';
 import OfflineRestartStatus from '@/components/pos/OfflineRestartStatus';
 import OfflineSalesBanner from '@/components/pos/OfflineSalesBanner';
 import CategoryIcon from '@/components/CategoryIcon';
@@ -1490,6 +1490,7 @@ export default function POS() {
         // must start a fresh read rather than join a response already received.
         confirmedStockReadsRef.current.delete(shopId);
         const scoped = (outcome.response || []).filter((row) => row.location_id === shopId && productIds.includes(row.product_id));
+        if (!updateRestartStock(user, shopId, scoped)) setRestartSaved(false);
         setProductStock((current) => [...current.filter((row) =>
           row.location_id !== shopId || !productIds.includes(row.product_id)), ...scoped]);
         for (const hold of holds) {
@@ -1528,6 +1529,7 @@ export default function POS() {
       && (!payload.shift || Number(payload.shift.order_count || 0) >= Number(shift?.order_count || 0))
       && (!previous || order > previous.order || previous.key === saleKey);
     if (freshSnapshot) {
+      if (!updateRestartStock(user, saleShopId, payload.stock_updates)) setRestartSaved(false);
       stockReadGenerationRef.current++;
       latestStockSaleRef.current.set(saleShopId, { order, key: saleKey });
       const updatedByProduct = Object.fromEntries(payload.stock_updates.map((item) => [item.product_id, item.quantity]));
