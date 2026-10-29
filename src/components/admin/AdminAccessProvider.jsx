@@ -63,7 +63,7 @@ export default function AdminAccessProvider({ children }) {
   }, [identity, lock]);
 
   const requestOpen = useCallback(async () => {
-    if (!eligibleRef.current) return;
+    if (submitting.current || !eligibleRef.current) return;
     if (sessionRef.current && await checkSession()) { navigate('/admin'); return; }
     if (!eligibleRef.current) return;
     generation.current++;
@@ -89,9 +89,11 @@ export default function AdminAccessProvider({ children }) {
   useEffect(() => {
     if (!session) return undefined;
     let idleTimer;
+    let lastActivity = Date.now();
     const expire = () => { lock(); };
     const resetIdle = () => {
-      if (session.expiresAt <= Date.now()) { lock(); return; }
+      if (session.expiresAt <= Date.now() || Date.now() - lastActivity >= IDLE_MS) { lock(); return; }
+      lastActivity = Date.now();
       window.clearTimeout(idleTimer);
       idleTimer = window.setTimeout(expire, Math.min(IDLE_MS, session.expiresAt - Date.now()));
     };
@@ -131,7 +133,6 @@ export default function AdminAccessProvider({ children }) {
       navigate('/admin');
     } catch (failure) {
       if (currentGeneration === generation.current) {
-        console.warn('Admin panel verification reference:', failure?.response?.data?.reference || 'request');
         const retryAfter = Number(failure?.response?.data?.retry_after);
         setError((failure?.response?.data?.error || 'Kirishni tekshirib bo‘lmadi. Internet aloqasini tekshiring.')
           + (retryAfter > 2 ? ' Taxminan ' + Math.ceil(retryAfter / 60) + ' daqiqadan keyin urinib ko‘ring.' : ''));
