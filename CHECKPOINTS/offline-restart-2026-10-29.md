@@ -4,8 +4,9 @@
 - Build-generated, versioned service worker precaches JavaScript (including lazy POS dependencies), CSS and a POS navigation shell. Root/POS navigation falls back to that shell on connection failure. Updates wait for old clients to close, never force-reload a checkout.
 - Only public image requests are cached opportunistically, bounded to 600 entries. API responses, POST requests, private media and financial mutations are never service-worker cached.
 - A successfully verified staff profile provides local-only POS continuity for up to 24 hours, bound to app and the existing browser token fingerprint where available. Cookie-only browser sessions retain the same local continuity policy. This never issues credentials or grants server authentication; the original Base44 auth and backend permissions still govern all server operations.
-- Transport-only fallback for staff/profile, shop catalog and active shift. Explicit server denials never fall back to cached access. Reconnect/focus revalidates an offline staff session.
+- Transport-only fallback for staff/profile, shop catalog and active shift. Explicit server denials never fall back to cached access. Reconnect/focus and bounded 15-second retries revalidate an offline staff session, including outages where the browser never dispatches an online event. Cookie identity changes invalidate the previous cashier cache; late login results cannot revive a logged-out session.
 - User/role/shop-scoped catalog and shift snapshots restore the register after reload; private shop journals and unpaid customer orders are excluded. Closing a shift invalidates its snapshot. Both logout paths clear restart snapshots without touching pending sales.
+- Confirmed stock updates and authoritative reconciliation reads refresh the saved stock base. Pending deductions stay solely in the durable queue, so restart does not apply them twice.
 - Existing durable IndexedDB sales queue, original request keys, cross-tab locking, retry/backoff and acknowledgment rules preserved.
 - Offline availability shown in Uzbek. Admin shop selection can recover from scoped catalog storage. Product ordering is retained locally.
 - Extracted existing offline queue banner to keep changes within editor size limits; no financial flow redesign.
@@ -15,6 +16,7 @@ Open the updated hosted Kassa online first, with an open shift, and wait for the
 
 ## Verification
 - Production build and lint passed.
-- 65 memory/offline checks passed, including staff restoration, first-use block, network-only fallback, token/app scope, expiry, revocation on reconnect, shift invalidation, cache scope, emitted service worker, no API interception, and existing queue/idempotency regressions.
+- 70 memory/offline checks passed, including staff restoration, first-use block, network-only fallback, token/app scope, expiry, revocation on reconnect, shift invalidation, cache scope, emitted service worker, no API interception, and existing queue/idempotency regressions.
 - No live records were created, edited or deleted for verification.
-- Actual hosted-browser restart with networking disabled has not been exercised; use Testing Agent for browser acceptance verification. Publication is not performed by this change.
+- Generated production worker passed syntax validation; all 89 precached files exist, including the lazy POS bundle and styles. git diff --check passed.
+- Actual hosted-browser restart with networking disabled has not been exercised. Validation used memory-only SDK fixtures and simulated transport/storage failures, preserving all live records. Publication follows validation.
