@@ -139,7 +139,7 @@ test('Orders scopes paginated history, active alerts and day counts; clear keeps
     assert.deepEqual(Array.from(f.alertInputs.at(-1), order => order.id), ['o']);
     assert.doesNotMatch(text(f.tree.toJSON()), /BRANCH-ORDER/);
     const history = f.tree.root.findAllByType('button').find(node => text(node) === 'Tarix');
-    assert.ok(history, JSON.stringify(f.tree.root.findAllByType('button').map(node => text(node))));
+    assert.ok(history, JSON.stringify(f.tree.toJSON()));
     await act(async () => history.props.onClick());
     assert.match(text(f.tree.toJSON()), /OTHER-HISTORY/);
     assert.doesNotMatch(text(f.tree.toJSON()), /BRANCH-ORDER|OTHER-ORDER/);
