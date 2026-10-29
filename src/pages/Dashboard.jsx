@@ -217,7 +217,7 @@ export default function Dashboard() {
         )}
       />
 
-      <div className={'odina-home-filter' + (role === 'admin' ? ' odina-home-filter-admin' : '')}>
+      {!globalScope && <div className={'odina-home-filter' + (role === 'admin' ? ' odina-home-filter-admin' : '')}>
         {role === 'admin' ? <>
           <span className="odina-home-filter-label">Do‘konni tanlang</span>
           <div className="odina-home-shop-buttons" role="group" aria-label="Do‘kon bo‘yicha ko‘rish">
@@ -252,7 +252,7 @@ export default function Dashboard() {
           </OdinaSelect>
         </>}
         <p aria-live="polite" className="odina-home-filter-scope">{shopName} · Bugungi ko‘rsatkichlar</p>
-      </div>
+      </div>}
 
       {visibleExpiredItems.length > 0 && (
         <button
