@@ -327,3 +327,33 @@ test('Production scopes orders and keeps central forecast explicitly shared', as
     assert.ok(f.calls.every(call => call.payload.action === 'tomorrow_ingredient_forecast'));
   } finally { await f.close(); }
 });
+
+
+test('warehouse Orders automatically includes Branch and Central sales without changing ownership', async () => {
+  const original = structuredClone(orders);
+  const f = await renderPage('src/pages/Orders.jsx', { shopId: 'central' });
+  try {
+    assert.match(text(f.tree.toJSON()), /BRANCH-ORDER/);
+    assert.match(text(f.tree.toJSON()), /OTHER-ORDER/);
+    assert.match(text(f.tree.toJSON()), /Markaziy ombor navbati/);
+    assert.match(text(f.tree.toJSON()), /To‘lovlar buyurtma olingan do‘konda saqlanadi/);
+    assert.doesNotMatch(JSON.stringify(f.queries.at(-1)), /shop_id/);
+    assert.deepEqual(Array.from(f.alertInputs.at(-1), row => row.shop_id).sort(), ['branch', 'other']);
+    assert.equal(f.captures.card.onRepeat, null);
+    assert.equal(f.tree.root.findAllByType('a').some(node => node.props.to === '/production-screen'), true);
+    assert.deepEqual(orders, original);
+    await f.update('branch');
+    assert.match(text(f.tree.toJSON()), /BRANCH-ORDER/);
+    assert.doesNotMatch(text(f.tree.toJSON()), /OTHER-ORDER|Markaziy ombor navbati/);
+  } finally { await f.close(); }
+});
+
+test('selecting the warehouse on production screen shows every shop in the same queue', async () => {
+  const f = await renderPage('src/pages/ProductionScreen.jsx', { shopId: 'central' });
+  try {
+    assert.match(text(f.tree.toJSON()), /BRANCH-ORDER/);
+    assert.match(text(f.tree.toJSON()), /OTHER-ORDER/);
+    assert.match(text(f.tree.toJSON()), /Markaziy ombor navbati/);
+    assert.ok(f.calls.every(call => call.payload.action === 'tomorrow_ingredient_forecast'));
+  } finally { await f.close(); }
+});

@@ -624,3 +624,56 @@ test('normal completion still deducts finished goods while paused recipes leave 
 });
 
 console.log('Customer order ready-production offline regression tests ready.');
+
+test('warehouse preparing-ready-shipped changes one order and preserves both shops payment ownership', async () => {
+  for (const shopId of ['shop-a','shop-central']) {
+    const f = fixture('production', 'prod-main');
+    f.db.CustomerOrder[0].shop_id = shopId;
+    f.db.CustomerOrder[0].shop_name_snapshot = shopId;
+    f.db.OrderPayment.push({id:'original-payment',order_id:'order-1',shop_id:shopId,amount:950000});
+    const before = structuredClone(f.db);
+    const call = loadHandler(harness(f.db), {enableRecipeAccounting:false});
+    const first = await call({...readyRequest, step:'preparing'});
+    assert.equal(first.status,200,JSON.stringify(first));
+    assert.equal(first.data.order.order_status,'tayyorlanmoqda');
+    assert.equal((await call({...readyRequest,step:'preparing'})).data.already_started,true);
+    assert.equal((await call(readyRequest)).status,200);
+    assert.equal((await call({...readyRequest,step:'shipped'})).status,200);
+    assert.equal(f.db.CustomerOrder.length,1);
+    const final = f.db.CustomerOrder[0];
+    for (const key of ['id','shop_id','shop_name_snapshot','total','paid_amount','remaining_balance','payment_status']) {
+      assert.equal(final[key],before.CustomerOrder[0][key],key);
+    }
+    for (const entity of ['CustomerOrderItem','OrderPayment','ProductStock','IngredientStock','StockMovement','ProductionBatch']) {
+      assert.deepEqual(f.db[entity],before[entity],entity);
+    }
+  }
+});
+
+test('starting warehouse preparation enforces assignment, original shop scope and status', async () => {
+  for (const [role, assigned, expected] of [
+    ['production','prod-main',200], ['production','shop-a',403],
+    ['cashier','shop-a',403], ['manager','shop-other',403],
+  ]) {
+    const f=fixture(role,assigned);
+    f.db.Shop.push({id:'shop-other',active:true,location_type:'shop'});
+    const result=await loadHandler(harness(f.db),{enableRecipeAccounting:false})({...readyRequest,step:'preparing'});
+    assert.equal(result.status,expected,JSON.stringify({role,result}));
+    if(expected!==200) assert.equal(f.db.CustomerOrder[0].order_status,'qabul_qilindi');
+  }
+  for (const status of ['tayyor','yuborildi_olib_ketildi','yakunlandi','bekor_qilindi']) {
+    const f=fixture('production','prod-main'); f.db.CustomerOrder[0].order_status=status;
+    const result=await loadHandler(harness(f.db),{enableRecipeAccounting:false})({...readyRequest,step:'preparing'});
+    assert.equal(result.status,409);
+    assert.equal(f.db.CustomerOrder[0].order_status,status);
+  }
+});
+
+test('concurrent start requests create one preparation transition', async () => {
+  const f=fixture('production','prod-main');
+  const call=loadHandler(harness(f.db),{enableRecipeAccounting:false});
+  const results=await Promise.all([call({...readyRequest,step:'preparing'}),call({...readyRequest,step:'preparing'})]);
+  assert.ok(results.some(r=>r.status===200));
+  assert.ok(results.every(r=>[200,409].includes(r.status)));
+  assert.equal(f.db.ActionHistory.filter(row=>row.action==='production_status_change').length,1);
+});

@@ -355,3 +355,22 @@ test('adjustment is admin-only and requires a reason', async () => {
 });
 
 console.log('Customer orders regression tests ready.');
+
+test('new orders from either sales shop keep advances in the original shop through warehouse preparation', async () => {
+  for (const shopId of ['shop-a','shop-b']) {
+    const f=fixture('cashier',shopId); f.db.Shift[0].shop_id=shopId;
+    const call=loadHandler(harness(f.db));
+    const created=await call(baseOrder({shop_id:shopId,advance_payment:{method:'bank_card',amount:100000}}));
+    assert.equal(created.status,200,JSON.stringify(created));
+    const before=structuredClone(f.db);
+    f.db.User[0].role='admin';
+    const result=await call({action:'update_production_status',order_id:created.data.order.id,step:'preparing'});
+    assert.equal(result.status,200,JSON.stringify(result));
+    assert.equal(f.db.CustomerOrder.length,1);
+    assert.equal(f.db.CustomerOrder[0].shop_id,shopId);
+    assert.equal(f.db.CustomerOrderItem.every(item=>item.shop_id===shopId),true);
+    assert.equal(f.db.OrderPayment.every(payment=>payment.shop_id===shopId),true);
+    assert.deepEqual(f.db.OrderPayment,before.OrderPayment);
+    assert.deepEqual(f.db.Shift,before.Shift);
+  }
+});

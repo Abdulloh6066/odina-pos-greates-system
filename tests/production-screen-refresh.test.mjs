@@ -154,3 +154,27 @@ test('cleanup removes polling, subscriptions and reconnect listeners', async () 
   h.poll = () => {}; h.event('focus');
   assert.equal(h.requests.length,1);
 });
+
+
+test('warehouse reads every active page beyond the old 200-order ceiling', async () => {
+  const h = harness();
+  const rows = Array.from({length: 251}, (_, i) => order(String(i+1)));
+  await h.resolve(0, rows.slice(0,100));
+  assert.equal(h.requests[1].skip,100);
+  await h.resolve(1, rows.slice(100,200));
+  assert.equal(h.requests[2].skip,200);
+  await h.resolve(2, rows.slice(200));
+  assert.equal(h.state.active.length,251);
+  assert.equal(h.days()[0].orders.length,251);
+  assert.equal(h.requests[0].query.creation_state.$ne,'pending');
+  h.close();
+});
+
+test('overdue and later-date orders remain visible alongside today and tomorrow', async () => {
+  const h = harness();
+  await h.resolve(0,[order('1'), {...order('2'),required_date:'2026-10-07'},
+    {...order('3'),required_date:'2026-10-09'}, {...order('4'),required_date:'2026-11-10'}]);
+  assert.deepEqual(Array.from(h.days().flatMap(day => day.orders), row => row.id),['2','1','3','4']);
+  assert.equal(h.days()[0].key,'overdue');
+  h.close();
+});
