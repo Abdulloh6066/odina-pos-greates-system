@@ -7,8 +7,7 @@ import {
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
 import { MENU_ITEMS, canAccess } from '@/lib/pos';
-import { base44 } from '@/api/base44Client';
-import { clearOfflineRestart } from '@/lib/offline-restart';
+import { useAuth } from '@/lib/AuthContext';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
 import { likelyRoutesForRole, preloadRoute } from '@/lib/route-preload';
@@ -40,6 +39,7 @@ const WAREHOUSE_CHILDREN = [
 ];
 
 export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, collapsed, onToggle }) {
+  const { logout } = useAuth();
   const role = user?.role || 'cashier';
   const location = useLocation();
   const scopedLocation = adminShopScope?.isAdmin
@@ -97,8 +97,7 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
   };
 
   const handleLogout = async () => {
-    clearOfflineRestart();
-    await base44.auth.logout();
+    await logout(false);
   };
 
   const renderRegularItem = (item) => {
