@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { readAllEntityPages } from '../src/lib/history-pagination.js';
 
 const source = fs.readFileSync('src/pages/ProductionScreen.jsx', 'utf8');
 const lifecycle = source.slice(source.indexOf('  const loadOrders = async'), source.indexOf('  const doAction = async'));
@@ -22,7 +23,8 @@ function harness() {
   };
   const nav = { onLine: true };
   const context = vm.createContext({
-    active: [], clock: '', document: doc, navigator: nav,
+    active: [], scopedActive: [], clock: '', document: doc, navigator: nav, readAllEntityPages,
+    loadedOrders: { current: [] },
     window: {
       addEventListener: (key, cb) => windowListeners.set(key, cb),
       removeEventListener: (key, cb) => { if (windowListeners.get(key) === cb) windowListeners.delete(key); },
@@ -30,10 +32,10 @@ function harness() {
     ACTIVE_STATUSES: ['qabul_qilindi', 'tayyorlanmoqda', 'tayyor'],
     loadedOnce: { current: false }, refreshInFlight: { current: null },
     refreshQueued: { current: false }, forecastQueued: { current: false },
-    todayStr: () => '2026-10-08', dateOffsetStr: n => n ? '2026-10-09' : '2026-10-08',
+    todayStr: () => '2026-10-08', dateOffsetStr: n => n < 0 ? '2026-10-07' : n ? '2026-10-09' : '2026-10-08',
     clockStr: () => '08.10.2026 · 02:40',
     uzbekistanDateKey: value => value?.slice(0,10) || '',
-    setActive: value => { state.active = value; context.active = value; },
+    setActive: value => { state.active = value; context.active = value; context.scopedActive = value; },
     setShippedToday: value => { state.shipped = value; },
     setItemsByOrder: value => { state.items = value; },
     setRefreshing: value => { state.refreshing = value; },
@@ -53,9 +55,9 @@ function harness() {
       entities: Object.fromEntries(['CustomerOrder','CustomerOrderItem','IngredientStock','Recipe','RecipeItem'].map(name => [
         name, {
           subscribe: cb => { subscriptions.set(name, cb); return () => subscriptions.delete(name); },
-          list: name === 'CustomerOrder'
-            ? () => new Promise((resolve,reject) => requests.push({ resolve,reject }))
-            : async () => { if (failItems) throw Error('connection'); return [{ order_id:'1', product_name_snapshot:'Tort', quantity:1 }]; },
+          filter: name === 'CustomerOrder'
+            ? (query, sort, limit, skip) => new Promise((resolve,reject) => requests.push({ resolve,reject,query,sort,limit,skip }))
+            : async query => { if (failItems) throw Error('connection'); return query.order_id.$in.includes('1') ? [{ id:'item-1', order_id:'1', product_name_snapshot:'Tort', quantity:1 }] : []; },
         },
       ])),
       functions: { invoke: async name => { assert.equal(name,'production-run'); forecastCalls++; return { data:{ products:[] } }; } },
