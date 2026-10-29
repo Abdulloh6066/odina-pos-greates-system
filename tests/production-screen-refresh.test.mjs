@@ -174,7 +174,8 @@ test('overdue and later-date orders remain visible alongside today and tomorrow'
   const h = harness();
   await h.resolve(0,[order('1'), {...order('2'),required_date:'2026-10-07'},
     {...order('3'),required_date:'2026-10-09'}, {...order('4'),required_date:'2026-11-10'}]);
-  assert.deepEqual(Array.from(h.days().flatMap(day => day.orders), row => row.id),['2','1','3','4']);
-  assert.equal(h.days()[0].key,'overdue');
+  const days=h.days();
+  assert.deepEqual(Array.from(days.flatMap(day => day.orders), row => row.id),['2','1','3','4']);
+  assert.equal(days[0].key,'overdue');
   h.close();
 });
