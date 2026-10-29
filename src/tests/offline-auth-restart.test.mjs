@@ -7,13 +7,14 @@ import React from 'react';
 import { create, act } from 'react-test-renderer';
 import * as network from '../lib/pos-network.js';
 const staff = { id: 'u', role: 'cashier', shop_id: 's', active: true };
-async function fixture({ online = false, cached = staff, meError, allowed = true } = {}) {
+async function fixture({ online = false, cached = staff, meError, allowed = true, verified = staff, accessError, meGate } = {}) {
   let snapshot, calls = 0, cleared = 0;
   const listeners = {};
+  const timers = new Map();
   const navigator = { onLine: online };
-  const client = { auth: { me: async () => { calls++; if (meError) throw meError; return staff; } },
-    functions: { invoke: async name => name === 'staff-email-check' ? { data: { allowed } } : { data: {} } },
-    entities: { User: { get: async () => staff } } };
+  const client = { auth: { me: async () => { calls++; if (meError) throw meError; return meGate ? await meGate : verified; }, logout: () => {} },
+    functions: { invoke: async name => { if (name === 'staff-email-check' && accessError) throw accessError; return name === 'staff-email-check' ? { data: { allowed } } : { data: {} }; } },
+    entities: { User: { get: async () => verified } } };
   const imports = {
     react: { ...React, default: React }, '@/api/base44Client': { base44: client },
     '@/lib/app-params': { appParams: { appId: 'app' } },
@@ -29,13 +30,14 @@ async function fixture({ online = false, cached = staff, meError, allowed = true
   }).outputText;
   const module = { exports: {} };
   vm.runInNewContext('(function(require,module,exports){' + code + '\n})', { navigator, console: { warn() {}, error() {} },
-    window: { addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: name => { delete listeners[name]; } },
+    window: { setInterval: fn => { timers.set(1, fn); return 1; }, clearInterval: id => timers.delete(id), addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: name => { delete listeners[name]; } },
   })(name => { assert.ok(imports[name], name); return imports[name]; }, module, module.exports);
   function Consumer() { snapshot = module.exports.useAuth(); return null; }
   let tree;
   await act(async () => { tree = create(React.createElement(module.exports.AuthProvider, {}, React.createElement(Consumer))); });
   return { get state() { return snapshot; }, get calls() { return calls; }, get cleared() { return cleared; },
     reconnect: async () => { navigator.onLine = true; await act(async () => { listeners.online?.(); }); },
+    retryWithoutOnlineEvent: async () => { navigator.onLine = true; await act(async () => { await timers.get(1)?.(); }); },
     close: () => act(async () => tree.unmount()) };
 }
 test('offline restart restores verified local staff without claiming server authentication', async () => {
@@ -63,6 +65,28 @@ test('reconnection revalidates staff and exits local-only mode', async () => {
   const f = await fixture();
   try { await f.reconnect(); assert.equal(f.state.offlineSession, false); assert.equal(f.state.isAuthenticated, true); assert.equal(f.state.user.id, 'u'); }
   finally { await f.close(); }
+});
+test('recovery retries without an online event when browser connectivity was misleading', async () => {
+  const f = await fixture();
+  try { await f.retryWithoutOnlineEvent(); assert.equal(f.state.offlineSession, false); assert.equal(f.state.isAuthenticated, true); }
+  finally { await f.close(); }
+});
+test('a newly detected cookie identity cannot restore the previous cashier during a network failure', async () => {
+  const f = await fixture({ online: true, verified: { ...staff, id: 'new-user' }, accessError: { code: 'ERR_NETWORK' } });
+  try { assert.equal(f.state.user, null); assert.equal(f.state.offlineSession, false); assert.equal(f.state.authError.type, 'offline_unavailable'); assert.ok(f.cleared); }
+  finally { await f.close(); }
+});
+test('a late background login cannot revive the cashier after logout', async () => {
+  let resolveMe;
+  const gate = new Promise(resolve => { resolveMe = resolve; });
+  const f = await fixture({ meGate: gate });
+  try {
+    let pending;
+    await act(async () => { pending = f.state.checkUserAuth(true); });
+    await act(async () => { f.state.logout(false); });
+    await act(async () => { resolveMe(staff); await pending; });
+    assert.equal(f.state.user, null); assert.equal(f.state.isAuthenticated, false); assert.equal(f.state.offlineSession, false);
+  } finally { await f.close(); }
 });
 test('revoked staff are locked out on reconnection without deleting the sales queue', async () => {
   const f = await fixture({ allowed: false });
