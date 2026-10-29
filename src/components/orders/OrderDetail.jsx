@@ -22,15 +22,18 @@ export default function OrderDetail({ order, onClose, onPaid, onRepeat, onStaffT
 
   useEffect(() => {
     if (!order) return;
+    let current = true;
     setLoading(true);
     Promise.all([
       base44.entities.CustomerOrderItem.filter({ order_id: order.id }),
       base44.entities.OrderPayment.filter({ order_id: order.id }),
     ]).then(([it, pm]) => {
+      if (!current) return;
       setItems(it || []);
       setPayments((pm || []).sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1)));
-    }).finally(() => setLoading(false));
-  }, [order]);
+    }).finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [order?.id, order?.paid_amount]);
 
   if (!order) return null;
 
