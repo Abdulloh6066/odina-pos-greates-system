@@ -51,6 +51,7 @@ async function fixture({ role = 'admin', offline = false, invoke } = {}) {
   return { get state() { return snapshot; }, tree, requests, navigation, emit, enter,
     shortcut: module.exports.isAdminShortcut,
     changeUser: async next => { auth = next; await act(async () => tree.update(render())); },
+    advanceClock: delay => { clock += delay; },
     advanceToTimer: async delay => { clock += delay; await act(async () => [...timers.values()].find(timer => timer.delay === delay)?.fn()); },
     close: () => act(async () => tree.unmount()),
   };
@@ -100,6 +101,12 @@ test('inactivity and loss of connectivity lock an unlocked session', async () =>
     await f.enter(); await f.advanceToTimer(300000); assert.equal(f.state.unlocked, false);
     await f.enter(); await f.emit('offline'); assert.equal(f.state.unlocked, false);
   } finally { await f.close(); }
+});
+
+test('returning after background timer throttling cannot renew an idle session', async () => {
+  const f = await fixture();
+  try { await f.enter(); f.advanceClock(300001); await f.emit('focus'); assert.equal(f.state.unlocked, false); }
+  finally { await f.close(); }
 });
 
 test('logout or identity change invalidates an in-flight password result', async () => {
