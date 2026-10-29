@@ -10,7 +10,7 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  admin: ['admin', 'dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
   cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
@@ -28,6 +28,7 @@ export const ROLE_HOME = {
 };
 
 export const MENU_ITEMS = [
+  { key: 'admin', label: 'Admin panel', path: '/admin', icon: 'ShieldCheck' },
   { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
   { key: 'pos', label: 'Kassa', path: '/pos', icon: 'ShoppingCart' },
   { key: 'orders', label: 'Buyurtmalar', path: '/orders', icon: 'ClipboardList' },
