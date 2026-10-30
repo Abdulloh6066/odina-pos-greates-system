@@ -23,11 +23,12 @@ import ProductionPanel from '@/components/warehouse/ProductionPanel';
 import StockCountPanel from '@/components/warehouse/StockCountPanel';
 import { TEST_PRODUCT_IDS } from '@/lib/test-catalog-cleanup';
 import { isCakeLayer, ingredientUnitLabel } from '@/lib/cake-layer-inventory';
+import { PRODUCT_STOCK_STEP, isProductStockQuantity } from '../../base44/shared/product-stock-quantity.js';
 
 const TABS = [
   { id: 'cake_layers', label: 'Qavatlar va listlar', icon: Layers3, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'ingredients', label: 'Masalliqlar va qadoqlar', icon: Archive },
-  { id: 'products', label: 'Tayyor mahsulotlar', icon: Boxes, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
+  { id: 'products', label: 'Mahsulotlar', icon: Boxes, roles: ['admin', 'manager', 'cashier', 'accountant', 'production'] },
   { id: 'suppliers', label: 'Kirim va qarzlar', icon: Truck, roles: ['admin', 'manager', 'warehouse', 'accountant'] },
   { id: 'recipes', label: 'Retseptlar', icon: BookOpen, roles: ['admin', 'manager', 'accountant', 'production'] },
   { id: 'production', label: 'Ishlab chiqarish', icon: ChefHat, roles: ['admin', 'manager', 'accountant', 'production'] },
@@ -95,6 +96,7 @@ export default function Warehouse() {
   const requestedWarehouseTab = resolveWarehouseTab(requestedTab, user?.role);
   const tab = shopScope?.specificShopId && shopScope.shops.find((location) => location.id === shopScope.specificShopId)?.location_type !== 'production'
     && requestedWarehouseTab === 'cake_layers' ? 'ingredients' : requestedWarehouseTab;
+  const listView = tab === 'products' || newLayerView;
   const [search, setSearch] = useState('');
   const [ingredientCategory, setIngredientCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -350,19 +352,19 @@ export default function Warehouse() {
   const stockedCount = balancesForLocation.filter((balance) => Number(balance.quantity || 0) > 0).length;
 
   return (
-    <div className={`odina-page odina-workbench catalog-workbench catalog-warehouse p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in ${newLayerView ? 'warehouse-workspace' : ''}`}>
+    <div className={`odina-page odina-workbench catalog-workbench catalog-warehouse p-5 sm:p-8 max-w-7xl mx-auto animate-fade-in ${listView ? 'warehouse-workspace' : ''} ${tab === 'products' ? 'warehouse-products' : ''}`}>
       <PageHeader
         title={visibleTabs.find((item) => item.id === tab)?.label || 'Ombor'}
         subtitle={shopScope?.shopId === 'all' ? 'Barcha do‘konlar' : selectedLocationRecord ? selectedLocationRecord.name : 'Joylashuvni tanlang'}
         icon={WarehouseIcon}
         actions={(
           <div className="flex flex-wrap items-center gap-2">
-          {(
+          {tab !== 'products' && (
             <Button type="button" variant="outline" aria-pressed={newLayerView} onClick={() => setNewLayerView((current) => !current)} className="min-h-11 rounded-xl">
-              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {newLayerView ? 'Kartalar ko‘rinishi' : 'Ro‘yxat ko‘rinishi'}
+              <Layers3 className="w-4 h-4 mr-1.5" aria-hidden="true" /> {listView ? 'Kartalar ko‘rinishi' : 'Ro‘yxat ko‘rinishi'}
             </Button>
           )}
-          {canCreateIngredients && (
+          {canCreateIngredients && tab !== 'products' && (
           <Button onClick={() => { setIngredientIsLayer(tab === 'cake_layers'); setIngredientOpen(true); }} className="bg-primary text-primary-foreground hover:bg-primary-strong">
             <Plus className="w-4 h-4 mr-1.5" /> {tab === 'cake_layers' ? 'Qavat turi qo‘shish' : 'Yangi masalliq'}
           </Button>
@@ -371,8 +373,8 @@ export default function Warehouse() {
         )}
       />
 
-      <div className={newLayerView ? 'warehouse-frame' : undefined}>
-      {newLayerView && (
+      <div className={listView ? 'warehouse-frame' : undefined}>
+      {listView && (
         <nav className="warehouse-nav" aria-label="Ombor bo‘limlari">
           <p className="warehouse-nav-heading"><WarehouseIcon aria-hidden="true" className="w-4 h-4" /> Ombor bo‘limlari</p>
           <div className="warehouse-nav-items">
@@ -384,7 +386,7 @@ export default function Warehouse() {
           </div>
         </nav>
       )}
-      <div className={newLayerView ? 'warehouse-content' : undefined}>
+      <div className={listView ? 'warehouse-content' : undefined}>
       {loadWarning && (
         <div role="status" className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 flex flex-col sm:flex-row sm:items-center gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700" />
@@ -453,8 +455,8 @@ export default function Warehouse() {
             const key = tab === 'products' ? 'product_id' : 'ingredient_id';
             const locationMap = Object.fromEntries(balances.filter((row) => row.location_id === location.id).map((row) => [row[key], row]));
             return <section key={location.id} className="space-y-3"><h2 className="font-semibold text-lg">{location.name}</h2>{tab === 'history'
-              ? <HistoryList movements={movements.filter((row) => row.location_id === location.id && (!search.trim() || [row.item_name, row.reason, row.user_name].filter(Boolean).join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} modernView={newLayerView} />
-              : <StockGrid modernView={newLayerView} items={tab === 'products' ? items : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory) && (!search.trim() || item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} stockMap={locationMap} kind={tab === 'products' ? 'product' : 'ingredient'} location={location} onAdjust={null} />}</section>;
+              ? <HistoryList movements={movements.filter((row) => row.location_id === location.id && (!search.trim() || [row.item_name, row.reason, row.user_name].filter(Boolean).join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} modernView={listView} />
+              : <StockGrid modernView={listView} items={tab === 'products' ? items : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory) && (!search.trim() || item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} stockMap={locationMap} kind={tab === 'products' ? 'product' : 'ingredient'} location={location} onAdjust={null} />}</section>;
           })}
         </section>
       ) : !selectedLocation || !selectedLocationRecord || (shopScope && !shopScope.ready) ? (
@@ -465,8 +467,8 @@ export default function Warehouse() {
         </div>
       ) : (
         <>
-          {(!newLayerView || ['ingredients', 'products'].includes(tab)) && <div className="warehouse-summary-strip grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
-            {newLayerView ? <>
+          {(!listView || ['ingredients', 'products'].includes(tab)) && <div className="warehouse-summary-strip grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-5">
+            {listView ? <>
               <Summary label="Filtrdagi turlar" value={items.length} />
               <Summary label="Qoldiq mavjud" value={items.filter((item) => Number(stockMap[item.id]?.quantity || 0) > 0).length} />
               <Summary label="Qoldiq yo‘q" value={items.filter((item) => Number(stockMap[item.id]?.quantity || 0) === 0).length} />
@@ -479,7 +481,7 @@ export default function Warehouse() {
             </>}
           </div>}
 
-          <div className={newLayerView ? 'hidden' : 'flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3'}>
+          <div className={listView ? 'hidden' : 'flex lg:hidden gap-2 overflow-x-auto pb-2 mb-3'}>
             {visibleTabs.filter((item) => (item.id !== 'suppliers' || canViewSupplierLedger) && (item.id !== 'cake_layers' || selectedLocationRecord?.location_type === 'production')).map(({ id, label, icon: Icon }) => (
               <Button
                 key={id}
@@ -497,10 +499,10 @@ export default function Warehouse() {
               {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-32 rounded-2xl bg-secondary animate-pulse" />)}
             </div>
           ) : tab === 'history' ? (
-            <HistoryList movements={visibleMovements} modernView={newLayerView} />
+            <HistoryList movements={visibleMovements} modernView={listView} />
           ) : tab === 'suppliers' && canViewSupplierLedger ? (
             <SupplierLedgerPanel
-              modernView={newLayerView}
+              modernView={listView}
               user={user}
               location={selectedLocationRecord}
               ingredients={ingredients.filter((ingredient) => !isCakeLayer(ingredient) || selectedLocationRecord?.location_type === 'production')}
@@ -510,7 +512,7 @@ export default function Warehouse() {
           ) : ['recipes', 'production', 'cake_layers'].includes(tab) ? (
             <ProductionPanel
               mode={tab}
-              newLayerView={newLayerView}
+              newLayerView={listView}
               user={user}
               location={selectedLocationRecord}
               products={products}
@@ -559,7 +561,7 @@ export default function Warehouse() {
                 </div>
               )}
               <StockGrid
-                modernView={newLayerView}
+                modernView={listView}
                 items={items}
                 stockMap={stockMap}
                 location={selectedLocationRecord}
@@ -610,20 +612,20 @@ function StockGrid({ items, stockMap, kind, location, onAdjust, modernView = fal
   return (
     modernView ? <section className="inventory-ledger" aria-label={kind === 'product' ? 'Tayyor mahsulotlar qoldig‘i' : 'Masalliqlar va qadoqlar qoldig‘i'}>
       <div className="catalog-section-heading">
-        <div><h2>{kind === 'product' ? 'Mahsulot qoldiqlari' : 'Masalliq va qadoq qoldiqlari'}</h2><p>{location?.name}</p></div>
+        <div><h2>{kind === 'product' ? 'Mahsulot qoldiqlari' : 'Masalliq va qadoq qoldiqlari'}</h2><p>{location?.name}{kind === 'product' ? ' · Dona yoki list bo‘yicha qoldiq. Yarim miqdor: 0.5.' : ''}</p></div>
         <span className="catalog-result-count">{items.length} ta tur</span>
       </div>
       <div className="warehouse-table-wrap">
         <table className="warehouse-table inventory-ledger-table">
           <caption className="sr-only">{kind === 'product' ? 'Tayyor mahsulotlar qoldig‘i' : 'Masalliqlar va qadoqlar qoldig‘i'}</caption>
-          <thead><tr><th scope="col">Nomi</th><th scope="col">{kind === 'product' ? 'Ta’minot turi' : 'Turi'}</th><th scope="col">Qoldiq</th><th scope="col">Birlik</th><th scope="col">Holati</th>{onAdjust && <th scope="col" className="inventory-action-heading">Amal</th>}</tr></thead>
+          <thead><tr><th scope="col">Nomi</th>{kind === 'ingredient' && <th scope="col">Turi</th>}<th scope="col">Qoldiq</th><th scope="col">Birlik</th><th scope="col">Holati</th>{onAdjust && <th scope="col" className="inventory-action-heading">Amal</th>}</tr></thead>
           <tbody>{items.map((item) => {
             const stock = stockMap[item.id];
             const quantity = Number(stock?.quantity || 0);
             const unit = kind === 'ingredient' ? item.base_unit : (stock?.unit || (location?.location_type === 'production' ? item.production_unit || 'piece' : 'piece'));
             return <tr key={item.id}>
               <td data-label="Nomi" className="inventory-name"><strong>{item.name}</strong></td>
-              <td data-label="Turi" className="inventory-category">{kind === 'ingredient' ? (INGREDIENT_CATEGORY_LABELS[item.category] || item.category) : (SOURCE_LABELS[item.source_type] || 'Markaziy ishlab chiqarishda tayyorlanadi')}</td>
+              {kind === 'ingredient' && <td data-label="Turi" className="inventory-category">{INGREDIENT_CATEGORY_LABELS[item.category] || item.category}</td>}
               <td data-label="Qoldiq" className="warehouse-number">{formatNum(quantity)}</td>
               <td data-label="Birlik" className="inventory-unit">{UNIT_LABELS[unit] || unit}</td>
               <td data-label="Holati"><span className={`warehouse-status ${quantity > 0 ? 'bg-emerald-50 text-emerald-700' : quantity < 0 ? 'bg-red-50 text-destructive' : 'bg-secondary text-muted-foreground'}`}>{quantity > 0 ? 'Mavjud' : quantity < 0 ? 'Manfiy qoldiq' : 'Qoldiq yo‘q'}</span></td>
@@ -819,11 +821,16 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
 
   const unit = kind === 'ingredient' ? item?.base_unit : (location?.location_type === 'production' ? item?.production_unit || 'piece' : 'piece');
   const unitLabel = kind === 'ingredient' ? ingredientUnitLabel(item) : (UNIT_LABELS[unit] || unit);
+  const quantityStep = kind === 'product' ? PRODUCT_STOCK_STEP : unit === 'piece' ? 1 : 0.001;
   const change = (mode === 'remove' ? -1 : 1) * Number(quantity || 0);
   const after = current + change;
 
   const save = async () => {
     if (!item || !location || !Number.isFinite(change) || change === 0 || !reason.trim()) return;
+    if (kind === 'product' && !isProductStockQuantity(change)) {
+      void odinaAlert('Miqdorni 0.5 qadamda kiriting. Masalan: 10 dona yoki 10.5 dona.');
+      return;
+    }
     if (isCakeLayer(item) && !Number.isSafeInteger(change)) {
       void odinaAlert('Butun list/qavat sonini kiriting.');
       return;
@@ -841,6 +848,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
         item_id: item.id,
         movement_type: movementType,
         quantity_change: change,
+        expected_quantity: current,
         reason: reason.trim(),
       });
       const payload = result?.data || result;
@@ -871,8 +879,12 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
             <Button type="button" variant={mode === 'remove' ? 'destructive' : 'outline'} onClick={() => setMode('remove')}>{kind === 'product' ? 'Qoldiqni kamaytirish' : 'Chiqim qilish'}</Button>
           </div>
           <div>
-            <Label className="text-xs mb-1.5 block">Miqdor ({unitLabel})</Label>
-            <Input autoFocus type="number" min={kind === 'product' || unit === 'piece' ? '1' : '0.001'} step={kind === 'product' || unit === 'piece' ? '1' : '0.001'} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" />
+            <Label htmlFor="warehouse-adjust-quantity" className="text-xs mb-1.5 block">Miqdor ({unitLabel})</Label>
+            <Input id="warehouse-adjust-quantity" autoFocus type="number" min={quantityStep} step={quantityStep} value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder={kind === 'product' ? 'Masalan: 10 yoki 10.5' : '0'} />
+            {kind === 'product' && <div className="mt-2 flex items-center gap-3">
+              <Button type="button" variant="outline" disabled={saving} onClick={() => setQuantity(String((Number(quantity) || 0) + PRODUCT_STOCK_STEP))}>+ Yarim (0.5 {unitLabel})</Button>
+              <span className="text-xs text-muted-foreground">1 {unitLabel} = 2 ta yarim</span>
+            </div>}
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Sabab</Label>
@@ -892,7 +904,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
-          <Button onClick={save} disabled={saving || !quantity || !reason.trim() || after < 0} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
+          <Button onClick={save} disabled={saving || !quantity || Number(quantity) <= 0 || !Number.isFinite(after) || (kind === 'product' && !isProductStockQuantity(change)) || !reason.trim() || after < 0} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong touch-manipulation">
             {saving ? 'Saqlanmoqda…' : (kind === 'product' ? 'Faqat qoldiqni saqlash' : 'Tarix bilan saqlash')}
           </Button>
         </DialogFooter>
