@@ -6,12 +6,13 @@ import { webcrypto } from 'node:crypto';
 import ts from 'typescript';
 import { cakeProducts, cakeStockInfo, loadAllCakeBalances, mergeCakeStockEvent, stockChange, stockShops } from '../src/lib/cake-stock-shelf.js';
 import { matches } from './helpers/memory-backend.mjs';
+import { isProductStockQuantity } from '../base44/shared/product-stock-quantity.js';
 
-function fixture({ quantity = 10, existing = true, role = 'cashier', assigned = 'branch', baseUnit = 'ml' } = {}) {
+function fixture({ quantity = 10, existing = true, role = 'cashier', assigned = 'branch', baseUnit = 'ml', locationType = 'shop', productUnit = 'piece' } = {}) {
   const db = {
-    Shop: [{ id: 'branch', name: 'Branch', active: true, location_type: 'shop' }, { id: 'other', name: 'Other', active: true, location_type: 'shop' }],
-    Product: [{ id: 'cake', name: 'Cake', active: true, production_unit: 'piece' }],
-    ProductStock: existing ? [{ id: 'stock', product_id: 'cake', location_id: 'branch', unit: 'piece', quantity }] : [],
+    Shop: [{ id: 'branch', name: 'Branch', active: true, location_type: locationType }, { id: 'other', name: 'Other', active: true, location_type: 'shop' }],
+    Product: [{ id: 'cake', name: 'Cake', active: true, production_unit: productUnit }],
+    ProductStock: existing ? [{ id: 'stock', product_id: 'cake', location_id: 'branch', unit: productUnit, quantity }] : [],
     Ingredient: [{ id: 'ingredient', name: 'Ingredient', active: true, base_unit: baseUnit }],
     IngredientStock: existing ? [{ id: 'ingredient-stock', ingredient_id: 'ingredient', location_id: 'branch', unit: baseUnit, quantity }] : [],
     StockMovement: [], ActionHistory: [],
@@ -30,10 +31,11 @@ function fixture({ quantity = 10, existing = true, role = 'cashier', assigned = 
   let source = readFileSync('base44/functions/warehouse-stock/entry.ts', 'utf8')
     .replace(/import \{ createClientFromRequest \} from "npm:@base44\/sdk";/, 'const createClientFromRequest = () => client;')
     .replace(/import \{ resolveAppUser \} from "[^"]+";/, 'const resolveAppUser = async (_service, auth) => auth;')
+    .replace(/import \{ isProductStockQuantity \} from "[^"]+";/, '')
     .replace('export default async function(req)', 'async function handler(req)');
   source += '\nglobalThis.handler = handler;';
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-  const context = vm.createContext({ client, Response, crypto: webcrypto, console, exports: {} });
+  const context = vm.createContext({ client, isProductStockQuantity, Response, crypto: webcrypto, console, exports: {} });
   vm.runInContext(code, context);
   return { db, call: async (body) => { const response = await context.handler({ json: async () => body }); return { status: response.status, data: await response.json() }; } };
 }
@@ -68,7 +70,7 @@ await test('missing, zero, negative, duplicate and invalid units stay distinct',
   assert.equal(cakeStockInfo([{ product_id: 'cake', quantity: 2, unit: 'sheet' }], 'cake').status, 'invalid');
   assert.equal(cakeStockInfo([{ product_id: 'cake', quantity: 1 }, { product_id: 'cake', quantity: 2 }], 'cake').status, 'invalid');
   assert.ok(stockChange('out', 11, 10).error);
-  assert.ok(stockChange('in', 1.5, 10).error);
+  assert.ok(stockChange('in', 1.25, 10).error);
   assert.deepEqual(stockChange('count', 0, -3), { quantity: 0, before: -3, after: 0, delta: 3 });
 });
 await test('paginated stock loading keeps records beyond the first 500 and excludes another location', async () => {
@@ -119,7 +121,7 @@ await test('negative stock still rejects outgoing changes, negative counts and i
     assert.equal(f.db.StockMovement.length, 0);
   }
   const f = fixture({ quantity: -12 });
-  assert.equal((await f.call(request({ quantity_change: 1.5, expected_quantity: -12 }))).status, 400);
+  assert.equal((await f.call(request({ quantity_change: 1.25, expected_quantity: -12 }))).status, 400);
   assert.equal(f.db.ProductStock[0].quantity, -12);
   assert.equal(f.db.StockMovement.length, 0);
 });
@@ -149,12 +151,12 @@ await test('stale counts and repeated incoming requests do not overwrite or doub
   assert.equal((await f.call(request({ counted_quantity: 7, expected_quantity: 10 }))).status, 409);
   assert.equal(f.db.ProductStock[0].quantity, 13); assert.equal(f.db.StockMovement.length, 1);
 });
-await test('permission, whole-unit and non-negative validations remain on the backend', async () => {
+await test('permission, half-unit and non-negative validations remain on the backend', async () => {
   const other = fixture({ assigned: 'other' });
   assert.equal((await other.call(request({ counted_quantity: 9, expected_quantity: 10 }))).status, 403);
   assert.equal(other.db.StockMovement.length, 0);
   const f = fixture();
-  assert.equal((await f.call(request({ counted_quantity: 1.5, expected_quantity: 10 }))).status, 400);
+  assert.equal((await f.call(request({ counted_quantity: 1.25, expected_quantity: 10 }))).status, 400);
   assert.equal((await f.call(request({ quantity_change: -11, expected_quantity: 10 }))).status, 409);
   assert.equal((await f.call(request({ counted_quantity: 5, expected_quantity: NaN }))).status, 400);
   assert.equal(f.db.ProductStock[0].quantity, 10); assert.equal(f.db.StockMovement.length, 0);
@@ -200,6 +202,50 @@ await test('ingredient receipt and count validation preserve units, whole pieces
   assert.equal((await missing.call(zero)).data.unchanged, true);
   assert.equal(missing.db.StockMovement.length, 1);
 });
+
+await test('whole and half product balances are valid while quarter pieces are rejected', () => {
+  assert.equal(cakeStockInfo([{ product_id: 'cake', quantity: 10.5, unit: 'piece' }], 'cake').quantity, 10.5);
+  assert.equal(cakeStockInfo([{ product_id: 'cake', quantity: 10.25, unit: 'piece' }], 'cake').status, 'invalid');
+  assert.deepEqual(stockChange('in', '0.5', 10), { quantity: 0.5, before: 10, after: 10.5, delta: 0.5 });
+  assert.deepEqual(stockChange('out', '0.5', 10.5), { quantity: 0.5, before: 10.5, after: 10, delta: -0.5 });
+  assert.deepEqual(stockChange('count', '10.5', 20), { quantity: 10.5, before: 20, after: 10.5, delta: -9.5 });
+  for (const invalid of [0.25, 0.5001, NaN, Infinity, Number.MAX_SAFE_INTEGER]) {
+    assert.equal(isProductStockQuantity(invalid), false);
+  }
+});
+await test('half stock changes preserve history and prevent a repeated or stale write', async () => {
+  const f = fixture({ quantity: 10 });
+  const incoming = request({ quantity_change: 0.5, expected_quantity: 10 });
+  assert.equal((await f.call(incoming)).status, 200);
+  assert.equal(f.db.ProductStock[0].quantity, 10.5);
+  assert.equal(f.db.StockMovement[0].quantity_change, 0.5);
+  assert.equal((await f.call(incoming)).status, 409);
+  assert.equal((await f.call(request({ quantity_change: 1, expected_quantity: 10.5 }))).status, 200);
+  assert.equal(f.db.ProductStock[0].quantity, 11.5);
+  assert.equal((await f.call(request({ counted_quantity: 0.5, expected_quantity: 11.5 }))).status, 200);
+  assert.equal(f.db.ProductStock[0].quantity, 0.5);
+  assert.equal(f.db.StockMovement.at(-1).balance_after, 0.5);
+});
+await test('unsupported fractions and unit mismatches do not mutate product stock', async () => {
+  for (const quantity_change of [0.25, 0.5001, 1.2345]) {
+    const f = fixture();
+    assert.equal((await f.call(request({ quantity_change, expected_quantity: 10 }))).status, 400);
+    assert.equal(f.db.ProductStock[0].quantity, 10);
+    assert.equal(f.db.StockMovement.length, 0);
+  }
+  const f = fixture();
+  f.db.ProductStock[0].unit = 'sheet';
+  assert.equal((await f.call(request({ quantity_change: 0.5, expected_quantity: 10 }))).status, 400);
+  assert.equal(f.db.StockMovement.length, 0);
+});
+await test('production sheets accept halves and retain the sheet unit', async () => {
+  const f = fixture({ quantity: 2, role: 'admin', locationType: 'production', productUnit: 'sheet' });
+  assert.equal((await f.call(request({ quantity_change: 0.5, expected_quantity: 2 }))).status, 200);
+  assert.equal(f.db.ProductStock[0].quantity, 2.5);
+  assert.equal(f.db.ProductStock[0].unit, 'sheet');
+  assert.equal(f.db.StockMovement[0].unit, 'sheet');
+});
+
 console.log(checks + ' stock checks passed.');
 
 test('manager balances fall back to the server when direct read is blocked', async () => {
