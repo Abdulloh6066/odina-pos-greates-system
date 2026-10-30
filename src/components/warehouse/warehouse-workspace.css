@@ -85,6 +85,17 @@ body:has(.warehouse-workspace) .warehouse-receipt-drawer .bg-amber-50 { flex-wra
   .warehouse-workspace .warehouse-table .warehouse-status { justify-self: start; }
   body:has(.warehouse-workspace) .warehouse-receipt-drawer { border-radius: 0; padding: 24px 16px; }
 }
+
+/* Product inventory stays a list on narrow screens too. */
+@media(max-width:760px) {
+  .warehouse-products .inventory-ledger-table { display:table; min-width:560px; }
+  .warehouse-products .inventory-ledger-table thead { display:table-header-group; position:static; width:auto; height:auto; overflow:visible; clip-path:none; }
+  .warehouse-products .inventory-ledger-table tbody { display:table-row-group; }
+  .warehouse-products .inventory-ledger-table tr { display:table-row; padding:0; }
+  .warehouse-products .inventory-ledger-table td { display:table-cell; padding:14px 16px; border-bottom:1px solid #edf0f3; }
+  .warehouse-products .inventory-ledger-table td::before { display:none; }
+}
+
 @media(prefers-reduced-motion:reduce) {
   .warehouse-workspace *, body:has(.warehouse-workspace) .warehouse-dialog * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
