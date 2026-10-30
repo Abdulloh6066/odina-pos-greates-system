@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Cake, Check, ChefHat, ClipboardCheck, History, Loader2, RefreshCw, Search, Truck, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Cake, Check, ChefHat, ClipboardCheck, History, List, Loader2, RefreshCw, Search, Truck, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
 import { priceForShop } from '@/lib/shop-pricing';
@@ -306,6 +306,7 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
     {balances.error && <div className="cake-stock-message is-warning" role="alert"><AlertTriangle aria-hidden="true" /><p>{balances.error} Oxirgi ma’lumot ko‘rsatilishi mumkin. Kirim yoki chiqimdan oldin yangilang.</p></div>}
     <nav className="cake-stock-tabs" aria-label="Tort ombori ko‘rinishi">
       <Button type="button" variant={view === 'shelf' && !entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(false); }} aria-pressed={view === 'shelf' && !entryMode}><Cake className="mr-2 h-4 w-4" />{scope === 'cakes' ? 'Tort tokchasi' : 'Mahsulotlar tokchasi'}</Button>
+      <Button type="button" variant={view === 'list' ? 'default' : 'outline'} onClick={() => { setView('list'); setEntryMode(false); }} aria-pressed={view === 'list'}><List className="mr-2 h-4 w-4" aria-hidden="true" />Ro‘yxat / Jurnal</Button>
       {CAKE_STOCK_ROLES.has(user?.role) && <Button type="button" variant={entryMode ? 'default' : 'outline'} onClick={() => { setView('shelf'); setEntryMode(true); setNotice(''); }} aria-pressed={entryMode} disabled={!canChange}><ArrowDownLeft className="mr-2 h-4 w-4" />Kirim kiritish</Button>}
       {!isIngredient && !stockReadOnly && <Button type="button" variant={view === 'transfers' ? 'default' : 'outline'} onClick={() => { setView('transfers'); setEntryMode(false); }} aria-pressed={view === 'transfers'}><Truck className="mr-2 h-4 w-4" />Kelgan transferlar</Button>}
     </nav>
@@ -319,8 +320,29 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
       </div>
       <div className="cake-stock-layout">
         <div className="cake-stock-board">
-          <div className="cake-stock-board-heading"><div><h3>{shop.name} · {scope === 'cakes' ? 'tort tokchasi' : 'mahsulotlar tokchasi'}</h3><p>{visible.length} ta mahsulot turi</p></div><span>{balances.ready ? counts.inStock + ' turda qoldiq bor' : 'Yuklanmoqda…'}</span></div>
-          <div className={'cake-stock-board-scroll cake-stock-category-scroll' + (dragging ? ' is-dragging' : '')} ref={scrollRef}
+          <div className="cake-stock-board-heading"><div><h3>{shop.name} · {view === 'list' ? 'qoldiq jurnali' : scope === 'cakes' ? 'tort tokchasi' : 'mahsulotlar tokchasi'}</h3><p>{visible.length} ta mahsulot turi</p></div><span>{balances.ready ? counts.inStock + ' turda qoldiq bor' : 'Yuklanmoqda…'}</span></div>
+          {view === 'list' ? (
+            <div className="cake-stock-list-scroll" role="region" aria-label="Mahsulotlar qoldiq jurnali" tabIndex={0}>
+              <table className="cake-stock-list">
+                <caption className="sr-only">{shop.name} — mahsulotlar qoldiq jurnali</caption>
+                <thead><tr><th scope="col">Mahsulot</th><th scope="col">Kategoriya</th><th scope="col">Sotuv narxi</th><th scope="col">Qoldiq</th><th scope="col">Birlik</th><th scope="col">Holat</th></tr></thead>
+                <tbody>
+                  {shelfProducts.map((product) => {
+                    const info = inventoryStockInfo(balances.rows, product, balances.ready);
+                    return <tr key={product.id} className={selected?.id === product.id ? 'is-selected' : ''}>
+                      <th scope="row"><button type="button" onClick={() => selectProduct(product)} aria-pressed={selected?.id === product.id} className="cake-stock-list-select">{product.name}</button></th>
+                      <td>{categoryName(product)}</td>
+                      <td className="cake-stock-list-number">{isIngredient ? '—' : formatUZS(priceForShop(product, shop.id))}</td>
+                      <td className={'cake-stock-list-quantity ' + info.status}>{info.quantity == null ? (info.status === 'loading' ? '…' : '—') : formatStockQuantity(info.quantity, product)}</td>
+                      <td>{inventoryUnits(product).label}</td>
+                      <td><span className={'cake-stock-list-status ' + info.status}>{info.label}</span></td>
+                    </tr>;
+                  })}
+                  {shelfProducts.length === 0 && <tr><td colSpan={6}><div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>{noun} topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div></td></tr>}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className={'cake-stock-board-scroll cake-stock-category-scroll' + (dragging ? ' is-dragging' : '')} ref={scrollRef}
             onPointerDown={startShelfDrag} onPointerMove={moveShelfDrag} onPointerUp={finishShelfDrag}
             onPointerCancel={finishShelfDrag} onLostPointerCapture={finishShelfDrag}
             onClickCapture={blockDraggedClick} onDragStart={(event) => event.preventDefault()} aria-describedby="cake-stock-drag-help"
@@ -346,7 +368,8 @@ export default function CakeStockShelf({ user, products, categories, shops, ingr
               </section>)}
             </div> : <div className="cake-stock-empty"><Cake aria-hidden="true" /><h3>{noun} topilmadi</h3><p>Qidiruv yoki filtrni o‘zgartiring.</p></div>}
           </div>
-          <div className="cake-stock-board-footer"><span className="cake-stock-swipe" id="cake-stock-drag-help">Mahsulotlarni ko‘rish uchun ushlab o‘ng-chapga suring<span className="sr-only">. Mahsulotlar orasida klaviaturaning yo‘nalish tugmalari bilan yuring.</span></span></div>
+          }
+          <div className="cake-stock-board-footer">{view === 'list' ? <span>Qoldiq va amallarni ko‘rish uchun mahsulot nomini bosing.</span> : <span className="cake-stock-swipe" id="cake-stock-drag-help">Mahsulotlarni ko‘rish uchun ushlab o‘ng-chapga suring<span className="sr-only">. Mahsulotlar orasida klaviaturaning yo‘nalish tugmalari bilan yuring.</span></span>}</div>
         </div>
         <aside className="cake-stock-detail" aria-label={"Tanlangan " + noun.toLocaleLowerCase()}>
           {selected ? <>
