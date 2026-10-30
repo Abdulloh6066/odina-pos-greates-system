@@ -1,7 +1,9 @@
+import { PRODUCT_STOCK_STEP, isProductStockQuantity } from '../../base44/shared/product-stock-quantity.js';
+
 export const CAKE_STOCK_PAGE_SIZE = 48;
 
 export function inventoryUnits(item) {
-  if (item?.stock_kind !== 'ingredient') return { base: 'piece', unit: 'piece', label: 'dona', factor: 1, step: 1 };
+  if (item?.stock_kind !== 'ingredient') return { base: 'piece', unit: 'piece', label: 'dona', factor: 1, step: PRODUCT_STOCK_STEP };
   const base = item.base_unit;
   const unit = (base === 'g' && item.purchase_unit === 'kg') ? 'kg'
     : (base === 'ml' && item.purchase_unit === 'l') ? 'l' : base;
@@ -144,7 +146,7 @@ export function cakeStockInfo(rows, productId, ready = true) {
   if (!matches.length) return { status: 'missing', quantity: null, unit: 'piece', label: 'Sanoq kiritilmagan' };
   if (matches.length !== 1) return { status: 'invalid', quantity: null, unit: 'piece', label: 'Qoldiqni tekshiring' };
   const row = matches[0], quantity = Number(row.quantity);
-  if (row.quantity == null || !Number.isSafeInteger(quantity) || (row.unit || 'piece') !== 'piece') {
+  if (row.quantity == null || !isProductStockQuantity(quantity) || (row.unit || 'piece') !== 'piece') {
     return { status: 'invalid', quantity: null, unit: row.unit, label: 'Birlik yoki qoldiq xatosi' };
   }
   return { row, quantity, unit: 'piece', status: quantity < 0 ? 'negative' : quantity === 0 ? 'zero' : 'positive',
@@ -153,13 +155,13 @@ export function cakeStockInfo(rows, productId, ready = true) {
 
 export function stockChange(mode, value, current) {
   const quantity = Number(value);
-  if (String(value).trim() === '' || !Number.isSafeInteger(quantity) || quantity < (mode === 'count' ? 0 : 1)) {
-    return { error: mode === 'count' ? '0 yoki undan katta butun dona kiriting.' : 'Musbat butun dona kiriting.' };
+  if (String(value).trim() === '' || !isProductStockQuantity(quantity) || quantity < (mode === 'count' ? 0 : PRODUCT_STOCK_STEP)) {
+    return { error: mode === 'count' ? '0 yoki undan katta miqdorni 0.5 dona qadamda kiriting.' : 'Musbat miqdorni 0.5 dona qadamda kiriting.' };
   }
   const before = current == null ? 0 : Number(current);
-  if (!Number.isSafeInteger(before)) return { error: 'Qoldiqni avval tekshiring.' };
+  if (!isProductStockQuantity(before)) return { error: 'Qoldiqni avval tekshiring.' };
   const after = mode === 'count' ? quantity : before + (mode === 'out' ? -quantity : quantity);
-  if (!Number.isSafeInteger(after) || (after < 0 && mode !== 'in')) return { error: 'Qoldiq manfiy bo‘la olmaydi. Haqiqiy sanoqni kiriting.' };
+  if (!isProductStockQuantity(after) || (after < 0 && mode !== 'in')) return { error: 'Qoldiq manfiy bo‘la olmaydi. Haqiqiy sanoqni kiriting.' };
   return { quantity, before, after, delta: after - before };
 }
 
