@@ -1,5 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveAppUser } from "../../shared/user-helpers.ts";
+import { isProductStockQuantity } from "../../shared/product-stock-quantity.js";
 
 const ALLOWED_ROLES = new Set(["admin", "manager", "cashier", "accountant", "production"]);
 const ALLOWED_TYPES = new Set(["opening", "adjustment"]);
@@ -66,7 +67,7 @@ export default async function(req) {
     if (hasCount && (!Number.isFinite(countedQuantity) || countedQuantity < 0
       || Math.abs(countedQuantity) > Number.MAX_SAFE_INTEGER / 1000
       || Math.abs(countedQuantity - number(countedQuantity)) > 0.0000001
-      || (itemKind === "product" && !Number.isSafeInteger(countedQuantity))
+      || (itemKind === "product" && !isProductStockQuantity(countedQuantity))
       || typeof body?.counted_quantity !== "number" || typeof body?.expected_quantity !== "number" || movementType !== "adjustment")) {
       return Response.json({ error: "Haqiqiy sanoq uchun manfiy bo‘lmagan miqdor va ko‘rilgan qoldiq majburiy." }, { status: 400 });
     }
@@ -149,8 +150,11 @@ export default async function(req) {
     const userName = user.full_name || user.email || "Unknown user";
     const unit = itemKind === "ingredient" ? item.base_unit
       : location.location_type === "production" ? (item.production_unit || "piece") : "piece";
-    if (itemKind === "product" && (!Number.isSafeInteger(quantityChange) || (existing && (existing.unit || "piece") !== unit))) {
-      return Response.json({ error: "Butun list/dona kiriting; qoldiq birligi mahsulotga mos bo‘lishi kerak." }, { status: 400 });
+    if (itemKind === "product" && (!isProductStockQuantity(hasCount ? countedQuantity : Number(body?.quantity_change))
+      || !isProductStockQuantity(existing ? Number(existing.quantity) : 0)
+      || !isProductStockQuantity(balanceAfter)
+      || (existing && (existing.unit || "piece") !== unit))) {
+      return Response.json({ error: "Miqdorni 0.5 dona/list qadamda kiriting; qoldiq birligi mahsulotga mos bo‘lishi kerak." }, { status: 400 });
     }
     if (hasCount && existing && quantityChange === 0) {
       return Response.json({ stock: existing, movement: null, unchanged: true });
