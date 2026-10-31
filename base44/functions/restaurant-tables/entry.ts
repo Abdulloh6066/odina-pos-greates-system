@@ -1,7 +1,9 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
 import { allocateServiceTicketNumber } from "../../shared/shift-close-helpers.ts";
-import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName } from "../../shared/burger-fries.js";
+import { validateFriesOption, friesSurcharge, burgerOptionName } from "../../shared/burger-fries.js";
+import { saleLineKey, saleOptionFields } from "../../shared/sale-options.js";
+import { validateTeaOption, teaServingPrice, teaOptionName } from "../../shared/tea-options.js";
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
 // Completed sales, payments and stock movements occur only in complete-sale.
@@ -462,6 +464,7 @@ Deno.serve(async (req) => {
         const productId = String(row?.product_id || "");
         const quantity = row?.quantity;
         const option = validateFriesOption(row, shop.id);
+        const teaOption = validateTeaOption(row);
         const key = saleLineKey(row);
         if (!productId || seen.has(key) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000000) {
           return Response.json({ error: "Takroriy mahsulot yoki dona soni noto‘g‘ri." }, { status: 400 });
@@ -475,15 +478,15 @@ Deno.serve(async (req) => {
         if (!previous && product?.available_shop_ids?.length && !product.available_shop_ids.includes(shop.id)) {
           return Response.json({ error: "Bu mahsulot ushbu do‘konda sotilmaydi." }, { status: 403 });
         }
-        const price = previous ? previous.price : Number(product?.shop_prices?.[shop.id] ?? product.price) + friesSurcharge(row);
+        const price = previous ? previous.price : teaServingPrice(product?.shop_prices?.[shop.id] ?? product.price, teaOption) + friesSurcharge(row);
         if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(price * quantity)) {
           return Response.json({ error: "Mahsulot narxi yoki miqdori noto‘g‘ri." }, { status: 400 });
         }
         const saleUnit = (previous || product).sale_unit === "gram" ? "gram" : "piece";
         if (saleUnit !== "gram" && quantity > 1000) return Response.json({ error: "Dona soni chegaradan oshdi." }, { status: 400 });
         items.push({ product_id: productId,
-          product_name: previous?.product_name || burgerOptionName(String(product.name || "Mahsulot"), option),
-          ...friesOptionFields(previous || row),
+          product_name: previous?.product_name || teaOptionName(burgerOptionName(String(product.name || "Mahsulot"), option), teaOption),
+          ...saleOptionFields(previous || row),
           image_url: previous?.image_url || String(product.image_url || ""),
           price, quantity, sale_unit: saleUnit, subtotal: Math.round(price * quantity / (saleUnit === "gram" ? 1000 : 1)),
           stock_tracked: saleUnit !== "gram" && (previous ? previous.stock_tracked !== false : product.track_stock !== false),
