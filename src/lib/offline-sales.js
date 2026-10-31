@@ -1,4 +1,4 @@
-import { friesOptionFields } from './burger-fries.js';
+import { saleOptionFields } from './sale-options.js';
 import { isPosNetworkError } from './pos-network.js';
 
 const DB_NAME = 'odina-pos-offline-sales';
@@ -151,7 +151,7 @@ export function buildPendingSale({
     }
     return {
       product_id: String(item.product_id),
-      ...friesOptionFields(item),
+      ...saleOptionFields(item),
       product_name: String(item.product_name || ''),
       image_url: String(item.image_url || ''),
       price,
@@ -189,7 +189,7 @@ export function buildPendingSale({
     action: 'complete_sale',
     is_delivery: isDelivery === true,
     shift_id: String(shift.id),
-    items: items.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...friesOptionFields(item) })),
+    items: items.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...saleOptionFields(item) })),
     payments: normalizedPayments,
     idempotency_key: String(idempotencyKey),
     recorded_at: recordedIso,
