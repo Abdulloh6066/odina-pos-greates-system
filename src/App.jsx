@@ -26,6 +26,7 @@ const Orders = lazy(() => preloadPage('orders'));
 const RestaurantTables = lazy(() => preloadPage('tables'));
 const Customers = lazy(() => preloadPage('customers'));
 const Products = lazy(() => preloadPage('products'));
+const WholesaleProducts = lazy(() => preloadPage('wholesale'));
 const Categories = lazy(() => preloadPage('categories'));
 const Users = lazy(() => preloadPage('users'));
 const Reports = lazy(() => preloadPage('reports'));
@@ -57,6 +58,7 @@ const ROUTE_TITLES = {
   '/customers': 'Mijozlar',
   '/products': '3D +',
   '/3d-plus': '3D +',
+  '/wholesale-products': 'Mahsulotlar',
   '/categories': 'Kategoriyalar',
   '/users': 'Xodimlar',
   '/reports': 'Hisobotlar',
@@ -160,6 +162,7 @@ function App() {
                 <Route path="/customers" element={<RoleRoute pageKey="customers"><Customers /></RoleRoute>} />
                 <Route path="/products" element={<RoleRoute pageKey="products"><LegacyProductsRedirect /></RoleRoute>} />
                 <Route path="/3d-plus" element={<RoleRoute pageKey="products"><Products /></RoleRoute>} />
+                <Route path="/wholesale-products" element={<RoleRoute pageKey="wholesale"><WholesaleProducts /></RoleRoute>} />
                 <Route path="/categories" element={<RoleRoute pageKey="categories"><Categories /></RoleRoute>} />
                 <Route path="/users" element={<RoleRoute pageKey="users"><Users /></RoleRoute>} />
                 <Route path="/reports" element={<RoleRoute pageKey="reports"><Reports /></RoleRoute>} />

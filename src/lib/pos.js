@@ -10,11 +10,11 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['admin', 'dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  admin: ['wholesale', 'admin', 'dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
   cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
-  production: ['warehouse', 'products', 'customers', 'screens'],
+  production: ['wholesale', 'warehouse', 'products', 'customers', 'screens'],
   warehouse: ['warehouse'],
 };
 
@@ -37,6 +37,7 @@ export const MENU_ITEMS = [
   { key: 'screens', label: 'Ekranlar', path: '/production-screen', icon: 'Monitor' },
   { key: 'waste', label: 'Chiqitlar', path: '/waste', icon: 'Trash2' },
   { key: 'warehouse', label: 'Ombor', path: '/warehouse', icon: 'Ombor' },
+  { key: 'wholesale', label: 'Mahsulotlar', path: '/wholesale-products', icon: 'ShoppingCart' },
   { key: 'products', label: '3D +', path: '/3d-plus', icon: 'Cake' },
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },

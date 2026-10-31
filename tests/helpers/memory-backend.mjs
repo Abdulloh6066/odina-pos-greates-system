@@ -98,7 +98,7 @@ export function memoryBackend(seed = {}, { now = '2026-09-27T07:00:00Z', copySee
       structuredClone, console, Date: Clock,
       fetch: async () => { throw new Error('NETWORK IS DISABLED IN OFFLINE TESTS'); }, ...extra };
     const requireMock = name => {
-      if (name === 'npm:@base44/sdk') return { createClientFromRequest: () => client };
+      if (name === 'npm:@base44/sdk' || name === 'npm:@base44/sdk@0.8.54') return { createClientFromRequest: () => client };
       if (!name.startsWith('.')) throw new Error('Unexpected test dependency: ' + name);
       return load(path.resolve(path.dirname(absolute), name), extra);
     };

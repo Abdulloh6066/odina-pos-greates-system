@@ -1,0 +1,138 @@
+{
+  "name": "WholesaleSale",
+  "type": "object",
+  "properties": {
+    "source_id": {
+      "type": "string"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "buyer_type": {
+      "type": "string",
+      "enum": [
+        "branch",
+        "external"
+      ]
+    },
+    "buyer_id": {
+      "type": "string"
+    },
+    "buyer_name": {
+      "type": "string"
+    },
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number",
+      "minimum": 0.5
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "sheet"
+      ]
+    },
+    "unit_price": {
+      "type": "number"
+    },
+    "total": {
+      "type": "number"
+    },
+    "conversion_factor": {
+      "type": "integer"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "cash",
+        "bank_transfer"
+      ]
+    },
+    "seller_id": {
+      "type": "string"
+    },
+    "seller_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "processing",
+        "completed",
+        "cancelled"
+      ]
+    },
+    "lock_token": {
+      "type": "string"
+    },
+    "lock_until": {
+      "type": "string"
+    },
+    "stock_id": {
+      "type": "string"
+    },
+    "balance_before": {
+      "type": "number"
+    },
+    "balance_after": {
+      "type": "number"
+    },
+    "transfer_id": {
+      "type": "string"
+    },
+    "sold_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "source_id",
+    "source_name",
+    "buyer_type",
+    "buyer_name",
+    "product_id",
+    "product_name",
+    "quantity",
+    "unit",
+    "unit_price",
+    "total",
+    "seller_id",
+    "status",
+    "payment_method"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.seller_id": "{{user.id}}"
+        }
+      ]
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
