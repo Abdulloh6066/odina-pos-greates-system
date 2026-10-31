@@ -6,6 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
 import { formatInventoryQuantity } from '@/lib/stock-quantity';
+import { warehouseProductsForLocation } from '@/lib/warehouse-products';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import { WarehouseHistoryTable } from '@/components/warehouse/WarehouseTables';
@@ -82,6 +83,7 @@ export default function Warehouse() {
   const [locations, setLocations] = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [archivedProductIds, setArchivedProductIds] = useState([]);
   const [ingredientStock, setIngredientStock] = useState([]);
   const [productStock, setProductStock] = useState([]);
@@ -210,6 +212,7 @@ export default function Warehouse() {
           ? Promise.resolve({ data: { transfers: [] } })
           : loadTransferData(),
         canViewSupplierLedger ? base44.entities.CashRecipient.list('name', 500) : Promise.resolve([]),
+        user?.role === 'warehouse' ? Promise.resolve([]) : base44.entities.Category.list('name', 500),
       ]);
 
       const failedSections = [];
@@ -228,6 +231,7 @@ export default function Warehouse() {
       const movementList = resultValue(results[5], 'Ombor tarixi', movements);
       const transferResponse = resultValue(results[6], 'Transferlar', { data: { transfers } });
       const recipientList = resultValue(results[7], 'Yetkazib beruvchilar', recipients);
+      const categoryList = resultValue(results[8], 'Kategoriyalar', categories);
 
       const activeLocations = (locationList || []).filter((location) => location.active !== false);
       const transferPayload = transferResponse?.data || transferResponse;
@@ -245,6 +249,7 @@ export default function Warehouse() {
         ...TEST_PRODUCT_IDS.filter((id) => !(productList || []).some((item) => item.id === id)),
       ]);
       setProducts((productList || []).filter((item) => item.active !== false && item.archived !== true && item.track_stock !== false));
+      setCategories(categoryList || []);
       setIngredientStock(ingredientBalances || []);
       setProductStock(productBalances || []);
       setMovements(movementList || []);
@@ -328,7 +333,9 @@ export default function Warehouse() {
   }, [tab, ingredientStock, productStock, selectedLocation]);
 
   const items = useMemo(() => {
-    const source = tab === 'products' ? products : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory));
+    const source = tab === 'products'
+      ? warehouseProductsForLocation(products, categories, selectedLocationRecord)
+      : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory));
     const query = search.toLowerCase().trim();
     if (!query) return source;
     return source.filter((item) => [
@@ -336,7 +343,7 @@ export default function Warehouse() {
       item.category,
       item.source_type,
     ].filter(Boolean).join(' ').toLowerCase().includes(query));
-  }, [tab, products, ingredients, search, ingredientCategory]);
+  }, [tab, products, categories, selectedLocationRecord, ingredients, search, ingredientCategory]);
 
   const visibleMovements = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -457,7 +464,7 @@ export default function Warehouse() {
             const locationMap = Object.fromEntries(balances.filter((row) => row.location_id === location.id).map((row) => [row[key], row]));
             return <section key={location.id} className="space-y-3"><h2 className="font-semibold text-lg">{location.name}</h2>{tab === 'history'
               ? <HistoryList movements={movements.filter((row) => row.location_id === location.id && (!search.trim() || [row.item_name, row.reason, row.user_name].filter(Boolean).join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} modernView={listView} />
-              : <StockGrid modernView={listView} items={tab === 'products' ? items : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory) && (!search.trim() || item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} stockMap={locationMap} kind={tab === 'products' ? 'product' : 'ingredient'} location={location} onAdjust={null} />}</section>;
+              : <StockGrid modernView={listView} items={tab === 'products' ? warehouseProductsForLocation(products, categories, location, search) : ingredients.filter((item) => !isCakeLayer(item) && (ingredientCategory === 'all' || item.category === ingredientCategory) && (!search.trim() || item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())))} stockMap={locationMap} kind={tab === 'products' ? 'product' : 'ingredient'} location={location} onAdjust={null} />}</section>;
           })}
         </section>
       ) : !selectedLocation || !selectedLocationRecord || (shopScope && !shopScope.ready) ? (
