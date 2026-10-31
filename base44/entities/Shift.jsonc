@@ -82,6 +82,11 @@
       },
       "default": []
     },
+    "checkout_queue_resume_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Server-side pacing slot for older Central offline receipts; unrelated to shift financial totals."
+    },
     "cash_removed": {
       "type": "number",
       "default": 0
