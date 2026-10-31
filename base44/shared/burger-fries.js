@@ -21,8 +21,7 @@ export function validateFriesOption(row, shopId) {
 }
 
 // Missing options on old carts/receipts retain their original base-price meaning.
-export const saleLineKey = (row) =>
-  String(row?.product_id || '') + (row?.fries_option === 'with' ? '::fries' : '');
+export { saleLineKey } from './sale-options.js';
 export const friesOptionFields = (row) =>
   ['with', 'without'].includes(row?.fries_option) ? { fries_option: row.fries_option } : {};
 export const friesSurcharge = (row) => row?.fries_option === 'with' ? FRIES_SURCHARGE : 0;
