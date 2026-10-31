@@ -30,6 +30,7 @@ export const ROLE_HOME = {
 export const MENU_ITEMS = [
   { key: 'admin', label: 'Admin panel', path: '/admin', icon: 'ShieldCheck' },
   { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
+  { key: 'wholesale', label: 'Mahsulotlar', path: '/wholesale-products', icon: 'ShoppingCart' },
   { key: 'pos', label: 'Kassa', path: '/pos', icon: 'ShoppingCart' },
   { key: 'orders', label: 'Buyurtmalar', path: '/orders', icon: 'ClipboardList' },
   { key: 'tables', label: 'Stollar', path: '/tables', icon: 'Armchair' },
@@ -37,7 +38,6 @@ export const MENU_ITEMS = [
   { key: 'screens', label: 'Ekranlar', path: '/production-screen', icon: 'Monitor' },
   { key: 'waste', label: 'Chiqitlar', path: '/waste', icon: 'Trash2' },
   { key: 'warehouse', label: 'Ombor', path: '/warehouse', icon: 'Ombor' },
-  { key: 'wholesale', label: 'Mahsulotlar', path: '/wholesale-products', icon: 'ShoppingCart' },
   { key: 'products', label: '3D +', path: '/3d-plus', icon: 'Cake' },
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },
