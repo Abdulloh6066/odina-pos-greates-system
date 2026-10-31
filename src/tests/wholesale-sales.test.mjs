@@ -53,6 +53,26 @@ test('branch receives wholesale sheets through existing transfer flow exactly on
   assert.equal(f.db.ProductStock.find(s => s.location_id === 'branch').quantity, 10);
 });
 
+test('piece-stock sale freezes piece deduction and receives branch pieces once', async () => {
+  const data = seed();
+  Object.assign(data.Product[0], { production_unit: 'piece', pieces_per_sheet: 12, sheet_price: 384000 });
+  Object.assign(data.ProductStock[0], { unit: 'piece', quantity: 24 });
+  const f = memoryBackend(data), sale = await prepare(f, { buyer_type: 'branch', buyer_id: 'branch' });
+  assert.equal(sale.total, 192000);
+  assert.equal(sale.stock_quantity, 6);
+  assert.equal(sale.stock_unit, 'piece');
+  f.db.Product[0].pieces_per_sheet = 20;
+  assert.equal((await confirm(f, sale)).status, 200);
+  assert.equal((await confirm(f, sale)).status, 200);
+  assert.equal(f.db.ProductStock[0].quantity, 18);
+  assert.equal(f.db.StockMovement[0].unit, 'piece');
+  assert.equal(f.db.StockMovement[0].quantity_change, -6);
+  const result = await f.invoke('base44/functions/stock-transfer/entry.ts', { action: 'receive_transfer_batch', batch_id: `wholesale-${sale.id}` });
+  assert.equal(result.status, 200, JSON.stringify(result.data));
+  assert.equal(f.db.ProductStock.find(s => s.location_id === 'branch').quantity, 6);
+  assert.equal(f.db.ProductStock.find(s => s.location_id === 'factory').quantity, 18);
+});
+
 test('concurrent confirmations cannot double-sell', async () => {
   const f = memoryBackend(seed()), sale = await prepare(f);
   const results = await Promise.all([confirm(f, sale), confirm(f, sale)]);
