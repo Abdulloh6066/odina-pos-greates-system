@@ -21,6 +21,7 @@ export default async function(req) {
       return row;
     };
     const sourceAccess = async id => {
+      if (id !== '6a999c5afc5d285f47ee50ad') throw wholesaleError('Bu sahifa faqat Central ishlab chiqarish ombori uchun.', 403);
       if (user.role !== 'admin' && (!user.shop_id || id !== user.shop_id)) throw wholesaleError('Faqat biriktirilgan ishlab chiqarish joyidan sotish mumkin.', 403);
       const source = await get(entities.Shop, id);
       if (source.active === false || source.location_type !== 'production') throw wholesaleError('Ishlab chiqarish joyini tanlang.');
@@ -28,7 +29,7 @@ export default async function(req) {
     };
     if (body.action === 'setup') {
       const [sources, branches] = await Promise.all([
-        entities.Shop.filter({ location_type: 'production', active: true, ...(user.role === 'admin' ? {} : { id: user.shop_id || '__none__' }) }, 'name', 500),
+        entities.Shop.filter({ location_type: 'production', active: true, id: user.role === 'admin' || user.shop_id === '6a999c5afc5d285f47ee50ad' ? '6a999c5afc5d285f47ee50ad' : '__none__' }, 'name', 500),
         entities.Shop.filter({ location_type: 'shop', active: true }, 'name', 500),
       ]);
       const pick = rows => rows.map(({ id, name }) => ({ id, name }));
