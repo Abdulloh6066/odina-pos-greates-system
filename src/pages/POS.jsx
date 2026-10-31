@@ -11,7 +11,9 @@ import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift, openPosShift, invokePosRead } from '@/lib/current-pos-shift';
 import { priceForShop } from '@/lib/shop-pricing';
-import { canPreviewBurgerFries, repriceBurgerCartForShop, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
+import { canPreviewBurgerFries, repriceBurgerCartForShop, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
+import { saleLineKey, saleOptionFields } from '@/lib/sale-options';
+import { canChooseTeaServing, teaServingPrice, teaOptionName, repriceTeaCartForShop } from '@/lib/tea-options';
 import { categoryForShop, catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import ProductGrid from '@/components/pos/ProductGrid';
@@ -95,6 +97,7 @@ export default function POS() {
   const [keyboardProductId, setKeyboardProductId] = useState(null);
   const [weightProduct, setWeightProduct] = useState(null);
   const [burgerProduct, setBurgerProduct] = useState(null);
+  const [teaProduct, setTeaProduct] = useState(null);
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
@@ -360,7 +363,7 @@ export default function POS() {
         items: cart.map((row) => ({
           product_id: row.product_id,
           quantity: row.quantity,
-          ...friesOptionFields(row),
+          ...saleOptionFields(row),
           variant_name: row.variant_name || row.variant || '',
           notes: row.notes || '',
         })),
@@ -399,7 +402,7 @@ export default function POS() {
         action: 'save_takeaway_order', shop_id: shift.shop_id, shift_id: shift.id,
         order_id: orderId, expected_revision: takeawayOrder?.revision || 0,
         is_delivery: isDelivery,
-        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity, ...friesOptionFields(row),
+        items: cart.map((row) => ({ product_id: row.product_id, quantity: row.quantity, ...saleOptionFields(row),
           variant_name: row.variant_name || row.variant || '', notes: row.notes || '' })),
       });
       const result = response?.data || response;
@@ -946,6 +949,10 @@ export default function POS() {
       setBurgerProduct({ ...product, shopId: catalogShopId });
       return;
     }
+    if (canChooseTeaServing(product.id)) {
+      setTeaProduct({ ...product, shopId: catalogShopId });
+      return;
+    }
     setKeyboardProductId(product.id);
     if (product.sale_unit === 'gram') { openWeight(product); return; }
     setCart((prev) => {
@@ -974,12 +981,29 @@ export default function POS() {
     });
     setBurgerProduct(null);
   };
+  const saveTeaChoice = (option) => {
+    if (!teaProduct || !['cup', 'pot'].includes(option) || tableLocked || paying || payOpen || stockChecking
+      || teaProduct.shopId !== catalogShopId) return;
+    const row = { product_id: teaProduct.id, product_name: teaOptionName(teaProduct.name, option),
+      image_url: teaProduct.image_url, price: teaServingPrice(teaProduct.price, option),
+      sale_unit: 'piece', quantity: 1, tea_option: option };
+    row.subtotal = row.price;
+    const key = saleLineKey(row);
+    setKeyboardProductId(key);
+    setCart((prev) => {
+      const existing = prev.find((item) => saleLineKey(item) === key);
+      return existing ? prev.map((item) => saleLineKey(item) === key
+        ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.price } : item) : [...prev, row];
+    });
+    setTeaProduct(null);
+  };
+  useEffect(() => { setTeaProduct(null); }, [tableKey, catalogShopId]);
   useEffect(() => { setBurgerProduct(null); }, [tableKey, shift?.shop_id, user?.shop_id]);
   // Pre-shift preview uses catalogue prices; apply Branch prices when its shift opens.
   // Server-saved unpaid orders keep their original immutable price snapshots.
   useEffect(() => {
     if (!shift?.shop_id || selectedTable || takeawayOrder) return;
-    setCart((rows) => repriceBurgerCartForShop(rows, products, shift.shop_id));
+    setCart((rows) => repriceTeaCartForShop(repriceBurgerCartForShop(rows, products, shift.shop_id), products, shift.shop_id));
   }, [shift?.shop_id, products, tableKey, takeawayOrder]);
 
   useEffect(() => {
@@ -1360,7 +1384,7 @@ export default function POS() {
         ...(selectedTable ? { table_shop_id: selectedTable.shopId,
           table_number: selectedTable.number,
           table_order_id: tableOrder?.id, table_order_revision: tableOrder?.revision } : {}),
-        items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...friesOptionFields(item) })),
+        items: cart.map((item) => ({ product_id: item.product_id, quantity: item.quantity, ...saleOptionFields(item) })),
       });
       if (checkoutCancelledRef.current) return;
       reportRequestSuccess();
@@ -1672,7 +1696,7 @@ export default function POS() {
           items: cart.map((item) => ({
             product_id: item.product_id,
             quantity: item.quantity,
-            ...friesOptionFields(item),
+            ...saleOptionFields(item),
           })),
           discount_code: discountCode || undefined,
           rounding_total: adjustmentMode === 'rounding' ? roundingTarget : undefined,
@@ -2347,6 +2371,24 @@ export default function POS() {
             </Button>
           </div>
           <Button type="button" variant="ghost" onClick={() => setBurgerProduct(null)}>Bekor qilish</Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(teaProduct)} onOpenChange={(open) => !open && setTeaProduct(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{teaProduct?.name}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Stakan yoki choynik tanlang</p>
+          <div className="grid gap-3">
+            <Button type="button" variant="outline" className="h-auto min-h-20 justify-between gap-3 rounded-xl px-4 py-4"
+              disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveTeaChoice('cup')}>
+              <span className="text-base font-semibold">Stakan</span>
+              <span>{formatUZS(teaServingPrice(teaProduct?.price || 0, 'cup'))}</span>
+            </Button>
+            <Button type="button" className="h-auto min-h-20 justify-between gap-3 rounded-xl px-4 py-4"
+              disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveTeaChoice('pot')}>
+              <span className="text-base font-semibold">Choynik</span><span>{formatUZS(teaProduct?.price || 0)}</span>
+            </Button>
+          </div>
+          <Button type="button" variant="ghost" onClick={() => setTeaProduct(null)}>Bekor qilish</Button>
         </DialogContent>
       </Dialog>
       <Dialog open={Boolean(weightProduct)} onOpenChange={(open) => !open && setWeightProduct(null)}>
