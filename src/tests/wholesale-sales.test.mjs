@@ -4,12 +4,12 @@ import { memoryBackend } from '../../tests/helpers/memory-backend.mjs';
 const endpoint = 'base44/functions/wholesaleSales/entry.ts';
 const seed = () => ({
   User: [{ id: 'owner', role: 'admin', active: true }],
-  Shop: [{ id: 'factory', name: 'Factory', location_type: 'production', active: true }, { id: 'branch', name: 'Branch', location_type: 'shop', active: true }],
+  Shop: [{ id: '6a999c5afc5d285f47ee50ad', name: 'Factory', location_type: 'production', active: true }, { id: 'branch', name: 'Branch', location_type: 'shop', active: true }],
   Product: [{ id: 'cake', name: 'Cake', source_type: 'central_produced', production_unit: 'sheet', sheet_price: 200000, price: 15000, pieces_per_sheet: 20, active: true }],
-  ProductStock: [{ id: 'stock', location_id: 'factory', product_id: 'cake', unit: 'sheet', quantity: 10 }],
+  ProductStock: [{ id: 'stock', location_id: '6a999c5afc5d285f47ee50ad', product_id: 'cake', unit: 'sheet', quantity: 10 }],
 });
 const prepare = async (f, extra = {}) => {
-  const response = await f.invoke(endpoint, { action: 'prepare', source_id: 'factory', product_id: 'cake', buyer_type: 'external', buyer_name: 'Outside shop', quantity: 0.5, payment_method: 'cash', ...extra });
+  const response = await f.invoke(endpoint, { action: 'prepare', source_id: '6a999c5afc5d285f47ee50ad', product_id: 'cake', buyer_type: 'external', buyer_name: 'Outside shop', quantity: 0.5, payment_method: 'cash', ...extra });
   assert.equal(response.status, 200, JSON.stringify(response.data));
   return response.data.sale;
 };
@@ -48,7 +48,7 @@ test('branch receives wholesale sheets through existing transfer flow exactly on
   const result = await f.invoke('base44/functions/stock-transfer/entry.ts', { action: 'receive_transfer_batch', batch_id: `wholesale-${sale.id}` });
   assert.equal(result.status, 200, JSON.stringify(result.data));
   assert.equal(f.db.ProductStock.find(s => s.location_id === 'branch').quantity, 10);
-  assert.equal(f.db.ProductStock.find(s => s.location_id === 'factory').quantity, 9.5);
+  assert.equal(f.db.ProductStock.find(s => s.location_id === '6a999c5afc5d285f47ee50ad').quantity, 9.5);
   await f.invoke('base44/functions/stock-transfer/entry.ts', { action: 'receive_transfer_batch', batch_id: `wholesale-${sale.id}` });
   assert.equal(f.db.ProductStock.find(s => s.location_id === 'branch').quantity, 10);
 });
@@ -70,7 +70,7 @@ test('piece-stock sale freezes piece deduction and receives branch pieces once',
   const result = await f.invoke('base44/functions/stock-transfer/entry.ts', { action: 'receive_transfer_batch', batch_id: `wholesale-${sale.id}` });
   assert.equal(result.status, 200, JSON.stringify(result.data));
   assert.equal(f.db.ProductStock.find(s => s.location_id === 'branch').quantity, 6);
-  assert.equal(f.db.ProductStock.find(s => s.location_id === 'factory').quantity, 18);
+  assert.equal(f.db.ProductStock.find(s => s.location_id === '6a999c5afc5d285f47ee50ad').quantity, 18);
 });
 
 test('whole tort uses dona price, whole quantities, and dona branch receipt', async () => {
@@ -87,7 +87,7 @@ test('whole tort uses dona price, whole quantities, and dona branch receipt', as
   const r = await f.invoke('base44/functions/stock-transfer/entry.ts', { action: 'receive_transfer_batch', batch_id: `wholesale-${sale.id}` });
   assert.equal(r.status, 200, JSON.stringify(r.data));
   assert.equal(f.db.ProductStock.find(s => s.location_id === 'branch').quantity, 2);
-  const half = await f.invoke(endpoint, { action: 'prepare', source_id: 'factory', product_id: 'cake', quantity: 0.5, buyer_type: 'external', buyer_name: 'Shop', payment_method: 'cash' });
+  const half = await f.invoke(endpoint, { action: 'prepare', source_id: '6a999c5afc5d285f47ee50ad', product_id: 'cake', quantity: 0.5, buyer_type: 'external', buyer_name: 'Shop', payment_method: 'cash' });
   assert.equal(half.status, 400);
   assert.equal(f.db.WholesaleSale.length, 1);
 });
@@ -131,19 +131,19 @@ test('draft cancellation never changes inventory', async () => {
 test('price and quantity validation fails before any write', async () => {
   for (const changes of [{ quantity: 0.25 }, { quantity: -1 }, { quantity: 10001 }]) {
     const f = memoryBackend(seed());
-    const r = await f.invoke(endpoint, { action: 'prepare', source_id: 'factory', product_id: 'cake', buyer_type: 'external', buyer_name: 'Shop', payment_method: 'cash', ...changes });
+    const r = await f.invoke(endpoint, { action: 'prepare', source_id: '6a999c5afc5d285f47ee50ad', product_id: 'cake', buyer_type: 'external', buyer_name: 'Shop', payment_method: 'cash', ...changes });
     assert.equal(r.status, 400); assert.equal(f.calls.length, 0);
   }
   const data = seed(); delete data.Product[0].sheet_price;
   const f = memoryBackend(data);
-  const r = await f.invoke(endpoint, { action: 'prepare', source_id: 'factory', product_id: 'cake', quantity: 1, buyer_type: 'external', buyer_name: 'Shop', payment_method: 'cash' });
+  const r = await f.invoke(endpoint, { action: 'prepare', source_id: '6a999c5afc5d285f47ee50ad', product_id: 'cake', quantity: 1, buyer_type: 'external', buyer_name: 'Shop', payment_method: 'cash' });
   assert.equal(r.status, 400); assert.equal(f.calls.length, 0);
 });
 test('cashier cannot sell and production staff cannot choose another source', async () => {
-  for (const actor of [{ role: 'cashier', shop_id: 'factory' }, { role: 'production', shop_id: 'other' }]) {
+  for (const actor of [{ role: 'cashier', shop_id: '6a999c5afc5d285f47ee50ad' }, { role: 'production', shop_id: 'other' }]) {
     const data = seed(); Object.assign(data.User[0], actor);
     const f = memoryBackend(data);
-    const r = await f.invoke(endpoint, { action: 'prepare', source_id: 'factory' });
+    const r = await f.invoke(endpoint, { action: 'prepare', source_id: '6a999c5afc5d285f47ee50ad' });
     assert.equal(r.status, 403); assert.equal(f.calls.length, 0);
   }
 });
