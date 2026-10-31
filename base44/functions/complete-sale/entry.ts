@@ -1592,6 +1592,32 @@ export default async function(req) {
       }, { status: 400 });
     }
 
+    const receivedAt = new Date().toISOString();
+    const soldAt = idempotencyKey
+      ? resolveSoldAt(body?.recorded_at, shift, receivedAt)
+      : receivedAt;
+
+    // A Central backlog shares the service-token write limit with live tills.
+    // Reserve a paced slot BEFORE any payment claim, stock or financial write.
+    // Current online checkouts and acknowledged replays do not use this gate.
+    if (shift.shop_id === '6a96f0a4ecc85c2fc57f3173' && idempotencyKey
+      && !tableOrder && Date.parse(receivedAt) - Date.parse(soldAt) > 60000) {
+      const nowMs = Date.parse(receivedAt);
+      const resumeMs = Number(shift.checkout_queue_resume_ms || 0);
+      const throttled = (retryMs: number) => Response.json({
+        error: 'Oldingi savdolar server chegarasiga mos tezlikda yuborilmoqda. Avtomatik davom etadi.',
+        retry_after_ms: Math.max(1000, retryMs),
+      }, { status: 429 });
+      if (resumeMs > nowMs) return throttled(resumeMs - nowMs);
+      const gapMs = Math.max(20000, (stockPlans.length + ingredientPrep.plans.length + 6) * 3000);
+      const slot = await service.entities.Shift.updateMany({
+        id: shift.id, status: 'open',
+        $or: [{ checkout_queue_resume_ms: { $exists: false } },
+          { checkout_queue_resume_ms: null }, { checkout_queue_resume_ms: { $lte: nowMs } }],
+      }, { $set: { checkout_queue_resume_ms: nowMs + gapMs } });
+      if (!slot?.success || Number(slot.updated || 0) !== 1) return throttled(gapMs);
+    }
+
     // The one-time table lock must precede any financial or stock mutations.
     if (tableOrder) {
       if (!idempotencyKey) return Response.json({ error: "Stol to‘lovi uchun takrorlanmas kalit kerak." }, { status: 400 });
@@ -1608,10 +1634,6 @@ export default async function(req) {
       tablePaymentLock = { shopId: receiptShop.id, orderId: tableOrder.id, checkoutKey: idempotencyKey };
     }
 
-    const receivedAt = new Date().toISOString();
-    const soldAt = idempotencyKey
-      ? resolveSoldAt(body?.recorded_at, shift, receivedAt)
-      : receivedAt;
     const businessDate = tashkentBusinessDate(soldAt);
     const day = businessDate.replaceAll("-", "");
     const saleNumber = saleNumberFor(idempotencyKey, soldAt);
