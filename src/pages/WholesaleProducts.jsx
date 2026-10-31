@@ -24,7 +24,7 @@ export default function WholesaleProducts() {
     return () => { live = false; };
   }, [user.id]);
   return <div className="p-4 sm:p-6 space-y-6">
-    <header><h1 className="text-2xl font-bold">Mahsulotlar</h1><p className="text-muted-foreground">Odina filiallari va tashqi do‘konlarga sotuv · narx 1 list uchun</p></header>
+    <header><h1 className="text-2xl font-bold">Mahsulotlar</h1><p className="text-muted-foreground">Odina filiallari va tashqi do‘konlarga sotuv · tortlar donada, kesma mahsulotlar listda</p></header>
     {setupError && <p role="alert" className="text-destructive">{setupError}</p>}
     {setupLoading ? <p role="status">Ombor yuklanmoqda…</p> : validSource && <p className="text-sm text-muted-foreground">Central Production Warehouse</p>}
     {!setupLoading && !validSource && <p>Central ishlab chiqarish omboriga kirish huquqi mavjud emas.</p>}
