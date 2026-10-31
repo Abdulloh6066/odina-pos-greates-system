@@ -6,14 +6,14 @@ export function sheetQuote(product, quantity, buyerType) {
   const price = Number(product?.sheet_price);
   const factor = Number(product?.pieces_per_sheet);
   if (!product || product.active === false || product.archived === true || product.track_stock === false
-    || product.production_unit !== 'sheet' || product.source_type !== 'central_produced' || product.sale_unit === 'gram') {
+    || !['piece', 'sheet'].includes(product.production_unit || 'piece') || product.source_type !== 'central_produced' || product.sale_unit === 'gram') {
     throw wholesaleError('Faqat ishlab chiqarishdagi list mahsulotini sotish mumkin.');
   }
   if (!Number.isFinite(amount) || amount < 0.5 || amount > 10000 || !Number.isInteger(amount * 2)) {
     throw wholesaleError('Miqdor 0.5 list qadamida, 0.5 dan 10 000 gacha bo‘lsin.');
   }
   if (!Number.isSafeInteger(price) || price <= 0) throw wholesaleError('Mahsulotning 1 list narxini avval 3D + bo‘limida belgilang.');
-  if (buyerType === 'branch' && (!Number.isSafeInteger(factor) || factor < 1 || !Number.isSafeInteger(amount * factor))) {
+  if (!Number.isSafeInteger(factor) || factor < 1 || (buyerType === 'branch' && !Number.isSafeInteger(amount * factor))) {
     throw wholesaleError('Filial uchun listdan dona hisobiga o‘tish sozlamasi noto‘g‘ri.');
   }
   const total = Math.round(amount * price);
