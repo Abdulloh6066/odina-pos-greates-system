@@ -34,7 +34,8 @@
     "unit": {
       "type": "string",
       "enum": [
-        "sheet"
+        "sheet",
+        "piece"
       ]
     },
     "unit_price": {
