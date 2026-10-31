@@ -5,6 +5,7 @@ import { AlertTriangle, Archive, ArrowRightLeft, BookOpen, Boxes, ChefHat, Clipb
 import { base44 } from '@/api/base44Client';
 import { odinaAlert } from '@/lib/odina-dialog';
 import { formatNum } from '@/lib/pos';
+import { formatInventoryQuantity } from '@/lib/stock-quantity';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PageHeader from '@/components/PageHeader';
 import { WarehouseHistoryTable } from '@/components/warehouse/WarehouseTables';
@@ -626,7 +627,7 @@ function StockGrid({ items, stockMap, kind, location, onAdjust, modernView = fal
             return <tr key={item.id}>
               <td data-label="Nomi" className="inventory-name"><strong>{item.name}</strong></td>
               {kind === 'ingredient' && <td data-label="Turi" className="inventory-category">{INGREDIENT_CATEGORY_LABELS[item.category] || item.category}</td>}
-              <td data-label="Qoldiq" className="warehouse-number">{formatNum(quantity)}</td>
+              <td data-label="Qoldiq" className="warehouse-number">{formatInventoryQuantity(quantity)}</td>
               <td data-label="Birlik" className="inventory-unit">{UNIT_LABELS[unit] || unit}</td>
               <td data-label="Holati"><span className={`warehouse-status ${quantity > 0 ? 'bg-emerald-50 text-emerald-700' : quantity < 0 ? 'bg-red-50 text-destructive' : 'bg-secondary text-muted-foreground'}`}>{quantity > 0 ? 'Mavjud' : quantity < 0 ? 'Manfiy qoldiq' : 'Qoldiq yo‘q'}</span></td>
               {onAdjust && <td data-label="Amal" className="inventory-action"><Button type="button" variant="outline" onClick={() => onAdjust(item)} aria-label={item.name + ' — qoldiqni tuzatish'}><PackagePlus className="w-4 h-4 shrink-0" aria-hidden="true" /> Tuzatish</Button></td>}
@@ -650,7 +651,7 @@ function StockGrid({ items, stockMap, kind, location, onAdjust, modernView = fal
                 </p>
               </div>
               <div className={`rounded-xl px-3 py-1.5 text-right ${quantity > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>
-                <p className="text-lg font-semibold leading-none">{formatNum(quantity)}</p>
+                <p className="text-lg font-semibold leading-none">{formatInventoryQuantity(quantity)}</p>
                 <p className="text-[10px] mt-1">{UNIT_LABELS[unit] || unit}</p>
               </div>
             </div>
@@ -685,11 +686,11 @@ function HistoryList({ movements, modernView = false }) {
                 <p className="text-xs text-muted-foreground">{MOVEMENT_LABELS[movement.movement_type] || movement.movement_type} · {movement.reason}</p>
               </div>
               <p className={`font-semibold ${movement.quantity_change > 0 ? 'text-emerald-700' : 'text-destructive'}`}>
-                {movement.quantity_change > 0 ? '+' : ''}{formatNum(movement.quantity_change)} {UNIT_LABELS[movement.unit] || movement.unit}
+                {movement.quantity_change > 0 ? '+' : ''}{formatInventoryQuantity(movement.quantity_change)} {UNIT_LABELS[movement.unit] || movement.unit}
               </p>
             </div>
             <div className="text-xs text-muted-foreground mt-2">
-              {formatNum(movement.balance_before)} → {formatNum(movement.balance_after)} · {movement.user_name} · {formatUzbekistanDateTime(movement.created_at || movement.created_date)}
+              {formatInventoryQuantity(movement.balance_before)} → {formatInventoryQuantity(movement.balance_after)} · {movement.user_name} · {formatUzbekistanDateTime(movement.created_at || movement.created_date)}
             </div>
           </div>
         </div>
@@ -899,7 +900,7 @@ function AdjustStockDialog({ open, item, kind, location, current, onClose, onSav
           </div>
           <div className="rounded-xl bg-secondary/60 p-3 text-sm flex items-center justify-between">
             <span className="text-muted-foreground">O‘zgarishdan keyingi qoldiq</span>
-            <span className={`font-semibold ${after < 0 ? 'text-destructive' : ''}`}>{formatNum(after)} {unitLabel}</span>
+            <span className={`font-semibold ${after < 0 ? 'text-destructive' : ''}`}>{formatInventoryQuantity(after)} {unitLabel}</span>
           </div>
         </div>
         <DialogFooter>
