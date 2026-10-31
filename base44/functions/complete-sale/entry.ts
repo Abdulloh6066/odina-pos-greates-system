@@ -213,7 +213,16 @@ async function stockPolicy(service: any) {
 async function planSaleStock(service: any, shopId: string, items: any[]) {
   const plans = [];
   const shortages = [];
-  const trackedItems = items.filter((row) => row.stock_tracked);
+  // Serving variants share one finished-product balance. Combine them before
+  // compare-and-set writes, while retaining each line's own receipt snapshot.
+  const trackedByProduct = new Map<string, any>();
+  for (const item of items.filter((row) => row.stock_tracked)) {
+    item.stock_location_id = shopId;
+    const combined = trackedByProduct.get(item.product_id);
+    if (combined) combined.quantity += item.quantity;
+    else trackedByProduct.set(item.product_id, { ...item });
+  }
+  const trackedItems = [...trackedByProduct.values()];
   const stockRows = await Promise.all(trackedItems.map((item) =>
     service.entities.ProductStock.filter({
       location_id: shopId,
