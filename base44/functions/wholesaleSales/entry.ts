@@ -63,8 +63,12 @@ export default async function(req) {
         ...(search ? { name: { $regex: search, $options: 'i' } } : {}),
       }, { sort: 'name', limit: 30, ...(body.cursor ? { cursor: String(body.cursor) } : {}) });
       const stocks = page.items.length ? await entities.ProductStock.filter({ location_id: source.id, product_id: { $in: page.items.map(p => p.id) } }, 'id', 100) : [];
-      return Response.json({ ...page, items: page.items.map(p => ({ id: p.id, name: p.name, image_url: p.image_url, sheet_price: p.sheet_price, production_unit: p.production_unit, list_ready: p.production_unit === 'sheet' && p.source_type === 'central_produced',
-        stock_quantity: stocks.filter(s => s.product_id === p.id).length === 1 ? Number(stocks.find(s => s.product_id === p.id && s.unit === 'sheet')?.quantity || 0) : 0 })) });
+      return Response.json({ ...page, items: page.items.map(p => ({ id: p.id, name: p.name, image_url: p.image_url, sheet_price: p.sheet_price, production_unit: p.production_unit, pieces_per_sheet: p.pieces_per_sheet,
+        list_ready: Number.isSafeInteger(p.pieces_per_sheet) && p.pieces_per_sheet > 0 && p.source_type === 'central_produced',
+        stock_quantity: stocks.filter(s => s.product_id === p.id).length === 1 ? (() => {
+          const stock = stocks.find(s => s.product_id === p.id);
+          return stock.unit === 'sheet' ? Number(stock.quantity || 0) : stock.unit === 'piece' && p.pieces_per_sheet > 0 ? Number(stock.quantity || 0) / p.pieces_per_sheet : 0;
+        })() : 0 })) });
     }
     if (body.action === 'history') {
       const page = await entities.WholesaleSale.filter({ source_id: source.id, ...(user.role === 'admin' ? {} : { seller_id: user.id }) },
@@ -83,10 +87,13 @@ export default async function(req) {
       }
       if (!buyerName || buyerName.length > 120) throw wholesaleError('Do‘kon nomini kiriting (120 belgigacha).');
       const stocks = await entities.ProductStock.filter({ location_id: source.id, product_id: product.id }, 'id', 2);
-      if (stocks.length !== 1 || stocks[0].unit !== 'sheet' || Number(stocks[0].quantity) < quote.quantity) throw wholesaleError('Omborda yetarli list yo‘q.', 409);
+      if (stocks.length !== 1 || !['piece', 'sheet'].includes(stocks[0].unit)) throw wholesaleError('Ombor qoldig‘i topilmadi.', 409);
+      const stockUnit = stocks[0].unit;
+      const stockQuantity = quote.quantity * (stockUnit === 'piece' ? quote.conversion_factor : 1);
+      if (Number(stocks[0].quantity) < stockQuantity) throw wholesaleError('Omborda yetarli list yo‘q.', 409);
       const sale = await entities.WholesaleSale.create({ source_id: source.id, source_name: source.name,
         buyer_type: body.buyer_type, buyer_id: buyerId, buyer_name: buyerName, product_id: product.id, product_name: product.name,
-        ...quote, payment_method: body.payment_method, seller_id: user.id, seller_name: userLabel(user), status: 'draft', lock_token: '', lock_until: '' });
+        ...quote, stock_unit: stockUnit, stock_quantity: stockQuantity, payment_method: body.payment_method, seller_id: user.id, seller_name: userLabel(user), status: 'draft', lock_token: '', lock_until: '' });
       return Response.json({ sale: publicSale(sale) });
     }
     return Response.json({ error: 'Noma’lum amal.' }, { status: 400 });
