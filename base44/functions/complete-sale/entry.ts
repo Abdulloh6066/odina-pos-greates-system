@@ -39,7 +39,9 @@ import {
 import { loadIngredientCosts, recipeCostFromMap, costPerPiece, num } from "../../shared/cost-engine.ts";
 import { createCheckoutRecipeLoader, type CheckoutRecipeLoader } from "../../shared/checkout-recipes.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
-import { validateFriesOption, saleLineKey, friesOptionFields, friesSurcharge, burgerOptionName, costWithBurgerFries, FRIES_INGREDIENT_ID } from "../../shared/burger-fries.js";
+import { validateFriesOption, friesSurcharge, burgerOptionName, costWithBurgerFries, FRIES_INGREDIENT_ID } from "../../shared/burger-fries.js";
+import { saleLineKey, saleOptionFields } from "../../shared/sale-options.js";
+import { validateTeaOption, teaServingPrice, teaOptionName } from "../../shared/tea-options.js";
 import {
   prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
 } from "../../shared/sale-ingredient-flow.ts";
@@ -151,13 +153,14 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     const quantity = Number(requested?.quantity);
     const productId = String(requested?.product_id || "");
     const option = validateFriesOption(requested, shopId);
+    const teaOption = validateTeaOption(requested);
     if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) {
       throw httpError("Har bir mahsulotda to‘g‘ri dona soni bo‘lishi kerak.", 400);
     }
     const key = saleLineKey(requested);
     const combined = (requestedLines.get(key)?.quantity || 0) + quantity;
     if (!Number.isSafeInteger(combined) || combined > 1000000) throw httpError("Mahsulot miqdori chegaradan oshdi.", 400);
-    requestedLines.set(key, { product_id: productId, quantity: combined, ...friesOptionFields({ fries_option: option }) });
+    requestedLines.set(key, { product_id: productId, quantity: combined, ...saleOptionFields({ fries_option: option, tea_option: teaOption }) });
   }
   const entries = [...requestedLines.values()];
   const savedItems = entries.map((row) =>
@@ -178,7 +181,7 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
       throw httpError("Bu mahsulot ushbu do‘konda sotilmaydi.", 403);
     }
     if (!savedItem) productsAtSale?.set(productId, product);
-    const unitPrice = savedItem ? savedItem.price : money(priceForShop(product, shopId)) + friesSurcharge(row);
+    const unitPrice = savedItem ? savedItem.price : teaServingPrice(money(priceForShop(product, shopId)), row.tea_option) + friesSurcharge(row);
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
     }
@@ -186,8 +189,8 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     const tracked = saleUnit !== "gram" && (product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false);
     normalizedItems.push({
       product_id: product.id || product.product_id,
-      product_name: savedItem ? savedItem.product_name : burgerOptionName(product.name, row.fries_option),
-      ...friesOptionFields(savedItem || row),
+      product_name: savedItem ? savedItem.product_name : teaOptionName(burgerOptionName(product.name, row.fries_option), row.tea_option),
+      ...saleOptionFields(savedItem || row),
       image_url: product.image_url || "",
       price: unitPrice,
       sale_unit: saleUnit,
@@ -348,7 +351,8 @@ function canonicalSaleRequest(body: any) {
     const quantity = Math.floor(Number(item?.quantity));
     quantities.set(key, { product_id: productId,
       quantity: (quantities.get(key)?.quantity || 0) + quantity,
-      ...(item?.fries_option === "with" ? { fries_option: "with" } : {}) });
+      ...(item?.fries_option === "with" ? { fries_option: "with" } : {}),
+      ...(item?.tea_option === "cup" ? { tea_option: "cup" } : {}) });
   }
   const items = Array.from(quantities.values())
     .sort((left, right) => saleLineKey(left).localeCompare(saleLineKey(right)));
@@ -1806,7 +1810,7 @@ export default async function(req) {
         stock_location_id: item.stock_location_id || undefined,
         stock_quantity_change: item.stock_quantity_change,
         product_name_snapshot: item.product_name,
-        ...friesOptionFields(item),
+        ...saleOptionFields(item),
         image_url_snapshot: item.image_url,
         quantity: item.quantity,
         unit_price: item.price,
