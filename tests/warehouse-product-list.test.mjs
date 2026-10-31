@@ -142,8 +142,7 @@ test('single-store and All-store product lists apply each store visibility indep
     assert.ok(content.includes('Central uchun tort'));
     await f.selectLocation('all');
     const overview = f.tree.root.findByProps({ 'aria-label': 'Barcha omborlar qoldig‘i' });
-    const section = name => overview.findAllByType('section').find(node =>
-      node.findAllByType('h2').some(heading => text(heading) === name));
+    const section = name => overview.findAllByType('h2').find(heading => text(heading) === name)?.parent;
     assert.ok(!text(section('Markaziy ombor')).includes('Ananas smuzi'));
     assert.ok(!text(section('Markaziy ombor')).includes('10 ming som'));
     assert.ok(text(section('Odina Branch')).includes('Ananas smuzi'));
