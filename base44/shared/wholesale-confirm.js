@@ -2,7 +2,7 @@ import { wholesaleError } from './wholesale-logic.js';
 
 const getStock = async (entities, sale) => {
   const stocks = await entities.ProductStock.filter({ location_id: sale.source_id, product_id: sale.product_id }, 'id', 2);
-  if (stocks.length !== 1 || stocks[0].unit !== 'sheet') throw wholesaleError('List qoldig‘i topilmadi yoki takrorlangan.', 409);
+  if (stocks.length !== 1 || stocks[0].unit !== (sale.stock_unit || 'sheet')) throw wholesaleError('List qoldig‘i topilmadi yoki takrorlangan.', 409);
   return stocks[0];
 };
 const changed = result => result?.success && Number(result.updated) === 1;
@@ -11,8 +11,10 @@ export async function confirmWholesale(entities, sale) {
   if (sale.status === 'completed') return sale;
   if (!['draft', 'processing'].includes(sale.status)) throw wholesaleError('Bu hujjat tasdiqlanmaydi.', 409);
   if (sale.lock_token && Date.parse(sale.lock_until) > Date.now()) throw wholesaleError('Savdo tekshirilmoqda. Qayta pul olmang; bir necha daqiqadan keyin shu hujjatni qayta tekshiring.', 409);
+  const stockQuantity = sale.stock_quantity ?? sale.quantity;
+  if (!Number.isFinite(stockQuantity) || stockQuantity <= 0) throw wholesaleError('Ombor miqdori noto‘g‘ri.', 409);
   let stock = await getStock(entities, sale);
-  if (!stock.wholesale_applied?.includes(sale.id) && Number(stock.quantity) < sale.quantity) throw wholesaleError('Omborda yetarli list qolmagan.', 409);
+  if (!stock.wholesale_applied?.includes(sale.id) && Number(stock.quantity) < stockQuantity) throw wholesaleError('Omborda yetarli list qolmagan.', 409);
   const token = crypto.randomUUID();
   const lockFilter = { id: sale.id, status: sale.status, ...(sale.lock_token ? { lock_token: sale.lock_token, lock_until: sale.lock_until } : { lock_token: { $in: ['', null] } }) };
   const acquired = await entities.WholesaleSale.updateMany(lockFilter, { $set: { status: 'processing', lock_token: token, lock_until: new Date(Date.now() + 360000).toISOString() } });
@@ -27,11 +29,11 @@ export async function confirmWholesale(entities, sale) {
   for (let pass = 0; pass < 4; pass++) {
     stock = await getStock(entities, sale);
     if (stock.wholesale_applied?.includes(sale.id)) break;
-    const before = Number(stock.quantity), after = before - sale.quantity;
+    const before = Number(stock.quantity), after = before - stockQuantity;
     if (after < 0) throw wholesaleError('Qoldiq boshqa savdoda o‘zgargan. Shu hujjatni keyin qayta tekshiring.', 409);
     await patch({ stock_id: stock.id, balance_before: before, balance_after: after });
     const result = await entities.ProductStock.updateMany({ id: stock.id, quantity: before, wholesale_applied: { $ne: sale.id } }, {
-      $inc: { quantity: -sale.quantity }, $push: { wholesale_applied: sale.id },
+      $inc: { quantity: -stockQuantity }, $push: { wholesale_applied: sale.id },
       $set: { updated_at: new Date().toISOString(), updated_by: sale.seller_id, updated_by_name: sale.seller_name },
     });
     if (changed(result)) break;
@@ -45,8 +47,8 @@ export async function confirmWholesale(entities, sale) {
   if (movements.length > 1) throw wholesaleError('Takroriy harakat: administrator tekshirsin.', 409);
   if (!movements.length) await entities.StockMovement.create({
     movement_number: movementNumber, location_id: sale.source_id, location_name: sale.source_name,
-    item_kind: 'product', item_id: sale.product_id, item_name: sale.product_name, unit: 'sheet', movement_type: 'sale',
-    quantity_change: -sale.quantity, balance_before: sale.balance_before, balance_after: sale.balance_after,
+    item_kind: 'product', item_id: sale.product_id, item_name: sale.product_name, unit: sale.stock_unit || 'sheet', movement_type: 'sale',
+    quantity_change: -stockQuantity, balance_before: sale.balance_before, balance_after: sale.balance_after,
     reason: `${sale.buyer_name}: list savdosi`, reference_id: sale.id, reference_type: 'wholesale_sale',
     user_id: sale.seller_id, user_name: sale.seller_name, created_at: now,
   });
