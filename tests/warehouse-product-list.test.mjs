@@ -111,6 +111,66 @@ test('stock formatting preserves halves and base-unit decimals without rounding 
   assert.equal(stockFormatting.formatInventoryQuantity(20), '20');
 });
 
+
+test('production inventory excludes drinks and charges while keeping cakes sold in either store', async () => {
+  const f = await fixture();
+  try {
+    await f.products();
+    const content = text(f.tree.toJSON());
+    assert.ok(content.includes('Snikers oq'));
+    assert.ok(content.includes('Matilda list'));
+    assert.ok(content.includes('Branch uchun tort'));
+    assert.ok(content.includes('Central uchun tort'));
+    assert.ok(!content.includes('Ananas smuzi'));
+    assert.ok(!content.includes('10 ming som'));
+  } finally { await f.close(); }
+});
+
+test('single-store and All-store product lists apply each store visibility independently', async () => {
+  const f = await fixture();
+  try {
+    await f.products();
+    await f.selectLocation('branch');
+    let content = text(f.tree.toJSON());
+    assert.ok(content.includes('Ananas smuzi'));
+    assert.ok(content.includes('Branch uchun tort'));
+    assert.ok(!content.includes('Central uchun tort'));
+    await f.selectLocation('retail-central');
+    content = text(f.tree.toJSON());
+    assert.ok(!content.includes('Ananas smuzi'));
+    assert.ok(!content.includes('Branch uchun tort'));
+    assert.ok(content.includes('Central uchun tort'));
+    await f.selectLocation('all');
+    const overview = f.tree.root.findByProps({ 'aria-label': 'Barcha omborlar qoldig‘i' });
+    const section = name => overview.findAllByType('section').find(node =>
+      node.findAllByType('h2').some(heading => text(heading) === name));
+    assert.ok(!text(section('Markaziy ombor')).includes('Ananas smuzi'));
+    assert.ok(!text(section('Markaziy ombor')).includes('10 ming som'));
+    assert.ok(text(section('Odina Branch')).includes('Ananas smuzi'));
+    assert.ok(!text(section('Odina Central')).includes('Ananas smuzi'));
+    assert.ok(!text(section('Odina Branch')).includes('Central uchun tort'));
+    assert.equal(overview.findAllByType('button').length, 0);
+    assert.equal(f.writes.length, 0);
+  } finally { await f.close(); }
+});
+
+test('production category fallback preserves bakery cards and rejects misclassified retail items', () => {
+  const rows = [
+    { id: 'cake', name: 'Snikers', category_name: 'Aralash', available_shop_ids: ['branch'] },
+    { id: 'tart', name: 'Tart', category_name: 'mini:tart' },
+    { id: 'charge', name: '5 Ming som', category_name: 'Qoshimcha' },
+    { id: 'drink', name: 'Amerikano', category_name: 'Kofe/issiq', source_type: 'central_produced' },
+    { id: 'prepared', name: 'Shop cake', category_name: 'Aralash', source_type: 'shop_prepared' },
+    { id: 'archived', category_name: 'Tortlar', archived: true },
+    { id: 'inactive', category_name: 'Tortlar', active: false },
+    { id: 'untracked', category_name: 'Tortlar', track_stock: false },
+    { id: 'unknown', category_name: 'Other' },
+  ];
+  const location = { id: 'factory', location_type: 'production' };
+  assert.deepEqual(warehouseProducts.warehouseProductsForLocation(rows, [], location).map(row => row.id), ['cake', 'tart']);
+  assert.deepEqual(warehouseProducts.warehouseProductsForLocation(rows, [], location, 'snik').map(row => row.id), ['cake']);
+});
+
 test('warehouse products always use a list and retain dona/list and half balances', async () => {
   const f = await fixture();
   try {
