@@ -6,7 +6,7 @@ import {
   ReceiptText, Settings, Shield, ShieldCheck, ShoppingCart, Tags, Ticket, Trash2, Truck, Users, WalletCards, Warehouse, TrendingUp, ClipboardCheck, FileSpreadsheet,
 } from 'lucide-react';
 import OdinaBrand from '@/components/brand/OdinaBrand';
-import { MENU_ITEMS, canAccess } from '@/lib/pos';
+import { MENU_ITEMS, canAccess, canUseWholesaleWorkspace } from '@/lib/pos';
 import { useAuth } from '@/lib/AuthContext';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ScreenLaunchButton from '@/components/screens/ScreenLaunchButton';
@@ -48,6 +48,7 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
   const warehouseWorkspace = scopedLocation?.location_type === 'production'
     || scopedLocation?.allows_pos === false;
   const items = MENU_ITEMS.filter((item) => canAccess(role, item.key)
+    && (item.key !== 'wholesale' || canUseWholesaleWorkspace(user, adminShopScope))
     && !(warehouseWorkspace && ['pos', 'sales', 'cashouts', 'recipients'].includes(item.key)));
   const hasKassa = items.some((item) => item.key === 'pos');
   const kassaChildren = hasKassa ? items.filter((item) => KASSA_CHILD_KEYS.includes(item.key)) : [];
