@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   buildPendingSale,
   isRetryableSyncError,
+  syncRetryDelay,
   saleNumberFromKey,
   tashkentDateKey,
 } from '../src/lib/offline-sales.js';
@@ -81,6 +82,15 @@ test('only connection and temporary server failures are retryable', () => {
   assert.equal(isRetryableSyncError({ response: { status: 503 } }), true);
   assert.equal(isRetryableSyncError({ response: { status: 409 } }), false);
   assert.equal(isRetryableSyncError({ response: { status: 400 } }), false);
+});
+
+test('server pacing hints override exhausted queue backoff without changing session recovery', () => {
+  const paced = { response: { status: 429, data: { retry_after_ms: 22000 } } };
+  assert.equal(syncRetryDelay(paced, 20), 22250);
+  assert.equal(syncRetryDelay({ response: { status: 429, data: { retry_after_ms: 9999999 } } }), 600000);
+  assert.equal(syncRetryDelay({ response: { status: 429, data: { retry_after_ms: -1 } } }, 1), 10000);
+  assert.equal(syncRetryDelay({ response: { status: 503, data: { retry_after_ms: 22000 } } }, 0), 5000);
+  assert.equal(syncRetryDelay({ response: { status: 401, data: { retry_after_ms: 1000 } } }), 60000);
 });
 
 test('queue persists in IndexedDB and uses a cross-tab sync lock', () => {
