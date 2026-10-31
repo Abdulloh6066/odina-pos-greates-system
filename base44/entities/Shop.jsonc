@@ -244,6 +244,14 @@
                     "without"
                   ],
                   "description": "Burger fri tanlovi; eski savdolarda bo‘sh qoladi"
+                },
+                "tea_option": {
+                  "type": "string",
+                  "enum": [
+                    "cup",
+                    "pot"
+                  ],
+                  "description": "Choy: stakan yoki choynik. Eski savdolarda tanlov bo‘sh qoladi."
                 }
               },
               "required": [
