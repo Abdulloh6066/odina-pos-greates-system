@@ -63,6 +63,14 @@ export function formatUZS(n) {
   return formatNum(n) + ' UZS';
 }
 
+export function canUseWholesaleWorkspace(user, scope) {
+  if (!user || user.active === false) return false;
+  const centralId = '6a999c5afc5d285f47ee50ad';
+  return user.role === 'admin'
+    ? Boolean(scope?.ready && scope.specificShopId === centralId)
+    : user.role === 'production' && user.shop_id === centralId;
+}
+
 export function canAccess(role, key) {
   return (ROLE_MENU[role] || []).includes(key);
 }
