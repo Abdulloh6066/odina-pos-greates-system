@@ -365,6 +365,16 @@ export function isRetryableSyncError(error) {
   return !status || status === 408 || status === 429 || status >= 500;
 }
 
+export function syncRetryDelay(error, attempts = 0) {
+  const status = Number(error?.response?.status || error?.status || 0);
+  if (status === 401 || status === 403) return 60000;
+  const retryAfter = Number(error?.response?.data?.retry_after_ms ?? error?.data?.retry_after_ms);
+  if (status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(600000, Math.max(1000, retryAfter + 250));
+  }
+  return Math.min(60000, 5000 * (2 ** Math.min(Number(attempts || 0), 4)));
+}
+
 async function withSyncLock(work) {
   if (typeof navigator !== 'undefined' && navigator.locks?.request) {
     return navigator.locks.request(
@@ -461,7 +471,7 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
         const sessionBlocked = status === 401 || status === 403;
         const retryable = isRetryableSyncError(error) || sessionBlocked;
         const message = syncErrorMessage(error);
-        const delay = sessionBlocked ? 60000 : Math.min(60000, 5000 * (2 ** Math.min(Number(record.attempts || 0), 4)));
+        const delay = syncRetryDelay(error, record.attempts);
         await storage.update(record.id, {
           status: retryable ? 'pending' : 'failed',
           last_error: message,
