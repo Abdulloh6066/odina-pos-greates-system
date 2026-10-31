@@ -8,6 +8,7 @@ import React from 'react';
 import { create, act } from 'react-test-renderer';
 import * as quantities from '../base44/shared/product-stock-quantity.js';
 import * as stockFormatting from '../src/lib/stock-quantity.js';
+import * as warehouseProducts from '../src/lib/warehouse-products.js';
 
 const text = node => typeof node === 'string' || typeof node === 'number' ? String(node)
   : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
@@ -18,9 +19,22 @@ async function fixture() {
   let tab = 'ingredients';
   const writes = [];
   const shop = { id: 'central', name: 'Markaziy ombor', active: true, location_type: 'production' };
+  const locations = [shop,
+    { id: 'branch', name: 'Odina Branch', active: true, location_type: 'shop' },
+    { id: 'retail-central', name: 'Odina Central', active: true, location_type: 'shop' },
+  ];
+  const categories = [
+    { id: 'cakes', name: 'Aralash' },
+    { id: 'drinks', name: 'Milkshake&Smuzi', hidden_shop_ids: ['retail-central'] },
+    { id: 'extras', name: 'Qoshimcha' },
+  ];
   const products = [
-    { id: 'snikers', name: 'Snikers oq', active: true, production_unit: 'piece' },
-    { id: 'sheet', name: 'Matilda list', active: true, production_unit: 'sheet' },
+    { id: 'snikers', name: 'Snikers oq', category_id: 'cakes', active: true, production_unit: 'piece' },
+    { id: 'sheet', name: 'Matilda list', category_id: 'cakes', active: true, production_unit: 'sheet' },
+    { id: 'drink', name: 'Ananas smuzi', category_id: 'drinks', source_type: 'shop_prepared', active: true },
+    { id: 'extra', name: '10 ming som', category_id: 'extras', source_type: 'central_produced', active: true },
+    { id: 'branch-cake', name: 'Branch uchun tort', category_id: 'cakes', available_shop_ids: ['branch'], active: true },
+    { id: 'central-cake', name: 'Central uchun tort', category_id: 'cakes', available_shop_ids: ['retail-central'], active: true },
   ];
   const balances = [
     { id: 'stock-snikers', location_id: shop.id, product_id: 'snikers', quantity: 10.5, unit: 'piece' },
@@ -29,10 +43,10 @@ async function fixture() {
   const outlet = {
     user: { id: 'owner', role: 'admin', shop_id: shop.id },
     adminShopScope: { isAdmin: true, ready: true, shopId: shop.id, specificShopId: shop.id,
-      shops: [shop], registerGuard: () => () => {}, selectShop() {} },
+      shops: locations, registerGuard: () => () => {}, selectShop() {} },
   };
   const backend = { entities: new Proxy({}, { get: (_target, name) => ({
-    list: async () => name === 'Shop' ? [shop] : name === 'Product' ? products
+    list: async () => name === 'Shop' ? locations : name === 'Category' ? categories : name === 'Product' ? products
       : name === 'ProductStock' ? balances.map(row => ({ ...row })) : [],
     subscribe: () => () => {},
   }) }), functions: { invoke: async (name, payload) => {
@@ -52,6 +66,7 @@ async function fixture() {
     '@/lib/odina-dialog': { odinaAlert: async message => { throw Error(message); } },
     '@/lib/pos': { formatNum: value => String(Math.round(Number(value || 0))) },
     '@/lib/stock-quantity': stockFormatting,
+    '@/lib/warehouse-products': warehouseProducts,
     '@/lib/uzbekistan-time': { formatUzbekistanDateTime: String },
     '@/lib/test-catalog-cleanup': { TEST_PRODUCT_IDS: [] },
     '@/lib/cake-layer-inventory': { isCakeLayer: item => item?.is_cake_layer === true, ingredientUnitLabel: item => item?.base_unit },
@@ -81,6 +96,9 @@ async function fixture() {
   await act(async () => { tree = create(React.createElement(Component)); });
   return { tree, writes, balances, async products() {
     tab = 'products';
+    await act(async () => tree.update(React.createElement(Component)));
+  }, async selectLocation(id) {
+    outlet.adminShopScope = { ...outlet.adminShopScope, shopId: id, specificShopId: id === 'all' ? '' : id };
     await act(async () => tree.update(React.createElement(Component)));
   }, async close() { await act(async () => tree.unmount()); } };
 }
