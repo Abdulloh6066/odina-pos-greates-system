@@ -1624,6 +1624,8 @@ export default async function(req) {
         { id: shift.id, status: "open", sale_request_keys: { $ne: idempotencyKey } },
         { $push: { sale_request_keys: idempotencyKey } },
       );
+      console.info('[Odina checkout claim]', JSON.stringify({ request_key: idempotencyKey,
+        shift_id: shift.id, success: claim?.success, updated: claim?.updated }));
       if (!claim?.success || Number(claim.updated || 0) !== 1) {
         const completedMatches = await service.entities.Sale.filter(
           { idempotency_key: idempotencyKey },
