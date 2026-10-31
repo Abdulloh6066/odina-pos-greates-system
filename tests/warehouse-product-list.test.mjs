@@ -7,6 +7,7 @@ import ts from 'typescript';
 import React from 'react';
 import { create, act } from 'react-test-renderer';
 import * as quantities from '../base44/shared/product-stock-quantity.js';
+import * as stockFormatting from '../src/lib/stock-quantity.js';
 
 const text = node => typeof node === 'string' || typeof node === 'number' ? String(node)
   : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
@@ -49,7 +50,8 @@ async function fixture() {
       useSearchParams: () => [new URLSearchParams('tab=' + tab), next => { tab = next.tab; }] },
     '@/api/base44Client': { base44: backend },
     '@/lib/odina-dialog': { odinaAlert: async message => { throw Error(message); } },
-    '@/lib/pos': { formatNum: String },
+    '@/lib/pos': { formatNum: value => String(Math.round(Number(value || 0))) },
+    '@/lib/stock-quantity': stockFormatting,
     '@/lib/uzbekistan-time': { formatUzbekistanDateTime: String },
     '@/lib/test-catalog-cleanup': { TEST_PRODUCT_IDS: [] },
     '@/lib/cake-layer-inventory': { isCakeLayer: item => item?.is_cake_layer === true, ingredientUnitLabel: item => item?.base_unit },
@@ -82,6 +84,14 @@ async function fixture() {
     await act(async () => tree.update(React.createElement(Component)));
   }, async close() { await act(async () => tree.unmount()); } };
 }
+
+test('stock formatting preserves halves and base-unit decimals without rounding them to pieces', () => {
+  assert.equal(stockFormatting.formatInventoryQuantity(10.5), '10.5');
+  assert.equal(stockFormatting.formatInventoryQuantity(0.5), '0.5');
+  assert.equal(stockFormatting.formatInventoryQuantity(1250.125), '1 250.125');
+  assert.equal(stockFormatting.formatInventoryQuantity(-0.5), '-0.5');
+  assert.equal(stockFormatting.formatInventoryQuantity(20), '20');
+});
 
 test('warehouse products always use a list and retain dona/list and half balances', async () => {
   const f = await fixture();
