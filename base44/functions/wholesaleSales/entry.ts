@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { resolveAppUser, userLabel } from '../../shared/user-helpers.ts';
-import { sheetQuote, wholesaleError } from '../../shared/wholesale-logic.js';
+import { sheetQuote, wholesaleError, wholesaleUnit } from '../../shared/wholesale-logic.js';
 import { confirmWholesale } from '../../shared/wholesale-confirm.js';
 
 const publicSale = sale => Object.fromEntries(Object.entries(sale).filter(([key]) => !['lock_token', 'lock_until'].includes(key)));
@@ -63,10 +63,11 @@ export default async function(req) {
         ...(search ? { name: { $regex: search, $options: 'i' } } : {}),
       }, { sort: 'name', limit: 30, ...(body.cursor ? { cursor: String(body.cursor) } : {}) });
       const stocks = page.items.length ? await entities.ProductStock.filter({ location_id: source.id, product_id: { $in: page.items.map(p => p.id) } }, 'id', 100) : [];
-      return Response.json({ ...page, items: page.items.map(p => ({ id: p.id, name: p.name, image_url: p.image_url, sheet_price: p.sheet_price, production_unit: p.production_unit, pieces_per_sheet: p.pieces_per_sheet,
-        list_ready: Number.isSafeInteger(p.pieces_per_sheet) && p.pieces_per_sheet > 0 && p.source_type === 'central_produced',
+      return Response.json({ ...page, items: page.items.map(p => ({ id: p.id, name: p.name, image_url: p.image_url, sheet_price: p.sheet_price, wholesale_unit: wholesaleUnit(p), unit_price: wholesaleUnit(p) === 'piece' ? p.price : p.sheet_price, production_unit: p.production_unit, pieces_per_sheet: p.pieces_per_sheet,
+        list_ready: (wholesaleUnit(p) === 'piece' || (Number.isSafeInteger(p.pieces_per_sheet) && p.pieces_per_sheet > 0)) && p.source_type === 'central_produced',
         stock_quantity: stocks.filter(s => s.product_id === p.id).length === 1 ? (() => {
           const stock = stocks.find(s => s.product_id === p.id);
+          if (wholesaleUnit(p) === 'piece') return stock.unit === 'piece' ? Number(stock.quantity || 0) : 0;
           return stock.unit === 'sheet' ? Number(stock.quantity || 0) : stock.unit === 'piece' && p.pieces_per_sheet > 0 ? Number(stock.quantity || 0) / p.pieces_per_sheet : 0;
         })() : 0 })) });
     }
@@ -89,8 +90,9 @@ export default async function(req) {
       const stocks = await entities.ProductStock.filter({ location_id: source.id, product_id: product.id }, 'id', 2);
       if (stocks.length !== 1 || !['piece', 'sheet'].includes(stocks[0].unit)) throw wholesaleError('Ombor qoldig‘i topilmadi.', 409);
       const stockUnit = stocks[0].unit;
+      if (quote.unit === 'piece' && stockUnit !== 'piece') throw wholesaleError('Dona mahsulotining ombor birligi dona bo‘lishi kerak.', 409);
       const stockQuantity = quote.quantity * (stockUnit === 'piece' ? quote.conversion_factor : 1);
-      if (Number(stocks[0].quantity) < stockQuantity) throw wholesaleError('Omborda yetarli list yo‘q.', 409);
+      if (Number(stocks[0].quantity) < stockQuantity) throw wholesaleError('Omborda yetarli mahsulot yo‘q.', 409);
       const sale = await entities.WholesaleSale.create({ source_id: source.id, source_name: source.name,
         buyer_type: body.buyer_type, buyer_id: buyerId, buyer_name: buyerName, product_id: product.id, product_name: product.name,
         ...quote, stock_unit: stockUnit, stock_quantity: stockQuantity, payment_method: body.payment_method, seller_id: user.id, seller_name: userLabel(user), status: 'draft', lock_token: '', lock_until: '' });
