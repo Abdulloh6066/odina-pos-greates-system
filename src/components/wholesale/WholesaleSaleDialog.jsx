@@ -8,6 +8,7 @@ import { formatUZS } from '@/lib/pos';
 export default function WholesaleSaleDialog({ selection, sourceId, branches, onClose, onSaved }) {
   const [sale, setSale] = useState(selection.sale || null);
   const [form, setForm] = useState({ buyer_type: 'branch', buyer_id: '', buyer_name: '', quantity: '1', payment_method: 'cash' });
+  const unitLabel = (sale?.unit || selection.product?.wholesale_unit) === 'piece' ? 'dona' : 'list';
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [uncertain, setUncertain] = useState(false);
   const act = async action => {
@@ -28,13 +29,13 @@ export default function WholesaleSaleDialog({ selection, sourceId, branches, onC
     finally { setBusy(false); }
   };
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}><DialogContent>
-    <DialogHeader><DialogTitle>{sale?.product_name || selection.product?.name} · list savdosi</DialogTitle></DialogHeader>
+    <DialogHeader><DialogTitle>{sale?.product_name || selection.product?.name} · {unitLabel} savdosi</DialogTitle></DialogHeader>
     {sale ? <div className="space-y-2">
-      <p className="font-semibold">{sale.buyer_name}</p><p>{sale.quantity} list × {formatUZS(sale.unit_price)}</p>
+      <p className="font-semibold">{sale.buyer_name}</p><p>{sale.quantity} {unitLabel} × {formatUZS(sale.unit_price)}</p>
       <p className="text-xl font-bold">Jami: {formatUZS(sale.total)}</p>
       <p>To‘lov: {sale.payment_method === 'cash' ? 'Naqd pul' : 'Bank o‘tkazmasi'}</p>
       <p className="text-sm text-muted-foreground">Faqat pul qabul qilingach tasdiqlang. Qoldiq ishlab chiqarish omboridan ayriladi.{sale.buyer_type === 'branch' ? ' Filial mahsulotni Transferlar orqali qabul qiladi.' : ''}</p>
-    </div> : <fieldset disabled={busy || uncertain}><WholesaleBuyerFields form={form} setForm={setForm} branches={branches} /></fieldset>}
+    </div> : <fieldset disabled={busy || uncertain}><WholesaleBuyerFields form={form} setForm={setForm} branches={branches} unit={selection.product?.wholesale_unit} /></fieldset>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {uncertain && <p className="text-sm">Natija noaniq. Oynani yoping va savdolar tarixidan tayyorlangan hujjatni tekshiring; yangi savdo boshlamang.</p>}
     <div className="flex flex-wrap justify-end gap-2">
