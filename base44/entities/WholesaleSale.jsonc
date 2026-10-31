@@ -74,6 +74,17 @@
     "lock_until": {
       "type": "string"
     },
+    "stock_unit": {
+      "type": "string",
+      "enum": [
+        "piece",
+        "sheet"
+      ]
+    },
+    "stock_quantity": {
+      "type": "number",
+      "minimum": 0.5
+    },
     "stock_id": {
       "type": "string"
     },
