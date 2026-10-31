@@ -101,6 +101,7 @@ export default function POS() {
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
   const [shift, setShift] = useState(null);
+  const catalogShopId = shopScope ? scopedShopId : shift?.shop_id || user?.shop_id;
   const scopedShop = shopScope?.shops?.find((row) => row.id === scopedShopId);
   const posScopeReadOnly = Boolean(shopScope && (!shopScope.ready || !scopedShopId
     || !scopedShop || scopedShop.location_type === 'production' || scopedShop.allows_pos === false
@@ -1158,7 +1159,6 @@ export default function POS() {
     setPendingDiscountCode('');
   };
 
-  const catalogShopId = shopScope ? scopedShopId : shift?.shop_id || user?.shop_id;
   const { categories: visibleCategories, products: catalogProducts } = useMemo(
     () => shopScope && !catalogShopId ? { categories, products } : catalogForShop(products, categories, catalogShopId),
     [products, categories, catalogShopId, Boolean(shopScope)],
