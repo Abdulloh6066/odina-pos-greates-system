@@ -1970,6 +1970,13 @@ export default async function(req) {
       })),
     });
   } catch (error) {
+    console.error('[Odina checkout failure]', JSON.stringify({
+      action: trackedAction, request_key: idempotencyKey, shift_id: idempotencyShiftId,
+      claim_acknowledged: idempotencyClaimed, sale_id: sale?.id || '',
+      stock_writes: stockChanges.length, payment_writes: paymentRecords.length,
+      error: error instanceof Error ? error.message : String(error),
+      status: Number((error as any)?.status || (error as any)?.response?.status || 0),
+    }));
     let rollbackSafe = true;
     for (const movement of ingredientMovementRecords) {
       try { await service.entities.StockMovement.delete(movement.id); } catch { rollbackSafe = false; }
@@ -2027,6 +2034,10 @@ export default async function(req) {
         // Preserve the original failure. A retry can be reviewed if the claim remains.
       }
     }
+
+    if (!rollbackSafe) console.error('[Odina checkout rollback incomplete]', JSON.stringify({
+      request_key: idempotencyKey, shift_id: idempotencyShiftId, sale_id: sale?.id || '',
+    }));
 
     // An uncertain payment must never reopen the table for a second charge.
     if (tablePaymentLock && rollbackSafe) {
