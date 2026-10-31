@@ -52,12 +52,18 @@ export default async function(req) {
     const source = await sourceAccess(body.source_id);
     if (body.action === 'catalog') {
       const search = String(body.search || '').trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const categories = await entities.Category.filter({}, 'name', 500);
+      const cakeCategories = new Set(['tortlar', 'aralash', '15 somlik', '18 somlik', 'mini/tart', 'pishiriqlar']);
+      const categoryIds = categories.filter(c => cakeCategories.has(String(c.name || '').trim().toLocaleLowerCase()
+        .replace(/:/g, '/').replace(/\s+/g, ' '))).map(c => c.id);
       const page = await entities.Product.filter({ active: true, archived: { $ne: true }, track_stock: { $ne: false },
-        source_type: 'central_produced', production_unit: 'sheet', sale_unit: { $ne: 'gram' },
+        category_id: { $in: categoryIds },
+        $or: [{ source_type: 'central_produced' }, { source_type: { $exists: false } }, { source_type: null }, { source_type: '' }],
+        sale_unit: { $ne: 'gram' },
         ...(search ? { name: { $regex: search, $options: 'i' } } : {}),
       }, { sort: 'name', limit: 30, ...(body.cursor ? { cursor: String(body.cursor) } : {}) });
       const stocks = page.items.length ? await entities.ProductStock.filter({ location_id: source.id, product_id: { $in: page.items.map(p => p.id) } }, 'id', 100) : [];
-      return Response.json({ ...page, items: page.items.map(p => ({ id: p.id, name: p.name, image_url: p.image_url, sheet_price: p.sheet_price,
+      return Response.json({ ...page, items: page.items.map(p => ({ id: p.id, name: p.name, image_url: p.image_url, sheet_price: p.sheet_price, production_unit: p.production_unit, list_ready: p.production_unit === 'sheet' && p.source_type === 'central_produced',
         stock_quantity: stocks.filter(s => s.product_id === p.id).length === 1 ? Number(stocks.find(s => s.product_id === p.id && s.unit === 'sheet')?.quantity || 0) : 0 })) });
     }
     if (body.action === 'history') {
