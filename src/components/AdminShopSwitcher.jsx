@@ -12,7 +12,7 @@ const SHARED_NOTES = {
 };
 
 export default function AdminShopSwitcher({ scope, pathname = '' }) {
-  if (!scope?.isAdmin) return null;
+  if (!scope?.isAdmin || pathname === '/wholesale-products') return null;
   const selected = scope.shops.find((shop) => shop.id === scope.shopId);
   const name = scope.shopId === 'all' ? 'Barcha do‘konlar' : selected?.name || 'Tanlangan do‘kon';
   return <section className="odina-global-shop-bar" aria-label="Umumiy do‘kon tanlash">
