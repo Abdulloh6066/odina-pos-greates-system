@@ -49,7 +49,7 @@ export async function confirmWholesale(entities, sale) {
     movement_number: movementNumber, location_id: sale.source_id, location_name: sale.source_name,
     item_kind: 'product', item_id: sale.product_id, item_name: sale.product_name, unit: sale.stock_unit || 'sheet', movement_type: 'sale',
     quantity_change: -stockQuantity, balance_before: sale.balance_before, balance_after: sale.balance_after,
-    reason: `${sale.buyer_name}: list savdosi`, reference_id: sale.id, reference_type: 'wholesale_sale',
+    reason: `${sale.buyer_name}: ${sale.unit === 'piece' ? 'dona' : 'list'} savdosi`, reference_id: sale.id, reference_type: 'wholesale_sale',
     user_id: sale.seller_id, user_name: sale.seller_name, created_at: now,
   });
   if (sale.buyer_type === 'branch') {
@@ -59,9 +59,9 @@ export async function confirmWholesale(entities, sale) {
       transfer_number: movementNumber, batch_id: `wholesale-${sale.id}`, batch_number: movementNumber, line_number: 1, batch_item_count: 1,
       source_location_id: sale.source_id, source_location_name: sale.source_name,
       destination_location_id: sale.buyer_id, destination_location_name: sale.buyer_name,
-      product_id: sale.product_id, product_name_snapshot: sale.product_name, quantity: sale.quantity, unit: 'sheet',
+      product_id: sale.product_id, product_name_snapshot: sale.product_name, quantity: sale.quantity, unit: sale.unit || 'sheet',
       conversion_factor: sale.conversion_factor, received_quantity: sale.quantity * sale.conversion_factor,
-      status: 'pending', notes: `List savdosi ${movementNumber}. 1 list: ${sale.unit_price} UZS; jami: ${sale.total} UZS.`,
+      status: 'pending', notes: `Mahsulot savdosi ${movementNumber}. 1 ${sale.unit === 'piece' ? 'dona' : 'list'}: ${sale.unit_price} UZS; jami: ${sale.total} UZS.`,
       created_by: sale.seller_id, created_by_name: sale.seller_name, sent_at: now,
     });
     await patch({ transfer_id: transfer.id });
