@@ -7,7 +7,7 @@ import { memoryBackend } from './helpers/memory-backend.mjs';
 const ledger = 'base44/functions/supplier-ledger/entry.ts';
 const requests = 'base44/shared/ingredient-requests.ts';
 const plain = value => JSON.parse(JSON.stringify(value));
-const supplier = (id, assignment) => ({ id, name: id, active: true, recipient_type: 'supplier',
+const supplier = (id, assignment) => ({ id, name: id, active: true, recipient_type: 'supplier', supplier_location_ids: ['shop'],
   ...(assignment === undefined ? {} : { supplied_ingredient_ids: assignment }) });
 const ingredients = ['flour', 'sugar'].map(id => ({ id, name: id, category: 'food', active: true,
   base_unit: 'g', purchase_unit: 'kg', conversion_to_base: 1000 }));
@@ -211,4 +211,18 @@ test('warehouse transfer receipt does not query or apply purchase-supplier assig
   assert.equal(f.db.SupplierReceipt.length, 0);
   assert.equal(f.db.SupplierReceiptItem.length, 0);
   assertNoDeletes(f);
+});
+
+test('location assignments scope the catalog and reject purchases for another location before any write', async () => {
+  const f = fixture();
+  f.db.CashRecipient[0].supplier_location_ids = ['warehouse'];
+  const catalog = await f.handle({ action: 'catalog', location_id: 'shop' });
+  assert.equal(catalog.suppliers.some(row => row.id === 'flour-supplier'), false);
+  const warehouseCatalog = await f.handle({ action: 'catalog', location_id: 'warehouse' });
+  assert.deepEqual(plain(warehouseCatalog.suppliers.map(row => row.id)), ['flour-supplier']);
+  const before = snapshot(f);
+  const response = await f.invoke(ledger, receipt());
+  assert.equal(response.status, 403);
+  await assert.rejects(f.handle(receive()), /biriktirilmagan/);
+  assert.equal(snapshot(f), before);
 });

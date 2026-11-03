@@ -30,7 +30,7 @@ const suppliers = [
   { id: 'empty', name: 'Empty supplier', recipient_type: 'supplier', active: true, supplied_ingredient_ids: [] },
   { id: 'inactive', name: 'Inactive supplier', recipient_type: 'supplier', active: false, supplied_ingredient_ids: ['a'] },
   { id: 'person', name: 'Person', recipient_type: 'person', active: true, supplied_ingredient_ids: ['a'] },
-];
+].map(supplier => ({ ...supplier, supplier_location_ids: ['warehouse'] }));
 
 function receiptComponent(backend) {
   const module = { exports: {} };
@@ -385,5 +385,20 @@ test('a frozen receipt keeps its original rows and exact retry payload after ass
     assert.deepEqual(f.mutations, [{ name: 'ingredient-request', payload: frozen }]);
     assert.deepEqual(retry.readOrderRequest(f.scope, f.storage), frozen);
     assert.match(text(f.tree.root.findByType('dialog')), /Flour 5 kg/);
+  } finally { await f.close(); }
+});
+
+test('switching receipt locations shows only suppliers assigned to the new location', async () => {
+  const f = await fixture({ rows: [
+    suppliers[0],
+    { ...suppliers[1], supplier_location_ids: ['branch'] },
+    { ...suppliers[2], supplier_location_ids: [] },
+  ] });
+  try {
+    assert.deepEqual(optionValues(supplierSelect(f.tree)), ['dayim']);
+    await f.choose('dayim');
+    await f.update({ location: { id: 'branch', name: 'Branch' } });
+    assert.deepEqual(optionValues(supplierSelect(f.tree)), ['other']);
+    assert.equal(submit(f.tree).props.disabled, true);
   } finally { await f.close(); }
 });

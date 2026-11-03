@@ -29,7 +29,7 @@ function fixture() {
     Recipe: [{ id: 'recipe', product_id: 'cake', output_quantity: 1, output_unit: 'piece', active: true, version: 1 }],
     RecipeItem: [{ id: 'rl', recipe_id: 'recipe', ingredient_id: 'layer', ingredient_name_snapshot: 'Biskvit list', quantity: 5, unit: 'piece' },
       { id: 'rc', recipe_id: 'recipe', ingredient_id: 'cream', ingredient_name_snapshot: 'Krem', quantity: 200, unit: 'g' }],
-    CashRecipient: [{ id: 'supplier', name: 'Supplier', active: true, recipient_type: 'supplier' }],
+    CashRecipient: [{ id: 'supplier', name: 'Supplier', active: true, recipient_type: 'supplier', supplier_location_ids: ['central', 'branch'] }],
     SupplierReceipt: [], SupplierReceiptItem: [], StockTransfer: [], StockMovement: [],
     ActionHistory: [], ProductionBatch: [], ProductionBatchItem: [],
   };
