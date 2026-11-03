@@ -100,6 +100,12 @@ const unitSnapshot = (ingredient: any) => {
 // An absent field preserves older supplier records during the preview rollout.
 // Once configured, even an empty list is authoritative for NEW purchase receipts.
 // Call only before a receipt claim; pending operations retain their saved snapshot.
+export function assertSupplierLocation(supplier: any, locationId: string) {
+  if (!Array.isArray(supplier.supplier_location_ids) || !supplier.supplier_location_ids.includes(locationId)) {
+    throw fail("Bu yetkazib beruvchi ushbu omborga biriktirilmagan.", 403);
+  }
+}
+
 export function assertSupplierIngredientAssignment(supplier: any, ingredientIds: string[]) {
   const configured = supplier.supplied_ingredient_ids;
   if (configured === undefined) return;
@@ -405,7 +411,7 @@ export async function handleIngredientRequest(service: any, user: any, body: any
       const [ingredients, warehouses, suppliers] = await Promise.all([
         service.entities.Ingredient.filter({ active: { $ne: false } }, "name", 1000),
         service.entities.Shop.filter({ active: { $ne: false }, location_type: "production" }, "name", 100),
-        PURCHASE_ROLES.has(role) ? service.entities.CashRecipient.filter({ active: { $ne: false }, recipient_type: { $in: ["supplier", "company"] } }, "name", 1000) : [],
+        PURCHASE_ROLES.has(role) ? service.entities.CashRecipient.filter({ active: { $ne: false }, recipient_type: { $in: ["supplier", "company"] }, supplier_location_ids: { $in: [locationId] } }, "name", 1000) : [],
       ]);
       const available = [], unavailable = [];
       for (const ingredient of ingredients.filter((i: any) => i.is_cake_layer !== true)) {
@@ -477,6 +483,7 @@ export async function handleIngredientRequest(service: any, user: any, body: any
     if (!["unpaid", "paid_external"].includes(input.payment_state)) throw fail("To‘lov holatini tanlang.");
     supplier = input.supplier_id ? await get(service.entities.CashRecipient, input.supplier_id) : null;
     if (!supplier || supplier.active === false || !["supplier", "company"].includes(supplier.recipient_type)) throw fail("Faol yetkazib beruvchini tanlang.");
+    assertSupplierLocation(supplier, request.location_id);
     assertSupplierIngredientAssignment(supplier, input.items.map((item: any) => item.ingredient_id));
   }
   const items = [];

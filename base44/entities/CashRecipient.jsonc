@@ -15,6 +15,11 @@
     "notes": {
       "type": "string"
     },
+    "supplier_location_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Locations where this supplier can be used for new purchases."
+    },
     "supplied_ingredient_ids": {
       "type": "array",
       "items": {

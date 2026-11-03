@@ -2,7 +2,7 @@ import { resolveAppUser } from "../../shared/user-helpers.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { financialRequestKey, runSupplierPayment } from "../../shared/supplier-payment-recovery.ts";
-import { assertSupplierIngredientAssignment } from "../../shared/ingredient-requests.ts";
+import { assertSupplierIngredientAssignment, assertSupplierLocation } from "../../shared/ingredient-requests.ts";
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
 const quantity = (value: unknown) => {
@@ -150,6 +150,7 @@ export default async function(req) {
       if (ids.length !== inputItems.length) {
         return Response.json({ error: "Bir masalliqni bitta kirimda ikki marta qo‘shmang." }, { status: 400 });
       }
+      assertSupplierLocation(supplier, locationId);
       assertSupplierIngredientAssignment(supplier, ids);
 
       const ingredients = await Promise.all(ids.map((id) => service.entities.Ingredient.get(id)));

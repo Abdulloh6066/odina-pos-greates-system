@@ -105,10 +105,15 @@ export default function SupplierLedgerPanel({
     })
   ), [receipts, user?.role, location?.id]);
 
+  useEffect(() => {
+    setSupplierFilter("all");
+    setDialogOpen(false);
+  }, [location?.id]);
+
   const supplierOptions = useMemo(() => {
     const names = new Map();
     for (const recipient of recipients) {
-      if (["supplier", "company"].includes(recipient.recipient_type)) {
+      if (["supplier", "company"].includes(recipient.recipient_type) && recipient.supplier_location_ids?.includes(location?.id)) {
         names.set(recipient.id, recipient.name);
       }
     }
@@ -119,7 +124,7 @@ export default function SupplierLedgerPanel({
     }
     return Array.from(names, ([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, "uz"));
-  }, [recipients, locationReceipts]);
+  }, [recipients, locationReceipts, location?.id]);
 
   const visible = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -405,6 +410,7 @@ export default function SupplierLedgerPanel({
       </section>
 
       <ReceiptDialog
+        key={location?.id}
         open={dialogOpen}
         user={user}
         location={location}
@@ -867,7 +873,8 @@ function ReceiptDialog({ open, user, location, ingredients, recipients, onClose,
   }, [open]);
 
   const supplierList = supplierRecords.filter(
-    (recipient) => recipient.active !== false && ["supplier", "company"].includes(recipient.recipient_type),
+    (recipient) => recipient.active !== false && ["supplier", "company"].includes(recipient.recipient_type)
+      && recipient.supplier_location_ids?.includes(location?.id),
   );
   const supplier = supplierList.find(item => item.id === supplierId);
   const assignedIds = new Set(Array.isArray(supplier?.supplied_ingredient_ids) ? supplier.supplied_ingredient_ids : []);
@@ -944,7 +951,7 @@ function ReceiptDialog({ open, user, location, ingredients, recipients, onClose,
               </OdinaSelect>
               {!suppliersLoading && !suppliersError && supplierList.length === 0 && (
                 <p className="text-xs text-amber-700 mt-1.5">
-                  Egasi avval yetkazib beruvchini ro‘yxatga kiritishi kerak.
+                  Egasi “Qabul qiluvchilar” bo‘limida yetkazib beruvchini ushbu omborga biriktirishi kerak.
                 </p>
               )}
             </div>

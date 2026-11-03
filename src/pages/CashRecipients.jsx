@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import SupplierProductsDialog from '@/components/warehouse/SupplierProductsDialog';
 
 export default function CashRecipients() {
-  const { user } = useOutletContext();
+  const { user, adminShopScope } = useOutletContext();
+  const locations = adminShopScope?.shops || [];
   const canManage = user?.role === 'admin';
   const [recipients, setRecipients] = useState([]);
   const [search, setSearch] = useState('');
@@ -80,6 +81,7 @@ export default function CashRecipients() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate">{item.name}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{item.recipient_type === 'company' ? 'Kompaniya' : 'Yetkazib beruvchi'} · {item.active === false ? 'Faol emas' : 'Faol'}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{locations.filter(location => item.supplier_location_ids?.includes(location.id)).map(location => location.name).join(', ') || 'Kirim uchun joy biriktirilmagan'}</p>
                   {item.notes && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{item.notes}</p>}
                 </div>
                 {canManage && (
@@ -98,6 +100,7 @@ export default function CashRecipients() {
       <RecipientDialog
         open={Boolean(editing)}
         recipient={editing}
+        locations={locations}
         user={user}
         onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); load(); }}
@@ -110,7 +113,8 @@ export default function CashRecipients() {
   );
 }
 
-function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
+function RecipientDialog({ open, recipient, locations, user, onClose, onSaved }) {
+  const [locationIds, setLocationIds] = useState([]);
   const [name, setName] = useState('');
   const [type, setType] = useState('supplier');
   const [notes, setNotes] = useState('');
@@ -119,6 +123,7 @@ function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
 
   useEffect(() => {
     if (!open) return;
+    setLocationIds(recipient?.supplier_location_ids || []);
     setName(recipient?.name || '');
     setType(recipient?.recipient_type || 'supplier');
     setNotes(recipient?.notes || '');
@@ -129,7 +134,7 @@ function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const payload = { name: name.trim(), recipient_type: type, notes: notes.trim(), active };
+      const payload = { name: name.trim(), recipient_type: type, notes: notes.trim(), active, supplier_location_ids: locationIds };
       if (recipient?.id) await base44.entities.CashRecipient.update(recipient.id, payload);
       else await base44.entities.CashRecipient.create({ ...payload, created_by: user.id, created_by_name: user.full_name || user.email });
       onSaved();
@@ -153,6 +158,18 @@ function RecipientDialog({ open, recipient, user, onClose, onSaved }) {
               <option value="company">Kompaniya</option>
             </OdinaSelect>
           </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium mb-1">Kirim uchun do‘kon va omborlar</legend>
+            {locations.filter(location => location.active !== false).map(location => (
+              <label key={location.id} className="flex items-center gap-2 min-h-10 text-sm">
+                <input type="checkbox" checked={locationIds.includes(location.id)} onChange={(event) => {
+                  const checked = event.target.checked;
+                  setLocationIds(ids => checked ? [...ids, location.id] : ids.filter(id => id !== location.id));
+                }} />
+                {location.name}
+              </label>
+            ))}
+          </fieldset>
           <div><Label className="text-xs mb-1.5 block">Izoh</Label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Telefon yoki qo‘shimcha ma’lumot (ixtiyoriy)" rows={2} /></div>
           {recipient?.id && (
             <label className="flex items-center gap-3 rounded-xl bg-secondary/60 p-3 text-sm"><input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} className="w-4 h-4" /> Faol ro‘yxatda ko‘rsatish</label>
