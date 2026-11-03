@@ -1,3 +1,4 @@
+import { memoryBackend } from './helpers/memory-backend.mjs';
 // All handlers run against in-memory entities. No network or production records.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -223,7 +224,9 @@ test('cashier or worker assigned elsewhere cannot assemble central cakes', async
 });
 
 test('supplier cannot receive fractional layers or receive them into Branch', async () => {
-  const f = fixture(), call = handler('supplier-ledger', f.client), before = structuredClone(f.db);
+  const f = fixture(), before = structuredClone(f.db);
+  const backend = memoryBackend(f.db, { copySeed: false });
+  const call = body => backend.invoke('base44/functions/supplier-ledger/entry.ts', body);
   for (const [location_id, purchase_quantity] of [['central', 1.5], ['branch', 2]]) {
     const result = await call({ action: 'create_receipt', location_id, supplier_id: 'supplier',
       items: [{ ingredient_id: 'layer', purchase_quantity, unit_price: 100 }] });
