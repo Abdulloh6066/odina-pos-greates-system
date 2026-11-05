@@ -46,6 +46,7 @@ import { canQueuePosSale, isPosNetworkError } from '@/lib/pos-network';
 import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, restartCatalog, restartRead, updateRestartStock } from '@/lib/offline-restart';
 import OfflineRestartStatus from '@/components/pos/OfflineRestartStatus';
 import OfflineSalesBanner from '@/components/pos/OfflineSalesBanner';
+import OwnerPendingSalesDialog from '@/components/pos/OwnerPendingSalesDialog';
 import CategoryIcon from '@/components/CategoryIcon';
 import '@/components/pos/pos-workbench.css';
 import {
@@ -58,6 +59,7 @@ import {
   startSaleRequest,
   waitForSaleResponse,
   releaseSaleRequest,
+  isPendingSaleCancellation,
 } from '@/lib/offline-sales';
 
 // Temporary business choice: sell through without the negative-stock confirmation.
@@ -730,6 +732,11 @@ export default function POS() {
     return reconcileCompletedSale(payload, key, record);
   });
 
+  const clearCancelledReceipt = useStableEvent((keys) => {
+    setReceiptPrintSale((receipt) => receipt?.offline_pending === true
+      && receipt.user_id === user?.id && keys.includes(receipt.idempotency_key) ? null : receipt);
+  });
+
   const {
     isOnline: queueOnline,
     browserOnline,
@@ -748,7 +755,7 @@ export default function POS() {
     shiftMutationRef.current++;
     setShift(currentShift);
     setShiftReadState('ready');
-  }, confirmQueuedSale);
+  }, confirmQueuedSale, clearCancelledReceipt);
   const isOnline = queueOnline && !catalogOffline;
   const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
     takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
@@ -1475,7 +1482,7 @@ export default function POS() {
     checkoutAttemptRef.current = null;
     setCheckoutRetryPending(false);
     resetCart();
-    presentCompletedSale(record.local_sale, printReceipt);
+    presentCompletedSale({ ...record.local_sale, idempotency_key: record.id }, printReceipt);
   };
 
   // Keep the previous stock base while a confirmed sale still has a local
@@ -1761,6 +1768,21 @@ export default function POS() {
         checkoutServerMs = flight.roundTripMs ?? Math.round(performance.now() - serverTimingStarted);
         const payload = result?.data || result;
         checkoutBackendTiming = payload?.backend_timing || null;
+        if (pendingRecord && isPendingSaleCancellation(pendingRecord, payload)) {
+          releaseSaleRequest(idempotencyKey, flight);
+          if (checkoutSessionRef.current !== checkoutSession) return;
+          checkoutAttemptRef.current = null;
+          checkoutRequestKeyRef.current = '';
+          checkoutRecordedAtRef.current = '';
+          setCheckoutRetryPending(false);
+          setCheckoutOffline(false);
+          setPayOpen(false);
+          clearCancelledReceipt([idempotencyKey]);
+          resetCart();
+          void loadAll({ showLoading: false }).catch(() => {});
+          void odinaAlert('Bu savdo hisob egasi tomonidan bekor qilingan. Yangi to‘lov olishdan oldin tekshiring.');
+          return;
+        }
         if (!payload?.sale?.id) {
           releaseSaleRequest(idempotencyKey, flight);
           throw Object.assign(new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.'), { status: 502 });
@@ -2131,6 +2153,8 @@ export default function POS() {
       )}
 
       <OfflineRestartStatus saved={restartSaved && Boolean(shift) && readShiftRestart(user)?.shift?.id === shift?.id} error={restartError} offline={catalogOffline || !isOnline} />
+      <OwnerPendingSalesDialog user={user} isOnline={browserOnline} syncing={offlineSyncing}
+        onCancelled={(result) => { clearCancelledReceipt([result.idempotency_key]); void loadAll({ showLoading: false }).catch(() => {}); }} />
       <OfflineSalesBanner
         browserOnline={browserOnline} connectionPaused={connectionPaused}
         isOnline={isOnline}

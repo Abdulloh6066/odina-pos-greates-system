@@ -17,7 +17,7 @@ import {
   probePosConnection,
 } from '@/lib/pos-network';
 
-export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onConfirmed) {
+export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onConfirmed, onCancelled) {
   const [browserOnline, setBrowserOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine !== false
   ));
@@ -44,6 +44,8 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
   onRecoveredRef.current = onRecovered;
   const onConfirmedRef = useRef(onConfirmed);
   onConfirmedRef.current = onConfirmed;
+  const onCancelledRef = useRef(onCancelled);
+  onCancelledRef.current = onCancelled;
   const confirmedKeysRef = useRef(new Set());
   const reconcilingRef = useRef(new Map());
   const isOnline = browserOnline && !connection.offline;
@@ -93,6 +95,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
         for (const entry of reconcilingRef.current.values()) merged.set(entry.id, entry.record);
         setRecords([...merged.values()].sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))));
         setStorageError('');
+        if (!merged.size) setSyncError('');
       }
       return next;
     } catch (error) {
@@ -196,7 +199,10 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
       if (!mountedRef.current || sessionRef.current !== session || userRef.current !== userId) return result;
       if (result?.failed) setSyncError(result.failed.message);
       else if (!result?.skipped) setSyncError('');
-      if (result?.synced > 0) {
+      if (result?.cancelled > 0) {
+        try { onCancelledRef.current?.(result.cancelledKeys || []); } catch { /* Cancellation is already durable. */ }
+      }
+      if (result?.synced > 0 || result?.cancelled > 0) {
         // Catalog/alert refetches are recovery, not part of payment acknowledgment.
         void Promise.resolve().then(() => {
           if (sessionRef.current === session) return onSyncedRef.current?.(result);
@@ -239,7 +245,16 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
 
   useEffect(() => {
     void refresh();
-    return subscribePendingSales(() => { void refresh(); });
+    return subscribePendingSales((event) => {
+      if (!mountedRef.current || sessionRef.current !== renderSession || userRef.current !== userId) return;
+      const cancelled = event?.cancelled;
+      if (cancelled?.user_id === userId && typeof cancelled.id === 'string' && cancelled.id) {
+        // This event only dismisses an exact pending receipt. Durable queue state
+        // is always reread, and no financial change is authorized by the event.
+        try { onCancelledRef.current?.([cancelled.id]); } catch { /* Refresh still follows. */ }
+      }
+      void refresh();
+    });
   }, [refresh]);
 
   useEffect(() => {

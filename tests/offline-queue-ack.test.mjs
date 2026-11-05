@@ -12,7 +12,7 @@ import * as network from '../src/lib/pos-network.js';
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 let fixtureId = 0;
-function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {}, seed = [] } = {}) {
+function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {}, onCancelled = () => {}, cancelled = false, replyError = null, seed = [] } = {}) {
   const user = `queue-user-${++fixtureId}`, rows = new Map(seed.map(row => [row.id, row]));
   const subscribers = new Set(), events = new Map(), timers = new Map(), saves = [], reads = [];
   let saveGate = null, listGate = null, next = 0, writes = 0, value, renderer;
@@ -30,7 +30,10 @@ function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {
   };
   const transport = async (_name, request) => {
     if (request.action === 'get_current_shift') return { data: { ok: true, shift: { id: 'shift', status: 'open' } } };
-    writes++; return { data: { sale: { id: request.idempotency_key }, shift: { id: 'shift', order_count: writes }, stock_updates: [] } };
+    writes++;
+    if (replyError) throw replyError;
+    if (cancelled) return { data: { cancelled: true, idempotency_key: request.idempotency_key, shift_id: 'shift', user_id: user, shop_id: 'shop' } };
+    return { data: { sale: { id: request.idempotency_key }, shift: { id: 'shift', order_count: writes }, stock_updates: [] } };
   };
   const data = { ...offline,
     listPendingSales: storage.list,
@@ -45,12 +48,13 @@ function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {
   vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { navigator: nav, window: win })(name => {
     assert.ok(Object.hasOwn(dependencies, name), name); return dependencies[name];
   }, module, module.exports);
-  function Probe({ userId = user }) { value = module.exports.default(userId, onSynced, undefined, onConfirmed); return null; }
+  function Probe({ userId = user }) { value = module.exports.default(userId, onSynced, undefined, onConfirmed, onCancelled); return null; }
   const record = suffix => offline.buildPendingSale({ idempotencyKey: `pos-${user}-${suffix}`, recordedAt: '2026-10-16T08:00:00.000Z',
     shift: { id: 'shift', shop_id: 'shop' }, user: { id: user },
     cart: [{ product_id: 'cake', price: 1000, quantity: 1 }], payments: [{ method: 'cash', amount: 1000 }] });
   return { userId: user, rows, reads, saves, nav, events, timers, record, value: () => value,
     writes: () => writes,
+    notify: event => { for (const fn of subscribers) fn(event); },
     blockSave: () => (saveGate = deferred()), blockList: () => (listGate = deferred()),
     clearList: () => { listGate = null; },
     async mount() { await act(async () => { renderer = TestRenderer.create(React.createElement(Probe)); await tick(); }); },
@@ -161,5 +165,63 @@ test('old user durable-save continuation cannot invalidate the new user’s pend
     await act(async () => { lists.resolve(); await tick(); });
     assert.deepEqual(Array.from(f.value().records, row => row.id), [nextUserRow.id]);
     assert.equal(f.value().records[0].request.items[0].quantity, 2, 'preserve the next user’s pending stock reservation');
+  } finally { f.unmount(); }
+});
+
+
+test('cancelled queue ACK clears only via cancellation callback and refreshes without confirmed receipt', async () => {
+  let refreshes = 0, receipts = 0; const cancelledKeys = [];
+  const f = fixture({ cancelled: true, onSynced: () => refreshes++, onConfirmed: () => receipts++,
+    onCancelled: keys => cancelledKeys.push(...keys) });
+  await f.mount();
+  try {
+    const row = f.record('cancelled');
+    await act(async () => { await f.value().enqueue(row); });
+    f.nav.onLine = true;
+    await act(async () => { await f.value().syncNow(); await tick(); });
+    assert.deepEqual(cancelledKeys, [row.id]); assert.equal(receipts, 0); assert.equal(refreshes, 1);
+    assert.equal(f.rows.size, 0);
+  } finally { f.unmount(); }
+});
+
+
+test('removal of the last queued record clears its obsolete sync error', async () => {
+  const f = fixture({ replyError: Object.assign(new Error('Permanent test refusal'), { status: 400 }) });
+  await f.mount();
+  try {
+    const row = f.record('refused');
+    await act(async () => { await f.value().enqueue(row); });
+    f.nav.onLine = true;
+    await act(async () => { await f.value().syncNow(); await tick(); });
+    assert.equal(f.value().syncError, 'Permanent test refusal');
+    await act(async () => { f.rows.clear(); f.notify(); await tick(); });
+    assert.equal(f.value().syncError, ''); assert.equal(f.value().records.length, 0);
+  } finally { f.unmount(); }
+});
+
+
+test('cross-tab cancellation dismisses matching user receipt without confirming or mutating sales', async () => {
+  const keys = []; let receipts = 0;
+  const f = fixture({ onCancelled: values => keys.push(...values), onConfirmed: () => receipts++ });
+  await f.mount();
+  try {
+    const row = f.record('cross-tab');
+    await act(async () => { await f.value().enqueue(row); });
+    await act(async () => {
+      f.notify({ cancelled: { id: row.id, user_id: 'another-user' } });
+      f.notify({ cancelled: { user_id: f.userId } });
+      await tick();
+    });
+    assert.equal(keys.length, 0);
+    await act(async () => {
+      f.rows.clear();
+      f.notify({ cancelled: { id: row.id, user_id: f.userId } });
+      await tick();
+    });
+    assert.deepEqual(keys, [row.id]); assert.equal(f.value().records.length, 0);
+    assert.equal(receipts, 0); assert.equal(f.writes(), 0);
+    await f.user('new-user');
+    await act(async () => { f.notify({ cancelled: { id: row.id, user_id: f.userId } }); await tick(); });
+    assert.deepEqual(keys, [row.id]);
   } finally { f.unmount(); }
 });

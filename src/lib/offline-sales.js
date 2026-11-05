@@ -271,15 +271,16 @@ function channel() {
   return broadcastChannel;
 }
 
-function notifyQueueChanged() {
+function notifyQueueChanged(detail = null) {
+  if (typeof window === 'undefined') return;
   // Notifications cannot turn a completed durable transaction into a failure.
-  try { if (typeof window !== 'undefined') window.dispatchEvent(new Event(QUEUE_EVENT)); } catch { /* Refresh on the next queue operation. */ }
-  try { channel()?.postMessage({ type: 'changed' }); } catch { /* A closed channel does not undo the stored sale. */ }
+  try { if (typeof window !== 'undefined') window.dispatchEvent(detail ? new CustomEvent(QUEUE_EVENT, { detail }) : new Event(QUEUE_EVENT)); } catch { /* Refresh on the next queue operation. */ }
+  try { channel()?.postMessage({ type: 'changed', ...detail }); } catch { /* A closed channel does not undo the stored sale. */ }
 }
 
 export function subscribePendingSales(listener) {
   if (typeof listener !== 'function') return () => {};
-  const localListener = () => listener();
+  const localListener = (event) => listener(event?.detail || event?.data || null);
   const sharedChannel = channel();
 
   if (typeof window !== 'undefined') window.addEventListener(QUEUE_EVENT, localListener);
@@ -389,6 +390,39 @@ async function withSyncLock(work) {
   return run;
 }
 
+// Require a response tied to this saved row. A generic success (or another
+// cashier's acknowledgment) must never discard an offline receipt.
+export function isPendingSaleCancellation(record, payload) {
+  return payload?.cancelled === true && payload.idempotency_key === record.id
+    && payload.shift_id === record.shift_id && payload.user_id === record.user_id
+    && payload.shop_id === record.shop_id;
+}
+
+export async function cancelPendingSale({ recordId, ownerId, ownerPin, reason, send,
+  storage = { list: listPendingSales, remove: removePendingSale }, lock = withSyncLock,
+}) {
+  if (!ownerId || !recordId || typeof send !== 'function') throw new Error('Hisob egasi va savdo tanlanishi kerak.');
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('Bekor qilish uchun internet kerak.');
+  return lock(async () => {
+    const records = await storage.list();
+    const record = records.find((row) => row.id === recordId);
+    if (!record || record.status === 'confirmed' || record.id !== record.request?.idempotency_key) {
+      throw new Error('Savdo navbatda topilmadi yoki allaqachon tasdiqlangan. Ro‘yxatni yangilang.');
+    }
+    // PIN exists only in this online request, never in IndexedDB or retry state.
+    const response = await send({ action: 'cancel_pending_sale', idempotency_key: record.id,
+      shift_id: record.shift_id, owner_pin: ownerPin, reason });
+    const payload = response?.data || response;
+    if (!isPendingSaleCancellation(record, payload)) throw new Error(payload?.error || 'Bekor qilish serverda tasdiqlanmadi.');
+    await storage.remove(record.id);
+    notifyQueueChanged({ cancelled: { id: record.id, user_id: record.user_id } });
+    for (const flight of saleRequests.values()) {
+      if (flight.cacheKey === JSON.stringify([String(record.user_id), String(record.id)])) releaseSaleRequest(record.id, flight);
+    }
+    return payload;
+  });
+}
+
 export function pendingSaleRetryDelay(records, now = Date.now()) {
   const pending = (records || []).filter((row) => row.status !== 'failed');
   if (!pending.length) return null;
@@ -411,6 +445,7 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
   const result = await lock(async () => {
     const records = await storage.list(userId);
     let synced = 0;
+    const cancelledKeys = [];
     const priorFailure = records.find((row) => row.status === 'failed');
     let failed = priorFailure && !retryFailed
       ? { id: priorFailure.id, retryable: false, message: priorFailure.last_error } : null;
@@ -441,6 +476,15 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
         }
         const response = outcome.response;
         const payload = response?.data || response;
+        if (isPendingSaleCancellation(record, payload)) {
+          // The owner may have cancelled on another tab/device after this row
+          // was loaded, or its local removal may previously have failed.
+          await storage.remove(record.id);
+          notifyQueueChanged({ cancelled: { id: record.id, user_id: record.user_id } });
+          releaseSaleRequest(record.id, flight);
+          cancelledKeys.push(record.id);
+          continue;
+        }
         if (!payload?.sale?.id) {
           releaseSaleRequest(record.id, flight);
           const error = errorWithCode(
@@ -486,7 +530,7 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
     }
 
     const remaining = (await storage.list(userId)).length;
-    return { synced, remaining, failed };
+    return { synced, remaining, failed, ...(cancelledKeys.length ? { cancelled: cancelledKeys.length, cancelledKeys } : {}) };
   });
 
   if (result?.skipped) {
