@@ -80,7 +80,13 @@
       "items": {
         "type": "string"
       },
-      "default": []
+      "default": [],
+      "rls": {
+        "read": true,
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
+      }
     },
     "checkout_queue_resume_ms": {
       "type": "number",
@@ -157,6 +163,43 @@
     "order_payment_operations_json": {
       "type": "string",
       "description": "Backend pending order payment reservations and atomic shift accounting confirmations; shift closing checks the same journal."
+    },
+    "cancelled_sale_requests": {
+      "type": "array",
+      "description": "Owner-approved cancellation journal for unclaimed offline requests. Written atomically with sale_request_keys; never changes financial snapshots.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "idempotency_key": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "shop_id": {
+            "type": "string"
+          },
+          "cancelled_by": {
+            "type": "string"
+          },
+          "cancelled_by_role": {
+            "type": "string",
+            "enum": ["admin", "cashier"]
+          },
+          "cancelled_at": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "rls": {
+        "read": true,
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
+      }
     }
   },
   "required": [

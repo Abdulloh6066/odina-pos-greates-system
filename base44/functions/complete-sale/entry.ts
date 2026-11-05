@@ -1,3 +1,4 @@
+import { cancelPendingSaleRequest, cancelledPendingSaleResponse } from "../../shared/pending-sale-cancellation.ts";
 import { pendingFinancialCloseGuard } from "../../shared/shift-pending-financial.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { savedShiftCloseResponse, reconcileShiftCloseFailure } from "../../shared/shift-settlement-recovery.ts";
@@ -499,6 +500,10 @@ export default async function(req) {
     }
 
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
+
+    if (action === "cancel_pending_sale") {
+      return await cancelPendingSaleRequest({ service, authenticatedUser, user, body, verifyOwnerPin });
+    }
 
     if (action === "runtime_status") {
       return Response.json({ ok: true, runtime_version: COMPLETE_SALE_RUNTIME_VERSION });
@@ -1394,6 +1399,10 @@ export default async function(req) {
           already_processed: true,
         });
       }
+      const cancellation = cancelledPendingSaleResponse(
+        shiftRead.status === "fulfilled" ? shiftRead.value : null, idempotencyKey, user.id,
+      );
+      if (cancellation) return Response.json(cancellation);
     }
 
     if (!shiftId || requestedItems.length === 0) {
@@ -1698,6 +1707,9 @@ export default async function(req) {
           await changeLockedTable(service, tablePaymentLock.shopId,
             tablePaymentLock.orderId, tablePaymentLock.checkoutKey, false).catch(() => false);
         }
+        const latestShift = await service.entities.Shift.get(shift.id);
+        const cancellation = cancelledPendingSaleResponse(latestShift, idempotencyKey, user.id);
+        if (cancellation) return Response.json(cancellation);
         return Response.json({
           error: "Savdo serverda yakunlanmoqda. Bir ozdan so‘ng avtomatik qayta yuboriladi.",
         }, { status: 503 });
