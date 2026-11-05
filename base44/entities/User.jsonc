@@ -17,21 +17,41 @@
         "production",
         "warehouse"
       ],
-      "default": "cashier"
+      "default": "cashier",
+      "rls": {
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
+      }
     },
     "shop_id": {
-      "type": "string"
+      "type": "string",
+      "rls": {
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
+      }
     },
     "shop_name": {
       "type": "string"
     },
     "active": {
       "type": "boolean",
-      "default": true
+      "default": true,
+      "rls": {
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
+      }
     },
     "is_owner": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "rls": {
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
+      }
     }
   },
   "required": [],

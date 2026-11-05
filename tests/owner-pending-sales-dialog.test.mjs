@@ -8,6 +8,7 @@ import React from 'react';
 import { create, act } from 'react-test-renderer';
 
 const owner = { id: 'owner', role: 'admin', is_owner: true };
+const cashier = { id: 'cashier', role: 'cashier', shop_id: 'shop', active: true };
 const row = { id: 'sale-1', status: 'pending', user_id: 'cashier', shop_id: 'shop', created_at: '2026-11-05T08:00:00Z',
   local_sale: { sale_number: 'OFFLINE-1', user_name: 'Kassir', shop_name: 'Do‘kon', total: 20000 } };
 const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
@@ -16,9 +17,9 @@ const input = tree => tree.root.findByType('input');
 const enter = (node, value) => node.props.onChange({ target: { value } });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 function setup({ cancel, list } = {}) {
-  let rows = [structuredClone(row)], listener, calls = [], reads = 0, updates = 0;
+  let rows = [structuredClone(row)], listener, calls = [], reads = 0, updates = 0, readScopes = [];
   const queue = {
-    listPendingSales: async (...args) => { assert.equal(args.length, 0); reads++; return list ? list(reads) : rows; },
+    listPendingSales: async (...args) => { readScopes.push(args); reads++; return list ? list(reads) : rows; },
     subscribePendingSales: fn => { listener = fn; return () => { listener = null; }; },
     cancelPendingSale: async args => { calls.push(args); if (cancel) return cancel(args); rows = []; return { cancelled: true }; },
     syncErrorMessage: error => error.message,
@@ -40,7 +41,7 @@ function setup({ cancel, list } = {}) {
   vm.runInNewContext('(function(require,module,exports){' + code + '\n})', { console })(require, module, module.exports);
   const Component = module.exports.default;
   const props = { user: owner, isOnline: true, syncing: false, onCancelled: () => { updates++; } };
-  return { Component, props, calls, get reads() { return reads; }, get updates() { return updates; },
+  return { Component, props, calls, readScopes, get reads() { return reads; }, get updates() { return updates; },
     notify: async next => { rows = next; await listener?.(); } };
 }
 async function mount(fixture, props = {}) {
@@ -61,7 +62,7 @@ test('only authenticated admin owner sees device-wide queue action', async () =>
   }
   const f = setup(), tree = await mount(f, { user: { id: 'owner', role: 'admin', data: { is_owner: true } } });
   await open(tree); assert.ok(text(tree.toJSON()).includes('Kassir')); assert.ok(text(tree.toJSON()).includes('sale-1'));
-  assert.equal(f.reads, 1); await act(async () => tree.unmount());
+  assert.equal(f.reads, 1); assert.deepEqual(f.readScopes, [[]]); await act(async () => tree.unmount());
 });
 
 test('explicit selected sale, PIN and reason are required; success clears credentials and refreshes stock', async () => {
@@ -69,7 +70,8 @@ test('explicit selected sale, PIN and reason are required; success clears creden
   assert.equal(button(tree, 'Ha, bekor qilish').props.disabled, true);
   await submit(tree); assert.equal(f.calls.length, 0);
   await fill(tree); await submit(tree);
-  assert.equal(f.calls.length, 1); assert.equal(f.calls[0].recordId, 'sale-1'); assert.equal(f.calls[0].ownerId, 'owner');
+  assert.equal(f.calls.length, 1); assert.equal(f.calls[0].recordId, 'sale-1'); assert.equal(f.calls[0].actorId, 'owner');
+  assert.equal(f.calls[0].isOwner, true);
   assert.equal(f.calls[0].ownerPin, '1234'); assert.equal(f.calls[0].reason, 'Xato kiritildi');
   assert.equal(f.updates, 1); assert.equal(tree.root.findAllByType('input').length, 0);
   assert.ok(text(tree.toJSON()).includes('Savdo bekor qilindi.')); await act(async () => tree.unmount());
@@ -132,7 +134,23 @@ test('cancellation journals and key claims are protected from client writes', ()
   const schema = JSON.parse(readFileSync('base44/entities/Shift.jsonc', 'utf8'));
   for (const field of ['sale_request_keys', 'cancelled_sale_requests']) {
     assert.equal(schema.properties[field].rls.write, false);
+    for (const operation of ['create', 'update']) {
+      assert.deepEqual(schema.properties[field].rls[operation], { user_condition: { collaborator_role: 'editor' } });
+    }
   }
+});
+
+test('stored role/shop/active/owner authorization fields cannot be self-assigned by app users', () => {
+  const schema = JSON.parse(readFileSync('base44/entities/User.jsonc', 'utf8'));
+  for (const field of ['role', 'shop_id', 'active', 'is_owner']) {
+    assert.equal(schema.properties[field].rls.write, false);
+    for (const operation of ['create', 'update']) {
+      assert.deepEqual(schema.properties[field].rls[operation], { user_condition: { collaborator_role: 'editor' } });
+    }
+  }
+  // Staff management continues through existing authenticated service-role functions.
+  assert.match(readFileSync('base44/functions/security-admin/entry.ts', 'utf8'), /service.entities.User.update\(target.id, patch\)/);
+  assert.match(readFileSync('base44/functions/staff-invite/entry.ts', 'utf8'), /asServiceRole.entities.User.update\(currentUser.id, userPatch\)/);
 });
 
 test('POS clears only exact matching offline receipts and handles direct cancellation before generic failure', () => {
@@ -140,4 +158,77 @@ test('POS clears only exact matching offline receipts and handles direct cancell
   assert.match(source, /receipt\?\.offline_pending === true[\s\S]*?receipt.user_id === user\?\.id && keys.includes\(receipt.idempotency_key\)/);
   assert.match(source, /presentCompletedSale\(\{ \.\.\.record.local_sale, idempotency_key: record.id \}, printReceipt\)/);
   assert.ok(source.indexOf('isPendingSaleCancellation(pendingRecord, payload)') < source.indexOf("throw Object.assign(new Error(payload?.error || 'Savdoni yakunlab bo‘lmadi.')"));
+});
+
+test('cashier sees only their own assigned-shop device queue and uses admin approval code', async () => {
+  const rows = [row, { ...row, id: 'other-user', user_id: 'another-cashier' },
+    { ...row, id: 'other-shop', shop_id: 'another-shop' }, { ...row, id: 'already-confirmed', status: 'confirmed' }];
+  const f = setup({ list: () => rows }), tree = await mount(f, { user: cashier });
+  await open(tree);
+  assert.deepEqual(f.readScopes, [['cashier']]);
+  const rendered = text(tree.toJSON()); assert.ok(rendered.includes('sale-1'));
+  for (const hidden of ['other-user', 'other-shop', 'already-confirmed']) assert.ok(!rendered.includes(hidden));
+  await select(tree); await fill(tree); await submit(tree);
+  assert.equal(f.calls[0].actorId, 'cashier'); assert.equal(f.calls[0].shopId, 'shop');
+  assert.equal(f.calls[0].isOwner, false); assert.equal(f.calls[0].ownerPin, '1234');
+  assert.ok(rendered.includes('admin tasdiqlash kodi'));
+  await act(async () => tree.unmount());
+});
+
+test('inactive/unassigned cashiers and other roles cannot open queue; nested assigned shop is supported', async () => {
+  for (const user of [{ ...cashier, active: false }, { ...cashier, data: { active: false } },
+    { ...cashier, shop_id: '' }, { ...cashier, role: 'manager' }, { ...cashier, role: 'accountant' }]) {
+    const f = setup(), tree = await mount(f, { user });
+    assert.equal(tree.toJSON(), null); assert.equal(f.reads, 0); await act(async () => tree.unmount());
+  }
+  const f = setup(), tree = await mount(f, { user: { ...cashier, shop_id: undefined, data: { shop_id: 'shop' } } });
+  await open(tree); await select(tree); await fill(tree); await submit(tree);
+  assert.equal(f.calls[0].shopId, 'shop'); await act(async () => tree.unmount());
+});
+
+test('cashier wrong code retains selected sale but clears the approval code', async () => {
+  const f = setup({ cancel: async () => { throw new Error('Admin tasdiqlash kodi noto‘g‘ri.'); } });
+  const tree = await mount(f, { user: cashier }); await open(tree); await select(tree); await fill(tree); await submit(tree);
+  assert.equal(input(tree).props.value, ''); assert.equal(tree.root.findByType('textarea').props.value, 'Xato kiritildi');
+  assert.ok(text(tree.toJSON()).includes('Admin tasdiqlash kodi noto‘g‘ri.')); assert.equal(f.updates, 0);
+  await act(async () => tree.unmount());
+});
+
+test('same-ID role, owner flag or shop change clears selection/code and ignores stale completion', async () => {
+  for (const [before, after] of [[owner, { ...owner, role: 'cashier', shop_id: 'shop' }],
+    [cashier, { ...cashier, shop_id: 'another-shop' }], [owner, { ...owner, is_owner: false }]]) {
+    const wait = deferred(), f = setup({ cancel: () => wait.promise }), tree = await mount(f, { user: before });
+    await open(tree); await select(tree); await fill(tree);
+    let first; act(() => { first = tree.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+    await act(async () => tree.update(React.createElement(f.Component, { ...f.props, user: after })));
+    assert.equal(tree.root.findAllByType('input').length, 0);
+    await act(async () => { wait.resolve({ cancelled: true }); await first; });
+    assert.equal(f.updates, 0); assert.ok(!text(tree.toJSON()).includes('Savdo bekor qilindi.'));
+    if (after.role === 'cashier') {
+      await open(tree); assert.equal(tree.root.findAllByType('form').length, 0);
+      if (after.shop_id === 'another-shop') assert.ok(!text(tree.toJSON()).includes('sale-1'));
+    }
+    await act(async () => tree.unmount());
+  }
+});
+
+test('identity change while waiting for local queue lock prevents an unsent backend request', async () => {
+  const wait = deferred(); let captured;
+  const f = setup({ cancel: async args => { captured = args; await wait.promise; return args.send({}); } });
+  const tree = await mount(f, { user: cashier }); await open(tree); await select(tree); await fill(tree);
+  let first; act(() => { first = tree.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+  await act(async () => tree.update(React.createElement(f.Component, { ...f.props, user: { ...cashier, shop_id: 'another-shop' } })));
+  assert.equal(captured.actorId, cashier.id);
+  // The API mock throws "Unexpected real invocation" if the lifecycle guard fails.
+  await act(async () => { wait.resolve(); await first; });
+  assert.equal(f.updates, 0); assert.equal(tree.root.findAllByType('form').length, 0);
+  assert.throws(() => captured.send({}), /Hisob yoki ish joyi/);
+  await act(async () => tree.unmount());
+});
+
+test('cashier queue notifications filter foreign rows and clear stale selection/code', async () => {
+  const f = setup(), tree = await mount(f, { user: cashier }); await open(tree); await select(tree); await fill(tree);
+  await act(async () => f.notify([{ ...row, user_id: 'another-cashier' }, { ...row, shop_id: 'another-shop' }]));
+  assert.equal(tree.root.findAllByType('input').length, 0); assert.ok(!text(tree.toJSON()).includes('sale-1'));
+  assert.deepEqual(f.readScopes, [['cashier'], ['cashier']]); await act(async () => tree.unmount());
 });

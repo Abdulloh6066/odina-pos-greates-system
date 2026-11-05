@@ -398,15 +398,16 @@ export function isPendingSaleCancellation(record, payload) {
     && payload.shop_id === record.shop_id;
 }
 
-export async function cancelPendingSale({ recordId, ownerId, ownerPin, reason, send,
+export async function cancelPendingSale({ recordId, actorId, isOwner = false, shopId, ownerPin, reason, send,
   storage = { list: listPendingSales, remove: removePendingSale }, lock = withSyncLock,
 }) {
-  if (!ownerId || !recordId || typeof send !== 'function') throw new Error('Hisob egasi va savdo tanlanishi kerak.');
+  if (!actorId || !recordId || (!isOwner && !shopId) || typeof send !== 'function') throw new Error('Xodim va savdo tanlanishi kerak.');
   if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('Bekor qilish uchun internet kerak.');
   return lock(async () => {
-    const records = await storage.list();
+    const records = isOwner ? await storage.list() : await storage.list(actorId);
     const record = records.find((row) => row.id === recordId);
-    if (!record || record.status === 'confirmed' || record.id !== record.request?.idempotency_key) {
+    if (!record || record.status === 'confirmed' || record.id !== record.request?.idempotency_key
+      || (!isOwner && (record.user_id !== actorId || record.shop_id !== shopId))) {
       throw new Error('Savdo navbatda topilmadi yoki allaqachon tasdiqlangan. Ro‘yxatni yangilang.');
     }
     // PIN exists only in this online request, never in IndexedDB or retry state.

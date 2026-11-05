@@ -136,7 +136,7 @@ function queue() {
     shift_id: original.shift_id, shop_id: original.shop_id } };
 }
 function cancelOptions(q, extra = {}) {
-  return { recordId: q.original.id, ownerId: 'owner', ownerPin: pin, reason: 'Xato savdo',
+  return { recordId: q.original.id, actorId: 'owner', isOwner: true, ownerPin: pin, reason: 'Xato savdo',
     storage: q.storage, lock: work => work(), send: async () => q.ack, ...extra };
 }
 
@@ -172,4 +172,144 @@ test('cashier queue replay consumes only a cancellation ACK bound to the saved s
   const bad = queue(); const retained = await syncPendingSales({ userId: 'cashier', storage: bad.storage, lock: work => work(),
     send: async () => ({ ...bad.ack, shop_id: 'different-shop' }) });
   assert.equal(retained.remaining, 1);
+});
+
+test('stored cashier cancels their own assigned-shop shift with existing admin code and durable actor audit', async () => {
+  const f = fixture(), before = financialState(f), users = structuredClone(f.db.User);
+  const reply = await f.invokeAs(f.cashier, f.cancelBody);
+  assert.equal(reply.status, 200); assert.equal(reply.data.cancelled, true);
+  const entry = f.db.Shift[0].cancelled_sale_requests[0];
+  assert.equal(entry.cancelled_by, f.cashier.id); assert.equal(entry.cancelled_by_role, 'cashier');
+  assert.equal(entry.user_id, f.cashier.id); assert.equal(entry.shop_id, f.cashier.shop_id);
+  assert.equal(entry.reason, f.cancelBody.reason); assert.ok(entry.cancelled_at);
+  assert.equal(f.db.ActionHistory.filter(row => row.user_id === f.cashier.id && row.action === 'owner_pin_verified').length, 1);
+  assert.equal(f.db.ActionHistory.filter(row => row.user_id === f.cashier.id && row.action === 'pending_sale_cancelled').length, 1);
+  assert.deepEqual(financialState(f), before); assert.deepEqual(f.db.User, users);
+  assert.ok(!JSON.stringify(f.db).includes(pin));
+});
+
+test('cashier missing/wrong admin code and rate limit cannot claim or alter the sale', async () => {
+  const f = fixture(), before = financialState(f);
+  for (const owner_pin of [undefined, '', '000000', '000000', '000000']) {
+    assert.equal((await f.invokeAs(f.cashier, { ...f.cancelBody, owner_pin })).status, 403);
+  }
+  assert.equal((await f.invokeAs(f.cashier, f.cancelBody)).status, 403);
+  assert.equal(f.db.ActionHistory.filter(row => row.user_id === f.cashier.id && row.action === 'owner_pin_failed').length, 5);
+  assert.deepEqual(f.db.Shift[0].sale_request_keys, []); assert.deepEqual(financialState(f), before);
+  // Failure limits use the stored actor, so body/auth claims cannot select another counter.
+  assert.equal((await f.invokeAs({ ...f.cashier, role: 'admin', is_owner: true },
+    { ...f.cancelBody, user_id: f.owner.id, actor_id: f.owner.id })).status, 403);
+  assert.equal((await f.cancel()).status, 200);
+});
+
+test('cashier cannot cancel another user or shop even with a valid code and spoofed request/auth fields', async () => {
+  for (const shiftPatch of [{ user_id: 'another-cashier' }, { shop_id: 'another-shop' },
+    { user_id: 'another-cashier', shop_id: 'another-shop' }]) {
+    const f = fixture(); Object.assign(f.db.Shift[0], shiftPatch);
+    const before = structuredClone(f.db.Shift[0]);
+    const reply = await f.invokeAs({ ...f.cashier, role: 'admin', is_owner: true, shop_id: 'another-shop' },
+      { ...f.cancelBody, user_id: f.owner.id, shop_id: 'another-shop', is_owner: true, role: 'admin' });
+    assert.equal(reply.status, 403); assert.deepEqual(f.db.Shift[0], before);
+    assert.equal(f.db.ActionHistory.length, 0);
+    // Owner's existing cross-cashier device recovery remains available.
+    assert.equal((await f.cancel()).status, 200);
+  }
+});
+
+test('cashier must be active, assigned and matched by authenticated ID; stored role overrides spoofing', async () => {
+  for (const patch of [{ shop_id: '' }, { active: false }, { data: { active: false } },
+    { role: 'manager' }, { role: 'admin', is_owner: false }, { role: 'accountant' }]) {
+    const f = fixture(); Object.assign(f.cashier, patch);
+    assert.equal((await f.invokeAs({ ...f.cashier, role: 'cashier', shop_id: 'mock-central', is_owner: true }, f.cancelBody)).status, 403);
+    assert.deepEqual(f.db.Shift[0].sale_request_keys, []);
+  }
+  const f = fixture(); f.cashier.email = 'mock-cashier@example.invalid';
+  const reply = await f.invokeAs({ id: 'different-auth-id', email: f.cashier.email, role: 'cashier' }, f.cancelBody);
+  assert.equal(reply.status, 403); assert.deepEqual(f.db.Shift[0].sale_request_keys, []);
+});
+
+test('cashier cancellation retry requires fresh valid admin code and current scope before any replay ACK', async () => {
+  const f = fixture(); assert.equal((await f.invokeAs(f.cashier, f.cancelBody)).status, 200);
+  const journal = structuredClone(f.db.Shift[0].cancelled_sale_requests);
+  assert.equal((await f.invokeAs(f.cashier, { ...f.cancelBody, owner_pin: '000000' })).status, 403);
+  assert.equal((await f.invokeAs(f.cashier, { ...f.cancelBody, reason: 'Retry reason' })).status, 200);
+  f.cashier.shop_id = 'reassigned-shop';
+  assert.equal((await f.invokeAs(f.cashier, f.cancelBody)).status, 403);
+  f.cashier.shop_id = f.db.Shift[0].shop_id; f.db.Shift[0].user_id = 'reassigned-cashier';
+  assert.equal((await f.invokeAs(f.cashier, f.cancelBody)).status, 403);
+  assert.deepEqual(f.db.Shift[0].cancelled_sale_requests, journal);
+});
+
+test('cashier rejects completed, claimed and closing work, and may cancel an unclaimed closed-shift queue', async () => {
+  const done = fixture(); assert.equal((await done.invokeAs(done.cashier, done.request)).status, 200);
+  const before = financialState(done);
+  assert.equal((await done.invokeAs(done.cashier, done.cancelBody)).status, 409);
+  assert.deepEqual(financialState(done), before);
+  for (const status of ['open', 'closed', 'closing']) {
+    const f = fixture(); f.db.Shift[0].status = status;
+    f.db.Shift[0].sale_request_keys.push(f.request.idempotency_key);
+    assert.equal((await f.invokeAs(f.cashier, f.cancelBody)).status, 409);
+    assert.equal(f.db.Shift[0].cancelled_sale_requests, undefined);
+  }
+  const closing = fixture(); closing.db.Shift[0].status = 'closing';
+  assert.equal((await closing.invokeAs(closing.cashier, closing.cancelBody)).status, 409);
+  const closed = fixture(); closed.db.Shift[0].status = 'closed'; const snapshot = financialState(closed);
+  assert.equal((await closed.invokeAs(closed.cashier, closed.cancelBody)).status, 200);
+  assert.deepEqual(financialState(closed), snapshot);
+});
+
+test('cashier cancellation and checkout race on the same atomic key in either order', async () => {
+  const checkoutFirst = fixture(), updateFirst = checkoutFirst.entities.Shift.updateMany;
+  checkoutFirst.entities.Shift.updateMany = async (query, patch) => {
+    if (patch.$push?.cancelled_sale_requests) checkoutFirst.db.Shift[0].sale_request_keys.push(checkoutFirst.request.idempotency_key);
+    return updateFirst(query, patch);
+  };
+  assert.equal((await checkoutFirst.invokeAs(checkoutFirst.cashier, checkoutFirst.cancelBody)).status, 409);
+  assert.equal(checkoutFirst.db.Shift[0].cancelled_sale_requests, undefined);
+  const cancelFirst = fixture(), update = cancelFirst.entities.Shift.updateMany; let inserted = false;
+  cancelFirst.entities.Shift.updateMany = async (query, patch) => {
+    if (!inserted && patch.$push?.sale_request_keys && !patch.$push?.cancelled_sale_requests) {
+      inserted = true;
+      assert.equal((await cancelFirst.invokeAs(cancelFirst.cashier, cancelFirst.cancelBody)).status, 200);
+    }
+    return update(query, patch);
+  };
+  const before = financialState(cancelFirst);
+  const reply = await cancelFirst.invokeAs(cancelFirst.cashier, cancelFirst.request);
+  assert.equal(reply.status, 200); assert.equal(reply.data.cancelled, true);
+  assert.deepEqual(financialState(cancelFirst), before);
+});
+
+test('cashier recovers lost atomic response with one journal and exact shift/user/shop ACK', async () => {
+  const f = fixture(), update = f.entities.Shift.updateMany;
+  f.entities.Shift.updateMany = async (...args) => { await update(...args); throw new Error('Lost response'); };
+  const reply = await f.invokeAs(f.cashier, f.cancelBody);
+  assert.equal(reply.status, 200); assert.equal(reply.data.idempotency_key, f.request.idempotency_key);
+  assert.equal(reply.data.shift_id, f.request.shift_id); assert.equal(reply.data.user_id, f.cashier.id);
+  assert.equal(reply.data.shop_id, f.cashier.shop_id); assert.equal(f.db.Shift[0].cancelled_sale_requests.length, 1);
+});
+
+test('local cashier cancellation reads own queue, checks assigned shop and sends no role grant', async () => {
+  const q = queue(); let scope, request;
+  const list = q.storage.list; q.storage.list = async id => { scope = id; return list(id); };
+  await cancelPendingSale(cancelOptions(q, { actorId: 'cashier', isOwner: false, shopId: 'shop',
+    send: async body => { request = body; return q.ack; } }));
+  assert.equal(scope, 'cashier'); assert.equal(q.rows().length, 0);
+  assert.deepEqual(Object.keys(request).sort(), ['action', 'idempotency_key', 'owner_pin', 'reason', 'shift_id']);
+  for (const scope of [{ actorId: 'other', shopId: 'shop' }, { actorId: 'cashier', shopId: 'other' },
+    { actorId: 'cashier', shopId: '' }]) {
+    const retained = queue(); let sends = 0;
+    await assert.rejects(cancelPendingSale(cancelOptions(retained, { ...scope, isOwner: false,
+      send: async () => { sends++; return retained.ack; } })));
+    assert.equal(sends, 0); assert.deepEqual(retained.rows(), [retained.original]);
+  }
+});
+
+test('cashier retains local row for a mismatched key, shift, user or shop acknowledgment', async () => {
+  for (const field of ['idempotency_key', 'shift_id', 'user_id', 'shop_id']) {
+    const q = queue();
+    await assert.rejects(cancelPendingSale(cancelOptions(q, { actorId: 'cashier', isOwner: false, shopId: 'shop',
+      send: async () => ({ ...q.ack, [field]: 'different' }) })));
+    assert.deepEqual(q.rows(), [q.original]);
+  }
 });

@@ -16,26 +16,29 @@ const DialogContent = /** @type {React.ComponentType<Record<string, any>>} */ (D
 const DialogTitle = /** @type {React.ComponentType<Record<string, any>>} */ (DialogTitlePrimitive);
 const DialogDescription = /** @type {React.ComponentType<Record<string, any>>} */ (DialogDescriptionPrimitive);
 
-// The server independently verifies the authenticated owner and the PIN.
+// The server independently verifies the stored actor, shop and admin approval code.
 export default function OwnerPendingSalesDialog({ user, isOnline, syncing, onCancelled }) {
   const isOwner = user?.role === 'admin' && (user?.is_owner === true || user?.data?.is_owner === true);
-  if (!isOwner || !user?.id) return null;
-  return <OwnerQueue key={user.id} ownerId={user.id} isOnline={isOnline} syncing={syncing} onCancelled={onCancelled} />;
+  const shopId = user?.shop_id || user?.data?.shop_id || '';
+  const isCashier = user?.role === 'cashier' && Boolean(shopId);
+  if ((!isOwner && !isCashier) || !user?.id || user.active === false || user.data?.active === false) return null;
+  return <PendingQueue key={JSON.stringify([user.id, user.role, shopId, isOwner])}
+    actorId={user.id} isOwner={isOwner} shopId={shopId} isOnline={isOnline} syncing={syncing} onCancelled={onCancelled} />;
 }
 
-function OwnerQueue({ ownerId, isOnline, syncing, onCancelled }) {
+function PendingQueue({ actorId, isOwner, shopId, isOnline, syncing, onCancelled }) {
   const [open, setOpen] = useState(false);
   return <>
     <div className="mx-3 sm:mx-5 mt-3 shrink-0">
       <Button type="button" variant="outline" className="min-h-11" onClick={() => setOpen(true)}>Navbatdagi savdolar</Button>
     </div>
     <Dialog open={open} onOpenChange={setOpen}>
-      {open && <PendingSalesContent ownerId={ownerId} isOnline={isOnline} syncing={syncing} onCancelled={onCancelled} />}
+      {open && <PendingSalesContent actorId={actorId} isOwner={isOwner} shopId={shopId} isOnline={isOnline} syncing={syncing} onCancelled={onCancelled} />}
     </Dialog>
   </>;
 }
 
-function PendingSalesContent({ ownerId, isOnline, syncing, onCancelled }) {
+function PendingSalesContent({ actorId, isOwner, shopId, isOnline, syncing, onCancelled }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -56,10 +59,11 @@ function PendingSalesContent({ ownerId, isOnline, syncing, onCancelled }) {
     const refresh = async () => {
       const current = ++generation;
       try {
-        // Deliberately device-wide: the owner must see a cashier's pending queue.
-        const rows = await listPendingSales();
+        // Owners retain device-wide recovery; cashiers read only their own queue.
+        const rows = isOwner ? await listPendingSales() : await listPendingSales(actorId);
         if (!active.current || current !== generation) return;
-        setRecords(rows.filter(row => row.status !== 'confirmed'));
+        setRecords(rows.filter(row => row.status !== 'confirmed'
+          && (isOwner || (row.user_id === actorId && row.shop_id === shopId))));
         setLoadError('');
       } catch {
         if (active.current && current === generation) {
@@ -74,7 +78,7 @@ function PendingSalesContent({ ownerId, isOnline, syncing, onCancelled }) {
     void refresh();
     const unsubscribe = subscribePendingSales(refresh);
     return () => { active.current = false; generation++; reload.current = null; unsubscribe(); };
-  }, []);
+  }, [actorId, isOwner, shopId]);
 
   useEffect(() => {
     if (selectedId && !selected) {
@@ -94,8 +98,11 @@ function PendingSalesContent({ ownerId, isOnline, syncing, onCancelled }) {
     const ownerPin = pin;
     setPin('');
     try {
-      const result = await cancelPendingSale({ recordId: selected.id, ownerId, ownerPin, reason: reason.trim(),
-        send: body => base44.functions.invoke('complete-sale', body) });
+      const result = await cancelPendingSale({ recordId: selected.id, actorId, isOwner, shopId, ownerPin, reason: reason.trim(),
+        send: body => {
+          if (!active.current) throw new Error('Hisob yoki ish joyi o‘zgardi. Savdoni qayta tanlang.');
+          return base44.functions.invoke('complete-sale', body);
+        } });
       if (!active.current) return;
       if (!result?.cancelled) {
         setError(result?.skipped ? 'Savdo hozir yuborilmoqda. Biroz kutib, qayta urinib ko‘ring.' : 'Bekor qilish tasdiqlanmadi.');
@@ -116,7 +123,7 @@ function PendingSalesContent({ ownerId, isOnline, syncing, onCancelled }) {
   return <DialogContent className="max-w-xl max-h-[90dvh] overflow-y-auto">
     <DialogHeader className="space-y-2">
       <DialogTitle>Navbatdagi savdolar</DialogTitle>
-      <DialogDescription>Shu qurilmada server tasdig‘ini kutayotgan savdolar. Faqat egasi PIN kod bilan bekor qilishi mumkin.</DialogDescription>
+      <DialogDescription>{isOwner ? 'Shu qurilmada server tasdig‘ini kutayotgan savdolar.' : 'Shu qurilmada o‘z do‘koningizdagi server tasdig‘ini kutayotgan o‘z savdolaringiz.'} Bekor qilish uchun admin tasdiqlash kodi kerak.</DialogDescription>
     </DialogHeader>
     {!isOnline && <p role="alert" className="text-sm text-destructive">Bekor qilish uchun internet aloqasi kerak.</p>}
     {syncing && <p role="status" className="text-sm">Savdolar yuborilmoqda. Tugashini kuting.</p>}
@@ -140,7 +147,7 @@ function PendingSalesContent({ ownerId, isOnline, syncing, onCancelled }) {
       <p className="text-sm">Summa: {formatUZS(selected.local_sale?.total)}. Server tasdiqlagandan keyin savdo navbatdan olinadi.</p>
       <label className="block text-sm" htmlFor="pending-sale-reason">Bekor qilish sababi</label>
       <Textarea id="pending-sale-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={500} required disabled={busy} />
-      <label className="block text-sm" htmlFor="pending-sale-pin">Egasi PIN kodi</label>
+      <label className="block text-sm" htmlFor="pending-sale-pin">Admin tasdiqlash kodi</label>
       <Input id="pending-sale-pin" type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event => setPin(event.target.value)} required disabled={busy} />
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" className="min-h-11 flex-1" disabled={busy} onClick={() => { setSelectedId(''); setPin(''); setReason(''); setError(''); }}>Yo‘q, qolsin</Button>

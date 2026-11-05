@@ -13,9 +13,12 @@ export function cancelledPendingSaleResponse(shift: any, key: string, userId: st
 }
 
 export async function cancelPendingSaleRequest({ service, authenticatedUser, user, body, verifyOwnerPin }: any) {
-  // Do not accept an ordinary admin, a browser flag, or an email-fallback identity.
-  if (user.role !== 'admin' || user.is_owner !== true || String(authenticatedUser?.id) !== String(user.id)) {
-    return Response.json({ error: 'Navbatdagi savdoni faqat hisob egasi bekor qila oladi.' }, { status: 403 });
+  // Roles and shop come from the stored User, never the browser or an email fallback.
+  const isOwner = user.role === 'admin' && user.is_owner === true;
+  const isCashier = user.role === 'cashier' && Boolean(user.shop_id);
+  if ((!isOwner && !isCashier) || user.active === false || user.data?.active === false
+    || !authenticatedUser?.id || String(authenticatedUser.id) !== String(user.id)) {
+    return Response.json({ error: 'Bu savdoni bekor qilishga ruxsat yo‘q.' }, { status: 403 });
   }
   const key = String(body?.idempotency_key || '');
   const shiftId = String(body?.shift_id || '');
@@ -24,16 +27,18 @@ export async function cancelPendingSaleRequest({ service, authenticatedUser, use
     || [...reason].some((character: string) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
     return Response.json({ error: 'Savdo, smena va bekor qilish sababi (1–500 belgi) kerak.' }, { status: 400 });
   }
-  if (!(await verifyOwnerPin(service, body?.owner_pin, user))) {
-    return Response.json({ error: 'Egasi PIN kodi noto‘g‘ri yoki urinishlar vaqtincha cheklangan.' }, { status: 403 });
+  const shift = await service.entities.Shift.get(shiftId);
+  // Enforce scope before returning any prior acknowledgment or inspecting sales.
+  if (isCashier && (!shift || shift.user_id !== user.id || shift.shop_id !== user.shop_id)) {
+    return Response.json({ error: 'Faqat o‘z do‘koningizdagi o‘z smenangiz savdosini bekor qilish mumkin.' }, { status: 403 });
   }
-  const [shift, sales] = await Promise.all([
-    service.entities.Shift.get(shiftId),
-    service.entities.Sale.filter({ idempotency_key: key }, '-created_date', 2),
-  ]);
+  if (!(await verifyOwnerPin(service, body?.owner_pin, user))) {
+    return Response.json({ error: 'Admin tasdiqlash kodi noto‘g‘ri yoki urinishlar vaqtincha cheklangan.' }, { status: 403 });
+  }
   if (!shift?.user_id || !shift.shop_id) {
     return Response.json({ error: 'Savdo smenasi topilmadi.' }, { status: 404 });
   }
+  const sales = await service.entities.Sale.filter({ idempotency_key: key }, '-created_date', 2);
   if (sales?.length) {
     return Response.json({ error: 'Savdo serverda mavjud. Navbatdan bekor qilib bo‘lmaydi; savdo tarixidan qaytarishni tekshiring.' }, { status: 409 });
   }
@@ -43,7 +48,7 @@ export async function cancelPendingSaleRequest({ service, authenticatedUser, use
     return Response.json({ error: 'Savdo yoki smena serverda bajarilmoqda, yoxud natijasi noaniq. Bekor qilinmadi; egasi tekshirishi kerak.' }, { status: 409 });
   }
   const cancellation = { idempotency_key: key, user_id: shift.user_id, shop_id: shift.shop_id,
-    cancelled_by: user.id, cancelled_at: new Date().toISOString(), reason };
+    cancelled_by: user.id, cancelled_by_role: user.role, cancelled_at: new Date().toISOString(), reason };
   try {
     await service.entities.Shift.updateMany(
       { id: shift.id, user_id: shift.user_id, shop_id: shift.shop_id, status: shift.status,
@@ -61,7 +66,7 @@ export async function cancelPendingSaleRequest({ service, authenticatedUser, use
   }
   // The atomic journal above is the durable audit even if this feed is unavailable.
   await service.entities.ActionHistory.create({ user_id: user.id,
-    user_name: user.full_name || user.email || 'Egasi', action: 'pending_sale_cancelled',
+    user_name: user.full_name || user.email || (isOwner ? 'Egasi' : 'Kassir'), action: 'pending_sale_cancelled',
     details: `${key} · smena ${shift.id} · do‘kon ${shift.shop_id} · kassir ${shift.user_id} · ${reason}`,
   }).catch(() => {});
   return Response.json(confirmed);

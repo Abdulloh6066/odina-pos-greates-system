@@ -83,7 +83,9 @@
       "default": [],
       "rls": {
         "read": true,
-        "write": false
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
       }
     },
     "checkout_queue_resume_ms": {
@@ -180,6 +182,10 @@
           "cancelled_by": {
             "type": "string"
           },
+          "cancelled_by_role": {
+            "type": "string",
+            "enum": ["admin", "cashier"]
+          },
           "cancelled_at": {
             "type": "string"
           },
@@ -190,7 +196,9 @@
       },
       "rls": {
         "read": true,
-        "write": false
+        "write": false,
+        "create": { "user_condition": { "collaborator_role": "editor" } },
+        "update": { "user_condition": { "collaborator_role": "editor" } }
       }
     }
   },
