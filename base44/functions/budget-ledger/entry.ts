@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveAppUser } from "../../shared/user-helpers.ts";
-import { financialRequestKey, runBudgetAdjustment, runSupplierPayment } from "../../shared/supplier-payment-recovery.ts";
+import { financialRequestKey, runBudgetAdjustment, runSupplierPayment, ensureBudgetAccount } from "../../shared/supplier-payment-recovery.ts";
 
 const ACCOUNTS = new Set(["cash", "uzcard", "humo", "online", "bank"]);
 const ACCOUNT_LABELS: Record<string, string> = {
@@ -88,6 +88,172 @@ async function verifyOwnerPin(service: any, pinValue: unknown, actor: any) {
   return verified;
 }
 
+
+function bankCardError(message, status = 503, pending = true) {
+  return Object.assign(new Error(message), { status, operation_pending: pending });
+}
+
+function readBankCardJournal(row, field) {
+  if (!row) throw bankCardError("Moliyaviy yozuv topilmadi.", 404);
+  if (!row[field]) return {};
+  try {
+    const value = JSON.parse(row[field]);
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value;
+  } catch {
+    throw bankCardError("Moliyaviy amal holatini egasi tekshirishi kerak.");
+  }
+}
+
+async function updateBankCardState(entity, id, field, key, change) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const row = await entity.get(id);
+    const journal = readBankCardJournal(row, field);
+    const current = journal[key];
+    const next = change(current ? structuredClone(current) : null, row);
+    if (!next) return current;
+    next.revision = crypto.randomUUID();
+    journal[key] = next;
+    const query = { id, [field]: row[field] === undefined ? { $exists: false } : row[field] };
+    try {
+      const result = await entity.updateMany(query, { $set: { [field]: JSON.stringify(journal) } });
+      if (result?.success && Number(result.updated) === 1) return next;
+    } catch (error) {
+      const latest = await entity.get(id);
+      if (readBankCardJournal(latest, field)[key]?.revision === next.revision) return next;
+      if (Number(error?.status || error?.response?.status) >= 400
+        && Number(error?.status || error?.response?.status) < 500) throw error;
+    }
+  }
+  throw bankCardError("Bank card amali bir vaqtda o‘zgardi. Shu so‘rovni tekshiring.");
+}
+
+async function bankCardRequestDigest(value) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// The parent freezes a server-calculated allocation. Each child uses the existing
+// durable Budget adjustment engine and its original idempotent recovery protocol.
+async function runCombinedBankCardAdjustment(service, user, input, labels) {
+  const field = "financial_operations_json";
+  const fingerprint = JSON.stringify(["manual_adjustment", user.id, "bank_card",
+    input.direction, input.amount, input.description]);
+  const digest = await bankCardRequestDigest(fingerprint);
+  const settings = await service.entities.Settings.list("created_date", 2);
+  if (settings.length !== 1) throw bankCardError("Ilova sozlamasini egasi tekshirishi kerak.", 409, false);
+  await updateBankCardState(service.entities.Settings, settings[0].id,
+    "budget_account_initialization_json", "request:" + input.key, prior => {
+      if (prior) {
+        if (prior.actor !== user.id || prior.digest !== digest) {
+          throw bankCardError("Bu so‘rov kaliti boshqa moliyaviy amal uchun ishlatilgan.", 409, false);
+        }
+        return null;
+      }
+      return { actor: user.id, digest };
+    });
+
+  const cards = await Promise.all(["uzcard", "humo"].map(account =>
+    ensureBudgetAccount(service, account, labels[account], user)));
+  const anchor = cards[0];
+  const childKeys = await Promise.all(cards.map(async card => ({
+    account: card.account,
+    key: "bc_" + await bankCardRequestDigest(JSON.stringify([user.id, input.key, card.account, "apply"])),
+    reverseKey: "bc_" + await bankCardRequestDigest(JSON.stringify([user.id, input.key, card.account, "reverse"])),
+  })));
+  let operation = await updateBankCardState(service.entities.BudgetBalance, anchor.id, field, input.key,
+    (prior, current) => {
+      if (prior) {
+        if (prior.actor !== user.id || prior.fingerprint !== fingerprint) {
+          throw bankCardError("Bu so‘rov kaliti boshqa Budget amali uchun ishlatilgan.", 409, false);
+        }
+        return null;
+      }
+      const available = Number(current.balance || 0) + Number(cards[1].balance || 0);
+      if (input.direction === "out" && input.amount > available) {
+        throw bankCardError("Bank card hisobida mablag‘ yetarli emas.", 400, false);
+      }
+      const first = input.direction === "in" ? input.amount
+        : Math.min(input.amount, Math.max(0, money(current.balance)));
+      const amounts = [first, input.amount - first];
+      return {
+        actor: user.id, fingerprint, direction: input.direction, amount: input.amount,
+        description: input.description, status: "processing",
+        allocations: childKeys.map((part, index) => ({ ...part, amount: amounts[index] }))
+          .filter(part => part.amount > 0),
+      };
+    });
+
+  const saveState = change => updateBankCardState(service.entities.BudgetBalance,
+    anchor.id, field, input.key, change);
+  const reversed = () => Object.assign(
+    bankCardError("Bank card amali bajarilmadi va mablag‘ qaytarildi. Qayta urinib ko‘ring.", 409, false),
+    { operation_reversed: true });
+  if (operation.status === "reversed") throw reversed();
+  if (operation.status === "completed") {
+    const transactions = await Promise.all(operation.transaction_ids.map(id =>
+      service.entities.BudgetTransaction.get(id)));
+    if (transactions.some(transaction => !transaction)) throw bankCardError("Budget tarixi topilmadi.");
+    return { transaction: transactions[0], transactions, already_processed: true };
+  }
+
+  const compensate = async () => {
+    for (const part of operation.allocations) {
+      const transactions = await service.entities.BudgetTransaction.filter({
+        idempotency_key: part.key, performed_by_id: user.id,
+      }, "created_date", 2);
+      if (transactions.length > 1) throw bankCardError("Takroriy Budget tarixi topildi.");
+      if (!transactions.length) continue;
+      const transaction = transactions[0];
+      if (transaction.account !== part.account || transaction.amount !== part.amount
+        || transaction.direction !== operation.direction) throw bankCardError("Budget tarixi so‘rovga mos emas.");
+      await runBudgetAdjustment(service, user, {
+        key: part.reverseKey, account: part.account,
+        direction: operation.direction === "out" ? "in" : "out",
+        amount: part.amount, description: "Bank card amalini qaytarish · " + operation.description,
+      }, labels);
+    }
+    await saveState(prior => ({ ...prior, status: "reversed" }));
+    throw reversed();
+  };
+  if (operation.compensation_requested) {
+    try { return await compensate(); }
+    catch (error) {
+      if (error.operation_reversed) throw error;
+      throw Object.assign(error, { operation_pending: true });
+    }
+  }
+
+  try {
+    const transactions = [];
+    for (const part of operation.allocations) {
+      const latest = readBankCardJournal(await service.entities.BudgetBalance.get(anchor.id), field)[input.key];
+      if (latest.compensation_requested) throw bankCardError("Bank card amali qaytarilmoqda.");
+      const result = await runBudgetAdjustment(service, user, {
+        key: part.key, account: part.account, direction: operation.direction,
+        amount: part.amount, description: operation.description,
+      }, labels);
+      transactions.push(result.transaction);
+    }
+    await saveState(prior => {
+      if (prior.compensation_requested) throw bankCardError("Bank card amali qaytarilmoqda.");
+      return { ...prior, status: "completed", transaction_ids: transactions.map(transaction => transaction.id) };
+    });
+    return { transaction: transactions[0], transactions, already_processed: false };
+  } catch (error) {
+    const status = Number(error?.status || error?.response?.status || 0);
+    const definite = error.operation_reversed
+      || (!error.operation_pending && [400, 403, 404, 422].includes(status));
+    if (!definite) throw Object.assign(error, { operation_pending: true });
+    operation = await saveState(prior => ({ ...prior, compensation_requested: true }));
+    try { return await compensate(); }
+    catch (failure) {
+      if (failure.operation_reversed) throw failure;
+      throw Object.assign(failure, { operation_pending: true });
+    }
+  }
+}
+
 export default async function(req) {
   const base44 = createClientFromRequest(req);
   const service = base44.asServiceRole;
@@ -123,11 +289,12 @@ export default async function(req) {
       const direction = String(body?.direction || "");
       const amount = money(body?.amount);
       const description = String(body?.description || "").trim();
-      if (!ACCOUNTS.has(account) || !["in", "out"].includes(direction) || !Number.isSafeInteger(amount) || amount <= 0 || description.length < 3) {
+      if ((!ACCOUNTS.has(account) && account !== "bank_card") || !["in", "out"].includes(direction) || !Number.isSafeInteger(amount) || amount <= 0 || description.length < 3) {
         return Response.json({ error: "Hisob, amal, musbat summa va izoh majburiy." }, { status: 400 });
       }
 
-      const result = await runBudgetAdjustment(service, user, {
+      const adjust = account === "bank_card" ? runCombinedBankCardAdjustment : runBudgetAdjustment;
+      const result = await adjust(service, user, {
         key: financialRequestKey(body), account, direction, amount, description,
       }, ACCOUNT_LABELS);
       return Response.json(result);
