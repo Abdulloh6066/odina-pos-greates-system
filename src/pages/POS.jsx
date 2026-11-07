@@ -46,6 +46,7 @@ import { canQueuePosSale, isPosNetworkError } from '@/lib/pos-network';
 import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, restartCatalog, restartRead, updateRestartStock } from '@/lib/offline-restart';
 import OfflineRestartStatus from '@/components/pos/OfflineRestartStatus';
 import OfflineSalesBanner from '@/components/pos/OfflineSalesBanner';
+import PendingSalesDialog from '@/components/pos/PendingSalesDialog';
 import CategoryIcon from '@/components/CategoryIcon';
 import '@/components/pos/pos-workbench.css';
 import {
@@ -199,6 +200,7 @@ export default function POS() {
   const [shiftLoading, setShiftLoading] = useState(false);
   const [discountApprovalOpen, setDiscountApprovalOpen] = useState(false);
   const [pendingDiscountCode, setPendingDiscountCode] = useState('');
+  const [pendingSalesOpen, setPendingSalesOpen] = useState(false);
   const [discountLoading, setDiscountLoading] = useState(false);
   const [cashWithdrawalOpen, setCashWithdrawalOpen] = useState(false);
   const [cashWithdrawalLoading, setCashWithdrawalLoading] = useState(false);
@@ -228,7 +230,7 @@ export default function POS() {
   const savingTableRef = useRef(false);
   const [tableReload, setTableReload] = useState(0);
   const scopeWorkPending = cart.length > 0 || Boolean(selectedTable || takeawayOrder || takeawayRequestIdRef.current)
-    || paying || payOpen || stockChecking || savingTable || takeawaySaving || checkoutRetryPending
+    || paying || payOpen || stockChecking || savingTable || takeawaySaving || checkoutRetryPending || pendingSalesOpen
     || shiftLoading || cashWithdrawalLoading || Boolean(cancellingTakeawayId);
   useEffect(() => shopScope?.registerGuard?.(() => scopeWorkPending
     ? 'Do‘konni almashtirishdan oldin joriy savat yoki ochiq buyurtmani yakunlang yoki saqlab yoping. Amal bajarilayotgan bo‘lsa, tugashini kuting.' : ''),
@@ -743,6 +745,7 @@ export default function POS() {
     syncError: offlineSyncError,
     enqueue: enqueueOfflineSale,
     syncNow: syncOfflineSales,
+    resolveRecord: resolveOfflineSale,
   } = useOfflineSaleQueue(user?.id, () => loadAll({ showLoading: false }).catch(() => {}), (currentShift) => {
     saveShiftRestart(user, currentShift);
     shiftMutationRef.current++;
@@ -2139,7 +2142,11 @@ export default function POS() {
         storageError={offlineStorageError}
         syncError={offlineSyncError}
         onRetry={syncOfflineSales}
+        onOpenReview={() => setPendingSalesOpen(true)}
       />
+      {pendingSalesOpen && <PendingSalesDialog key={user.id} records={offlineSales}
+        online={browserOnline} syncing={offlineSyncing} onRetry={syncOfflineSales}
+        onResolve={resolveOfflineSale} onClose={() => setPendingSalesOpen(false)} />}
 
       {(selectedTable || tableQuery.invalid) && (
         <div className="mx-3 sm:mx-5 mt-3 shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 p-3 text-sm">
