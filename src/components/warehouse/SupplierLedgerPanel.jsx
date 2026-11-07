@@ -854,7 +854,7 @@ function CancelReceiptDialog({ receipt, onClose, onCancelled }) {
         <div>
           <Label className="text-xs mb-1.5 block">Owner PIN</Label>
           <Input
-            type="password"
+            type="password" autoComplete="one-time-code" data-lpignore="true" data-1p-ignore="true" data-bwignore="true"
             inputMode="numeric"
             maxLength={8}
             value={ownerPin}
