@@ -80,7 +80,9 @@ export default function CashRecipients() {
         <div className="odina-panel rounded-2xl border border-border bg-card py-16 text-center">
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
           <p className="font-medium">Qabul qiluvchi topilmadi</p>
-          <p className="text-sm text-muted-foreground mt-1">{adminShopScope?.isAdmin && selectedShopId !== 'all'
+          <p className="text-sm text-muted-foreground mt-1">{search.trim()
+            ? 'Qidiruv bo‘yicha qabul qiluvchi topilmadi.'
+            : adminShopScope?.isAdmin && selectedShopId !== 'all'
             ? 'Bu do‘konga biriktirilgan qabul qiluvchi yo‘q. “Barcha do‘konlar”ni tanlang yoki qabul qiluvchini tahrirlab shu do‘konga biriktiring.'
             : '“Yangi qabul qiluvchi” orqali birinchi kompaniyani kiriting.'}</p>
         </div>
