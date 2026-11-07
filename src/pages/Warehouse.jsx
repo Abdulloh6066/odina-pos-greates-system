@@ -458,7 +458,7 @@ export default function Warehouse() {
       {shopScope?.shopId === 'all' ? (
         <section className="space-y-6" aria-label="Barcha omborlar qoldig‘i">
           <p className="rounded-xl border border-border bg-card p-4 text-sm">Har bir do‘kon qoldig‘i alohida. Kirim, chiqim yoki boshqa ombor amali uchun yuqoridan bitta do‘konni tanlang.</p>
-          {!['ingredients', 'products', 'history'].includes(tab) ? <p className="rounded-xl border border-border bg-card p-4 text-sm">{visibleTabs.find((item) => item.id === tab)?.label || 'Bu bo‘lim'}ni ochish uchun yuqoridan bitta do‘konni tanlang.</p> : locations.map((location) => {
+          {tab === 'suppliers' && user?.role === 'admin' ? <SupplierLedgerPanel key="all-supplier-ledger" user={user} allLocations readOnly location={null} ingredients={ingredients} recipients={recipients} search={search} modernView={listView} /> : !['ingredients', 'products', 'history'].includes(tab) ? <p className="rounded-xl border border-border bg-card p-4 text-sm">{visibleTabs.find((item) => item.id === tab)?.label || 'Bu bo‘lim'}ni ochish uchun yuqoridan bitta do‘konni tanlang.</p> : locations.map((location) => {
             const balances = tab === 'products' ? productStock : ingredientStock;
             const key = tab === 'products' ? 'product_id' : 'ingredient_id';
             const locationMap = Object.fromEntries(balances.filter((row) => row.location_id === location.id).map((row) => [row[key], row]));

@@ -58,12 +58,21 @@ const receiptPaid = (receipt) => {
 
 export default function SupplierLedgerPanel({
   modernView = false,
+  allLocations = false,
+  readOnly = false,
   user,
   location,
   ingredients,
   recipients,
   search = "",
 }) {
+  const globalView = user?.role === "admin" && allLocations === true && !location?.id;
+  const scopeKey = `${user?.id}:${user?.role}:${location?.id || ''}:${globalView}`;
+  const [loadedScope, setLoadedScope] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [reload, setReload] = useState(0);
+  const [openingDebts, setOpeningDebts] = useState([]);
+  const [openingPayments, setOpeningPayments] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [receiptItems, setReceiptItems] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -77,33 +86,52 @@ export default function SupplierLedgerPanel({
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [receiptList, itemList, paymentList] = await Promise.all([
-        base44.entities.SupplierReceipt.list("-received_at", 500),
-        base44.entities.SupplierReceiptItem.list("-created_date", 500),
-        base44.entities.SupplierPayment.list("-paid_at", 500),
-      ]);
-      setReceipts(receiptList || []);
-      setReceiptItems(itemList || []);
-      setPayments(paymentList || []);
-    } catch (error) {
-      void odinaAlert("Kirim va qarzlarni yuklab bo‘lmadi: " + errorText(error));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
+  const load = () => setReload(value => value + 1);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setLoadError(""); setLoadedScope("");
+    setReceipts([]); setReceiptItems([]); setPayments([]); setOpeningDebts([]); setOpeningPayments([]);
+    setSupplierFilter("all"); setDialogOpen(false); setSelectedReceipt(null); setSelectedSupplierId(""); setCancelTarget(null);
+    (async () => {
+      try {
+        const readRecords = async (entity, sort) => {
+          if (!globalView) return entity.list(sort, 500);
+          const rows = [], seen = new Set();
+          for (let skip = 0; ; skip += 500) {
+            const page = await entity.list("id", 500, skip);
+            if (!Array.isArray(page) || page.some(row => !row.id || seen.has(row.id))) throw new Error("Tarix to‘liq yuklanmadi.");
+            for (const row of page) { seen.add(row.id); rows.push(row); }
+            if (page.length < 500) return rows.sort((a, b) => String(b[sort.slice(1)] || "").localeCompare(String(a[sort.slice(1)] || "")));
+            if (cancelled) return [];
+          }
+        };
+        const [receiptList, itemList, paymentList, openingResult] = await Promise.all([
+          readRecords(base44.entities.SupplierReceipt, "-received_at"),
+          readRecords(base44.entities.SupplierReceiptItem, "-created_date"),
+          readRecords(base44.entities.SupplierPayment, "-paid_at"),
+          globalView ? base44.functions.invoke("supplier-ledger", { action: "list_opening_debts" }) : Promise.resolve(null),
+        ]);
+        const opening = openingResult?.data || openingResult;
+        if (globalView && (!Array.isArray(opening?.opening_debts) || !Array.isArray(opening?.payments))) {
+          throw new Error(opening?.error || "Boshlang‘ich qarzlar olinmadi. Jami qarz hisoblanmadi.");
+        }
+        if (cancelled) return;
+        setReceipts(receiptList || []); setReceiptItems(itemList || []);
+        setPayments((paymentList || []).filter(payment => !payment.opening_debt_id));
+        setOpeningDebts(globalView ? [...new Map(opening.opening_debts.map(debt => [debt.id, debt])).values()] : []);
+        setOpeningPayments(globalView ? [...new Map(opening.payments.map(payment => [payment.id, payment])).values()] : []);
+      } catch (error) {
+        if (!cancelled) setLoadError("Kirim va qarzlar to‘liq yuklanmadi. Jami qarz hisoblanmadi: " + errorText(error));
+      } finally { if (!cancelled) { setLoadedScope(scopeKey); setLoading(false); } }
+    })();
+    return () => { cancelled = true; };
+  }, [scopeKey, reload]);
 
   const locationReceipts = useMemo(() => (
     receipts.filter((receipt) => {
-      if (user?.role !== "admin" && receipt.location_id !== location?.id) return false;
-      if (user?.role === "admin" && location?.id && receipt.location_id !== location.id) return false;
-      return true;
+      return globalView || (Boolean(location?.id) && receipt.location_id === location.id);
     })
-  ), [receipts, user?.role, location?.id]);
+  ), [receipts, globalView, location?.id]);
 
   useEffect(() => {
     setSupplierFilter("all");
@@ -113,7 +141,7 @@ export default function SupplierLedgerPanel({
   const supplierOptions = useMemo(() => {
     const names = new Map();
     for (const recipient of recipients) {
-      if (["supplier", "company"].includes(recipient.recipient_type) && recipient.supplier_location_ids?.includes(location?.id)) {
+      if (["supplier", "company"].includes(recipient.recipient_type) && (globalView || recipient.supplier_location_ids?.includes(location?.id))) {
         names.set(recipient.id, recipient.name);
       }
     }
@@ -122,9 +150,12 @@ export default function SupplierLedgerPanel({
         names.set(receipt.supplier_id, receipt.supplier_name_snapshot || "Noma’lum yetkazib beruvchi");
       }
     }
+    if (globalView) for (const debt of openingDebts) {
+      if (!names.has(debt.supplier_id)) names.set(debt.supplier_id, debt.supplier_name_snapshot || "Yetkazib beruvchi");
+    }
     return Array.from(names, ([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, "uz"));
-  }, [recipients, locationReceipts, location?.id]);
+  }, [recipients, locationReceipts, location?.id, globalView, openingDebts]);
 
   const visible = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -149,20 +180,32 @@ export default function SupplierLedgerPanel({
     });
   }, [locationReceipts, supplierFilter, statusFilter, dateFrom, dateTo, search]);
 
+  const visibleOpeningDebts = useMemo(() => !globalView ? [] : openingDebts.filter(debt => {
+    if (supplierFilter !== "all" && debt.supplier_id !== supplierFilter) return false;
+    if (statusFilter === "cancelled") return false;
+    if (statusFilter === "debt" && Number(debt.remaining_debt || 0) <= 0) return false;
+    if (statusFilter === "paid" && Number(debt.remaining_debt || 0) > 0) return false;
+    const query = search.toLowerCase().trim();
+    return !query || [debt.supplier_name_snapshot, debt.notes, debt.created_by_name].filter(Boolean).join(" ").toLowerCase().includes(query);
+  }), [globalView, openingDebts, supplierFilter, statusFilter, search]);
+  const openingOutstanding = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.remaining_debt || 0), 0);
+  const openingPaid = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.debt_amount || 0) - Number(debt.remaining_debt || 0), 0);
+
   const visibleReceiptIds = useMemo(() => new Set(visible.map((receipt) => receipt.id)), [visible]);
   const visiblePayments = useMemo(
-    () => payments.filter((payment) => visibleReceiptIds.has(payment.receipt_id)),
-    [payments, visibleReceiptIds],
+    () => [...payments.filter((payment) => visibleReceiptIds.has(payment.receipt_id)),
+      ...openingPayments.filter(payment => visibleOpeningDebts.some(debt => debt.id === payment.opening_debt_id))],
+    [payments, visibleReceiptIds, openingPayments, visibleOpeningDebts],
   );
 
   const activeReceipts = visible.filter((receipt) => !isCancelled(receipt));
   const totalPurchases = activeReceipts.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
-  const outstanding = activeReceipts.reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0);
-  const paidTotal = activeReceipts.reduce((sum, receipt) => sum + receiptPaid(receipt), 0);
+  const outstanding = openingOutstanding + activeReceipts.reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0);
+  const paidTotal = openingPaid + activeReceipts.reduce((sum, receipt) => sum + receiptPaid(receipt), 0);
   const cancelledTotal = visible
     .filter((receipt) => isCancelled(receipt))
     .reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
-  const canReceive = ["admin", "manager", "warehouse"].includes(user?.role);
+  const canReceive = !readOnly && !allLocations && ["admin", "manager", "warehouse"].includes(user?.role);
 
   const supplierRows = useMemo(() => {
     const grouped = new Map();
@@ -187,22 +230,31 @@ export default function SupplierLedgerPanel({
       }
       grouped.set(key, row);
     }
+    for (const debt of visibleOpeningDebts) {
+      const row = grouped.get(debt.supplier_id) || { id: debt.supplier_id, name: debt.supplier_name_snapshot || "Yetkazib beruvchi", purchases: 0, paid: 0, debt: 0, cancelled: 0, receiptCount: 0 };
+      row.openingDebt = (row.openingDebt || 0) + Number(debt.remaining_debt || 0);
+      row.debt += Number(debt.remaining_debt || 0);
+      row.paid += Number(debt.debt_amount || 0) - Number(debt.remaining_debt || 0);
+      grouped.set(debt.supplier_id, row);
+    }
     return Array.from(grouped.values()).sort((a, b) => b.debt - a.debt || b.purchases - a.purchases);
-  }, [visible]);
+  }, [visible, visibleOpeningDebts]);
 
   const selectedSupplier = useMemo(() => {
     if (!selectedSupplierId) return null;
     const supplierReceipts = locationReceipts.filter((receipt) => receipt.supplier_id === selectedSupplierId);
-    if (!supplierReceipts.length) return null;
+    const supplierOpening = globalView ? openingDebts.filter(debt => debt.supplier_id === selectedSupplierId) : [];
+    if (!supplierReceipts.length && !supplierOpening.length) return null;
     const receiptIds = new Set(supplierReceipts.map((receipt) => receipt.id));
     return {
       id: selectedSupplierId,
-      name: supplierReceipts[0].supplier_name_snapshot || "Yetkazib beruvchi",
+      name: supplierReceipts[0]?.supplier_name_snapshot || supplierOpening[0]?.supplier_name_snapshot || "Yetkazib beruvchi",
+      openingDebts: supplierOpening,
       receipts: supplierReceipts,
-      payments: payments.filter((payment) => receiptIds.has(payment.receipt_id)),
+      payments: [...payments.filter((payment) => receiptIds.has(payment.receipt_id)), ...openingPayments.filter(payment => supplierOpening.some(debt => debt.id === payment.opening_debt_id))],
       items: receiptItems.filter((item) => receiptIds.has(item.receipt_id)),
     };
-  }, [selectedSupplierId, locationReceipts, payments, receiptItems]);
+  }, [selectedSupplierId, locationReceipts, payments, receiptItems, openingDebts, openingPayments, globalView]);
 
   const showThisMonth = () => {
     setDateFrom(uzbekistanMonthStartKey());
@@ -214,7 +266,7 @@ export default function SupplierLedgerPanel({
     setDateTo("");
   };
 
-  if (loading) {
+  if (loading || loadedScope !== scopeKey) {
     return (
       <div className="grid sm:grid-cols-2 gap-3">
         {Array.from({ length: 4 }).map((_, index) => (
@@ -223,6 +275,8 @@ export default function SupplierLedgerPanel({
       </div>
     );
   }
+
+  if (loadError) return <div role="alert" className="rounded-xl border border-destructive p-4 space-y-3"><p>{loadError}</p><button type="button" className="min-h-11 rounded-xl border border-border px-4" onClick={load}>Qayta yuklash</button></div>;
 
   return (
     <div className="space-y-5">
@@ -244,6 +298,8 @@ export default function SupplierLedgerPanel({
         )}
       </div>
 
+      {globalView && <p className="rounded-xl border border-border p-4 text-sm">Barcha do‘konlar · faqat ko‘rish. Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
+      {user?.role === "admin" && !globalView && <p className="text-sm text-muted-foreground">Boshlang‘ich qarzlarni ko‘rish uchun “Barcha do‘konlar”ni tanlang.</p>}
       <div className="odina-panel rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={showThisMonth} className="min-h-10 rounded-xl">
@@ -287,7 +343,7 @@ export default function SupplierLedgerPanel({
               className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
             >
               <option value="all">Barcha holatlar</option>
-              <option value="active">Faol kirimlar</option>
+              <option value="active">{globalView ? "Faol kirim va qarzlar" : "Faol kirimlar"}</option>
               <option value="debt">Qarzi bor</option>
               <option value="paid">To‘langan</option>
               <option value="cancelled">Bekor qilingan</option>
@@ -302,6 +358,9 @@ export default function SupplierLedgerPanel({
         <Summary icon={Scale} label="Qolgan qarz" value={formatUZS(outstanding)} warning={outstanding > 0} />
         <Summary icon={Ban} label="Bekor qilingan" value={formatUZS(cancelledTotal)} danger={cancelledTotal > 0} />
       </div>
+
+      {globalView && <p className="text-sm text-muted-foreground">Qolgan qarz tarkibi: kirimlar {formatUZS(outstanding - openingOutstanding)} · boshlang‘ich qarzlar {formatUZS(openingOutstanding)}.</p>}
+      {globalView && visibleOpeningDebts.length > 0 && <section aria-label="Boshlang‘ich qarzlar"><h3 className="font-semibold mb-3">Boshlang‘ich qarzlar</h3><div className="space-y-3">{visibleOpeningDebts.map(debt => <OpeningDebtCard key={debt.id} debt={debt} />)}</div></section>}
 
       {supplierRows.length > 0 && (
         <section>
@@ -336,6 +395,7 @@ export default function SupplierLedgerPanel({
                   supplier.debt > 0 ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"
                 )}>
                   <p className="text-[11px] opacity-75">Qolgan qarz</p>
+                  {supplier.openingDebt !== undefined && <p className="text-xs">Shundan boshlang‘ich: {formatUZS(supplier.openingDebt)}</p>}
                   <p className="font-semibold mt-0.5">{formatUZS(supplier.debt)}</p>
                 </div>
               </button>
@@ -409,7 +469,7 @@ export default function SupplierLedgerPanel({
         )}
       </section>
 
-      <ReceiptDialog
+      {canReceive && <ReceiptDialog
         key={location?.id}
         open={dialogOpen}
         user={user}
@@ -418,7 +478,7 @@ export default function SupplierLedgerPanel({
         recipients={recipients}
         onClose={() => setDialogOpen(false)}
         onSaved={() => { setDialogOpen(false); load(); }}
-      />
+      />}
 
       <ReceiptDetailDialog
         receipt={selectedReceipt}
@@ -435,11 +495,11 @@ export default function SupplierLedgerPanel({
         onClose={() => setSelectedSupplierId("")}
       />
 
-      <CancelReceiptDialog
+      {canReceive && <CancelReceiptDialog
         receipt={cancelTarget}
         onClose={() => setCancelTarget(null)}
         onCancelled={() => { setCancelTarget(null); load(); }}
-      />
+      />}
     </div>
   );
 }
@@ -514,13 +574,23 @@ function ReceiptCard({ receipt, items, payments, onView }) {
   );
 }
 
+function OpeningDebtCard({ debt }) {
+  return <article className="rounded-xl border border-border bg-card p-4 space-y-2">
+    <p className="font-semibold">{debt.supplier_name_snapshot} · Boshlang‘ich qarz</p>
+    <p className="text-sm">Boshlang‘ich summa: {formatUZS(debt.debt_amount)} · Qoldiq: {formatUZS(debt.remaining_debt)}</p>
+    <p className="text-xs text-muted-foreground">Qarz sanasi: {debt.effective_date} · {STATUS_LABELS[debt.status] || debt.status}</p>
+    <p className="text-xs text-muted-foreground">Kiritildi: {formatUzbekistanDateTime(debt.created_at)} · {debt.created_by_name || "—"}</p>
+    {debt.notes && <p className="text-sm break-words">{debt.notes}</p>}
+  </article>;
+}
+
 function PaymentCard({ payment }) {
   return (
     <div className="odina-panel rounded-2xl border border-border bg-card p-3.5 sm:p-4 flex items-start justify-between gap-4">
       <div className="min-w-0">
         <p className="font-medium">{payment.supplier_name_snapshot}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          {payment.payment_number} · {payment.receipt_number_snapshot}
+          {payment.payment_number} · {payment.opening_debt_id ? "Boshlang‘ich qarz to‘lovi" : payment.receipt_number_snapshot}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
           {payment.shop_name_snapshot} · {payment.user_name} · {formatUzbekistanDateTime(
@@ -634,8 +704,10 @@ function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
   if (!supplier) return null;
   const active = supplier.receipts.filter((receipt) => !isCancelled(receipt));
   const purchases = active.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
-  const paid = active.reduce((sum, receipt) => sum + receiptPaid(receipt), 0);
-  const debt = active.reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0);
+  const opening = supplier.openingDebts || [];
+  const openingRemaining = opening.reduce((sum, debt) => sum + Number(debt.remaining_debt || 0), 0);
+  const paid = opening.reduce((sum, debt) => sum + Number(debt.debt_amount || 0) - Number(debt.remaining_debt || 0), 0) + active.reduce((sum, receipt) => sum + receiptPaid(receipt), 0);
+  const debt = openingRemaining + active.reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0);
 
   return (
     <Dialog open={!!supplier} onOpenChange={(open) => !open && onClose()}>
@@ -653,6 +725,7 @@ function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
         </div>
 
         <div>
+          {opening.length > 0 && <section aria-label="Boshlang‘ich qarz tarixi" className="space-y-3 mb-4"><h4 className="font-semibold">Boshlang‘ich qarzlar</h4>{opening.map(debt => <OpeningDebtCard key={debt.id} debt={debt} />)}</section>}
           <h4 className="font-semibold mb-2">Barcha kirimlar</h4>
           <div className="space-y-2">
             {supplier.receipts.map((receipt) => (

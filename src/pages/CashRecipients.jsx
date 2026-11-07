@@ -11,7 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import OpeningDebtDialog from '@/components/OpeningDebtDialog';
+import { formatUZS } from '@/lib/pos';
 import SupplierProductsDialog from '@/components/warehouse/SupplierProductsDialog';
+
+// Type only the new controls; existing shared button behavior is unchanged.
+const OpeningDebtButton = /** @type {React.ComponentType<React.ComponentPropsWithRef<'button'> & import('class-variance-authority').VariantProps<typeof import('@/components/ui/button').buttonVariants> & { asChild?: boolean }>} */ (Button);
 
 export default function CashRecipients() {
   const { user, adminShopScope } = useOutletContext();
@@ -25,6 +30,31 @@ export default function CashRecipients() {
   const [editing, setEditing] = useState(null);
   const [productsSupplier, setProductsSupplier] = useState(null);
   const [loading, setLoading] = useState(true);
+  const canViewOpeningDebts = canManage && selectedShopId === 'all';
+  const [openingDebts, setOpeningDebts] = useState([]);
+  const [openingPayments, setOpeningPayments] = useState([]);
+  const [openingLoading, setOpeningLoading] = useState(true);
+  const [openingError, setOpeningError] = useState('');
+  const [openingRecipient, setOpeningRecipient] = useState(null);
+  const [openingRefresh, setOpeningRefresh] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setOpeningDebts([]); setOpeningPayments([]); setOpeningRecipient(null);
+    if (!canViewOpeningDebts) return () => { cancelled = true; };
+    setOpeningLoading(true); setOpeningError('');
+    (async () => {
+      try {
+        const result = await base44.functions.invoke('supplier-ledger', { action: 'list_opening_debts' });
+        const data = result?.data || result;
+        if (!Array.isArray(data?.opening_debts) || !Array.isArray(data?.payments)) throw new Error(data?.error || 'Qarz ma’lumotlari olinmadi.');
+        if (!cancelled) { setOpeningDebts(data.opening_debts); setOpeningPayments(data.payments); }
+      } catch (error) {
+        if (!cancelled) setOpeningError(error?.message || 'Qarzlarni yuklab bo‘lmadi.');
+      } finally { if (!cancelled) setOpeningLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [canViewOpeningDebts, user?.id, openingRefresh]);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +104,12 @@ export default function CashRecipients() {
         </div>
       </div>
 
+      {canViewOpeningDebts && <div className="rounded-xl border border-border bg-card p-4 mb-5 text-sm">
+        <p>Boshlang‘ich qarzlar do‘konga bog‘lanmaydi. Avvaldan mavjud qarzni bir marta kiriting. Bu qarz xaridlardan alohida hisobga olinadi.</p>
+        {openingLoading && <p className="mt-2 text-muted-foreground" role="status">Qarzlar yuklanmoqda…</p>}
+        {openingError && <div className="mt-2"><p role="alert" className="text-destructive">{openingError}</p><OpeningDebtButton variant="outline" className="mt-2 min-h-11" onClick={() => setOpeningRefresh(value => value + 1)}>Qarzlarni qayta yuklash</OpeningDebtButton></div>}
+      </div>}
+
       {loading ? (
         <div className="grid sm:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-28 rounded-2xl bg-secondary animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
@@ -106,11 +142,24 @@ export default function CashRecipients() {
                 <p className="text-xs text-muted-foreground">{new Set(Array.isArray(item.supplied_ingredient_ids) ? item.supplied_ingredient_ids.filter(id => typeof id === 'string' && id) : []).size} ta mahsulot biriktirilgan</p>
                 {canManage && <Button type="button" variant="outline" className="min-h-11 rounded-xl" aria-label={`${item.name} — mahsulotlar`} onClick={() => setProductsSupplier(item)}>Mahsulotlar</Button>}
               </div>
+              {canViewOpeningDebts && !openingLoading && !openingError && <div className="mt-3 border-t border-border pt-3 space-y-2">
+                {openingDebts.filter(debt => debt.supplier_id === item.id).map(debt => <p key={debt.id} className="text-sm">Boshlang‘ich: {formatUZS(debt.debt_amount)} · Qoldiq: <strong>{formatUZS(debt.remaining_debt)}</strong></p>)}
+                <OpeningDebtButton variant="outline" className="min-h-11 rounded-xl" onClick={() => setOpeningRecipient(item)} aria-label={`${item.name} — boshlang‘ich qarz`}>{openingDebts.some(debt => debt.supplier_id === item.id) ? 'Qarz tarixi' : 'Boshlang‘ich qarz kiritish'}</OpeningDebtButton>
+              </div>}
             </article>
           ))}
         </div>
       )}
 
+      {canViewOpeningDebts && openingRecipient && <OpeningDebtDialog
+        key={`${user.id}:${openingRecipient.id}`}
+        recipient={openingRecipient}
+        debt={openingDebts.find(debt => debt.supplier_id === openingRecipient.id)}
+        payments={openingPayments.filter(payment => openingDebts.some(debt => debt.supplier_id === openingRecipient.id && debt.id === payment.opening_debt_id))}
+        user={user} allowed={canViewOpeningDebts}
+        onClose={() => setOpeningRecipient(null)}
+        onSaved={() => { setOpeningRecipient(null); setOpeningRefresh(value => value + 1); }}
+      />}
       <RecipientDialog
         open={Boolean(editing)}
         recipient={editing}

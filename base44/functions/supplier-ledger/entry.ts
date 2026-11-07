@@ -1,3 +1,4 @@
+import { createOpeningDebt, listOpeningDebts } from "../../shared/supplier-opening-debt.ts";
 import { resolveAppUser } from "../../shared/user-helpers.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
@@ -102,6 +103,16 @@ export default async function(req) {
     const body = await req.json();
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "");
+
+    if (action === "list_opening_debts") {
+      return Response.json(await listOpeningDebts(service, user));
+    }
+    if (action === "create_opening_debt") {
+      return Response.json(await createOpeningDebt(service, user, {
+        supplier_id: body?.supplier_id, amount: body?.amount, effective_date: body?.effective_date,
+        notes: body?.notes ?? "", key: financialRequestKey(body),
+      }));
+    }
 
     if (action === "get_debts") {
       if (!["admin", "manager", "cashier", "warehouse", "accountant"].includes(user.role)) {
@@ -558,6 +569,7 @@ export default async function(req) {
       error: error instanceof Error ? error.message : "Yetkazib beruvchi amali bajarilmadi.",
       operation_pending: Boolean((error as any)?.operation_pending),
       operation_reversed: Boolean((error as any)?.operation_reversed),
+      request_not_started: Boolean((error as any)?.request_not_started),
     }, { status: Number((error as any)?.status) || 500 });
   }
 }
