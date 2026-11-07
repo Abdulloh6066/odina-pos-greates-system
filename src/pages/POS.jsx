@@ -16,6 +16,7 @@ import { canChooseTeaServing, teaServingPrice, teaOptionName, repriceTeaCartForS
 import { catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import PosCatalog from '@/components/pos/PosCatalog';
+import PosImageCacheButton from '@/components/pos/PosImageCacheButton';
 import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
 import CheckoutTimingStatus from '@/components/pos/CheckoutTimingStatus';
 import CheckoutTimingHistory from '@/components/pos/CheckoutTimingHistory';
@@ -2024,6 +2025,8 @@ export default function POS() {
           </div>
         </div>
         <div className="flex-1" />
+        <PosImageCacheButton products={catalogProducts} scopeKey={`${user?.id}:${catalogShopId || 'all'}`}
+          online={browserOnline} disabled={loadingData} />
         <Button type="button" variant="outline" size="sm" onClick={togglePosCompact}
           aria-pressed={Boolean(posCompact)} aria-label="Ixcham kassa ko‘rinishi"
           title={posCompact ? 'Oddiy ko‘rinishga qaytish' : 'Ixcham ko‘rinishga o‘tish'}
