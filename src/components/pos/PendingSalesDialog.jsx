@@ -14,11 +14,12 @@ const statusLabel = record => record.status === 'confirmed' ? 'Serverda saqlanga
   : record.status === 'failed' ? 'Tekshirish kerak' : record.status === 'syncing' ? 'Yuborilmoqda' : 'Navbatda';
 const methodLabels = { cash: 'Naqd', bank_card: 'Bank card', humo: 'HUMO', uzcard: 'UZCARD', online: 'Online', bank_transfer: 'Bank o‘tkazmasi' };
 
-export default function PendingSalesDialog({ records, online, syncing, onRetry, onResolve, onClose }) {
+export default function PendingSalesDialog({ records, online, syncing, onRetry, onResolve, onResolveAll, onClose }) {
   const [selectedId, setSelectedId] = useState('');
   const [inspection, setInspection] = useState({ loading: false, data: null, error: '' });
   const [refresh, setRefresh] = useState(0);
   const [mode, setMode] = useState('');
+  const [batchIds, setBatchIds] = useState([]);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [pin, setPin] = useState('');
@@ -55,7 +56,15 @@ export default function PendingSalesDialog({ records, online, syncing, onRetry, 
     if (!selected || flight.current || blocked) return;
     flight.current = true; setBusy(true); setError(''); setNotice('');
     try {
-      if (operation === 'retry') {
+      if (operation === 'cancel_all') {
+        const result = await onResolveAll(batchIds, { reason: reason.trim(), pin });
+        const cancelled = result.results.filter(row => row.state === 'cancelled').length;
+        const confirmed = result.results.filter(row => row.state === 'confirmed').length;
+        setNotice(cancelled + ' ta savdo bekor qilindi. ' + confirmed + ' ta serverda saqlangan savdo navbatdan chiqarildi.'
+          + (result.errors.length ? ' ' + result.errors.length + ' ta yozuv navbatda qoldi: '
+            + result.errors.slice(0, 3).map(row => row.error).join(' · ') : ''));
+        setMode('');
+      } else if (operation === 'retry') {
         const result = await onRetry({ retryFailed: true, recordId: selected.id });
         if (result?.failed) throw new Error(result.failed.message);
         if (result?.skipped) throw new Error('Boshqa oynada yuborilmoqda. Bir ozdan keyin qayta tekshiring.');
@@ -80,6 +89,7 @@ export default function PendingSalesDialog({ records, online, syncing, onRetry, 
       <DialogHeader><DialogTitle className="flex items-center gap-2 font-display text-xl"><FileClock className="h-5 w-5" />Navbatdagi savdolar <span className="text-sm text-muted-foreground">({active.length})</span></DialogTitle>
         <p className="text-sm text-muted-foreground">Shu brauzerda joriy xodim saqlagan savdolar. Tahrirlash va bekor qilish uchun egasi PIN-kodi kerak.</p>
       </DialogHeader>
+      {active.length > 0 && onResolveAll && <div className="flex justify-end"><Button type="button" variant="outline" className="min-h-11 border-destructive/30 text-destructive" disabled={blocked} onClick={() => { setBatchIds(active.map(row => row.id)); setMode('cancel_all'); setReason(''); setPin(''); setError(''); }}><Trash2 className="mr-2 h-4 w-4" />Hammasini bekor qilish ({active.length})</Button></div>}
       {notice && <p role="status" className="flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm"><CheckCircle2 className="h-5 w-5 shrink-0" />{notice}</p>}
       {error && <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive break-words">{error}</p>}
       {!online && <p role="status" className="rounded-xl border border-border p-3 text-sm">Internet yo‘q. Yozuvlarni ko‘rish mumkin; yuborish va PIN tasdig‘i uchun ulaning.</p>}
@@ -99,11 +109,11 @@ export default function PendingSalesDialog({ records, online, syncing, onRetry, 
             {data?.state === 'processing' && <p role="status" className="text-sm text-muted-foreground">Savdo serverda yakunlanmoqda yoki tekshiruv talab qiladi. Hozir tahrirlash va bekor qilish yopiq.</p>}
             {closed && !resolved && <p className="rounded-xl border border-border p-3 text-sm">Smena yopilgan. Savdoni tahrirlab qayta yozish hisobotni o‘zgartiradi. Server holatini tekshiring; tasdiqlanmagan savdoni PIN bilan bekor qilish mumkin.</p>}
             {resolved ? <Button type="button" className="min-h-11 w-full" disabled={blocked} onClick={() => void run('reconcile')}>Server qarorini navbatga moslash</Button> : <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" disabled={blocked} onClick={() => setRefresh(value => value + 1)}><RefreshCw className="mr-2 h-4 w-4" />Holatini tekshirish</Button><Button type="button" className="min-h-11" disabled={blocked || inspection.loading || Boolean(mode)} onClick={() => void run('retry')}><RefreshCw className="mr-2 h-4 w-4" />Qayta yuborish</Button><Button type="button" variant="outline" className="min-h-11" disabled={blocked || !editable} onClick={() => { setMode('edit'); setPin(''); }}><Pencil className="mr-2 h-4 w-4" />Tahrirlash</Button><Button type="button" variant="outline" className="min-h-11" disabled={blocked || !cancellable} onClick={() => { setMode('cancel'); setPin(''); }}><Trash2 className="mr-2 h-4 w-4" />Bekor qilish</Button></div>}
-            {mode && <form className="space-y-3 rounded-xl border border-border p-4" onSubmit={event => { event.preventDefault(); void run(mode); }}><h4 className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" />{mode === 'edit' ? 'Summani tahrirlash' : 'Navbatdagi savdoni bekor qilish'}</h4>
-              {mode === 'edit' ? <><div><Label htmlFor="pending-sale-total">Yakuniy summa (UZS)</Label><Input id="pending-sale-total" type="number" inputMode="numeric" min="1" step="1" value={amount} onChange={event => setAmount(event.target.value)} disabled={blocked} className="mt-1 min-h-11" required /></div><p className="text-sm text-muted-foreground">Mahsulotlar va to‘lov usullari saqlanadi. Summalar yangi jamiga moslanadi; chegirma server narxidan hisoblanadi.</p>{amount && !validAmount && <p role="alert" className="text-sm text-destructive">Summa 1 so‘mdan kam va server jamidan ko‘p bo‘lmasin.</p>}</> : <p className="text-sm text-muted-foreground">Faqat serverga yozilmagan savdo bekor qilinadi. Bu amal mijozga pul qaytarishni hisobga olmaydi. Qaror tarixda saqlanadi.</p>}
+            {mode && <form className="space-y-3 rounded-xl border border-border p-4" onSubmit={event => { event.preventDefault(); void run(mode); }}><h4 className="flex items-center gap-2 font-semibold"><ShieldCheck className="h-4 w-4" />{mode === 'edit' ? 'Summani tahrirlash' : mode === 'cancel_all' ? batchIds.length + ' ta savdoni bekor qilish' : 'Navbatdagi savdoni bekor qilish'}</h4>
+              {mode === 'edit' ? <><div><Label htmlFor="pending-sale-total">Yakuniy summa (UZS)</Label><Input id="pending-sale-total" type="number" inputMode="numeric" min="1" step="1" value={amount} onChange={event => setAmount(event.target.value)} disabled={blocked} className="mt-1 min-h-11" required /></div><p className="text-sm text-muted-foreground">Mahsulotlar va to‘lov usullari saqlanadi. Summalar yangi jamiga moslanadi; chegirma server narxidan hisoblanadi.</p>{amount && !validAmount && <p role="alert" className="text-sm text-destructive">Summa 1 so‘mdan kam va server jamidan ko‘p bo‘lmasin.</p>}</> : <p className="text-sm text-muted-foreground">{mode === 'cancel_all' ? 'Tanlangan ' + batchIds.length + ' ta yozuv tekshiriladi. ' : ''}Faqat serverga yozilmagan savdo bekor qilinadi. Serverda saqlangan savdolar tarixi o‘chmaydi. Bu amal mijozga pul qaytarishni hisobga olmaydi. Qaror tarixda saqlanadi.</p>}
               <div><Label htmlFor="pending-sale-reason">Sabab</Label><Textarea id="pending-sale-reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={500} disabled={blocked} className="mt-1" required /></div>
               <div><Label htmlFor="pending-sale-pin">Egasi PIN-kodi</Label><Input id="pending-sale-pin" type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event => setPin(event.target.value.replace(/\D/g, '').slice(0, 8))} disabled={blocked} className="mt-1 min-h-11" required /><p className="mt-1 text-xs text-muted-foreground">PIN saqlanmaydi. Tasdiq serverda tekshiriladi.</p></div>
-              <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => { setMode(''); setPin(''); }}>Orqaga</Button><Button type="submit" className="min-h-11" disabled={blocked || !reason.trim() || !/^\d{4,8}$/.test(pin) || (mode === 'edit' && !validAmount)}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}{mode === 'edit' ? 'PIN bilan saqlash' : 'PIN bilan bekor qilish'}</Button></div>
+              <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => { setMode(''); setPin(''); }}>Orqaga</Button><Button type="submit" className="min-h-11" disabled={blocked || !reason.trim() || !/^\d{4,8}$/.test(pin) || (mode === 'edit' && !validAmount)}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}{mode === 'edit' ? 'PIN bilan saqlash' : mode === 'cancel_all' ? 'Hammasini PIN bilan bekor qilish' : 'PIN bilan bekor qilish'}</Button></div>
             </form>}
           </div>
         </div>}

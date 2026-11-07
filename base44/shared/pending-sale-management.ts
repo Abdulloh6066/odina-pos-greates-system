@@ -67,8 +67,10 @@ export async function managePendingSale(service: any, user: any, body: any, deps
     return { state: "processing", original_key: key, shift_status: shift.status };
   }
   let items: any[] = [], pricingError = "";
-  try { items = await deps.normalizeItems(service, original.items, shift.shop_id); }
-  catch (error) { pricingError = error instanceof Error ? error.message : "Narxni tekshirib bo‘lmadi."; }
+  if (!resolving || operation === "edit") {
+    try { items = await deps.normalizeItems(service, original.items, shift.shop_id); }
+    catch (error) { pricingError = error instanceof Error ? error.message : "Narxni tekshirib bo‘lmadi."; }
+  }
   const subtotal = items.reduce((sum: number, row: any) => sum + row.subtotal, 0);
   const paidTotal = original.payments.reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
   if (!resolving) return { state: "pending", original_key: key, shift_status: shift.status,
@@ -129,4 +131,39 @@ export async function managePendingSale(service: any, user: any, body: any, deps
     details: JSON.stringify({ original_key: key, shift_id: shift.id, shop_id: shift.shop_id,
       final_total: result.final_total, reason }) }); } catch { /* Already durably journaled. */ }
   return result;
+}
+
+export async function cancelPendingSales(service: any, user: any, body: any, deps: any) {
+  const originals = body.original_requests;
+  const reason = String(body.reason || "").trim();
+  if (!Array.isArray(originals) || !originals.length || originals.length > 50
+    || new Set(originals.map(row => row?.idempotency_key)).size !== originals.length) {
+    throw fail("Bir so‘rovda 1–50 ta takrorlanmagan savdo bo‘lishi kerak.", 400);
+  }
+  if (!reason || reason.length > 500) throw fail("Bekor qilish sababini kiriting.", 400);
+  if (!await deps.verifyPin(service, body.owner_pin, user)) {
+    throw fail("Hammasini bekor qilish uchun egasi PIN-kodi kerak.", 403);
+  }
+  // PIN is verified once for this bounded batch. Each original still receives
+  // its own scope, ownership, existing-sale and atomic checkout-fence checks.
+  const approved = { ...deps, verifyPin: async () => true };
+  const results: any[] = [], errors: any[] = [];
+  for (const original of originals) {
+    const originalKey = String(original?.idempotency_key || "");
+    try {
+      results.push(await managePendingSale(service, user, { action: "resolve_pending_sale",
+        operation: "cancel", original_request: original, reason }, approved));
+    } catch (error) {
+      // A committed request is reconciled, never deleted from server history.
+      try {
+        const state = await managePendingSale(service, user, {
+          action: "inspect_pending_sale", original_request: original,
+        }, approved);
+        if (["confirmed", "cancelled"].includes(state.state)) { results.push(state); continue; }
+      } catch { /* Keep the original rejection below. */ }
+      errors.push({ original_key: originalKey,
+        error: error instanceof Error ? error.message : "Savdo bekor qilinmadi.", status: Number(error?.status || 500) });
+    }
+  }
+  return { results, errors };
 }
