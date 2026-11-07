@@ -30,7 +30,7 @@ export function OwnerPinDialog({ open, title = 'Egasi tasdig‘i', description, 
         <div>
           <Label className="text-xs mb-1.5 block">Egasi PIN-kodi</Label>
           <Input
-            autoFocus type="password" inputMode="numeric" autoComplete="off"
+            autoFocus type="password" autoComplete="one-time-code" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" inputMode="numeric"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
@@ -187,9 +187,8 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
             <div>
               <Label className="text-xs mb-1.5 block">Egasi PIN-kodi</Label>
               <Input
-                type="password"
+                type="password" autoComplete="one-time-code" data-lpignore="true" data-1p-ignore="true" data-bwignore="true"
                 inputMode="numeric"
-                autoComplete="off"
                 value={ownerPin}
                 onChange={(event) => setOwnerPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
                 placeholder="••••"
@@ -297,7 +296,7 @@ export function RefundDialog({ open, sale, onClose, onConfirm, loading }) {
           </div>
           <div>
             <Label className="text-xs mb-1.5 block">Egasi PIN-kodi</Label>
-            <Input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="••••" className="h-11 text-center text-lg tracking-[0.4em]" />
+            <Input type="password" autoComplete="one-time-code" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="••••" className="h-11 text-center text-lg tracking-[0.4em]" />
           </div>
           <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-destructive">
             Bu amalni bekor qilib bo‘lmaydi. Asl savdo nazorat tarixi uchun saqlanadi.

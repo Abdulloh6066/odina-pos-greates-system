@@ -164,7 +164,7 @@ export default function OpeningDebtPaymentDialog({ debt, user, allowed, onClose,
           <p className="text-xs text-muted-foreground">Server to‘lov paytida joriy qoldiqlarni yana tekshiradi.</p>
         </>}
         <Label htmlFor="opening-payment-pin">Owner PIN</Label>
-        <Input id="opening-payment-pin" type="password" inputMode="numeric" autoComplete="off" maxLength={8} value={ownerPin} disabled={saving} onChange={event => !saving && setOwnerPin(event.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="4–8 xonali PIN" className="min-h-11" />
+        <Input id="opening-payment-pin" type="password" autoComplete="one-time-code" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" inputMode="numeric" maxLength={8} value={ownerPin} disabled={saving} onChange={event => !saving && setOwnerPin(event.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="4–8 xonali PIN" className="min-h-11" />
       </section>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <DialogFooter className="gap-2">
