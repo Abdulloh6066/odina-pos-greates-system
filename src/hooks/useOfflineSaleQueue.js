@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import {
   listPendingSales,
   managePendingSale,
+  managePendingSales,
   pendingSaleRetryDelay,
   savePendingSale,
   subscribePendingSales,
@@ -246,6 +247,34 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     }
   }, [userId, refresh, reconcileConfirmed]);
 
+  const resolveRecords = useCallback(async (ids, { reason, pin }) => {
+    if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      throw new Error('Yuborish tugashini yoki internet ulanishini kuting.');
+    }
+    const session = sessionRef.current;
+    syncingRef.current = true; setSyncing(true);
+    try {
+      const result = await managePendingSales({ userId, ids, authorize: records => base44.functions.invoke('complete-sale', {
+        action: 'cancel_pending_sales', original_requests: records.map(record => record.request), reason, owner_pin: pin,
+      }) });
+      if (mountedRef.current && sessionRef.current === session && userRef.current === userId) {
+        for (const decision of result.results) if (decision.state === 'confirmed') {
+          reconcileConfirmed({ id: decision.original_key, record: decision.record,
+            payload: { sale: decision.sale, shift: decision.shift, already_processed: true, stock_updates: [] } });
+        }
+        setSyncError('');
+        await refresh();
+        void Promise.resolve(onSyncedRef.current?.(result)).catch(() => {});
+      }
+      return result;
+    } finally {
+      if (sessionRef.current === session) {
+        syncingRef.current = false;
+        if (mountedRef.current) { setSyncing(false); void refresh(); }
+      }
+    }
+  }, [userId, refresh, reconcileConfirmed]);
+
   const enqueue = useCallback(async (record) => {
     const session = sessionRef.current;
     try {
@@ -328,5 +357,6 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     refresh,
     syncNow,
     resolveRecord,
+    resolveRecords,
   };
 }

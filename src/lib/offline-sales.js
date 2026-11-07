@@ -578,3 +578,52 @@ export async function managePendingSale({ userId, id, authorize, lock = withSync
   if (result?.skipped) throw new Error('Boshqa oynada savdo yuborilmoqda. Bir ozdan keyin qayta tekshiring.');
   return result;
 }
+
+export async function managePendingSales({ userId, ids, authorize, lock = withSyncLock,
+  storage = { list: listPendingSales, resolve: persistPendingResolution } }) {
+  if (!userId || !Array.isArray(ids) || !ids.length || ids.length > 10000) {
+    throw new Error('Bekor qilinadigan savdolarni tanlang.');
+  }
+  const selectedIds = new Set(ids);
+  const result = await lock(async () => {
+    const selected = (await storage.list(userId)).filter(row => row.user_id === userId && selectedIds.has(row.id));
+    const results = [], errors = [];
+    try {
+      for (let start = 0; start < selected.length; start += 50) {
+      const batch = selected.slice(start, start + 50);
+      const response = await authorize(batch);
+      const payload = response?.data || response;
+      if (!Array.isArray(payload?.results) || !Array.isArray(payload?.errors)) {
+        throw new Error(payload?.error || 'Server ommaviy bekor qilishni tasdiqlamadi.');
+      }
+      const seen = new Set();
+      for (const decision of payload.results) {
+        const record = batch.find(row => row.id === decision.original_key);
+        if (!record || seen.has(record.id) || !['confirmed', 'cancelled'].includes(decision.state)
+          || (decision.state === 'confirmed' && (!decision.sale?.id || decision.sale.idempotency_key !== record.id
+            || decision.sale.user_id !== record.user_id || decision.sale.shift_id !== record.shift_id))) {
+          throw new Error('Server qarori tanlangan savdoga mos kelmadi. Navbat saqlanib turadi.');
+        }
+        seen.add(record.id);
+        await storage.resolve(record, decision);
+        releaseSaleRequest(record.id, saleRequests.get(JSON.stringify([String(userId), record.id])));
+        results.push({ ...decision, record });
+      }
+      errors.push(...payload.errors);
+      for (const record of batch) if (!seen.has(record.id) && !payload.errors.some(row => row.original_key === record.id)) {
+        errors.push({ original_key: record.id, error: 'Server qarori kelmadi; yozuv navbatda saqlandi.' });
+      }
+      }
+    } catch (error) {
+      if (!results.length) throw error;
+      const acknowledged = new Set(results.map(row => row.original_key));
+      const rejected = new Set(errors.map(row => row.original_key));
+      for (const record of selected) if (!acknowledged.has(record.id) && !rejected.has(record.id)) {
+        errors.push({ original_key: record.id, error: syncErrorMessage(error) });
+      }
+    }
+    return { results, errors };
+  });
+  if (result?.skipped) throw new Error('Boshqa oynada yuborilmoqda. Bir ozdan so‘ng qayta urinib ko‘ring.');
+  return result;
+}

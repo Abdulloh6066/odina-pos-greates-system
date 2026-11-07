@@ -1,5 +1,5 @@
 import { pendingFinancialCloseGuard } from "../../shared/shift-pending-financial.ts";
-import { managePendingSale, pendingSaleResolutions } from "../../shared/pending-sale-management.ts";
+import { cancelPendingSales, managePendingSale, pendingSaleResolutions } from "../../shared/pending-sale-management.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { savedShiftCloseResponse, reconcileShiftCloseFailure } from "../../shared/shift-settlement-recovery.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
@@ -503,6 +503,12 @@ export default async function(req) {
 
     if (action === "inspect_pending_sale" || action === "resolve_pending_sale") {
       return Response.json(await managePendingSale(service, user, body, {
+        verifyPin: verifyOwnerPin, fingerprint: saleRequestFingerprint,
+        canonical: canonicalSaleRequest, normalizeItems: normalizeSaleItems, money, paymentMethods: PAYMENT_METHODS,
+      }));
+    }
+    if (action === "cancel_pending_sales") {
+      return Response.json(await cancelPendingSales(service, user, body, {
         verifyPin: verifyOwnerPin, fingerprint: saleRequestFingerprint,
         canonical: canonicalSaleRequest, normalizeItems: normalizeSaleItems, money, paymentMethods: PAYMENT_METHODS,
       }));
