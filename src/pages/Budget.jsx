@@ -210,6 +210,11 @@ export default function Budget() {
                         {incoming ? "+" : "−"}{formatUZS(transaction.amount)}
                       </p>
                     </div>
+                    {transaction.type === "supplier_payment" && (
+                      <p className="text-sm font-medium mt-2 break-words">
+                        Qabul qiluvchi: {transaction.supplier_name?.trim() || "Noma’lum"}
+                      </p>
+                    )}
                     <p className="text-sm mt-2">{transaction.description}</p>
                     <p className="text-xs text-muted-foreground mt-2">
                       {transaction.performed_by_name || "Noma’lum"} · {formatUzbekistanDateTime(transaction.created_at || transaction.created_date)}
