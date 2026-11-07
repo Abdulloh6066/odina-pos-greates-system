@@ -277,15 +277,23 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
     requestRef.current = saved;
     setRetryPending(Boolean(saved));
     setDirection(saved?.direction || "in");
-    setAccount(saved?.account || "cash");
+    setAccount(saved && BANK_CARD_ACCOUNTS.includes(saved.account) ? "bank_card" : saved?.account || "cash");
     setAmount(saved ? String(saved.amount) : "");
     setDescription(saved?.description || "");
     setOwnerPin("");
   }, [open, requestScope]);
 
   const value = Math.round(Number(amount) || 0);
-  const available = Number(balances[account] || 0);
+  // «Bank card» bitta hamyon: UZCARD va HUMO qoldiqlari birga hisoblanadi.
+  const available = (DISPLAY_ACCOUNTS.find((item) => item.id === account)?.accounts || [account])
+    .reduce((sum, key) => sum + Number(balances[key] || 0), 0);
   const invalidWithdrawal = direction === "out" && value > available;
+  // Tanlangan hisob aniq karta hisobiga bog‘lanadi, shunda qoldiq aniq saqlanadi.
+  const resolveAccount = () => {
+    if (account !== "bank_card") return account;
+    if (direction === "in") return BANK_CARD_ACCOUNTS[0];
+    return BANK_CARD_ACCOUNTS.find((key) => Number(balances[key] || 0) >= value) || BANK_CARD_ACCOUNTS[0];
+  };
 
   const submit = async () => {
     if (!/^\d{4,8}$/.test(ownerPin) || (!retryPending && (value <= 0 || description.trim().length < 3 || invalidWithdrawal))) return;
@@ -294,7 +302,7 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
     setSaving(true);
     try {
       requestRef.current = retainOrderRequest(requestScope, requestRef.current || {
-        action: "manual_adjustment", direction, account, amount: value,
+        action: "manual_adjustment", direction, account: resolveAccount(), amount: value,
         description: description.trim(), idempotency_key: crypto.randomUUID(),
       });
       setRetryPending(true);
@@ -335,8 +343,10 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
         <div>
           <Label className="text-xs mb-1.5 block">Pul hisobi</Label>
           <OdinaSelect value={account} onChange={(event) => setAccount(event.target.value)} disabled={saving || retryPending} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
-            {ACCOUNTS.map((item) => (
-              <option key={item.id} value={item.id}>{item.label} · {formatUZS(balances[item.id] || 0)}</option>
+            {DISPLAY_ACCOUNTS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label} · {formatUZS(item.accounts.reduce((sum, key) => sum + Number(balances[key] || 0), 0))}
+              </option>
             ))}
           </OdinaSelect>
         </div>
