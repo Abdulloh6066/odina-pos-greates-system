@@ -50,7 +50,7 @@ test('shared Input forwards hints into HTML without exposing the PIN as visible 
   const code = ts.transpileModule(readFileSync('src/components/ui/input.jsx', 'utf8'), { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React,
   } }).outputText;
-  const require = name => name === 'react' ? React : name === '@/lib/utils' ? { cn: (...values) => values.filter(Boolean).join(' ') } : (() => { throw new Error(name); })();
+  const require = name => name === 'react' ? React : name === './money-input' ? { MoneyInput: () => { throw new Error('PIN inputs must not use money formatting'); } } : name === '@/lib/utils' ? { cn: (...values) => values.filter(Boolean).join(' ') } : (() => { throw new Error(name); })();
   vm.runInNewContext('(function(require,module,exports){' + code + '\n})')(require, module, module.exports);
   const html = renderToStaticMarkup(React.createElement(module.exports.Input, { ...hints, inputMode: 'numeric', defaultValue: '' }));
   assert.match(html, /type="password"/);
