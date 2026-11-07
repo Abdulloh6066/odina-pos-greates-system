@@ -28,11 +28,25 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 
 const ACCOUNTS = [
   { id: "cash", label: "Naqd pul", icon: Banknote, tone: "bg-secondary text-brand-ink" },
-  { id: "uzcard", label: "Bank card", icon: CreditCard, tone: "bg-secondary text-brand-ink" },
-  { id: "humo", label: "Humo", icon: WalletCards, tone: "bg-secondary text-brand-ink" },
+  { id: "uzcard", label: "Bank card (Uzcard)", icon: CreditCard, tone: "bg-secondary text-brand-ink" },
+  { id: "humo", label: "Bank card (Humo)", icon: WalletCards, tone: "bg-secondary text-brand-ink" },
   { id: "online", label: "Online", icon: Smartphone, tone: "bg-secondary text-brand-ink" },
   { id: "bank", label: "Bank", icon: Landmark, tone: "bg-secondary text-brand-ink" },
 ];
+
+// Budget ko‘rinishida HUMO va UZCARD bitta «Bank card» hisobi sifatida chiqadi.
+const BANK_CARD_ACCOUNTS = ["uzcard", "humo"];
+const DISPLAY_ACCOUNTS = [
+  { id: "cash", label: "Naqd pul", icon: Banknote, tone: "bg-secondary text-brand-ink", accounts: ["cash"] },
+  { id: "bank_card", label: "Bank card", icon: CreditCard, tone: "bg-secondary text-brand-ink", accounts: BANK_CARD_ACCOUNTS },
+  { id: "online", label: "Online", icon: Smartphone, tone: "bg-secondary text-brand-ink", accounts: ["online"] },
+  { id: "bank", label: "Bank", icon: Landmark, tone: "bg-secondary text-brand-ink", accounts: ["bank"] },
+];
+
+const accountLabel = (id) => {
+  if (BANK_CARD_ACCOUNTS.includes(id)) return "Bank card";
+  return ACCOUNTS.find((item) => item.id === id)?.label || id;
+};
 
 const TYPE_LABELS = {
   shift_deposit: "Smena topshirig‘i",
@@ -84,7 +98,10 @@ export default function Budget() {
     const query = search.trim().toLowerCase();
     return transactions.filter((transaction) => {
       if (scopedShopId && transaction.shop_id !== scopedShopId) return false;
-      if (accountFilter !== "all" && transaction.account !== accountFilter) return false;
+      if (accountFilter !== "all") {
+        const target = DISPLAY_ACCOUNTS.find((item) => item.id === accountFilter);
+        if (!target || !target.accounts.includes(transaction.account)) return false;
+      }
       if (typeFilter !== "all" && transaction.type !== typeFilter) return false;
       if (!query) return true;
       return [
@@ -143,13 +160,15 @@ export default function Budget() {
               <p className="text-2xl sm:text-3xl font-semibold mt-2">{formatUZS(totalBalance)}</p>
               <p className="text-xs opacity-75 mt-2">Barcha pul manbalari yig‘indisi</p>
             </div>
-            {ACCOUNTS.map(({ id, label, icon: Icon, tone }) => (
+            {DISPLAY_ACCOUNTS.map(({ id, label, icon: Icon, tone, accounts }) => (
               <div key={id} className="odina-budget-account odina-panel rounded-2xl border border-border bg-card p-4">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tone}`}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">{label}</p>
-                <p className="text-lg sm:text-xl font-semibold mt-1">{formatUZS(balanceMap[id] || 0)}</p>
+                <p className="text-lg sm:text-xl font-semibold mt-1">
+                  {formatUZS(accounts.reduce((sum, key) => sum + Number(balanceMap[key] || 0), 0))}
+                </p>
               </div>
             ))}
           </div>
@@ -164,7 +183,7 @@ export default function Budget() {
                 <span className="text-xs text-muted-foreground block mb-1.5">Hisob</span>
                 <OdinaSelect value={accountFilter} onChange={(event) => setAccountFilter(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm">
                   <option value="all">Barcha hisoblar</option>
-                  {ACCOUNTS.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
+                  {DISPLAY_ACCOUNTS.map((account) => <option key={account.id} value={account.id}>{account.label}</option>)}
                 </OdinaSelect>
               </label>
               <label className="lg:w-52">
@@ -191,7 +210,6 @@ export default function Budget() {
               </div>
             ) : visibleTransactions.map((transaction) => {
               const incoming = transaction.direction === "in";
-              const account = ACCOUNTS.find((item) => item.id === transaction.account);
               const Icon = incoming ? ArrowDownLeft : ArrowUpRight;
               return (
                 <div key={transaction.id} className="odina-ledger-row odina-budget-row odina-panel rounded-2xl border border-border bg-card p-4 flex items-start gap-3">
@@ -203,7 +221,7 @@ export default function Budget() {
                       <div>
                         <p className="font-semibold">{TYPE_LABELS[transaction.type] || transaction.type}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {account?.label || transaction.account} · {transaction.transaction_number}
+                          {accountLabel(transaction.account)} · {transaction.transaction_number}
                         </p>
                       </div>
                       <p className={`font-semibold whitespace-nowrap ${incoming ? "text-emerald-700" : "text-destructive"}`}>
