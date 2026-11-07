@@ -146,7 +146,7 @@ test('lost payment/debt update replies recover once, including opening target', 
 });
 
 test('opening entity is admin-read/backend-write only; purchase schema unchanged', () => {
-  const schema = JSON.parse(readFileSync('base44/entities/supplier-opening-debt.jsonc', 'utf8'));
+  const schema = JSON.parse(readFileSync('base44/entities/SupplierOpeningDebt.jsonc', 'utf8'));
   assert.deepEqual(schema.rls, { read: { user_condition: { role: 'admin' } }, create: false, update: false, delete: false });
   assert.equal(schema.properties.location_id, undefined);
 });
