@@ -87,6 +87,10 @@
       "minimum": 0,
       "description": "Server-side pacing slot for older Central offline receipts; unrelated to shift financial totals."
     },
+    "pos_queue_resolutions_json": {
+      "type": "string",
+      "description": "PIN-approved pending POS cancellations/edits, original fingerprints and replacement requests. Written atomically with checkout fences; financial totals remain unchanged."
+    },
     "cash_removed": {
       "type": "number",
       "default": 0

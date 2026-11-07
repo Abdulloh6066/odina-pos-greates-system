@@ -6,6 +6,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'pending_sales';
 const QUEUE_EVENT = 'odina:offline-sales-changed';
 const SYNC_LOCK = 'odina-pos-offline-sales-sync';
+const isResolved = row => ['cancelled', 'superseded', 'reconciled'].includes(row?.status);
 
 let databasePromise;
 let broadcastChannel;
@@ -302,6 +303,7 @@ export async function listPendingSales(userId) {
 
   return rows
     .filter((row) => !userId || row.user_id === userId)
+    .filter((row) => !isResolved(row))
     .sort((left, right) => String(left.created_at).localeCompare(String(right.created_at)));
 }
 
@@ -328,7 +330,7 @@ async function updatePendingSale(id, patch) {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(id);
     request.onsuccess = () => {
-      if (!request.result) return;
+      if (!request.result || isResolved(request.result)) return;
       store.put({ ...request.result, ...patch, updated_at: new Date().toISOString() });
     };
     request.onerror = () => reject(request.error || new Error('Offline savdoni yangilab bo‘lmadi.'));
@@ -400,7 +402,7 @@ export function pendingSaleRetryDelay(records, now = Date.now()) {
 
 // Storage injection is used by memory-only regression tests; production defaults
 // remain IndexedDB. Failed records are retained until an explicit manual retry.
-export async function syncPendingSales({ userId, send, retryFailed = false, onConfirmed,
+export async function syncPendingSales({ userId, send, retryFailed = false, recordId = '', onConfirmed,
   storage = { list: listPendingSales, update: updatePendingSale, remove: removePendingSale },
   lock = withSyncLock, now = () => Date.now(),
 }) {
@@ -411,11 +413,11 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
   const result = await lock(async () => {
     const records = await storage.list(userId);
     let synced = 0;
-    const priorFailure = records.find((row) => row.status === 'failed');
+    const priorFailure = records.find((row) => row.status === 'failed' && (!recordId || row.id === recordId));
     let failed = priorFailure && !retryFailed
       ? { id: priorFailure.id, retryable: false, message: priorFailure.last_error } : null;
 
-    for (const record of records) {
+    for (const record of records.filter((row) => !recordId || row.id === recordId)) {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
       if (!retryFailed && record.status === 'failed') continue;
       if (!retryFailed && Date.parse(record.next_retry_at || '') > now()) break;
@@ -492,5 +494,87 @@ export async function syncPendingSales({ userId, send, retryFailed = false, onCo
   if (result?.skipped) {
     return { synced: 0, remaining: (await storage.list(userId)).length, failed: null, skipped: true };
   }
+  return result;
+}
+
+export function resolvedPendingRecords(record, result) {
+  if (!record?.id || result?.original_key !== record.id
+    || !['cancelled', 'edited', 'confirmed'].includes(result?.state)) {
+    throw new Error('Server qarori savdo kalitiga mos kelmadi. Navbat o‘zgartirilmadi.');
+  }
+  const archived = { ...record, status: result.state === 'edited' ? 'superseded'
+    : result.state === 'confirmed' ? 'reconciled' : 'cancelled',
+  resolution: result, updated_at: new Date().toISOString() };
+  if (result.state !== 'edited') return [archived];
+  const request = result.request;
+  if (!request?.idempotency_key || request.idempotency_key === record.id
+    || request.action !== 'complete_sale' || request.shift_id !== record.shift_id
+    || !Number.isSafeInteger(result.final_total) || result.final_total <= 0) {
+    throw new Error('Tahrirlangan savdo ma’lumoti tasdiqlanmadi. Avvalgi yozuv saqlanib turadi.');
+  }
+  return [archived, { ...record, id: request.idempotency_key, request,
+    status: 'pending', attempts: 0, last_error: '', last_error_status: 0, next_retry_at: '',
+    replaces_id: record.id, updated_at: new Date().toISOString(),
+    local_sale: { ...record.local_sale, sale_number: saleNumberFromKey(request.idempotency_key, record.created_at),
+      items: result.items, subtotal: result.subtotal, total: result.final_total,
+      discount_amount: result.subtotal - result.final_total, discount_code: 'QAYTIB_BERISH',
+      payments: request.payments, payment_methods_summary: request.payments.map(row => row.method).join(' + ') },
+  }];
+}
+
+async function persistPendingResolution(record, result) {
+  const rows = resolvedPendingRecords(record, result);
+  const database = await openDatabase();
+  await new Promise((resolve, reject) => {
+    let failure;
+    const transaction = database.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const abort = message => { failure = new Error(message); transaction.abort(); };
+    const read = store.get(record.id);
+    read.onsuccess = () => {
+      const current = read.result;
+      if (!current || isResolved(current) || current.user_id !== record.user_id
+        || JSON.stringify(current.request) !== JSON.stringify(record.request)) {
+        abort('Navbat yozuvi o‘zgardi. Holatini qayta tekshiring.'); return;
+      }
+      if (rows.length === 1) { store.put(rows[0]); return; }
+      const replacement = store.get(rows[1].id);
+      replacement.onsuccess = () => {
+        if (replacement.result && (replacement.result.user_id !== record.user_id
+          || JSON.stringify(replacement.result.request) !== JSON.stringify(rows[1].request))) {
+          abort('Tahrirlangan savdo kaliti band. Egasi tekshirishi kerak.'); return;
+        }
+        store.put(rows[0]);
+        if (!replacement.result) store.put(rows[1]);
+      };
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(failure || transaction.error || new Error('Qaror qurilmaga saqlanmadi.'));
+    transaction.onabort = () => reject(failure || transaction.error || new Error('Navbat o‘zgarishsiz qoldi.'));
+  });
+  notifyQueueChanged();
+}
+
+// Use the very same cross-tab lock as the sender. A queued request cannot be
+// edited while this device is sending it. The server also fences other devices.
+export async function managePendingSale({ userId, id, authorize, lock = withSyncLock,
+  storage = { list: listPendingSales, resolve: persistPendingResolution } }) {
+  const result = await lock(async () => {
+    const record = (await storage.list(userId)).find(row => row.id === id && row.user_id === userId);
+    if (!record) throw new Error('Savdo navbatda topilmadi. Ro‘yxatni yangilang.');
+    const response = await authorize(record);
+    const payload = response?.data || response;
+    if (payload?.original_key !== record.id || !['cancelled', 'edited', 'confirmed'].includes(payload?.state)) {
+      throw new Error(payload?.error || 'Server qarori hali tasdiqlanmadi.');
+    }
+    if (payload.state === 'confirmed' && (!payload.sale?.id || payload.sale.idempotency_key !== record.id
+      || payload.sale.user_id !== record.user_id || payload.sale.shift_id !== record.shift_id)) {
+      throw new Error('Server tasdig‘i saqlangan savdoga mos emas. Navbat saqlanib turadi.');
+    }
+    await storage.resolve(record, payload);
+    releaseSaleRequest(record.id, saleRequests.get(JSON.stringify([String(userId), record.id])));
+    return { ...payload, record };
+  });
+  if (result?.skipped) throw new Error('Boshqa oynada savdo yuborilmoqda. Bir ozdan keyin qayta tekshiring.');
   return result;
 }

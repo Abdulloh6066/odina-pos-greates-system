@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   listPendingSales,
+  managePendingSale,
   pendingSaleRetryDelay,
   savePendingSale,
   subscribePendingSales,
@@ -154,7 +155,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     } catch { failed(); }
   }, [userId]);
 
-  const syncNow = useCallback(async ({ retryFailed = true } = {}) => {
+  const syncNow = useCallback(async ({ retryFailed = true, recordId = '' } = {}) => {
     const session = sessionRef.current;
     if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       const current = await refresh();
@@ -178,6 +179,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
       const result = await syncPendingSales({
         userId,
         retryFailed,
+        recordId,
         onConfirmed: (event) => {
           if (sessionRef.current === session) reconcileConfirmed(event);
         },
@@ -216,6 +218,33 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
       }
     }
   }, [refresh, userId, probeConnection, reportRequestSuccess, reportRequestError, reconcileConfirmed]);
+
+  const resolveRecord = useCallback(async (id, { operation, finalTotal, reason, pin } = {}) => {
+    if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      throw new Error('Yuborish tugashini yoki internet ulanishini kuting.');
+    }
+    const session = sessionRef.current;
+    syncingRef.current = true; setSyncing(true);
+    try {
+      const result = await managePendingSale({ userId, id, authorize: record => base44.functions.invoke('complete-sale', {
+        action: operation ? 'resolve_pending_sale' : 'inspect_pending_sale', original_request: record.request,
+        ...(operation ? { operation, final_total: finalTotal, reason, owner_pin: pin } : {}),
+      }) });
+      if (mountedRef.current && sessionRef.current === session && userRef.current === userId) {
+        if (result.state === 'confirmed') reconcileConfirmed({ id, record: result.record,
+          payload: { sale: result.sale, shift: result.shift, already_processed: true, stock_updates: [] } });
+        setSyncError('');
+        await refresh();
+        void Promise.resolve(onSyncedRef.current?.(result)).catch(() => {});
+      }
+      return result;
+    } finally {
+      if (sessionRef.current === session) {
+        syncingRef.current = false;
+        if (mountedRef.current) setSyncing(false);
+      }
+    }
+  }, [userId, refresh, reconcileConfirmed]);
 
   const enqueue = useCallback(async (record) => {
     const session = sessionRef.current;
@@ -298,5 +327,6 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     enqueue,
     refresh,
     syncNow,
+    resolveRecord,
   };
 }

@@ -1,4 +1,5 @@
 import { pendingFinancialCloseGuard } from "../../shared/shift-pending-financial.ts";
+import { managePendingSale, pendingSaleResolutions } from "../../shared/pending-sale-management.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { savedShiftCloseResponse, reconcileShiftCloseFailure } from "../../shared/shift-settlement-recovery.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
@@ -499,6 +500,13 @@ export default async function(req) {
     }
 
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
+
+    if (action === "inspect_pending_sale" || action === "resolve_pending_sale") {
+      return Response.json(await managePendingSale(service, user, body, {
+        verifyPin: verifyOwnerPin, fingerprint: saleRequestFingerprint,
+        canonical: canonicalSaleRequest, normalizeItems: normalizeSaleItems, money, paymentMethods: PAYMENT_METHODS,
+      }));
+    }
 
     if (action === "runtime_status") {
       return Response.json({ ok: true, runtime_version: COMPLETE_SALE_RUNTIME_VERSION });
@@ -1403,6 +1411,11 @@ export default async function(req) {
     if (requestedShiftRead?.status === "rejected") throw requestedShiftRead.reason;
     const shift = requestedShiftRead?.status === "fulfilled"
       ? requestedShiftRead.value : await service.entities.Shift.get(shiftId);
+    if (shift && shift.user_id === user.id && (user.role === "admin" || shift.shop_id === user.shop_id)
+      && idempotencyKey && pendingSaleResolutions(shift)[idempotencyKey]) {
+      return Response.json({ error: "Bu navbatdagi savdo egasi PIN-kodi bilan bekor qilingan yoki tahrirlangan. Navbat oynasidan holatini tekshiring.",
+        queue_resolution: true }, { status: 410 });
+    }
     if (!shift || shift.status !== "open") {
       return Response.json({ error: "The shift is not open." }, { status: 409 });
     }

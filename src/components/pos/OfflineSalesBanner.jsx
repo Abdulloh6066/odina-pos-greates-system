@@ -1,7 +1,7 @@
 import React from 'react';
-import { CloudOff, CloudUpload, RefreshCw } from 'lucide-react';
+import { CloudOff, CloudUpload, FileClock, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-export default function OfflineSalesBanner({ isOnline, browserOnline = isOnline, connectionPaused = false, records, syncing, storageError, syncError, onRetry }) {
+export default function OfflineSalesBanner({ isOnline, browserOnline = isOnline, connectionPaused = false, records, syncing, storageError, syncError, onRetry, onOpenReview }) {
   const failed = records.find(record => record.status === 'failed');
   const error = storageError || failed?.last_error || syncError;
   if (isOnline && !records.length && !syncing && !error) return null;
@@ -12,11 +12,12 @@ export default function OfflineSalesBanner({ isOnline, browserOnline = isOnline,
     : syncing ? `${records.length} ta savdo yuborilmoqda…` : `${records.length} ta savdo tasdig‘i kutilmoqda`;
   const description = error || (!isOnline ? 'Oddiy savdolar shu qurilmada xavfsiz saqlanadi.'
     : 'Savdolar navbat bilan serverga yuboriladi. Oddiy savdoni davom ettirishingiz mumkin.');
-  return <div className={`mx-3 sm:mx-5 mt-3 shrink-0 flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${tone}`}>
+  return <div className={`mx-3 sm:mx-5 mt-3 shrink-0 flex flex-wrap items-center gap-3 rounded-2xl border px-3.5 py-2.5 ${tone}`}>
     <span className="w-9 h-9 rounded-xl bg-card/60 flex items-center justify-center shrink-0"><Icon className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} /></span>
     <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{title}</span><span className="block text-xs opacity-80 mt-0.5 truncate">{description}</span></span>
+    {records.length > 0 && onOpenReview && <Button type="button" variant="outline" size="sm" onClick={onOpenReview} className="min-h-11 shrink-0 bg-card/70" aria-label="Navbatdagi savdolarni ochish"><FileClock className="mr-1.5 h-4 w-4" />Ko‘rish</Button>}
     {browserOnline && records.length > 0 && <Button type="button" variant="outline" size="sm" disabled={syncing}
-      onClick={() => { void onRetry(); }} aria-label={isOnline ? 'Navbatdagi savdolarni yuborish' : 'Server aloqasini tekshirish'} className="h-10 shrink-0 bg-card/70">
+      onClick={() => { void onRetry(); }} aria-label={isOnline ? 'Navbatdagi savdolarni yuborish' : 'Server aloqasini tekshirish'} className="min-h-11 shrink-0 bg-card/70">
       <RefreshCw className={`w-4 h-4 sm:mr-1.5 ${syncing ? 'animate-spin' : ''}`} /><span className="hidden sm:inline">{isOnline ? 'Qayta yuborish' : 'Aloqani tekshirish'}</span>
     </Button>}
   </div>;
