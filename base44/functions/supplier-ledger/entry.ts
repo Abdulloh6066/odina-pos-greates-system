@@ -1,4 +1,5 @@
-import { createOpeningDebt, listOpeningDebts } from "../../shared/supplier-opening-debt.ts";
+import { createRecipient } from "../../shared/recipient-create.ts";
+import { assignOpeningDebtLocation, correctOpeningDebtAmount, createOpeningDebt, listOpeningDebts } from "../../shared/supplier-opening-debt.ts";
 import { resolveAppUser } from "../../shared/user-helpers.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
@@ -104,8 +105,24 @@ export default async function(req) {
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
     const action = String(body?.action || "");
 
+    if (action === "create_recipient") {
+      return Response.json(await createRecipient(service, user, { recipient: body?.recipient,
+        opening_debt: body?.opening_debt, key: financialRequestKey(body) }));
+    }
     if (action === "list_opening_debts") {
-      return Response.json(await listOpeningDebts(service, user));
+      return Response.json(await listOpeningDebts(service, user, body?.location_id));
+    }
+    if (action === "assign_opening_debt_location") {
+      return Response.json(await assignOpeningDebtLocation(service, user, {
+        opening_debt_id: body?.opening_debt_id, location_id: body?.location_id,
+        key: financialRequestKey(body),
+      }));
+    }
+    if (action === "correct_opening_debt_amount") {
+      return Response.json(await correctOpeningDebtAmount(service, user, {
+        opening_debt_id: body?.opening_debt_id, amount: body?.amount, reason: body?.reason,
+        key: financialRequestKey(body),
+      }));
     }
     if (action === "create_opening_debt") {
       return Response.json(await createOpeningDebt(service, user, {

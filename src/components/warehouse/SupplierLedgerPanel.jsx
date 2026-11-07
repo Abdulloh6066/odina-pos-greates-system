@@ -67,6 +67,7 @@ export default function SupplierLedgerPanel({
   search = "",
 }) {
   const globalView = user?.role === "admin" && allLocations === true && !location?.id;
+  const canViewOpening = user?.role === "admin" && (globalView || Boolean(location?.id));
   const scopeKey = `${user?.id}:${user?.role}:${location?.id || ''}:${globalView}`;
   const [loadedScope, setLoadedScope] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -109,17 +110,17 @@ export default function SupplierLedgerPanel({
           readRecords(base44.entities.SupplierReceipt, "-received_at"),
           readRecords(base44.entities.SupplierReceiptItem, "-created_date"),
           readRecords(base44.entities.SupplierPayment, "-paid_at"),
-          globalView ? base44.functions.invoke("supplier-ledger", { action: "list_opening_debts" }) : Promise.resolve(null),
+          canViewOpening ? base44.functions.invoke("supplier-ledger", { action: "list_opening_debts", ...(globalView ? {} : { location_id: location.id }) }) : Promise.resolve(null),
         ]);
         const opening = openingResult?.data || openingResult;
-        if (globalView && (!Array.isArray(opening?.opening_debts) || !Array.isArray(opening?.payments))) {
+        if (canViewOpening && (!Array.isArray(opening?.opening_debts) || !Array.isArray(opening?.payments))) {
           throw new Error(opening?.error || "Boshlang‘ich qarzlar olinmadi. Jami qarz hisoblanmadi.");
         }
         if (cancelled) return;
         setReceipts(receiptList || []); setReceiptItems(itemList || []);
         setPayments((paymentList || []).filter(payment => !payment.opening_debt_id));
-        setOpeningDebts(globalView ? [...new Map(opening.opening_debts.map(debt => [debt.id, debt])).values()] : []);
-        setOpeningPayments(globalView ? [...new Map(opening.payments.map(payment => [payment.id, payment])).values()] : []);
+        setOpeningDebts(canViewOpening ? [...new Map(opening.opening_debts.filter(debt => globalView || debt.location_id === location.id).map(debt => [debt.id, debt])).values()] : []);
+        setOpeningPayments(canViewOpening ? [...new Map(opening.payments.map(payment => [payment.id, payment])).values()] : []);
       } catch (error) {
         if (!cancelled) setLoadError("Kirim va qarzlar to‘liq yuklanmadi. Jami qarz hisoblanmadi: " + errorText(error));
       } finally { if (!cancelled) { setLoadedScope(scopeKey); setLoading(false); } }
@@ -150,12 +151,12 @@ export default function SupplierLedgerPanel({
         names.set(receipt.supplier_id, receipt.supplier_name_snapshot || "Noma’lum yetkazib beruvchi");
       }
     }
-    if (globalView) for (const debt of openingDebts) {
+    if (canViewOpening) for (const debt of openingDebts) {
       if (!names.has(debt.supplier_id)) names.set(debt.supplier_id, debt.supplier_name_snapshot || "Yetkazib beruvchi");
     }
     return Array.from(names, ([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, "uz"));
-  }, [recipients, locationReceipts, location?.id, globalView, openingDebts]);
+  }, [recipients, locationReceipts, location?.id, globalView, canViewOpening, openingDebts]);
 
   const visible = useMemo(() => {
     const query = search.toLowerCase().trim();
@@ -180,16 +181,16 @@ export default function SupplierLedgerPanel({
     });
   }, [locationReceipts, supplierFilter, statusFilter, dateFrom, dateTo, search]);
 
-  const visibleOpeningDebts = useMemo(() => !globalView ? [] : openingDebts.filter(debt => {
+  const visibleOpeningDebts = useMemo(() => !canViewOpening ? [] : openingDebts.filter(debt => {
     if (supplierFilter !== "all" && debt.supplier_id !== supplierFilter) return false;
     if (statusFilter === "cancelled") return false;
     if (statusFilter === "debt" && Number(debt.remaining_debt || 0) <= 0) return false;
     if (statusFilter === "paid" && Number(debt.remaining_debt || 0) > 0) return false;
     const query = search.toLowerCase().trim();
     return !query || [debt.supplier_name_snapshot, debt.notes, debt.created_by_name].filter(Boolean).join(" ").toLowerCase().includes(query);
-  }), [globalView, openingDebts, supplierFilter, statusFilter, search]);
+  }), [canViewOpening, openingDebts, supplierFilter, statusFilter, search]);
   const openingOutstanding = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.remaining_debt || 0), 0);
-  const openingPaid = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.debt_amount || 0) - Number(debt.remaining_debt || 0), 0);
+  const openingPaid = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.corrected_debt_amount ?? debt.debt_amount ?? 0) - Number(debt.remaining_debt || 0), 0);
 
   const visibleReceiptIds = useMemo(() => new Set(visible.map((receipt) => receipt.id)), [visible]);
   const visiblePayments = useMemo(
@@ -234,7 +235,7 @@ export default function SupplierLedgerPanel({
       const row = grouped.get(debt.supplier_id) || { id: debt.supplier_id, name: debt.supplier_name_snapshot || "Yetkazib beruvchi", purchases: 0, paid: 0, debt: 0, cancelled: 0, receiptCount: 0 };
       row.openingDebt = (row.openingDebt || 0) + Number(debt.remaining_debt || 0);
       row.debt += Number(debt.remaining_debt || 0);
-      row.paid += Number(debt.debt_amount || 0) - Number(debt.remaining_debt || 0);
+      row.paid += Number(debt.corrected_debt_amount ?? debt.debt_amount ?? 0) - Number(debt.remaining_debt || 0);
       grouped.set(debt.supplier_id, row);
     }
     return Array.from(grouped.values()).sort((a, b) => b.debt - a.debt || b.purchases - a.purchases);
@@ -243,7 +244,7 @@ export default function SupplierLedgerPanel({
   const selectedSupplier = useMemo(() => {
     if (!selectedSupplierId) return null;
     const supplierReceipts = locationReceipts.filter((receipt) => receipt.supplier_id === selectedSupplierId);
-    const supplierOpening = globalView ? openingDebts.filter(debt => debt.supplier_id === selectedSupplierId) : [];
+    const supplierOpening = canViewOpening ? openingDebts.filter(debt => debt.supplier_id === selectedSupplierId) : [];
     if (!supplierReceipts.length && !supplierOpening.length) return null;
     const receiptIds = new Set(supplierReceipts.map((receipt) => receipt.id));
     return {
@@ -254,7 +255,7 @@ export default function SupplierLedgerPanel({
       payments: [...payments.filter((payment) => receiptIds.has(payment.receipt_id)), ...openingPayments.filter(payment => supplierOpening.some(debt => debt.id === payment.opening_debt_id))],
       items: receiptItems.filter((item) => receiptIds.has(item.receipt_id)),
     };
-  }, [selectedSupplierId, locationReceipts, payments, receiptItems, openingDebts, openingPayments, globalView]);
+  }, [selectedSupplierId, locationReceipts, payments, receiptItems, openingDebts, openingPayments, canViewOpening]);
 
   const showThisMonth = () => {
     setDateFrom(uzbekistanMonthStartKey());
@@ -298,8 +299,8 @@ export default function SupplierLedgerPanel({
         )}
       </div>
 
-      {globalView && <p className="rounded-xl border border-border p-4 text-sm">Barcha do‘konlar · faqat ko‘rish. Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
-      {user?.role === "admin" && !globalView && <p className="text-sm text-muted-foreground">Boshlang‘ich qarzlarni ko‘rish uchun “Barcha do‘konlar”ni tanlang.</p>}
+      {canViewOpening && <p className="rounded-xl border border-border p-4 text-sm">{globalView ? "Barcha do‘konlar · faqat ko‘rish." : "Tanlangan omborga biriktirilgan boshlang‘ich qarzlar."} Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
+      {user?.role === "admin" && !globalView && <p className="text-sm text-muted-foreground">Omborga biriktirilmagan qarzlar faqat “Barcha do‘konlar”da ko‘rinadi.</p>}
       <div className="odina-panel rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={showThisMonth} className="min-h-10 rounded-xl">
@@ -343,7 +344,7 @@ export default function SupplierLedgerPanel({
               className="w-full h-11 rounded-xl border border-input bg-card px-3 text-sm"
             >
               <option value="all">Barcha holatlar</option>
-              <option value="active">{globalView ? "Faol kirim va qarzlar" : "Faol kirimlar"}</option>
+              <option value="active">{canViewOpening ? "Faol kirim va qarzlar" : "Faol kirimlar"}</option>
               <option value="debt">Qarzi bor</option>
               <option value="paid">To‘langan</option>
               <option value="cancelled">Bekor qilingan</option>
@@ -359,8 +360,8 @@ export default function SupplierLedgerPanel({
         <Summary icon={Ban} label="Bekor qilingan" value={formatUZS(cancelledTotal)} danger={cancelledTotal > 0} />
       </div>
 
-      {globalView && <p className="text-sm text-muted-foreground">Qolgan qarz tarkibi: kirimlar {formatUZS(outstanding - openingOutstanding)} · boshlang‘ich qarzlar {formatUZS(openingOutstanding)}.</p>}
-      {globalView && visibleOpeningDebts.length > 0 && <section aria-label="Boshlang‘ich qarzlar"><h3 className="font-semibold mb-3">Boshlang‘ich qarzlar</h3><div className="space-y-3">{visibleOpeningDebts.map(debt => <OpeningDebtCard key={debt.id} debt={debt} />)}</div></section>}
+      {canViewOpening && <p className="text-sm text-muted-foreground">Qolgan qarz tarkibi: kirimlar {formatUZS(outstanding - openingOutstanding)} · boshlang‘ich qarzlar {formatUZS(openingOutstanding)}.</p>}
+      {canViewOpening && visibleOpeningDebts.length > 0 && <section aria-label="Boshlang‘ich qarzlar"><h3 className="font-semibold mb-3">Boshlang‘ich qarzlar</h3><div className="space-y-3">{visibleOpeningDebts.map(debt => <OpeningDebtCard key={debt.id} debt={debt} />)}</div></section>}
 
       {supplierRows.length > 0 && (
         <section>
@@ -577,7 +578,13 @@ function ReceiptCard({ receipt, items, payments, onView }) {
 function OpeningDebtCard({ debt }) {
   return <article className="rounded-xl border border-border bg-card p-4 space-y-2">
     <p className="font-semibold">{debt.supplier_name_snapshot} · Boshlang‘ich qarz</p>
-    <p className="text-sm">Boshlang‘ich summa: {formatUZS(debt.debt_amount)} · Qoldiq: {formatUZS(debt.remaining_debt)}</p>
+    <p className="text-xs text-muted-foreground">Ombor: {debt.location_name_snapshot || (debt.location_id ? "Biriktirilgan ombor" : "Biriktirilmagan")}</p>
+    <p className="text-sm">Boshlang‘ich summa: {formatUZS(debt.corrected_debt_amount ?? debt.debt_amount)} · Qoldiq: {formatUZS(debt.remaining_debt)}</p>
+    {debt.corrected_debt_amount != null && <div className="text-xs text-muted-foreground space-y-1" aria-label="Qarz tuzatish tarixi">
+      <p>Dastlabki summa: {formatUZS(debt.debt_amount)} · Tuzatilgan: {formatUZS(debt.corrected_debt_amount)}</p>
+      <p>Sabab: {debt.amount_correction_reason}</p>
+      <p>Tuzatildi: {formatUzbekistanDateTime(debt.amount_corrected_at)} · {debt.amount_corrected_by_name || "—"}. Bu to‘lov emas.</p>
+    </div>}
     <p className="text-xs text-muted-foreground">Qarz sanasi: {debt.effective_date} · {STATUS_LABELS[debt.status] || debt.status}</p>
     <p className="text-xs text-muted-foreground">Kiritildi: {formatUzbekistanDateTime(debt.created_at)} · {debt.created_by_name || "—"}</p>
     {debt.notes && <p className="text-sm break-words">{debt.notes}</p>}
@@ -706,7 +713,7 @@ function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
   const purchases = active.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
   const opening = supplier.openingDebts || [];
   const openingRemaining = opening.reduce((sum, debt) => sum + Number(debt.remaining_debt || 0), 0);
-  const paid = opening.reduce((sum, debt) => sum + Number(debt.debt_amount || 0) - Number(debt.remaining_debt || 0), 0) + active.reduce((sum, receipt) => sum + receiptPaid(receipt), 0);
+  const paid = opening.reduce((sum, debt) => sum + Number(debt.corrected_debt_amount ?? debt.debt_amount ?? 0) - Number(debt.remaining_debt || 0), 0) + active.reduce((sum, receipt) => sum + receiptPaid(receipt), 0);
   const debt = openingRemaining + active.reduce((sum, receipt) => sum + Number(receipt.remaining_debt || 0), 0);
 
   return (

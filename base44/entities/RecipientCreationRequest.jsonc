@@ -1,0 +1,48 @@
+{
+  "name": "RecipientCreationRequest",
+  "type": "object",
+  "properties": {
+    "request_token": {
+      "type": "string"
+    },
+    "request_fingerprint": {
+      "type": "string"
+    },
+    "actor_id": {
+      "type": "string"
+    },
+    "recipient_id": {
+      "type": "string"
+    },
+    "opening_debt_id": {
+      "type": "string"
+    },
+    "recipient_state": {
+      "type": "string",
+      "enum": [
+        "not_started",
+        "started"
+      ]
+    },
+    "completed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "request_token",
+    "request_fingerprint",
+    "actor_id",
+    "recipient_state",
+    "completed"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
