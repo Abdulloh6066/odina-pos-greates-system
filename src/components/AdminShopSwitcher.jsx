@@ -7,7 +7,7 @@ const SHARED_NOTES = {
   '/customers': 'Mijozlar ro‘yxati barcha do‘konlar uchun umumiy.',
   '/categories': 'Kategoriyalar umumiy katalogga tegishli. Do‘kondagi ko‘rinish alohida belgilanadi.',
   '/discounts': 'Chegirma kodlari barcha do‘konlar uchun umumiy.',
-  '/cash-recipients': 'Qabul qiluvchilar ro‘yxati barcha do‘konlar uchun umumiy.',
+  '/cash-recipients': 'Tanlangan do‘konga biriktirilgan qabul qiluvchilar ko‘rsatiladi; hamkor yozuvi umumiy.',
   '/security': 'Xavfsizlik va hisob ruxsatlari barcha do‘konlar uchun umumiy.',
 };
 
