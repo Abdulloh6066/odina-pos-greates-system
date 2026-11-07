@@ -2,6 +2,12 @@
   "name": "Settings",
   "type": "object",
   "properties": {
+    "recipient_creation_request_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "customer_order_last_number": {
       "type": "integer",
       "minimum": 0,

@@ -52,6 +52,45 @@
         "partial",
         "paid"
       ]
+    },
+    "location_id": {
+      "type": "string"
+    },
+    "location_name_snapshot": {
+      "type": "string"
+    },
+    "location_assigned_by_id": {
+      "type": "string"
+    },
+    "location_assigned_by_name": {
+      "type": "string"
+    },
+    "location_assignment_key": {
+      "type": "string"
+    },
+    "location_assigned_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "corrected_debt_amount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "amount_correction_reason": {
+      "type": "string"
+    },
+    "amount_correction_key": {
+      "type": "string"
+    },
+    "amount_corrected_by_id": {
+      "type": "string"
+    },
+    "amount_corrected_by_name": {
+      "type": "string"
+    },
+    "amount_corrected_at": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [

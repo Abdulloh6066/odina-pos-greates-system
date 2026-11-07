@@ -129,11 +129,13 @@ test('supplier, search and status filters apply to opening balances coherently',
   } finally { await f.close(); }
 });
 
-test('specific shop and nonadmin never request or display opening debts', async () => {
+test('specific shop excludes unassigned debt and nonadmin never requests opening debts', async () => {
   for (const props of [{ allLocations: false, location: { id: 'shop-test' } }, { user: { id: 'manager', role: 'manager' }, location: { id: 'shop-test' } }]) {
     const f = await fixture({ props, receipts: [receipt] });
     try {
-      assert.equal(f.calls.length, 0); assert.equal(summary(f.tree, 'Qolgan qarz'), '150 UZS');
+      assert.equal(f.calls.length, props.user ? 0 : 1);
+      if (!props.user) assert.equal(f.calls[0].payload.location_id, 'shop-test');
+      assert.equal(summary(f.tree, 'Qolgan qarz'), '150 UZS');
       assert.doesNotMatch(text(f.tree.toJSON()), /Old carried debt|MOCK-OPENING-PAYMENT/);
     } finally { await f.close(); }
   }
@@ -178,5 +180,57 @@ test('global purchase history paginates past 500 without losing purchases or dou
   try {
     assert.equal(summary(f.tree, 'Jami faol kirim'), `${501 * 200} UZS`);
     assert.equal(summary(f.tree, 'Qolgan qarz'), `${501 * 150 + 80} UZS`);
+  } finally { await f.close(); }
+});
+
+
+test('assigned opening debt appears only in its admin location and is counted once globally', async () => {
+  const allocated = { ...opening, location_id: 'shop-test', location_name_snapshot: 'Mock warehouse' };
+  const f = await fixture({ debts: [allocated, { ...opening, id: 'unassigned', remaining_debt: 25 }, { ...allocated, id: 'elsewhere', location_id: 'other-shop', remaining_debt: 35 }], receipts: [receipt], props: { allLocations: false, location: { id: 'shop-test' } } });
+  try {
+    assert.equal(f.calls[0].payload.location_id, 'shop-test');
+    assert.equal(summary(f.tree, 'Qolgan qarz'), '230 UZS');
+    assert.equal(summary(f.tree, 'Jami faol kirim'), '200 UZS');
+    assert.match(text(f.tree.toJSON()), /Mock warehouse/);
+    await f.update({ allLocations: true, location: null });
+    assert.equal(f.calls.at(-1).payload.location_id, undefined);
+    assert.equal(summary(f.tree, 'Qolgan qarz'), '290 UZS');
+    await f.update({ allLocations: false, location: { id: 'no-debt-shop' } });
+    assert.equal(summary(f.tree, 'Qolgan qarz'), '0 UZS');
+    assert.doesNotMatch(text(f.tree.toJSON()), /MOCK-OPENING-PAYMENT/);
+  } finally { await f.close(); }
+});
+
+test('late location response cannot replace the new warehouse opening balance', async () => {
+  let resolve;
+  const pending = new Promise(done => { resolve = done; });
+  const f = await fixture({ props: { allLocations: false, location: { id: 'shop-test' } }, openingRead: attempt => attempt === 1 ? pending : { data: { opening_debts: [{ ...opening, location_id: 'next-shop', remaining_debt: 35 }], payments: [] } } });
+  try {
+    await f.update({ location: { id: 'next-shop' } });
+    assert.equal(summary(f.tree, 'Qolgan qarz'), '35 UZS');
+    await act(async () => { resolve({ data: { opening_debts: [{ ...opening, location_id: 'shop-test' }], payments: [payment] } }); await pending; });
+    assert.equal(summary(f.tree, 'Qolgan qarz'), '35 UZS');
+    assert.doesNotMatch(text(f.tree.toJSON()), /MOCK-OPENING-PAYMENT/);
+  } finally { await f.close(); }
+});
+
+test('corrected opening principal never becomes a fake payment in global or warehouse totals', async () => {
+  const debt = { ...opening, debt_amount: 120, corrected_debt_amount: 80, remaining_debt: 80, status: 'unpaid',
+    location_id: 'shop-test', amount_correction_reason: 'Mock typo', amount_corrected_at: '2026-11-01T00:00:00Z', amount_corrected_by_name: 'Mock admin' };
+  const f = await fixture({ openingRead: () => ({ data: { opening_debts: [debt], payments: [] } }) });
+  try {
+    for (const props of [{ allLocations: true, location: null }, { allLocations: false, location: { id: 'shop-test' } }]) {
+      await f.update(props);
+      assert.equal(summary(f.tree, 'Qolgan qarz'), '80 UZS'); assert.equal(summary(f.tree, 'To‘langan'), '0 UZS');
+      assert.equal(summary(f.tree, 'Jami faol kirim'), '0 UZS');
+      assert.match(text(f.tree.toJSON()), /Dastlabki summa: 120 UZS/); assert.match(text(f.tree.toJSON()), /Mock typo/);
+      const supplier = f.tree.root.findAllByType('button').find(node => text(node).includes('Mock supplier'));
+      await act(async () => supplier.props.onClick());
+      const detail = f.tree.root.findByType('dialog');
+      assert.match(text(detail), /To‘langan0 UZS/); assert.match(text(detail), /Hali to‘lov qilinmagan/);
+      await act(async () => button(f.tree, 'Yopish').props.onClick());
+      await act(async () => select(f.tree, 1, 'paid')); assert.equal(summary(f.tree, 'Qolgan qarz'), '0 UZS');
+      await act(async () => select(f.tree, 1, 'debt')); assert.equal(summary(f.tree, 'Qolgan qarz'), '80 UZS');
+    }
   } finally { await f.close(); }
 });

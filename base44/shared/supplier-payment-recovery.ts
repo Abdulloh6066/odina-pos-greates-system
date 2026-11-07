@@ -208,7 +208,7 @@ async function debtDelta(service: any, allocation: any, marker: string, reverse 
       return { operation: { amount: allocation.amount, state: reverse ? "reversed" : "applied" },
         query: { remaining_debt: Number(row.remaining_debt || 0), status: row.status },
         inc: { remaining_debt: reverse ? allocation.amount : -allocation.amount },
-        set: { status: after <= 0 ? "paid" : after < money(row.debt_amount) ? "partial" : "unpaid" } };
+        set: { status: after <= 0 ? "paid" : after < money(allocation.opening_debt_id ? (row.corrected_debt_amount ?? row.debt_amount) : row.debt_amount) ? "partial" : "unpaid" } };
     });
 }
 

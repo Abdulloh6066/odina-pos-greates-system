@@ -1,6 +1,10 @@
 {
   "name": "CashRecipient",
   "properties": {
+    "creation_request_id": {
+      "type": "string",
+      "description": "Opaque correlation ID for retry-safe recipient creation. Contains no debt data."
+    },
     "name": {
       "type": "string"
     },
