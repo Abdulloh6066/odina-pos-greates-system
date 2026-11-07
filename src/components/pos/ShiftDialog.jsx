@@ -61,7 +61,7 @@ export function OpenShiftDialog({ open, shops, user, onClose, onConfirm, loading
           </div>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Boshlang‘ich naqd pul</label>
-            <Input
+            <Input data-money
               type="number"
               value={startingCash}
               onChange={(e) => setStartingCash(e.target.value)}
@@ -142,11 +142,11 @@ export function CloseShiftDialog({ open, shift, onClose, onConfirm, loading }) {
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Sanab chiqilgan haqiqiy naqd pul</label>
-                <Input type="number" min="0" value={actualCash} onChange={(e) => setActualCash(e.target.value)} className="h-11" />
+                <Input data-money type="number" min="0" value={actualCash} onChange={(e) => setActualCash(e.target.value)} className="h-11" />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Keyingi smenaga kassada qoldiriladi</label>
-                <Input type="number" min="0" max={countedCash} value={cashLeft} onChange={(e) => setCashLeft(e.target.value)} className="h-11" />
+                <Input data-money type="number" min="0" max={countedCash} value={cashLeft} onChange={(e) => setCashLeft(e.target.value)} className="h-11" />
                 <p className="text-xs text-muted-foreground mt-1">Qolgan naqd pul Budget hisobiga topshirilgan deb yoziladi.</p>
               </div>
             </div>

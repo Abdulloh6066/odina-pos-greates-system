@@ -148,7 +148,7 @@ export default function OpeningDebtPaymentDialog({ debt, user, allowed, onClose,
         <div><Label htmlFor="opening-payment-account">Budget hisobi</Label><OdinaSelect id="opening-payment-account" value={account} disabled={locked} onChange={event => !locked && setAccount(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
           {ACCOUNTS.map(item => <option key={item.id} value={item.id}>{item.label}{balances !== null ? ` · ${formatUZS(balances[item.id] || 0)}` : ''}</option>)}
         </OdinaSelect></div>
-        <div><Label htmlFor="opening-payment-amount">To‘lov summasi (UZS)</Label><Input id="opening-payment-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} placeholder="Butun musbat summa" className="mt-1 min-h-11" />
+        <div><Label htmlFor="opening-payment-amount">To‘lov summasi (UZS)</Label><Input data-money id="opening-payment-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} placeholder="Butun musbat summa" className="mt-1 min-h-11" />
           {!pending && validAmount && value > remaining && <p className="mt-1 text-sm text-destructive">Summa qolgan qarzdan oshmasligi kerak.</p>}
           {!pending && validAmount && balances !== null && value > available && <p className="mt-1 text-sm text-destructive">Tanlangan Budget hisobida mablag‘ yetarli emas.</p>}
         </div>

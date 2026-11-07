@@ -104,7 +104,7 @@ export default function OpeningDebtDialog({ recipient, debt, payments = [], loca
         {debt && !pending && <OpeningDebtLocationAssignment key={`${user.id}:${debt.id}`} debt={debt} recipient={recipient} locations={locations} user={user} allowed={allowed} onSaved={onSaved} />}
         {(!debt || pending) && <>
           <fieldset disabled={locked} className="space-y-4">
-            <div><Label htmlFor="opening-debt-amount">Summa (UZS)</Label><Input id="opening-debt-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} placeholder="Butun musbat summa" className="mt-1 min-h-11" /></div>
+            <div><Label htmlFor="opening-debt-amount">Summa (UZS)</Label><Input data-money id="opening-debt-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} placeholder="Butun musbat summa" className="mt-1 min-h-11" /></div>
             <div><Label htmlFor="opening-debt-date">Qarz sanasi (Toshkent vaqti)</Label><Input id="opening-debt-date" type="date" value={effectiveDate} disabled={locked} onChange={event => !locked && setEffectiveDate(event.target.value)} className="mt-1 min-h-11" /></div>
             <div><Label htmlFor="opening-debt-notes">Izoh (ixtiyoriy)</Label><Textarea id="opening-debt-notes" maxLength={2000} value={notes} disabled={locked} onChange={event => !locked && setNotes(event.target.value)} className="mt-1" /></div>
           </fieldset>
@@ -215,7 +215,7 @@ function OpeningDebtAmountCorrection({ debt, payments, user, allowed, onSaved })
     <h3 className="font-semibold">Boshlang‘ich summani tuzatish</h3>
     <p className="text-sm">Faqat to‘lov boshlanishidan oldin bir marta tuzatiladi. Dastlabki summa tarixda qoladi. Tovar kirimi yoki pul harakati yaratilmaydi.</p>
     <Label htmlFor="opening-correction-amount">To‘g‘ri summa (UZS)</Label>
-    <Input id="opening-correction-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} className="min-h-11" />
+    <Input data-money id="opening-correction-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} className="min-h-11" />
     <Label htmlFor="opening-correction-reason">Tuzatish sababi</Label>
     <Textarea id="opening-correction-reason" maxLength={2000} value={reason} disabled={locked} onChange={event => !locked && setReason(event.target.value)} />
     {pending && <p role="status" className="text-sm">Avvalgi tuzatish so‘rovi saqlandi. Summa va sabab o‘zgarmasdan qayta tekshiriladi.</p>}

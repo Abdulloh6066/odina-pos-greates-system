@@ -353,7 +353,7 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
 
         <div>
           <Label className="text-xs mb-1.5 block">Summa</Label>
-          <Input type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" disabled={saving || retryPending} />
+          <Input data-money type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" disabled={saving || retryPending} />
           {invalidWithdrawal && <p className="text-xs text-destructive mt-1">Tanlangan hisobda mablag‘ yetarli emas.</p>}
         </div>
 

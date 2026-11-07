@@ -392,7 +392,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
             {form.fulfilment_type === 'delivery' && !isWedding && (
               <div>
                 <Label>Yetkazib berish narxi (UZS)</Label>
-                <Input type="number" value={form.delivery_fee} onChange={(e) => update({ delivery_fee: Number(e.target.value) })} className="mt-1" />
+                <Input data-money type="number" value={form.delivery_fee} onChange={(e) => update({ delivery_fee: Number(e.target.value) })} className="mt-1" />
               </div>
             )}
           </div>
@@ -462,7 +462,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-border pt-4">
               <div>
                 <Label>Chegirma / Qo‘shimcha (UZS)</Label>
-                <Input type="number" value={form.adjustment_amount} onChange={(e) => update({ adjustment_amount: e.target.value })} placeholder="Masalan: 25000 yoki -25000" className="mt-1" />
+                <Input data-money type="number" value={form.adjustment_amount} onChange={(e) => update({ adjustment_amount: e.target.value })} placeholder="Masalan: 25000 yoki -25000" className="mt-1" />
               </div>
               <div>
                 <Label>Sabab (majburiy)</Label>
@@ -481,7 +481,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
                 <OdinaSelect value={form.advance_method} onChange={(e) => update({ advance_method: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3 text-sm">
                   {PAYMENT_METHODS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </OdinaSelect>
-                <Input type="number" min="0" value={form.advance_amount} onChange={(e) => update({ advance_amount: Number(e.target.value) })} placeholder="Summa" />
+                <Input data-money type="number" min="0" value={form.advance_amount} onChange={(e) => update({ advance_amount: Number(e.target.value) })} placeholder="Summa" />
               </div>
             )}
           </div>

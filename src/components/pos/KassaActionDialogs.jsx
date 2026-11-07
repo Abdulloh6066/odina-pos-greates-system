@@ -215,7 +215,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
           <div>
             <Label htmlFor="cash-withdrawal-amount" className="text-xs mb-1.5 block">Miqdor</Label>
             <div className="relative">
-              <Input id="cash-withdrawal-amount" aria-label="Pul miqdori" aria-describedby="cash-withdrawal-keypad-hint"
+              <Input data-money id="cash-withdrawal-amount" aria-label="Pul miqdori" aria-describedby="cash-withdrawal-keypad-hint"
                 disabled={loading || retryPending} autoFocus type="number" inputMode="none" min="1"
                 max={recipientRequired ? Math.min(Number(shift?.expected_cash || 0), selectedDebt || Infinity) : (shift?.expected_cash || undefined)}
                 value={amount} onChange={(event) => { amountReplaceRef.current = false; setAmount(event.target.value); }}
