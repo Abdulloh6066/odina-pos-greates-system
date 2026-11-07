@@ -137,13 +137,26 @@ function own(operation: any, token: string) {
 async function claim(source: any, field: string, key: string, fingerprint: string,
   actor: string, create: () => Promise<any>) {
   const token = crypto.randomUUID();
-  const initial = journal(source.row, field)[key];
+  const initial = journal(await source.entity.get(source.row.id), field)[key];
   if (initial && (initial.fingerprint !== fingerprint || initial.actor !== actor)) {
     throw fail("Bu so‘rov kaliti boshqa to‘lov ma’lumotlari uchun ishlatilgan.", 409, false);
   }
   // Validation/planning uses only a new request. Retries use the stored plan,
   // including debts that have since become fully paid or a shift now closed.
-  const blueprint = initial ? null : await create();
+  let blueprint = null;
+  if (!initial) {
+    try { blueprint = await create(); }
+    catch (error) {
+      // Another worker can complete this same request between our source read
+      // and planning. A newly paid debt is not proof that the request never
+      // started: recover the saved operation instead of discarding its key.
+      const current = journal(await source.entity.get(source.row.id), field)[key];
+      if (!current) throw error;
+      if (current.fingerprint !== fingerprint || current.actor !== actor) {
+        throw fail("Bu so‘rov kaliti boshqa to‘lov ma’lumotlari uchun ishlatilgan.", 409, false);
+      }
+    }
+  }
   const result = await mutate(source.entity, source.row.id, field, key, (operation: any, row: any) => {
     if (operation) {
       if (operation.fingerprint !== fingerprint || operation.actor !== actor) {
@@ -201,12 +214,22 @@ async function debtDelta(service: any, allocation: any, marker: string, reverse 
       if (reverse && operation?.state !== "applied") return { skip: true };
       if (!reverse && operation?.state === "applied") return { skip: true };
       if (!reverse && operation?.state === "reversed") throw fail("Bu qarz operatsiyasi avval qaytarilgan.", 409);
+      // New row-targeted payments freeze the liability's supplier and location.
+      // Recheck on each fresh snapshot, and fence metadata changes in the CAS.
+      // Refunds and already-applied retries must still reconcile their own delta.
+      const targeted = allocation.targeted_opening === true;
+      if (!reverse && targeted && (row.supplier_id !== allocation.supplier_id
+        || String(row.location_id || "") !== allocation.location_id)) {
+        throw fail("Qarzning qabul qiluvchisi yoki joylashuvi o‘zgardi. To‘lovni qayta tekshiring.", 409, false);
+      }
       const before = money(row.remaining_debt);
       if (["cancelled", "cancelling"].includes(row.status)) throw fail("Kirim bekor qilingan yoki bekor qilinmoqda.", 409, false);
       const after = before + (reverse ? allocation.amount : -allocation.amount);
       if (after < 0) throw fail("Qarz boshqa to‘lov bilan o‘zgardi. Shu to‘lovni tekshiring.", 409, false);
       return { operation: { amount: allocation.amount, state: reverse ? "reversed" : "applied" },
-        query: { remaining_debt: Number(row.remaining_debt || 0), status: row.status },
+        query: { remaining_debt: Number(row.remaining_debt || 0), status: row.status,
+          ...(!reverse && targeted ? { supplier_id: allocation.supplier_id,
+            location_id: row.location_id === undefined ? { $exists: false } : row.location_id } : {}) },
         inc: { remaining_debt: reverse ? allocation.amount : -allocation.amount },
         set: { status: after <= 0 ? "paid" : after < money(allocation.opening_debt_id ? (row.corrected_debt_amount ?? row.debt_amount) : row.debt_amount) ? "partial" : "unpaid" } };
     });
@@ -381,9 +404,22 @@ export async function runBudgetAdjustment(service: any, user: any, input: any, l
 
 export async function runSupplierPayment(service: any, user: any, input: any, labels: any = {}) {
   const budget = input.action === "pay_supplier";
+  const targeted = input.opening_debt_id !== undefined;
+  const notStarted = (message: string, status = 400) => Object.assign(fail(message, status, false), { request_not_started: true });
+  if (targeted && (!budget || user.role !== "admin" || user.active === false)) {
+    throw fail("Boshlang‘ich qarzni faqat egasi Budget orqali to‘laydi.", 403, false);
+  }
+  if ((targeted && (typeof input.opening_debt_id !== "string" || !input.opening_debt_id.trim()
+    || typeof input.amount !== "number" || !Number.isSafeInteger(input.amount) || input.amount <= 0))
+    || (input.location_id !== undefined && (!targeted || typeof input.location_id !== "string" || !input.location_id.trim()))) {
+    throw fail("Boshlang‘ich qarz, joylashuv yoki to‘lov summasi noto‘g‘ri.", 400, false);
+  }
   const field = budget ? JOURNAL : SHIFT_JOURNAL;
   const key = input.key;
-  const fingerprint = JSON.stringify([input.action, user.id, input.supplier_id, input.shift_id || "", input.account || "", input.amount, input.notes]);
+  // Preserve the byte-for-byte fingerprint of all previously saved FIFO requests.
+  // Only the opt-in row-targeted contract adds scope to the request identity.
+  const fingerprint = JSON.stringify([input.action, user.id, input.supplier_id, input.shift_id || "", input.account || "", input.amount, input.notes,
+    ...(targeted ? ["opening_debt", input.opening_debt_id, input.location_id || ""] : [])]);
   let row;
   if (budget) {
     const balances = await service.entities.BudgetBalance.list("account", 20);
@@ -404,29 +440,42 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
     if (!budget && row.status !== "open") throw fail("Smena ochiq emas.", 409, false);
     const supplier = await service.entities.CashRecipient.get(input.supplier_id);
     if (!supplier || supplier.active === false || (budget && !["supplier", "company"].includes(supplier.recipient_type))) throw fail("Yetkazib beruvchi topilmadi yoki faol emas.", 404, false);
-    const receipts = await service.entities.SupplierReceipt.filter({ supplier_id: supplier.id,
+    let selected;
+    if (targeted) {
+      selected = await service.entities.SupplierOpeningDebt.get(input.opening_debt_id);
+      if (!selected || selected.supplier_id !== supplier.id) throw notStarted("Tanlangan boshlang‘ich qarz bu qabul qiluvchiga tegishli emas.", 404);
+      if (input.location_id !== undefined && selected.location_id !== input.location_id) {
+        throw notStarted("Tanlangan qarz bu joylashuvga tegishli emas.", 409);
+      }
+      if (["cancelled", "cancelling"].includes(selected.status)) throw notStarted("Tanlangan boshlang‘ich qarz bekor qilingan.", 409);
+    }
+    const receipts = targeted ? [] : await service.entities.SupplierReceipt.filter({ supplier_id: supplier.id,
       remaining_debt: { $gt: 0 }, status: { $nin: ["cancelled", "cancelling"] },
       ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500);
-    // Unallocated opening liabilities are owner-only and repayable from Budget.
+    // Opening liabilities are owner-only and repayable from global Budget.
     // Cashier/shift flows retain their existing purchase-only scope.
-    const opening = budget && user.role === "admin" ? await allOpeningDebts(service, {
+    const opening = targeted ? [selected] : budget && user.role === "admin" ? await allOpeningDebts(service, {
       supplier_id: supplier.id, remaining_debt: { $gt: 0 },
     }) : [];
     const debts = [...opening.map((debt: any) => ({ ...debt, opening_debt_id: debt.id })), ...receipts];
     const total = debts.reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
-    if (input.amount > total || total <= 0) throw fail(`To‘lov qolgan qarzdan oshmasligi kerak: ${total} UZS.`, 400, false);
+    if (input.amount > total || total <= 0) throw targeted
+      ? notStarted(`To‘lov tanlangan qarzdan oshmasligi kerak: ${total} UZS.`)
+      : fail(`To‘lov qolgan qarzdan oshmasligi kerak: ${total} UZS.`, 400, false);
     let remaining = input.amount;
     const allocations = [];
     for (const receipt of debts) {
       if (remaining <= 0) break;
       const amount = Math.min(money(receipt.remaining_debt), remaining);
       allocations.push(receipt.opening_debt_id
-        ? { opening_debt_id: receipt.id, opening_debt_number: receipt.debt_number, amount }
+        ? { opening_debt_id: receipt.id, opening_debt_number: receipt.debt_number, amount,
+          ...(targeted ? { targeted_opening: true, supplier_id: supplier.id, location_id: String(selected.location_id || "") } : {}) }
         : { receipt_id: receipt.id, receipt_number: receipt.receipt_number, amount });
       remaining -= amount;
     }
     return { ...input, direction: "out", created_at: new Date().toISOString(), supplier: { id: supplier.id, name: supplier.name },
-      shop_id: budget ? "" : row.shop_id, shop_name: budget ? `Budget · ${labels[input.account]}` : row.shop_name,
+      shop_id: targeted ? String(selected.location_id || "") : budget ? "" : row.shop_id,
+      shop_name: targeted ? String(selected.location_name_snapshot || "") : budget ? `Budget · ${labels[input.account]}` : row.shop_name,
       payment_number: paymentNumber(budget ? "BQ" : "QT"), allocations, marker: crypto.randomUUID() };
   });
   const token = claimed.token;
@@ -448,6 +497,7 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
       transaction_number: operation.payment_number, type: "supplier_payment", direction: "out", account: input.account,
       amount: input.amount, balance_before: operation.balance_before, balance_after: operation.balance_after,
       supplier_id: operation.supplier.id, supplier_name: operation.supplier.name, reference_id: operation.payment_number,
+      ...(targeted ? { shop_id: operation.shop_id, shop_name: operation.shop_name } : {}),
       reference_type: "supplier_payment", description: input.notes || `${operation.supplier.name} qarzini to‘lash`,
       performed_by_id: user.id, performed_by_name: user.full_name || user.email, created_at: operation.created_at,
       status: "completed", idempotency_key: key, request_fingerprint: fingerprint,
@@ -494,8 +544,16 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
     }) : [];
     const remaining = [...receipts, ...opening].reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
     const latest = await source.entity.get(row.id);
+    const selected = targeted ? await service.entities.SupplierOpeningDebt.get(operation.opening_debt_id) : null;
+    if (targeted && (!selected || sourceLedger.request_fingerprint !== fingerprint
+      || payments.length !== 1 || payments[0].opening_debt_id !== operation.opening_debt_id
+      || payments[0].request_fingerprint !== fingerprint || payments[0].amount !== operation.amount)) {
+      throw fail("Tanlangan qarzning to‘lov tarixi tasdiqlanmadi. Shu so‘rovni tekshiring.");
+    }
     return { paid: true, payment_number: operation.payment_number, supplier: operation.supplier,
       payments, remaining_debt: remaining, already_processed: claimed.already,
+      ...(targeted ? { opening_debt_id: operation.opening_debt_id, amount: operation.amount,
+        account: operation.account, location_id: operation.shop_id, opening_remaining_debt: selected.remaining_debt } : {}),
       ...(budget ? { transaction: sourceLedger, budget_balance: latest.balance } : { cash_movement: sourceLedger, shift: latest }) };
   } catch (error) {
     // Before any ledger saved, a definite validation rejection can be safely

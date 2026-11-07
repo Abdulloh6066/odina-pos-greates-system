@@ -41,6 +41,7 @@ function receiptComponent(backend) {
     if (name === '@/lib/pos') return { formatUZS: value => `${value} UZS`, formatNum: String };
     if (name === '@/lib/uzbekistan-time') return { formatUzbekistanDateTime: () => '', uzbekistanDateKey: () => '2026-10-22', uzbekistanMonthStartKey: () => '2026-10-01' };
     if (name.endsWith('/odina-select')) return { default: wrapper('select') };
+    if (name.endsWith('/OpeningDebtPaymentDialog')) return { OpeningDebtPaymentButton: () => null, hasPendingOpeningDebtPayment: () => false };
     if (name.endsWith('/SupplierProductsDialog')) return {
       default: props => React.createElement('supplier-products-dialog', props),
     };
