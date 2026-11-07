@@ -16,6 +16,9 @@ import SupplierProductsDialog from '@/components/warehouse/SupplierProductsDialo
 export default function CashRecipients() {
   const { user, adminShopScope } = useOutletContext();
   const locations = adminShopScope?.shops || [];
+  const selectedShopId = adminShopScope?.shopId || 'all';
+  const selectedShop = locations.find((location) => location.id === selectedShopId);
+  const defaultLocationId = adminShopScope?.isAdmin && selectedShopId !== 'all' ? selectedShopId : '';
   const canManage = user?.role === 'admin';
   const [recipients, setRecipients] = useState([]);
   const [search, setSearch] = useState('');
@@ -34,11 +37,16 @@ export default function CashRecipients() {
 
   useEffect(() => { load(); }, []);
 
+  const scopedRecipients = useMemo(() => {
+    if (!adminShopScope?.isAdmin || selectedShopId === 'all') return recipients;
+    return recipients.filter((item) => item.supplier_location_ids?.includes(selectedShopId));
+  }, [recipients, adminShopScope?.isAdmin, selectedShopId]);
+
   const filtered = useMemo(() => {
     const query = search.toLowerCase().trim();
-    if (!query) return recipients;
-    return recipients.filter((item) => [item.name, item.notes].filter(Boolean).join(' ').toLowerCase().includes(query));
-  }, [recipients, search]);
+    if (!query) return scopedRecipients;
+    return scopedRecipients.filter((item) => [item.name, item.notes].filter(Boolean).join(' ').toLowerCase().includes(query));
+  }, [scopedRecipients, search]);
 
   if (!['admin', 'manager'].includes(user?.role)) return <Navigate to="/" replace />;
 
@@ -47,7 +55,9 @@ export default function CashRecipients() {
       <PageHeader
         title="Qabul qiluvchilar"
         eyebrow="HAMKORLAR"
-        subtitle="Tovarlarga pul beriladigan kompaniya va yetkazib beruvchilar"
+        subtitle={adminShopScope?.isAdmin && selectedShopId !== 'all'
+          ? `${selectedShop?.name || 'Tanlangan do‘kon'}ga biriktirilgan qabul qiluvchilar`
+          : 'Tovarlarga pul beriladigan kompaniya va yetkazib beruvchilar'}
         icon={Building2}
         actions={canManage && (
           <Button onClick={() => setEditing({})} className="min-h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary-strong">
@@ -70,7 +80,9 @@ export default function CashRecipients() {
         <div className="odina-panel rounded-2xl border border-border bg-card py-16 text-center">
           <Building2 className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
           <p className="font-medium">Qabul qiluvchi topilmadi</p>
-          <p className="text-sm text-muted-foreground mt-1">“Yangi qabul qiluvchi” orqali birinchi kompaniyani kiriting.</p>
+          <p className="text-sm text-muted-foreground mt-1">{adminShopScope?.isAdmin && selectedShopId !== 'all'
+            ? 'Bu do‘konga biriktirilgan qabul qiluvchi yo‘q. “Barcha do‘konlar”ni tanlang yoki qabul qiluvchini tahrirlab shu do‘konga biriktiring.'
+            : '“Yangi qabul qiluvchi” orqali birinchi kompaniyani kiriting.'}</p>
         </div>
       ) : (
         <div className="odina-partner-grid grid sm:grid-cols-2 gap-3">
@@ -101,6 +113,7 @@ export default function CashRecipients() {
         open={Boolean(editing)}
         recipient={editing}
         locations={locations}
+        defaultLocationId={defaultLocationId}
         user={user}
         onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); load(); }}
@@ -113,7 +126,7 @@ export default function CashRecipients() {
   );
 }
 
-function RecipientDialog({ open, recipient, locations, user, onClose, onSaved }) {
+function RecipientDialog({ open, recipient, locations, defaultLocationId, user, onClose, onSaved }) {
   const [locationIds, setLocationIds] = useState([]);
   const [name, setName] = useState('');
   const [type, setType] = useState('supplier');
@@ -123,7 +136,7 @@ function RecipientDialog({ open, recipient, locations, user, onClose, onSaved })
 
   useEffect(() => {
     if (!open) return;
-    setLocationIds(recipient?.supplier_location_ids || []);
+    setLocationIds(recipient?.supplier_location_ids || (defaultLocationId ? [defaultLocationId] : []));
     setName(recipient?.name || '');
     setType(recipient?.recipient_type || 'supplier');
     setNotes(recipient?.notes || '');
