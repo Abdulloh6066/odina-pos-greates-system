@@ -77,6 +77,20 @@
     },
     "request_fingerprint": {
       "type": "string"
+    },
+    "opening_debt_id": {
+      "type": "string"
+    },
+    "opening_debt_number_snapshot": {
+      "type": "string"
+    },
+    "debt_type": {
+      "type": "string",
+      "enum": [
+        "receipt",
+        "opening"
+      ],
+      "default": "receipt"
     }
   },
   "required": [

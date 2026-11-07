@@ -36,6 +36,10 @@
     },
     "created_by_name": {
       "type": "string"
+    },
+    "opening_debt_claim": {
+      "type": "string",
+      "description": "Backend-only opaque opening-debt creation claim. Contains no amount or notes."
     }
   },
   "required": [

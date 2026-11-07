@@ -1,3 +1,4 @@
+import { allOpeningDebts } from "./supplier-opening-debt.ts";
 // Durable financial request claims live on existing balance/shift records. Every
 // balance/debt delta and its marker are committed in the same conditional write.
 // A timeout never authorizes replaying an unconfirmed ledger create.
@@ -193,7 +194,8 @@ async function debit(source: any, field: string, key: string, token: string, use
 }
 
 async function debtDelta(service: any, allocation: any, marker: string, reverse = false) {
-  return mutate(service.entities.SupplierReceipt, allocation.receipt_id, DEBT_JOURNAL, marker,
+  return mutate(allocation.opening_debt_id ? service.entities.SupplierOpeningDebt : service.entities.SupplierReceipt,
+    allocation.opening_debt_id || allocation.receipt_id, DEBT_JOURNAL, marker,
     (operation: any, row: any) => {
       if (operation?.amount && operation.amount !== allocation.amount) throw fail("Qarz operatsiyasi ma’lumotlari mos emas.", 409);
       if (reverse && operation?.state !== "applied") return { skip: true };
@@ -405,14 +407,22 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
     const receipts = await service.entities.SupplierReceipt.filter({ supplier_id: supplier.id,
       remaining_debt: { $gt: 0 }, status: { $nin: ["cancelled", "cancelling"] },
       ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500);
-    const total = receipts.reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
+    // Unallocated opening liabilities are owner-only and repayable from Budget.
+    // Cashier/shift flows retain their existing purchase-only scope.
+    const opening = budget && user.role === "admin" ? await allOpeningDebts(service, {
+      supplier_id: supplier.id, remaining_debt: { $gt: 0 },
+    }) : [];
+    const debts = [...opening.map((debt: any) => ({ ...debt, opening_debt_id: debt.id })), ...receipts];
+    const total = debts.reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
     if (input.amount > total || total <= 0) throw fail(`To‘lov qolgan qarzdan oshmasligi kerak: ${total} UZS.`, 400, false);
     let remaining = input.amount;
     const allocations = [];
-    for (const receipt of receipts) {
+    for (const receipt of debts) {
       if (remaining <= 0) break;
       const amount = Math.min(money(receipt.remaining_debt), remaining);
-      allocations.push({ receipt_id: receipt.id, receipt_number: receipt.receipt_number, amount });
+      allocations.push(receipt.opening_debt_id
+        ? { opening_debt_id: receipt.id, opening_debt_number: receipt.debt_number, amount }
+        : { receipt_id: receipt.id, receipt_number: receipt.receipt_number, amount });
       remaining -= amount;
     }
     return { ...input, direction: "out", created_at: new Date().toISOString(), supplier: { id: supplier.id, name: supplier.name },
@@ -452,11 +462,14 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
     const payments = [];
     for (let index = 0; index < operation.allocations.length; index += 1) {
       const allocation = operation.allocations[index];
-      const paymentQuery = { ...query, receipt_id: allocation.receipt_id };
+      const paymentQuery = { ...query, ...(allocation.opening_debt_id
+        ? { opening_debt_id: allocation.opening_debt_id } : { receipt_id: allocation.receipt_id }) };
       let payment;
       if (claimed.already) payment = (await service.entities.SupplierPayment.filter(paymentQuery, "created_date", 2))[0];
       else payment = await ledger(source, field, key, token, `payment_${index}`, service.entities.SupplierPayment, paymentQuery, () => ({
-        payment_number: operation.payment_number, receipt_id: allocation.receipt_id,
+        payment_number: operation.payment_number, receipt_id: allocation.receipt_id || "",
+        ...(allocation.opening_debt_id ? { debt_type: "opening", opening_debt_id: allocation.opening_debt_id,
+          opening_debt_number_snapshot: allocation.opening_debt_number } : {}),
         receipt_number_snapshot: allocation.receipt_number, supplier_id: operation.supplier.id,
         supplier_name_snapshot: operation.supplier.name, amount: allocation.amount, shop_id: operation.shop_id,
         shop_name_snapshot: operation.shop_name, shift_id: budget ? "" : row.id,
@@ -476,7 +489,10 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
     }
     const receipts = await service.entities.SupplierReceipt.filter({ supplier_id: input.supplier_id,
       remaining_debt: { $gt: 0 }, ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500);
-    const remaining = receipts.reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
+    const opening = budget && user.role === "admin" ? await allOpeningDebts(service, {
+      supplier_id: input.supplier_id, remaining_debt: { $gt: 0 },
+    }) : [];
+    const remaining = [...receipts, ...opening].reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
     const latest = await source.entity.get(row.id);
     return { paid: true, payment_number: operation.payment_number, supplier: operation.supplier,
       payments, remaining_debt: remaining, already_processed: claimed.already,

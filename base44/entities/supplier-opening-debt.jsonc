@@ -1,0 +1,80 @@
+{
+  "name": "SupplierOpeningDebt",
+  "type": "object",
+  "properties": {
+    "supplier_id": {
+      "type": "string"
+    },
+    "supplier_name_snapshot": {
+      "type": "string"
+    },
+    "debt_number": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "request_fingerprint": {
+      "type": "string"
+    },
+    "payment_operations_json": {
+      "type": "string"
+    },
+    "debt_amount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "remaining_debt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "unpaid",
+        "partial",
+        "paid"
+      ]
+    }
+  },
+  "required": [
+    "supplier_id",
+    "supplier_name_snapshot",
+    "debt_number",
+    "debt_amount",
+    "remaining_debt",
+    "effective_date",
+    "created_at",
+    "created_by_id",
+    "status",
+    "idempotency_key",
+    "request_fingerprint"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": false,
+    "update": false,
+    "delete": false
+  }
+}
