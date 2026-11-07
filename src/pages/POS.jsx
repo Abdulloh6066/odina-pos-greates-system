@@ -4,19 +4,18 @@ import { base44 } from '@/api/base44Client';
 import { loadOperationalSettings } from '@/lib/operational-config';
 import { odinaAlert, odinaConfirm } from '@/lib/odina-dialog';
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from '@/lib/order-request-retry';
-import { AlertTriangle, Search, Star, Clock, Building2, Banknote, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
+import { AlertTriangle, Clock, Building2, Banknote, RefreshCw, Armchair, ArrowLeft, CheckCircle2, X, ReceiptText, UtensilsCrossed, Monitor, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift, openPosShift, invokePosRead } from '@/lib/current-pos-shift';
-import { priceForShop } from '@/lib/shop-pricing';
 import { canPreviewBurgerFries, repriceBurgerCartForShop, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
 import { saleLineKey, saleOptionFields } from '@/lib/sale-options';
 import { canChooseTeaServing, teaServingPrice, teaOptionName, repriceTeaCartForShop } from '@/lib/tea-options';
-import { categoryForShop, catalogForShop } from '@/lib/shop-category';
+import { catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
-import ProductGrid from '@/components/pos/ProductGrid';
+import PosCatalog from '@/components/pos/PosCatalog';
 import PaymentSavingStatus from '@/components/pos/PaymentSavingStatus';
 import CheckoutTimingStatus from '@/components/pos/CheckoutTimingStatus';
 import CheckoutTimingHistory from '@/components/pos/CheckoutTimingHistory';
@@ -26,7 +25,6 @@ import useStableEvent from '@/hooks/use-stable-event';
 import { mergePosStockEvent } from '@/lib/pos-stock-events';
 import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
 import usePosProductOrder from '@/hooks/usePosProductOrder';
-import { sortByShopOrder } from '@/lib/pos-product-order';
 import { preloadPosThumbnails } from '@/lib/pos-thumbnail-preload';
 import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
 import PaymentModal from '@/components/pos/PaymentModal';
@@ -47,7 +45,6 @@ import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, res
 import OfflineRestartStatus from '@/components/pos/OfflineRestartStatus';
 import OfflineSalesBanner from '@/components/pos/OfflineSalesBanner';
 import PendingSalesDialog from '@/components/pos/PendingSalesDialog';
-import CategoryIcon from '@/components/CategoryIcon';
 import '@/components/pos/pos-workbench.css';
 import {
   POS_CHECKOUT_RESPONSE_BUDGET_MS,
@@ -90,9 +87,7 @@ export default function POS() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [productStock, setProductStock] = useState([]);
-  const [activeCat, setActiveCat] = useState('all');
-  const [search, setSearch] = useState('');
-  const [showFav, setShowFav] = useState(false);
+  const catalogRef = useRef(null);
   const [cart, setCart] = useState([]);
   const [isDelivery, setIsDelivery] = useState(false);
   const [keyboardProductId, setKeyboardProductId] = useState(null);
@@ -864,9 +859,7 @@ export default function POS() {
     resetCart();
     setTableOrder(null);
     setTableSaveError('');
-    setActiveCat('all');
-    setShowFav(false);
-    setSearch('');
+    catalogRef.current?.reset();
     setMobileCartOpen(false);
     navigate(posHomePath, { replace: true, state: { savedTableNumber: savedNumber, savedShopId } });
     if (isStaffTicketEnabled(savedShopId)) setStaffTicket({ mode: 'table', shop: savedShop, shopId: savedShopId, tableNumber: savedNumber });
@@ -1172,40 +1165,10 @@ export default function POS() {
     if (loadingData) return undefined;
     return preloadPosThumbnails(catalogProducts);
   }, [catalogProducts, loadingData]);
-  useEffect(() => {
-    if (activeCat !== 'all' && categories.length && !visibleCategories.some(c => c.id === activeCat)) setActiveCat('all');
-  }, [activeCat, categories.length, visibleCategories]);
   const { order: shopProductOrder, accept: acceptProductOrder } = usePosProductOrder(catalogShopId, user?.id);
   const [productOrderOpen, setProductOrderOpen] = useState(false);
+  const [productOrderCategory, setProductOrderCategory] = useState('all');
   const canEditProductOrder = ['admin', 'manager'].includes(user?.role) && (!shopScope || Boolean(shopScope.ready && scopedShopId));
-
-  const filtered = useMemo(() => {
-    const shopId = catalogShopId;
-    let list = catalogProducts.map((product) => ({ ...product, price: priceForShop(product, shopId) }));
-    if (!showFav && activeCat !== 'all') {
-      const selectedCategory = categories.find((c) => c.id === activeCat);
-      const sourceIds = selectedCategory?.sourceCategoryIds || [activeCat];
-      list = list.filter((p) => sourceIds.includes(categoryForShop(p, shopId)));
-    }
-    if (showFav) list = list.filter((p) => p.is_favorite || (shopId && p.favorite_shop_ids?.includes(shopId)));
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q));
-    }
-    // Keep related variants immediately before their configured original.
-    for (const product of [...list]) {
-      if (!product.display_before_product_id || product.display_before_product_id === product.id) continue;
-      if (!list.some((row) => row.id === product.display_before_product_id)) continue;
-      list = list.filter((row) => row.id !== product.id);
-      const targetIndex = list.findIndex((row) => row.id === product.display_before_product_id);
-      list.splice(targetIndex, 0, product);
-    }
-    const activeCategory = categories.find((c) => c.id === activeCat);
-    if (activeCategory?.name?.trim().toLowerCase() === 'tortlar') {
-      list = [...list].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-    }
-    return sortByShopOrder(list, shopProductOrder);
-  }, [catalogProducts, categories, activeCat, showFav, search, catalogShopId, shopProductOrder]);
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id && record.status !== 'confirmed'),
@@ -2045,7 +2008,7 @@ export default function POS() {
       {productOrderOpen && canEditProductOrder && catalogShopId && <ProductOrderDialog
         key={catalogShopId} shopId={catalogShopId}
         shopName={shops.find(shop => shop.id === catalogShopId)?.name || shift?.shop_name || user?.shop_name || 'Do‘kon'}
-        products={catalogProducts} categories={visibleCategories} initialCategory={showFav ? 'all' : activeCat}
+        products={catalogProducts} categories={visibleCategories} initialCategory={productOrderCategory}
         onClose={() => setProductOrderOpen(false)} onSaved={acceptProductOrder} />}
       {/* Header */}
       <div className="odina-pos-header flex shrink-0 items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
@@ -2070,7 +2033,7 @@ export default function POS() {
         {canEditProductOrder && <Button type="button" variant="outline" size="icon"
           title={catalogShopId ? 'Mahsulotlar tartibini tahrirlash' : 'Avval do‘kon smenasini oching'}
           aria-label="Mahsulotlar tartibini tahrirlash" disabled={!catalogShopId || loadingData}
-          onClick={() => setProductOrderOpen(true)} className="h-11 w-10 shrink-0 rounded-xl touch-manipulation">
+          onClick={() => { setProductOrderCategory(catalogRef.current?.getInitialCategory() || 'all'); setProductOrderOpen(true); }} className="h-11 w-10 shrink-0 rounded-xl touch-manipulation">
           <ListOrdered className="h-4 w-4" />
         </Button>}
         {!screenMode && <Button asChild variant="outline" size="sm"
@@ -2226,47 +2189,11 @@ export default function POS() {
       )}
 
       <div className="odina-pos-body flex-1 flex min-h-0">
-        {/* Center: categories + grid */}
-        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-          {/* Category rail */}
-          <div className="odina-category-rail hidden md:flex w-36 shrink-0 border-r border-border bg-sidebar/50 flex-col py-3 overflow-y-auto scrollbar-thin">
-            <p className="odina-category-title">KATEGORIYALAR</p>
-            <CatTab active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }} icon={<Search className="w-4 h-4" />} label="Barchasi" />
-            <CatTab active={showFav} onClick={() => setShowFav(true)} icon={<Star className="w-4 h-4" />} label="Sevimlilar" />
-            <div className="h-px bg-border my-2 mx-3" />
-            {visibleCategories.map((c) => (
-              <CatTab key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }} icon={<CategoryIcon icon={c.icon} className="text-base" imgClassName="w-5 h-5" />} label={c.name.replaceAll('&', ' & ')} />
-            ))}
-          </div>
-
-          <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-            {/* Search + mobile categories */}
-            <div className="odina-pos-search px-4 sm:px-5 pt-4 pb-2 space-y-3">
-              <div className="odina-catalog-toolbar">
-                <h1>Mahsulotlar</h1>
-                <div className="odina-catalog-search relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input aria-label="Mahsulotlarni qidirish" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Mahsulotlarni qidirish…" className="pl-9 h-11 rounded-xl" />
-                </div>
-                {!loadingData && <span className="odina-catalog-count">{filtered.length} ta mahsulot</span>}
-              </div>
-              <div className="odina-category-chips flex gap-2 overflow-x-auto no-scrollbar pb-1 md:hidden">
-                <Chip active={activeCat === 'all' && !showFav} onClick={() => { setActiveCat('all'); setShowFav(false); }}>Barchasi</Chip>
-                <Chip active={showFav} onClick={() => setShowFav(true)}><Star className="h-4 w-4" aria-hidden="true" /> Sevimlilar</Chip>
-                {visibleCategories.map((c) => (
-                  <Chip key={c.id} active={activeCat === c.id && !showFav} onClick={() => { setActiveCat(c.id); setShowFav(false); }}>{c.name.replaceAll('&', ' & ')}</Chip>
-                ))}
-              </div>
-            </div>
-
-            <div role="region" aria-label="Kassadagi mahsulotlar" tabIndex={0} className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
-              <ProductGrid products={filtered} shopId={catalogShopId}
-                stockByProduct={stockByProduct} showStock={Boolean(shopScope ? catalogShopId : shift)}
-                onAdd={addToCart} disabled={tableLocked || paying || payOpen || stockChecking}
-                loading={loadingData} />
-            </div>
-          </div>
-        </div>
+        <PosCatalog ref={catalogRef} products={catalogProducts} categories={categories}
+          visibleCategories={visibleCategories} shopId={catalogShopId} productOrder={shopProductOrder}
+          stockByProduct={stockByProduct} showStock={Boolean(shopScope ? catalogShopId : shift)}
+          onAdd={addToCart} disabled={tableLocked || paying || payOpen || stockChecking}
+          loading={loadingData} />
 
         {/* Cart */}
         <div className="odina-cart-wrap hidden lg:flex w-[340px] xl:w-[380px] 2xl:w-[420px] min-h-0 min-w-0 shrink-0 border-l border-border overflow-hidden">
@@ -2488,22 +2415,5 @@ export default function POS() {
         loading={cashWithdrawalLoading}
       />
     </div>
-  );
-}
-
-function CatTab({ active, onClick, icon, label }) {
-  return (
-    <button type="button" aria-pressed={active} onClick={onClick} className={`odina-category-tab flex items-center gap-2.5 px-3 py-3 mx-2 min-h-11 border rounded-xl text-sm font-medium transition-all active:scale-[0.98] touch-manipulation text-left ${active ? 'bg-primary/35 text-brand-ink border-brand-sand' : 'text-muted-foreground hover:bg-secondary border-transparent'}`}>
-      <span className="w-5 flex justify-center">{icon}</span>
-      <span className="min-w-0 break-words leading-snug">{label}</span>
-    </button>
-  );
-}
-
-function Chip({ active, onClick, children }) {
-  return (
-    <button type="button" aria-pressed={active} onClick={onClick} className={`odina-category-chip whitespace-nowrap min-h-11 px-4 py-2 rounded-full text-sm font-medium transition-colors touch-manipulation ${active ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground/70'}`}>
-      {children}
-    </button>
   );
 }
