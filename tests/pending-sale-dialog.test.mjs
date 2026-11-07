@@ -17,7 +17,7 @@ const record = () => ({ id: 'pos-central-000001', user_id: 'staff', shift_id: 's
   local_sale: { sale_number: 'OD-TEST', shop_name: 'Central', total: 65000, subtotal: 75000,
     items: [{ product_name: 'Cake', quantity: 1, subtotal: 75000 }] } });
 async function fixture({ state = 'pending', shiftStatus = 'open', online = true, records = [record()] } = {}) {
-  const retries = [], resolutions = [], reads = [];
+  const retries = [], resolutions = [], bulkResolutions = [], reads = [];
   const Wrapper = ({ children }) => React.createElement('div', null, children);
   const Icon = () => React.createElement('svg');
   const deps = {
@@ -43,12 +43,15 @@ async function fixture({ state = 'pending', shiftStatus = 'open', online = true,
   await act(async () => { renderer = TestRenderer.create(React.createElement(module.exports.default, {
     records, online, syncing: false, onRetry: async payload => { retries.push(payload); return { synced: 1 }; },
     onResolve: async (...args) => { resolutions.push(args); return { state: args[1]?.operation === 'cancel' ? 'cancelled' : 'edited' }; }, onClose: () => {},
+    onResolveAll: async (ids, options) => { bulkResolutions.push([ids, options]); return {
+      results: ids.map(original_key => ({ original_key, state: 'cancelled' })), errors: [],
+    }; },
   })); });
   const button = label => renderer.root.findAllByType('button').find(node => text(node) === label);
   const click = async label => { const node = button(label); assert.ok(node, label); assert.ok(!node.props.disabled, label + ' disabled');
     await act(async () => { node.props.onClick(); }); };
   const edit = (id, value) => act(() => renderer.root.findByProps({ id }).props.onChange({ target: { value } }));
-  return { renderer, button, click, edit, retries, resolutions, reads, unmount: () => act(() => renderer.unmount()) };
+  return { renderer, button, click, edit, retries, resolutions, bulkResolutions, reads, unmount: () => act(() => renderer.unmount()) };
 }
 test('staff sees the full rejection, 65000 amount and can retry just that sale without PIN', async () => {
   const f = await fixture();
@@ -96,5 +99,21 @@ test('offline staff can read retained error but cannot retry or approve an edit'
     assert.ok(text(f.renderer.toJSON()).includes(record().last_error));
     assert.ok(f.button('Qayta yuborish').props.disabled);
     assert.ok(f.button('Bekor qilish').props.disabled);
+  } finally { f.unmount(); }
+});
+test('bulk cancellation shows the selected count and requires owner PIN before submitting', async () => {
+  const records = [record(), { ...record(), id: 'pos-central-000002' }];
+  const f = await fixture({ records });
+  try {
+    await f.click('Hammasini bekor qilish (2)');
+    assert.ok(text(f.renderer.toJSON()).includes('2 ta savdoni bekor qilish'));
+    assert.ok(f.button('Hammasini PIN bilan bekor qilish').props.disabled);
+    assert.equal(f.bulkResolutions.length, 0);
+    f.edit('pending-sale-reason', 'Navbatni tekshirish'); f.edit('pending-sale-pin', '1234');
+    await act(async () => { f.renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+    assert.deepEqual(Array.from(f.bulkResolutions[0][0]), records.map(row => row.id));
+    assert.equal(f.bulkResolutions[0][1].pin, '1234');
+    assert.equal(f.resolutions.length, 0);
+    assert.equal(f.retries.length, 0);
   } finally { f.unmount(); }
 });

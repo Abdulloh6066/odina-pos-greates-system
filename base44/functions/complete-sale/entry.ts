@@ -1,5 +1,5 @@
 import { pendingFinancialCloseGuard } from "../../shared/shift-pending-financial.ts";
-import { managePendingSale, pendingSaleResolutions } from "../../shared/pending-sale-management.ts";
+import { cancelPendingSales, managePendingSale, pendingSaleResolutions } from "../../shared/pending-sale-management.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { savedShiftCloseResponse, reconcileShiftCloseFailure } from "../../shared/shift-settlement-recovery.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
@@ -503,6 +503,12 @@ export default async function(req) {
 
     if (action === "inspect_pending_sale" || action === "resolve_pending_sale") {
       return Response.json(await managePendingSale(service, user, body, {
+        verifyPin: verifyOwnerPin, fingerprint: saleRequestFingerprint,
+        canonical: canonicalSaleRequest, normalizeItems: normalizeSaleItems, money, paymentMethods: PAYMENT_METHODS,
+      }));
+    }
+    if (action === "cancel_pending_sales") {
+      return Response.json(await cancelPendingSales(service, user, body, {
         verifyPin: verifyOwnerPin, fingerprint: saleRequestFingerprint,
         canonical: canonicalSaleRequest, normalizeItems: normalizeSaleItems, money, paymentMethods: PAYMENT_METHODS,
       }));
@@ -1417,7 +1423,7 @@ export default async function(req) {
         queue_resolution: true }, { status: 410 });
     }
     if (!shift || shift.status !== "open") {
-      return Response.json({ error: "The shift is not open." }, { status: 409 });
+      return Response.json({ error: "The shift is not open.", code: "SALE_SHIFT_NOT_OPEN" }, { status: 409 });
     }
     if (shift.user_id !== user.id) {
       return Response.json({ error: "This shift belongs to another user." }, { status: 403 });

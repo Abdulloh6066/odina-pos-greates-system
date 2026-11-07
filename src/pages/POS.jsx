@@ -42,7 +42,7 @@ import { OwnerPinDialog, CashWithdrawalDialog } from '@/components/pos/KassaActi
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import useOfflineSaleQueue from '@/hooks/useOfflineSaleQueue';
-import { canQueuePosSale, isPosNetworkError } from '@/lib/pos-network';
+import { canQueuePosSale, isPosNetworkError, isPosShiftStateError } from '@/lib/pos-network';
 import { readPosRestart, savePosRestart, readShiftRestart, saveShiftRestart, restartCatalog, restartRead, updateRestartStock } from '@/lib/offline-restart';
 import OfflineRestartStatus from '@/components/pos/OfflineRestartStatus';
 import OfflineSalesBanner from '@/components/pos/OfflineSalesBanner';
@@ -746,12 +746,13 @@ export default function POS() {
     enqueue: enqueueOfflineSale,
     syncNow: syncOfflineSales,
     resolveRecord: resolveOfflineSale,
+    resolveRecords: resolveOfflineSales,
   } = useOfflineSaleQueue(user?.id, () => loadAll({ showLoading: false }).catch(() => {}), (currentShift) => {
     saveShiftRestart(user, currentShift);
     shiftMutationRef.current++;
     setShift(currentShift);
     setShiftReadState('ready');
-  }, confirmQueuedSale);
+  }, confirmQueuedSale, loadCurrentShift);
   const isOnline = queueOnline && !catalogOffline;
   const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
     takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
@@ -1787,6 +1788,7 @@ export default function POS() {
       }
     } catch (error) {
       if (checkoutSessionRef.current !== checkoutSession) return;
+      if (isPosShiftStateError(error)) void loadCurrentShift().catch(() => {});
       // A storage failure can race a confirmed original response. Acknowledge
       // that one sale, without another SDK invocation or another request key.
       const latePayload = attempt?.flight?.status === 'fulfilled'
@@ -2146,7 +2148,7 @@ export default function POS() {
       />
       {pendingSalesOpen && <PendingSalesDialog key={user.id} records={offlineSales}
         online={browserOnline} syncing={offlineSyncing} onRetry={syncOfflineSales}
-        onResolve={resolveOfflineSale} onClose={() => setPendingSalesOpen(false)} />}
+        onResolve={resolveOfflineSale} onResolveAll={resolveOfflineSales} onClose={() => setPendingSalesOpen(false)} />}
 
       {(selectedTable || tableQuery.invalid) && (
         <div className="mx-3 sm:mx-5 mt-3 shrink-0 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-olive/40 bg-brand-olive/10 p-3 text-sm">

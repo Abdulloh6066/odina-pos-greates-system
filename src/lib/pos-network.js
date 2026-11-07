@@ -2,6 +2,13 @@
 export const POS_NETWORK_FAILURE_LIMIT = 2;
 export const POS_CONNECTION_RECHECK_MS = 15000;
 
+export function isPosShiftStateError(error) {
+  const status = Number(error?.response?.status || error?.status || 0);
+  const data = error?.response?.data || error?.data || {};
+  return status === 409 && (data.code === 'SALE_SHIFT_NOT_OPEN'
+    || /The shift is not open\./i.test(String(data.error || error?.message || '')));
+}
+
 export function isPosNetworkError(error) {
   const status = Number(error?.response?.status || error?.status || 0);
   if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError') return false;

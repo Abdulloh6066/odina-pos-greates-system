@@ -12,7 +12,8 @@ import * as network from '../src/lib/pos-network.js';
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 let fixtureId = 0;
-function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {}, seed = [] } = {}) {
+function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {}, onRecovered, onShiftRejected,
+  sendError = null, serverShift = { id: 'shift', status: 'open' }, seed = [] } = {}) {
   const user = `queue-user-${++fixtureId}`, rows = new Map(seed.map(row => [row.id, row]));
   const subscribers = new Set(), events = new Map(), timers = new Map(), saves = [], reads = [];
   let saveGate = null, listGate = null, next = 0, writes = 0, value, renderer;
@@ -29,7 +30,8 @@ function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {
     update: async (id, patch) => Object.assign(rows.get(id), patch), remove: async id => rows.delete(id),
   };
   const transport = async (_name, request) => {
-    if (request.action === 'get_current_shift') return { data: { ok: true, shift: { id: 'shift', status: 'open' } } };
+    if (request.action === 'get_current_shift') return { data: { ok: true, shift: serverShift } };
+    if (sendError) throw sendError;
     writes++; return { data: { sale: { id: request.idempotency_key }, shift: { id: 'shift', order_count: writes }, stock_updates: [] } };
   };
   const data = { ...offline,
@@ -45,7 +47,11 @@ function fixture({ connected = false, onSynced = () => {}, onConfirmed = () => {
   vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { navigator: nav, window: win })(name => {
     assert.ok(Object.hasOwn(dependencies, name), name); return dependencies[name];
   }, module, module.exports);
-  function Probe({ userId = user }) { value = module.exports.default(userId, onSynced, undefined, onConfirmed); return null; }
+  const shiftRejected = onShiftRejected || (async () => {
+    const response = await transport('complete-sale', { action: 'get_current_shift' });
+    onRecovered?.(response.data.shift);
+  });
+  function Probe({ userId = user }) { value = module.exports.default(userId, onSynced, onRecovered, onConfirmed, shiftRejected); return null; }
   const record = suffix => offline.buildPendingSale({ idempotencyKey: `pos-${user}-${suffix}`, recordedAt: '2026-10-16T08:00:00.000Z',
     shift: { id: 'shift', shop_id: 'shop' }, user: { id: user },
     cart: [{ product_id: 'cake', price: 1000, quantity: 1 }], payments: [{ method: 'cash', amount: 1000 }] });
@@ -162,4 +168,53 @@ test('old user durable-save continuation cannot invalidate the new user’s pend
     assert.deepEqual(Array.from(f.value().records, row => row.id), [nextUserRow.id]);
     assert.equal(f.value().records[0].request.items[0].quantity, 2, 'preserve the next user’s pending stock reservation');
   } finally { f.unmount(); }
+});
+
+test('a rejected old shift refreshes the cached till without moving the queued sale', async () => {
+  for (const serverShift of [{ id: 'new-shift', status: 'open' }, null]) {
+    const recovered = [];
+    const f = fixture({ serverShift, onRecovered: shift => recovered.push(shift),
+      sendError: Object.assign(new Error('The shift is not open.'), { status: 409 }) });
+    await f.mount();
+    try {
+      const row = f.record('closed-shift');
+      await act(async () => { await f.value().enqueue(row); });
+      f.nav.onLine = true;
+      await act(async () => { await f.value().syncNow(); await tick(); });
+      assert.equal(recovered.length, 1);
+      assert.equal(recovered[0]?.id || null, serverShift?.id || null);
+      assert.equal(f.rows.get(row.id).request.shift_id, 'shift');
+      assert.equal(f.rows.get(row.id).status, 'failed');
+    } finally { f.unmount(); }
+  }
+});
+test('shift rejection delegates to the guarded POS reader rather than the network recovery callback', async () => {
+  let guardedReads = 0, unguardedReads = 0;
+  const f = fixture({ onShiftRejected: async () => { guardedReads++; },
+    onRecovered: () => { unguardedReads++; }, sendError: Object.assign(new Error('The shift is not open.'), { status: 409 }) });
+  await f.mount();
+  try {
+    await act(async () => { await f.value().enqueue(f.record('guarded-read')); });
+    f.nav.onLine = true;
+    await act(async () => { await f.value().syncNow(); await tick(); });
+    assert.equal(guardedReads, 1);
+    assert.equal(unguardedReads, 0);
+  } finally { f.unmount(); }
+});
+test('the POS shift reader discards a late response after a newer till mutation', async () => {
+  const source = readFileSync('src/pages/POS.jsx', 'utf8');
+  const fragment = source.slice(source.indexOf('  const loadCurrentShift = async () => {'),
+    source.indexOf('  const loadCashData = async'));
+  const gate = deferred(), session = {}, writes = [];
+  const mutation = { current: 0 };
+  const context = { user: { id: 'staff' }, base44: {}, shiftReadGenerationRef: { current: 0 },
+    shiftMutationRef: mutation, checkoutSessionRef: { current: session }, stockUserRef: { current: 'staff' },
+    setShiftReadState: () => {}, setShift: value => writes.push(value), saveShiftRestart: () => writes.push('cache'),
+    restartRead: read => read(), fetchCurrentPosShift: () => gate.promise,
+    isPosNetworkError: () => false };
+  const read = vm.runInNewContext(fragment + '\nloadCurrentShift;', context);
+  const pending = read(); mutation.current++;
+  gate.resolve({ id: 'old-shift', status: 'open' });
+  await assert.rejects(pending, /Smena ma’lumoti yangilandi/);
+  assert.deepEqual(writes, []);
 });
