@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import OpeningDebtDialog from '@/components/OpeningDebtDialog';
+import { OpeningDebtPaymentButton } from '@/components/OpeningDebtPaymentDialog';
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest, orderRequestDefinitelyRejected } from '@/lib/order-request-retry';
 import { buildIdempotencyKey } from '@/lib/orders';
 import { uzbekistanDateKey } from '@/lib/uzbekistan-time';
@@ -148,7 +149,10 @@ export default function CashRecipients() {
                 {canManage && <Button type="button" variant="outline" className="min-h-11 rounded-xl" aria-label={`${item.name} — mahsulotlar`} onClick={() => setProductsSupplier(item)}>Mahsulotlar</Button>}
               </div>
               {canViewOpeningDebts && !openingLoading && !openingError && <div className="mt-3 border-t border-border pt-3 space-y-2">
-                {openingDebts.filter(debt => debt.supplier_id === item.id).map(debt => <p key={debt.id} className="text-sm">Boshlang‘ich: {formatUZS(debt.corrected_debt_amount ?? debt.debt_amount)} · Qoldiq: <strong>{formatUZS(debt.remaining_debt)}</strong><span className="block text-xs text-muted-foreground mt-1">Ombor: {debt.location_name_snapshot || (debt.location_id ? 'Biriktirilgan' : 'Biriktirilmagan')}</span></p>)}
+                {openingDebts.filter(debt => debt.supplier_id === item.id).map(debt => <div key={debt.id} className="space-y-2">
+                  <p className="text-sm">Boshlang‘ich: {formatUZS(debt.corrected_debt_amount ?? debt.debt_amount)} · Qoldiq: <strong>{formatUZS(debt.remaining_debt)}</strong><span className="block text-xs text-muted-foreground mt-1">Ombor: {debt.location_name_snapshot || (debt.location_id ? 'Biriktirilgan' : 'Biriktirilmagan')}</span></p>
+                  <OpeningDebtPaymentButton key={`${user.id}:${selectedShopId}:${debt.id}`} debt={{ ...debt, supplier_name_snapshot: debt.supplier_name_snapshot || item.name }} user={user} allowed={canViewOpeningDebts} onSaved={() => setOpeningRefresh(value => value + 1)} />
+                </div>)}
                 <OpeningDebtButton variant="outline" className="min-h-11 rounded-xl" onClick={() => setOpeningRecipient(item)} aria-label={`${item.name} — boshlang‘ich qarz`}>{openingDebts.some(debt => debt.supplier_id === item.id) ? 'Qarz tarixi' : 'Boshlang‘ich qarz kiritish'}</OpeningDebtButton>
               </div>}
             </article>

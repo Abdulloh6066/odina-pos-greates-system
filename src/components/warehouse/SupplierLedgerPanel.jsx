@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import SupplierProductsDialog from "./SupplierProductsDialog";
+import { OpeningDebtPaymentButton, hasPendingOpeningDebtPayment } from "@/components/OpeningDebtPaymentDialog";
 
 const UNIT_LABELS = { kg: "kg", l: "litr", g: "g", ml: "ml", piece: "dona" };
 const STATUS_LABELS = {
@@ -189,6 +190,11 @@ export default function SupplierLedgerPanel({
     const query = search.toLowerCase().trim();
     return !query || [debt.supplier_name_snapshot, debt.notes, debt.created_by_name].filter(Boolean).join(" ").toLowerCase().includes(query);
   }), [canViewOpening, openingDebts, supplierFilter, statusFilter, search]);
+  // A completed payment may have lost its response. Keep its exact retry
+  // reachable when a status/search filter hides the now-paid debt, without
+  // mixing it back into the filtered totals or another location's data.
+  const hiddenPaymentRecoveries = canViewOpening ? openingDebts.filter(debt =>
+    !visibleOpeningDebts.some(visibleDebt => visibleDebt.id === debt.id) && hasPendingOpeningDebtPayment(user, debt)) : [];
   const openingOutstanding = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.remaining_debt || 0), 0);
   const openingPaid = visibleOpeningDebts.reduce((sum, debt) => sum + Number(debt.corrected_debt_amount ?? debt.debt_amount ?? 0) - Number(debt.remaining_debt || 0), 0);
 
@@ -299,7 +305,7 @@ export default function SupplierLedgerPanel({
         )}
       </div>
 
-      {canViewOpening && <p className="rounded-xl border border-border p-4 text-sm">{globalView ? "Barcha do‘konlar · faqat ko‘rish." : "Tanlangan omborga biriktirilgan boshlang‘ich qarzlar."} Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
+      {canViewOpening && <p className="rounded-xl border border-border p-4 text-sm">{globalView ? "Barcha do‘konlar · kirimlar ko‘rish uchun. Boshlang‘ich qarzlarni Budgetdan to‘lash mumkin." : "Tanlangan omborga biriktirilgan boshlang‘ich qarzlar."} Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
       {user?.role === "admin" && !globalView && <p className="text-sm text-muted-foreground">Omborga biriktirilmagan qarzlar faqat “Barcha do‘konlar”da ko‘rinadi.</p>}
       <div className="odina-panel rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -361,7 +367,12 @@ export default function SupplierLedgerPanel({
       </div>
 
       {canViewOpening && <p className="text-sm text-muted-foreground">Qolgan qarz tarkibi: kirimlar {formatUZS(outstanding - openingOutstanding)} · boshlang‘ich qarzlar {formatUZS(openingOutstanding)}.</p>}
-      {canViewOpening && visibleOpeningDebts.length > 0 && <section aria-label="Boshlang‘ich qarzlar"><h3 className="font-semibold mb-3">Boshlang‘ich qarzlar</h3><div className="space-y-3">{visibleOpeningDebts.map(debt => <OpeningDebtCard key={debt.id} debt={debt} />)}</div></section>}
+      {hiddenPaymentRecoveries.length > 0 && <section aria-label="Tasdiq kutilayotgan to‘lovlar" className="rounded-xl border border-border p-4 space-y-3">
+        <h3 className="font-semibold">Tasdiq kutilayotgan to‘lovlar</h3>
+        <p className="text-sm text-muted-foreground">Bu qarzlar filtrga kirmaydi, lekin avvalgi to‘lov natijasini tekshirish kerak. Quyidagi yozuvlar filtrlangan jami summalarga qo‘shilmagan.</p>
+        {hiddenPaymentRecoveries.map(debt => <OpeningDebtCard key={debt.id} debt={debt} user={user} canPay={canViewOpening} paymentScope={scopeKey} onPaid={load} />)}
+      </section>}
+      {canViewOpening && visibleOpeningDebts.length > 0 && <section aria-label="Boshlang‘ich qarzlar"><h3 className="font-semibold mb-3">Boshlang‘ich qarzlar</h3><div className="space-y-3">{visibleOpeningDebts.map(debt => <OpeningDebtCard key={debt.id} debt={debt} user={user} canPay={canViewOpening} paymentScope={scopeKey} onPaid={load} />)}</div></section>}
 
       {supplierRows.length > 0 && (
         <section>
@@ -492,6 +503,7 @@ export default function SupplierLedgerPanel({
 
       <SupplierDetailDialog
         supplier={selectedSupplier}
+        user={user} canPay={canViewOpening} paymentScope={scopeKey} onPaid={load}
         onReceipt={(receipt) => { setSelectedSupplierId(""); setSelectedReceipt(receipt); }}
         onClose={() => setSelectedSupplierId("")}
       />
@@ -575,7 +587,7 @@ function ReceiptCard({ receipt, items, payments, onView }) {
   );
 }
 
-function OpeningDebtCard({ debt }) {
+function OpeningDebtCard({ debt, user, canPay, paymentScope, onPaid }) {
   return <article className="rounded-xl border border-border bg-card p-4 space-y-2">
     <p className="font-semibold">{debt.supplier_name_snapshot} · Boshlang‘ich qarz</p>
     <p className="text-xs text-muted-foreground">Ombor: {debt.location_name_snapshot || (debt.location_id ? "Biriktirilgan ombor" : "Biriktirilmagan")}</p>
@@ -588,6 +600,7 @@ function OpeningDebtCard({ debt }) {
     <p className="text-xs text-muted-foreground">Qarz sanasi: {debt.effective_date} · {STATUS_LABELS[debt.status] || debt.status}</p>
     <p className="text-xs text-muted-foreground">Kiritildi: {formatUzbekistanDateTime(debt.created_at)} · {debt.created_by_name || "—"}</p>
     {debt.notes && <p className="text-sm break-words">{debt.notes}</p>}
+    <OpeningDebtPaymentButton key={`${paymentScope}:${debt.id}`} debt={debt} user={user} allowed={canPay} onSaved={onPaid} />
   </article>;
 }
 
@@ -707,7 +720,7 @@ function ReceiptDetailDialog({ receipt, items, payments, canCancel, onCancel, on
   );
 }
 
-function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
+function SupplierDetailDialog({ supplier, user, canPay, paymentScope, onPaid, onReceipt, onClose }) {
   if (!supplier) return null;
   const active = supplier.receipts.filter((receipt) => !isCancelled(receipt));
   const purchases = active.reduce((sum, receipt) => sum + Number(receipt.total_amount || 0), 0);
@@ -732,7 +745,7 @@ function SupplierDetailDialog({ supplier, onReceipt, onClose }) {
         </div>
 
         <div>
-          {opening.length > 0 && <section aria-label="Boshlang‘ich qarz tarixi" className="space-y-3 mb-4"><h4 className="font-semibold">Boshlang‘ich qarzlar</h4>{opening.map(debt => <OpeningDebtCard key={debt.id} debt={debt} />)}</section>}
+          {opening.length > 0 && <section aria-label="Boshlang‘ich qarz tarixi" className="space-y-3 mb-4"><h4 className="font-semibold">Boshlang‘ich qarzlar</h4>{opening.map(debt => <OpeningDebtCard key={debt.id} debt={debt} user={user} canPay={canPay} paymentScope={paymentScope} onPaid={onPaid} />)}</section>}
           <h4 className="font-semibold mb-2">Barcha kirimlar</h4>
           <div className="space-y-2">
             {supplier.receipts.map((receipt) => (

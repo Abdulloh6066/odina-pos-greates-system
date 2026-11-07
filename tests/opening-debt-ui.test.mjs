@@ -31,6 +31,7 @@ function component(path, backend, storage, context) {
     if (name === '@/lib/odina-dialog') return { odinaAlert: async () => {} };
     if (name.endsWith('/odina-select')) return { default: wrapper('select') };
     if (name.endsWith('/PageHeader')) return { default: wrapper('header') };
+    if (name.endsWith('/OpeningDebtPaymentDialog')) return { OpeningDebtPaymentButton: () => null, hasPendingOpeningDebtPayment: () => false };
     if (name.endsWith('/OpeningDebtDialog') || name.endsWith('/SupplierProductsDialog')) return { default: () => null };
     if (name === 'lucide-react') return new Proxy({}, { get: () => wrapper('svg') });
     if (name.endsWith('.css')) return {};

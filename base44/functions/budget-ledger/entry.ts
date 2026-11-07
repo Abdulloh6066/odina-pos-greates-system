@@ -142,12 +142,20 @@ export default async function(req) {
       const supplierId = String(body?.supplier_id || "");
       const amount = money(body?.amount);
       const notes = String(body?.notes || "").trim();
+      const targeted = body?.opening_debt_id !== undefined;
+      if ((targeted && (typeof body.opening_debt_id !== "string" || !body.opening_debt_id.trim()
+        || typeof body.amount !== "number" || !Number.isSafeInteger(body.amount) || notes.length > 2000))
+        || (body?.location_id !== undefined && (!targeted || typeof body.location_id !== "string" || !body.location_id.trim()))) {
+        return Response.json({ error: "Boshlang‘ich qarz, joylashuv yoki to‘lov ma’lumotlari noto‘g‘ri." }, { status: 400 });
+      }
       if (!ACCOUNTS.has(account) || !supplierId || !Number.isSafeInteger(amount) || amount <= 0) {
         return Response.json({ error: "Yetkazib beruvchi, Budget hisobi va musbat summa majburiy." }, { status: 400 });
       }
 
       const result = await runSupplierPayment(service, user, {
         key: financialRequestKey(body), action, account, supplier_id: supplierId, amount, notes,
+        ...(targeted ? { opening_debt_id: body.opening_debt_id,
+          ...(body.location_id !== undefined ? { location_id: body.location_id } : {}) } : {}),
       }, ACCOUNT_LABELS);
       return Response.json(result);
     }
@@ -158,6 +166,7 @@ export default async function(req) {
     return Response.json({ error: message,
       operation_pending: Boolean((error as any)?.operation_pending),
       operation_reversed: Boolean((error as any)?.operation_reversed),
+      request_not_started: Boolean((error as any)?.request_not_started),
     }, { status: Number((error as any)?.status) || 500 });
   }
 }
