@@ -48,6 +48,67 @@ test('editing and cancellation both require the server-verified owner PIN', asyn
     assert.equal(f.db.Sale?.length || 0, 0);
   }
 });
+test('bulk cancellation requires one owner PIN and preserves closed-shift finances', async () => {
+  const f = fixture('closed');
+  const originals = [request(), { ...request(), idempotency_key: 'pos-central-pending-000002' }];
+  const body = { action: 'cancel_pending_sales', original_requests: originals, reason: 'Clear retained queue', owner_pin: '9999' };
+  assert.equal((await f.call(body)).status, 403);
+  assert.equal(f.db.Shift[0].pos_queue_resolutions_json, undefined);
+  const result = await f.call({ ...body, owner_pin: '1234' });
+  assert.equal(result.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.results.length, 2);
+  assert.ok(result.data.results.every(row => row.state === 'cancelled'));
+  assert.equal(f.db.Shift[0].status, 'closed');
+  assert.equal(f.db.Shift[0].total_sales, 0);
+  assert.equal(f.db.ProductStock[0].quantity, 10);
+  for (const original of originals) assert.equal((await f.call(original)).status, 410);
+  const replay = await f.call({ ...body, owner_pin: '1234' });
+  assert.equal(replay.data.results.length, 2);
+  assert.equal(Object.keys(JSON.parse(f.db.Shift[0].pos_queue_resolutions_json)).length, 2);
+});
+test('bulk cancellation retains processing sales and acknowledges completed sales without deleting them', async () => {
+  const f = fixture();
+  const original = request(), processing = { ...request(), idempotency_key: 'pos-central-processing-000002' };
+  f.db.Shift[0].sale_request_keys.push(processing.idempotency_key);
+  f.db.Sale = [{ id: 'saved', idempotency_key: original.idempotency_key,
+    user_id: 'staff', shift_id: 'shift', shop_id: 'shop', total: 65000 }];
+  const result = await f.call({ action: 'cancel_pending_sales', original_requests: [original, processing],
+    reason: 'Clear queue', owner_pin: '1234' });
+  assert.equal(result.status, 200);
+  assert.equal(result.data.results[0].state, 'confirmed');
+  assert.equal(result.data.errors.length, 1);
+  assert.equal(f.db.Sale.length, 1);
+  assert.equal(f.db.Shift[0].pos_queue_resolutions_json, undefined);
+});
+test('bulk local management touches only the explicitly selected snapshot after server approval', async () => {
+  assert.equal(typeof queue.managePendingSales, 'function');
+  const one = { id: 'pos-selected-snapshot-00001', user_id: 'staff', shift_id: 'shift', request: request() };
+  const later = { ...one, id: 'pos-later-arrival-00002' }, applied = [];
+  const storage = { list: async () => [one, later], resolve: async record => applied.push(record.id) };
+  const result = await queue.managePendingSales({ userId: 'staff', ids: [one.id], storage,
+    lock: work => work(), authorize: async records => ({ results: records.map(record => ({
+      state: 'cancelled', original_key: record.id })), errors: [] }) });
+  assert.deepEqual(applied, [one.id]);
+  assert.equal(result.results.length, 1);
+});
+test('a later bulk request failure returns earlier acknowledgements for reconciliation', async () => {
+  const rows = Array.from({ length: 51 }, (_, i) => ({ id: 'pos-batch-pending-' + String(i).padStart(6, '0'),
+    user_id: 'staff', shift_id: 'shift', request: request() }));
+  let calls = 0, archived = 0, result;
+  await assert.doesNotReject(async () => {
+    result = await queue.managePendingSales({ userId: 'staff', ids: rows.map(row => row.id),
+      lock: work => work(), storage: { list: async () => rows, resolve: async () => { archived++; } },
+      authorize: async batch => {
+        if (++calls > 1) throw new Error('second batch timeout');
+        return { results: batch.map(row => ({ state: 'confirmed', original_key: row.id,
+          sale: { id: 'saved-' + row.id, idempotency_key: row.id, user_id: 'staff', shift_id: 'shift' } })), errors: [] };
+      } });
+  });
+  assert.equal(archived, 50);
+  assert.equal(result.results.length, 50);
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].original_key, rows[50].id);
+});
 test('a closed-shift pending sale can be cancelled without altering closed financial totals', async () => {
   const f = fixture('closed'); const before = structuredClone(f.db.Shift[0]);
   const result = await f.resolve('cancel');

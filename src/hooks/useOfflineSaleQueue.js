@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import {
   listPendingSales,
   managePendingSale,
+  managePendingSales,
   pendingSaleRetryDelay,
   savePendingSale,
   subscribePendingSales,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/offline-sales';
 import {
   isPosNetworkError,
+  isPosShiftStateError,
   isPosAuthorizationError,
   nextPosConnectionState,
   POS_CONNECTION_RECHECK_MS,
@@ -18,7 +20,7 @@ import {
   probePosConnection,
 } from '@/lib/pos-network';
 
-export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onConfirmed) {
+export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onConfirmed, onShiftRejected) {
   const [browserOnline, setBrowserOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine !== false
   ));
@@ -45,6 +47,8 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
   onRecoveredRef.current = onRecovered;
   const onConfirmedRef = useRef(onConfirmed);
   onConfirmedRef.current = onConfirmed;
+  const onShiftRejectedRef = useRef(onShiftRejected);
+  onShiftRejectedRef.current = onShiftRejected;
   const confirmedKeysRef = useRef(new Set());
   const reconcilingRef = useRef(new Map());
   const isOnline = browserOnline && !connection.offline;
@@ -176,6 +180,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     setSyncing(true);
     try {
       for (const entry of reconcilingRef.current.values()) reconcileConfirmed(entry);
+      let shiftRechecked = false;
       const result = await syncPendingSales({
         userId,
         retryFailed,
@@ -190,6 +195,13 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
             return response;
           } catch (error) {
             if (mountedRef.current && sessionRef.current === session && userRef.current === userId) reportRequestError(error);
+            if (!shiftRechecked && isPosShiftStateError(error)
+              && mountedRef.current && sessionRef.current === session && userRef.current === userId) {
+              shiftRechecked = true;
+              // POS owns its mutation/generation guard. A late recovery read
+              // must not restore a closed shift or overwrite a newer sale.
+              try { void Promise.resolve(onShiftRejectedRef.current?.()).catch(() => {}); } catch { /* Retry from POS. */ }
+            }
             throw error;
           }
         },
@@ -242,6 +254,34 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
       if (sessionRef.current === session) {
         syncingRef.current = false;
         if (mountedRef.current) setSyncing(false);
+      }
+    }
+  }, [userId, refresh, reconcileConfirmed]);
+
+  const resolveRecords = useCallback(async (ids, { reason, pin }) => {
+    if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      throw new Error('Yuborish tugashini yoki internet ulanishini kuting.');
+    }
+    const session = sessionRef.current;
+    syncingRef.current = true; setSyncing(true);
+    try {
+      const result = await managePendingSales({ userId, ids, authorize: records => base44.functions.invoke('complete-sale', {
+        action: 'cancel_pending_sales', original_requests: records.map(record => record.request), reason, owner_pin: pin,
+      }) });
+      if (mountedRef.current && sessionRef.current === session && userRef.current === userId) {
+        for (const decision of result.results) if (decision.state === 'confirmed') {
+          reconcileConfirmed({ id: decision.original_key, record: decision.record,
+            payload: { sale: decision.sale, shift: decision.shift, already_processed: true, stock_updates: [] } });
+        }
+        setSyncError('');
+        await refresh();
+        void Promise.resolve(onSyncedRef.current?.(result)).catch(() => {});
+      }
+      return result;
+    } finally {
+      if (sessionRef.current === session) {
+        syncingRef.current = false;
+        if (mountedRef.current) { setSyncing(false); void refresh(); }
       }
     }
   }, [userId, refresh, reconcileConfirmed]);
@@ -328,5 +368,6 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     refresh,
     syncNow,
     resolveRecord,
+    resolveRecords,
   };
 }
