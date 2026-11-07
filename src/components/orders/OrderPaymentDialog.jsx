@@ -92,7 +92,7 @@ export default function OrderPaymentDialog({ open, onClose, order, onDone }) {
           </div>
           <div>
             <Label>Summa (UZS)</Label>
-            <Input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1" />
+            <Input data-money type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1" />
           </div>
         </fieldset>
         {pending && <p className="mt-3 text-sm text-muted-foreground">Oldingi to‘lov natijasini shu ma’lumotlar bilan qayta tekshiring.</p>}

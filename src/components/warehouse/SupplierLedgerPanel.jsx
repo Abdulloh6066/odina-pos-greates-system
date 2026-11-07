@@ -1106,7 +1106,7 @@ function ReceiptDialog({ open, user, location, ingredients, recipients, onClose,
                     </div>
                     <div>
                       <Label className="text-xs mb-1.5 block">1 birlik narxi</Label>
-                      <Input
+                      <Input data-money
                         type="number"
                         min="0"
                         step="1"

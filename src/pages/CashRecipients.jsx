@@ -292,7 +292,7 @@ function RecipientDialog({ open, recipient, locations, defaultLocationId, user, 
             <p className="text-xs text-muted-foreground">Ixtiyoriy: hozir biz to‘lashimiz kerak bo‘lgan summa. Bu tovar kirimi ham, to‘lov ham emas.</p>
             {hasDebt && <>
               <label className="block text-sm" htmlFor="new-recipient-debt-amount">Biz to‘lashimiz kerak bo‘lgan summa (UZS)</label>
-              <StartingDebtInput id="new-recipient-debt-amount" inputMode="numeric" value={debtAmount} disabled={locked} onChange={event => !locked && setDebtAmount(event.target.value)} className="min-h-11" />
+              <StartingDebtInput data-money id="new-recipient-debt-amount" inputMode="numeric" value={debtAmount} disabled={locked} onChange={event => !locked && setDebtAmount(event.target.value)} className="min-h-11" />
               {debtAmount !== '' && (!Number.isSafeInteger(amount) || amount <= 0 || !/^\d+$/.test(String(debtAmount))) && <p role="alert" className="text-sm text-destructive">Musbat butun summa kiriting. Qarz bo‘lmasa, “Biz bu yetkazib beruvchiga qarzdormiz” belgisini olib tashlang.</p>}
               <label className="block text-sm" htmlFor="new-recipient-debt-date">Qarz sanasi (Toshkent vaqti)</label>
               <StartingDebtInput id="new-recipient-debt-date" type="date" value={debtDate} disabled={locked} onChange={event => !locked && setDebtDate(event.target.value)} className="min-h-11" />

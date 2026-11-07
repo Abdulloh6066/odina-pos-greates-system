@@ -240,7 +240,7 @@ export default function Products() {
       <Dialog open={Boolean(shopPriceProduct)} onOpenChange={(value) => { if (!value && !savingShopPrice) setShopPriceProduct(null); }}>
         <DialogContent><DialogHeader><DialogTitle>{shopPriceProduct?.name} — do‘kon narxi</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{user?.shop_name} uchun sotuv narxi</p>
-          <Label>Narx (so‘m)</Label><Input type="number" min="0" step="1000" value={shopPrice} onChange={(event) => setShopPrice(event.target.value)} />
+          <Label>Narx (so‘m)</Label><Input data-money type="number" min="0" step="1000" value={shopPrice} onChange={(event) => setShopPrice(event.target.value)} />
           <DialogFooter><Button disabled={savingShopPrice || !shopPrice.trim() || !Number.isSafeInteger(Number(shopPrice)) || Number(shopPrice) < 0} onClick={saveShopPrice}>{savingShopPrice ? 'Saqlanmoqda…' : 'Saqlash'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -408,7 +408,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs mb-1.5 block">{saleUnit === 'gram' ? '1 kg narxi (UZS)' : productionUnit === 'sheet' ? '1 bo‘lak narxi (UZS)' : '1 dona narxi (UZS)'}</Label>
-              <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="45000" />
+              <Input data-money type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="45000" />
             </div>
             <div>
               <Label className="text-xs mb-1.5 block">Kategoriya</Label>
@@ -425,7 +425,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
                 {shops.map((shop) => (
                   <div key={shop.id}>
                     <Label className="text-xs mb-1.5 block">{shop.name} {saleUnit === 'gram' ? '1 kg' : ''} narxi (UZS)</Label>
-                    <Input type="number" min="0" step="1" value={shopPrices[shop.id] ?? price}
+                    <Input data-money type="number" min="0" step="1" value={shopPrices[shop.id] ?? price}
                       onChange={(e) => setShopPrices((current) => ({ ...current, [shop.id]: e.target.value }))} />
                   </div>
                 ))}
@@ -457,7 +457,7 @@ function ProductDialog({ open, product, categories, shops, onClose, onSaved, use
             {productionUnit === 'sheet' && (
               <div className="grid grid-cols-2 gap-3">
                 <div><Label className="text-xs mb-1.5 block">1 listdan bo‘lak soni</Label><Input type="number" min="1" step="1" value={piecesPerSheet} disabled={Boolean(product)} onChange={(e) => setPiecesPerSheet(e.target.value)} /></div>
-                <div><Label className="text-xs mb-1.5 block">1 list narxi (UZS)</Label><Input type="number" min="0" value={sheetPrice} onChange={(e) => setSheetPrice(e.target.value)} /></div>
+                <div><Label className="text-xs mb-1.5 block">1 list narxi (UZS)</Label><Input data-money type="number" min="0" value={sheetPrice} onChange={(e) => setSheetPrice(e.target.value)} /></div>
               </div>
             )}
             <p className="text-xs text-muted-foreground">{saleUnit === 'gram' ? 'Kassada gramm kiritiladi va summa avtomatik hisoblanadi. Ombor hisobi hozircha yuritilmaydi.' : productionUnit === 'sheet' ? `Markazda list. Do‘kon qabul qilganda 1 list → ${piecesPerSheet} bo‘lak. Kassa narxi — bitta bo‘lak uchun.` : 'Narx bitta dona uchun. Kassada dona soni bilan sotiladi.'}</p>

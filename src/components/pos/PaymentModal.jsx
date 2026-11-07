@@ -178,7 +178,7 @@ export default function PaymentModal({ open, total, onClose, onConfirm, loading,
                     <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
               </OdinaSelect>
-              <Input
+              <Input data-money
                 type="number"
                 step={1000}
                 min={0}
