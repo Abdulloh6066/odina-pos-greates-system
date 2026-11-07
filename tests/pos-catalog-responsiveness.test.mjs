@@ -91,6 +91,7 @@ async function fixture({ role = 'cashier', selectedShop = 'branch' } = {}) {
       DiscountRow: () => null, RoundingRow: () => null },
     '@/components/CategoryIcon': () => null,
     '@/components/pos/ProductOrderDialog': props => React.createElement('order-dialog', props),
+    '@/components/pos/PosImageCacheButton': props => React.createElement('cache-images-button', props),
   };
   function load(path) {
     if (cache.has(path)) return cache.get(path);
@@ -222,4 +223,17 @@ test('table-save success resets catalogue browsing only after confirmation; fail
     await context.run();
     assert.deepEqual(events, succeeds ? ['server', 'basket-reset', 'catalogue-reset', 'next-order'] : ['server']);
   }
+});
+
+test('image warmup receives only the viewed shop catalogue and sits immediately before the compact button', async () => {
+  const f = await fixture({ role: 'admin', selectedShop: 'other' });
+  try {
+    const header = f.tree.root.findAllByType('div').find(node => node.props.className?.includes('odina-pos-header'));
+    const controls = header.findAll(node => node.type === 'cache-images-button'
+      || (node.type === 'button' && node.props['aria-label'] === 'Ixcham kassa ko‘rinishi'));
+    assert.deepEqual(controls.map(node => node.type), ['cache-images-button', 'button']);
+    assert.ok(!controls[0].props.products.some(row => row.id === 'branch-only'));
+    assert.equal(controls[0].props.scopeKey, 'cashier:other');
+    assert.equal(controls[0].props.online, true);
+  } finally { await f.close(); }
 });

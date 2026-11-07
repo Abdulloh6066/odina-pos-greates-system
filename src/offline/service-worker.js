@@ -1,4 +1,4 @@
-/* Build replaces the two constants; API calls and mutations are never cached. */
+/* Build replaces the two constants; business API calls and mutations are never cached. */
 const BUILD = '__ODINA_BUILD__';
 const ASSETS = /* __ODINA_ASSETS__ */ [];
 const SHELL = `odina-shell-${BUILD}`;
@@ -39,6 +39,7 @@ self.addEventListener('fetch', event => {
   const publicImage = request.destination === 'image' &&
     ((url.origin === self.location.origin && /^\/(images\/|odina-mark\.png)/.test(url.pathname)) ||
       (url.hostname === 'media.base44.com' && url.pathname.startsWith('/images/public/')) ||
+      (url.hostname === 'base44.app' && /^\/api\/apps\/([a-f0-9]{24})\/files\/mp\/public\/\1\//.test(url.pathname)) ||
       (url.hostname === 'static.wixstatic.com' && url.pathname.startsWith('/media/')));
   if (!publicImage) return;
   event.respondWith((async () => {
