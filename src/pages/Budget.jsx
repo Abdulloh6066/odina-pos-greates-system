@@ -288,12 +288,6 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
   const available = (DISPLAY_ACCOUNTS.find((item) => item.id === account)?.accounts || [account])
     .reduce((sum, key) => sum + Number(balances[key] || 0), 0);
   const invalidWithdrawal = direction === "out" && value > available;
-  // Tanlangan hisob aniq karta hisobiga bog‘lanadi, shunda qoldiq aniq saqlanadi.
-  const resolveAccount = () => {
-    if (account !== "bank_card") return account;
-    if (direction === "in") return BANK_CARD_ACCOUNTS[0];
-    return BANK_CARD_ACCOUNTS.find((key) => Number(balances[key] || 0) >= value) || BANK_CARD_ACCOUNTS[0];
-  };
 
   const submit = async () => {
     if (!/^\d{4,8}$/.test(ownerPin) || (!retryPending && (value <= 0 || description.trim().length < 3 || invalidWithdrawal))) return;
@@ -302,7 +296,7 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
     setSaving(true);
     try {
       requestRef.current = retainOrderRequest(requestScope, requestRef.current || {
-        action: "manual_adjustment", direction, account: resolveAccount(), amount: value,
+        action: "manual_adjustment", direction, account, amount: value,
         description: description.trim(), idempotency_key: crypto.randomUUID(),
       });
       setRetryPending(true);
