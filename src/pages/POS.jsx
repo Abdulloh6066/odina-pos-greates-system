@@ -112,6 +112,7 @@ export default function POS() {
   const [cashDataLoading, setCashDataLoading] = useState(true);
   const [cashDataError, setCashDataError] = useState('');
   const loadGenerationRef = useRef(0);
+  const cashDataReadGenerationRef = useRef(0);
   const wasteAlertGenerationRef = useRef(0);
   const [loadingData, setLoadingData] = useState(true);
   const [restartSaved, setRestartSaved] = useState(false);
@@ -598,6 +599,8 @@ export default function POS() {
   };
 
   const loadCashData = async (generation = loadGenerationRef.current) => {
+    const readGeneration = ++cashDataReadGenerationRef.current;
+    const isCurrent = () => generation === loadGenerationRef.current && readGeneration === cashDataReadGenerationRef.current;
     setCashDataLoading(true);
     setCashDataError('');
     try {
@@ -605,14 +608,14 @@ export default function POS() {
         base44.entities.CashRecipient.list('name', 500),
         base44.functions.invoke('supplier-ledger', { action: 'get_debts' }),
       ]);
-      if (generation !== loadGenerationRef.current) return;
+      if (!isCurrent()) return;
       const payload = response?.data || response;
       setCashRecipients((recipientList || []).filter((recipient) => recipient.active !== false));
       setSupplierDebts(payload?.debts || {});
     } catch (error) {
-      if (generation === loadGenerationRef.current) setCashDataError('Yetkazib beruvchilar ma’lumoti yuklanmadi. Qayta urinib ko‘ring.');
+      if (isCurrent()) setCashDataError('Yetkazib beruvchilar ma’lumoti yuklanmadi. Qayta urinib ko‘ring.');
     } finally {
-      if (generation === loadGenerationRef.current) setCashDataLoading(false);
+      if (isCurrent()) setCashDataLoading(false);
     }
   };
 
@@ -2058,7 +2061,7 @@ export default function POS() {
         {shift ? (
           <>
 
-            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" title="Pul olish" onClick={() => setCashWithdrawalOpen(true)} disabled={posScopeReadOnly} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
+            <Button variant="outline" size="sm" aria-label="Kassadan pul olish" title="Pul olish" onClick={() => { void loadCashData(); setCashWithdrawalOpen(true); }} disabled={posScopeReadOnly} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">
               <Banknote className="w-4 h-4" />
             </Button>
             <Button variant="outline" size="sm" aria-label="Smenani yopish" title="Smenani yopish" onClick={requestCloseShift} disabled={offlineSyncing || posScopeReadOnly} className="h-10 w-10 shrink-0 rounded-xl p-0 touch-manipulation">

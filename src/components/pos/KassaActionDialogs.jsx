@@ -179,6 +179,7 @@ export function CashWithdrawalDialog({ open, shift, user, recipients = [], suppl
                 {onRetryData && <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetryData}>Qayta yuklash</Button>}
               </div>}
               {!dataLoading && !dataError && debtRecipients.length === 0 && <p className="text-xs text-amber-700 mt-1.5">Hozir to‘lanadigan yetkazib beruvchi qarzi yo‘q.</p>}
+              <p className="text-xs text-muted-foreground mt-1.5">Boshlang‘ich qarzlar ikkala do‘kon kassasidan to‘lanadi. Pul joriy kassadan olinadi.</p>
               {recipientId && <p className="text-xs text-muted-foreground mt-1.5">Qolgan umumiy qarz: <span className="font-semibold text-foreground">{formatUZS(selectedDebt)}</span></p>}
             </div>
           )}
