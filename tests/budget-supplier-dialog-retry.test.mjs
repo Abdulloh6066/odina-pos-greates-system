@@ -51,13 +51,15 @@ test('actual Budget adjustment dialog keeps its request through timeout/unmount 
     return { data: { transaction: { id: 'transaction' } } };
   } } };
   const Component = dialog('src/pages/Budget.jsx', 'AdjustmentDialog', backend);
-  const props = { actorId: 'owner', open: true, balances: { cash: 10000 }, onClose: () => {}, onSaved: () => { saved++; } };
+  const props = { actorId: 'owner', open: true, categories: [{ id: 'workers', name: 'Ishchilar uchun xarid' }], balances: { cash: 10000 }, onClose: () => {}, onSaved: () => { saved++; } };
   let tree;
   await act(async () => { tree = create(React.createElement(Component, props)); });
   await act(async () => { tree.root.findAllByType('button')[1].props.onClick(); enter(input(tree, 'number'), '1000'); enter(tree.root.findByType('textarea'), 'Mock adjustment'); enter(input(tree, 'password'), '1234'); });
+  await act(async () => { enter(tree.root.findAllByType('select')[1], 'workers'); });
   await act(async () => { await submit(tree); });
   const scope = retry.orderRequestScope('owner', 'manual_adjustment');
   assert.equal(retry.readOrderRequest(scope).amount, 1000);
+  assert.equal(retry.readOrderRequest(scope).expense_category_id, 'workers');
   assert.equal(retry.readOrderRequest(scope).owner_pin, undefined);
   await act(async () => { tree.unmount(); tree = create(React.createElement(Component, { ...props, balances: { cash: 0 } })); });
   assert.equal(input(tree, 'number').props.disabled, true);
@@ -203,5 +205,28 @@ test('actual cash dialog restores a pending supplier intent without applying cur
   await act(async () => { submit(tree); });
   assert.equal(calls[0].amount, 1000); assert.equal(calls[0].reason, 'Frozen supplier note');
   assert.equal(calls[0].recipient_id, 'supplier'); assert.equal(calls[0].owner_pin, '2468');
+  await act(async () => { tree.unmount(); });
+});
+
+test('category dialog cancels without writes, resets on reopen, and prevents repeated clicks', async () => {
+  const calls = []; let resolveSave; let saved = 0; let closed = 0;
+  const Component = dialog('src/pages/Budget.jsx', 'CategoryDialog', { functions: { invoke: async (_name, payload) => {
+    calls.push(payload); return new Promise(resolve => { resolveSave = resolve; });
+  } } });
+  const props = { open: true, onClose: () => { closed++; }, onSaved: () => { saved++; } };
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, props)); });
+  await act(async () => { enter(tree.root.findByType('input'), 'Cancelled'); });
+  await act(async () => { tree.root.findAllByType('button')[0].props.onClick(); });
+  assert.equal(closed, 1); assert.equal(calls.length, 0);
+  await act(async () => { tree.update(React.createElement(Component, { ...props, open: false })); });
+  await act(async () => { tree.update(React.createElement(Component, props)); });
+  assert.equal(tree.root.findByType('input').props.value, '');
+  await act(async () => { enter(tree.root.findByType('input'), 'Ishchilar uchun xarid'); });
+  let pending;
+  await act(async () => { pending = submit(tree); submit(tree); });
+  assert.equal(calls.length, 1);
+  await act(async () => { resolveSave({ data: { category: { id: 'workers', name: 'Ishchilar uchun xarid' } } }); await pending; });
+  assert.equal(saved, 1);
   await act(async () => { tree.unmount(); });
 });

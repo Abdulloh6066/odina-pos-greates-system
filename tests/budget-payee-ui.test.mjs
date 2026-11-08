@@ -69,7 +69,7 @@ async function fixture(transactions) {
   return {
     tree,
     async search(value) {
-      await act(async () => tree.root.findByType('input').props.onChange({ target: { value } }));
+      await act(async () => tree.root.findByProps({ placeholder: 'Do‘kon, xodim, hujjat…' }).props.onChange({ target: { value } }));
     },
     async close() {
       await act(async () => tree.unmount());
@@ -141,5 +141,45 @@ test('Budget search finds the stored recipient name and clearing search restores
     assert.match(text(f.tree.toJSON()), /Hozircha Budget harakati yo‘q/);
     await f.search('');
     assert.equal(rows(f.tree).length, 3);
+  } finally { await f.close(); }
+});
+
+
+test('category and Tashkent date filters show matching history and exact category totals', async () => {
+  const f = await fixture([
+    transaction('workers', { expense_category_id: 'workers', expense_category_name: 'Ishchilar uchun xarid', amount: 30000, created_at: '2026-11-07T20:00:00Z' }),
+    transaction('older', { expense_category_id: 'workers', expense_category_name: 'Ishchilar uchun xarid', amount: 10000, created_at: '2026-11-07T18:00:00Z' }),
+    transaction('legacy', { amount: 5000 }),
+    transaction('reversed', { amount: 999999, status: 'reversed' }),
+  ]);
+  try {
+    assert.match(text(f.tree.toJSON()), /Jami chiqim: 45000 UZS/);
+    const category = f.tree.root.findAllByType('select').at(-1);
+    await act(async () => category.props.onChange({ target: { value: 'workers' } }));
+    assert.equal(rows(f.tree).length, 2);
+    assert.match(text(f.tree.toJSON()), /Jami chiqim: 40000 UZS/);
+    const dates = f.tree.root.findAllByProps({ type: 'date' }).filter(row => row.type === 'input');
+    await act(async () => dates[0].props.onChange({ target: { value: '2026-11-08' } }));
+    assert.equal(rows(f.tree).length, 1);
+    assert.match(text(f.tree.toJSON()), /Jami chiqim: 30000 UZS/);
+    await act(async () => f.tree.root.findAllByType('input').filter(row => row.props.type === 'date')[1].props.onChange({ target: { value: '2026-11-07' } }));
+    assert.match(text(f.tree.toJSON()), /Boshlanish sanasi tugash sanasidan keyin bo‘lmasin/);
+    assert.doesNotMatch(text(f.tree.toJSON()), /Jami chiqim:/);
+  } finally { await f.close(); }
+});
+
+test('category search and refunded bank-card entries do not overstate expenses', async () => {
+  const f = await fixture([
+    transaction('out', { amount: 5000, expense_category_id: 'workers', expense_category_name: 'Ishchilar uchun xarid' }),
+    transaction('refund', { amount: 5000, direction: 'in', reference_type: 'manual_adjustment_reversal', expense_category_id: 'workers', expense_category_name: 'Ishchilar uchun xarid' }),
+    transaction('uncategorized-out', { amount: 2000 }),
+    transaction('old-refund', { amount: 2000, direction: 'in', idempotency_key: 'bc_mock', description: 'Bank card amalini qaytarish · mock' }),
+    transaction('deposit', { direction: 'in', amount: 100000 }),
+  ]);
+  try {
+    assert.match(text(f.tree.toJSON()), /Jami chiqim: 0 UZS/);
+    await f.search('ishchilar uchun');
+    assert.equal(rows(f.tree).length, 2);
+    assert.match(text(f.tree.toJSON()), /Jami chiqim: 0 UZS/);
   } finally { await f.close(); }
 });

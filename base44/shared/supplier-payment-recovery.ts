@@ -348,7 +348,8 @@ async function claimRequestScope(service: any, key: string, fingerprint: string,
 
 export async function runBudgetAdjustment(service: any, user: any, input: any, labels: any) {
   const key = input.key;
-  const fingerprint = JSON.stringify(["manual_adjustment", user.id, input.account, input.direction, input.amount, input.description]);
+  const fingerprint = JSON.stringify(["manual_adjustment", user.id, input.account, input.direction, input.amount, input.description,
+    ...(input.expense_category_id ? [input.expense_category_id] : [])]);
   // Detect reuse across Budget accounts before selecting the source row.
   const balances = await service.entities.BudgetBalance.list("account", 20);
   for (const balance of balances) {
@@ -373,7 +374,9 @@ export async function runBudgetAdjustment(service: any, user: any, input: any, l
       transaction_number: operation.payment_number, type: input.direction === "in" ? "manual_deposit" : "manual_withdrawal",
       direction: input.direction, account: input.account, amount: input.amount,
       balance_before: operation.balance_before, balance_after: operation.balance_after,
-      reference_type: "manual_adjustment", description: input.description, performed_by_id: user.id,
+      reference_type: operation.is_budget_refund ? "manual_adjustment_reversal" : "manual_adjustment", description: input.description, performed_by_id: user.id,
+      ...(operation.expense_category_id ? { expense_category_id: operation.expense_category_id,
+        expense_category_name: operation.expense_category_name } : {}),
       performed_by_name: user.full_name || user.email, created_at: operation.created_at, status: "completed",
       idempotency_key: key, request_fingerprint: fingerprint,
     }));

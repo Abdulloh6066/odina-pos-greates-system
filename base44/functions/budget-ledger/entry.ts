@@ -138,7 +138,8 @@ async function bankCardRequestDigest(value) {
 async function runCombinedBankCardAdjustment(service, user, input, labels) {
   const field = "financial_operations_json";
   const fingerprint = JSON.stringify(["manual_adjustment", user.id, "bank_card",
-    input.direction, input.amount, input.description]);
+    input.direction, input.amount, input.description,
+    ...(input.expense_category_id ? [input.expense_category_id] : [])]);
   const digest = await bankCardRequestDigest(fingerprint);
   const settings = await service.entities.Settings.list("created_date", 2);
   if (settings.length !== 1) throw bankCardError("Ilova sozlamasini egasi tekshirishi kerak.", 409, false);
@@ -178,7 +179,8 @@ async function runCombinedBankCardAdjustment(service, user, input, labels) {
       const amounts = [first, input.amount - first];
       return {
         actor: user.id, fingerprint, direction: input.direction, amount: input.amount,
-        description: input.description, status: "processing",
+        description: input.description, expense_category_id: input.expense_category_id,
+        expense_category_name: input.expense_category_name, status: "processing",
         allocations: childKeys.map((part, index) => ({ ...part, amount: amounts[index] }))
           .filter(part => part.amount > 0),
       };
@@ -210,7 +212,8 @@ async function runCombinedBankCardAdjustment(service, user, input, labels) {
       await runBudgetAdjustment(service, user, {
         key: part.reverseKey, account: part.account,
         direction: operation.direction === "out" ? "in" : "out",
-        amount: part.amount, description: "Bank card amalini qaytarish · " + operation.description,
+        amount: part.amount, is_budget_refund: true, description: "Bank card amalini qaytarish · " + operation.description,
+        expense_category_id: operation.expense_category_id, expense_category_name: operation.expense_category_name,
       }, labels);
     }
     await saveState(prior => ({ ...prior, status: "reversed" }));
@@ -232,6 +235,7 @@ async function runCombinedBankCardAdjustment(service, user, input, labels) {
       const result = await runBudgetAdjustment(service, user, {
         key: part.key, account: part.account, direction: operation.direction,
         amount: part.amount, description: operation.description,
+        expense_category_id: operation.expense_category_id, expense_category_name: operation.expense_category_name,
       }, labels);
       transactions.push(result.transaction);
     }
@@ -254,6 +258,16 @@ async function runCombinedBankCardAdjustment(service, user, input, labels) {
   }
 }
 
+// Fetch every page: report totals must not silently stop at the latest 500 rows.
+async function listAll(entity, sort) {
+  const rows = [];
+  for (let skip = 0; ; skip += 500) {
+    const page = await entity.list(sort, 500, skip);
+    rows.push(...page);
+    if (page.length < 500) return rows;
+  }
+}
+
 export default async function(req) {
   const base44 = createClientFromRequest(req);
   const service = base44.asServiceRole;
@@ -270,14 +284,24 @@ export default async function(req) {
     const action = String(body?.action || "");
 
     if (action === "summary") {
-      const [balances, transactions] = await Promise.all([
+      const [balances, transactions, categories] = await Promise.all([
         service.entities.BudgetBalance.list("account", 20),
-        service.entities.BudgetTransaction.list("-created_at", 500),
+        listAll(service.entities.BudgetTransaction, "-created_at"),
+        listAll(service.entities.BudgetExpenseCategory, "name"),
       ]);
       return Response.json({
         balances: (balances || []).map(({ financial_operations_json: _operations, shift_settlement_operations_json: _settlements, shift_settlement_keys: _keys, ...balance }: any) => balance),
-        transactions: transactions || [],
+        transactions: transactions || [], categories,
       });
+    }
+
+    if (action === "create_expense_category") {
+      const name = String(body?.name || "").trim().replace(/\s+/g, " ");
+      if (!name || name.length > 80) return Response.json({ error: "Kategoriya nomi 1–80 belgidan iborat bo‘lsin." }, { status: 400 });
+      const categories = await listAll(service.entities.BudgetExpenseCategory, "name");
+      const existing = categories.find(row => row.name.trim().toLowerCase() === name.toLowerCase());
+      const category = existing || await service.entities.BudgetExpenseCategory.create({ name });
+      return Response.json({ category });
     }
 
     if (action === "manual_adjustment") {
@@ -293,9 +317,28 @@ export default async function(req) {
         return Response.json({ error: "Hisob, amal, musbat summa va izoh majburiy." }, { status: 400 });
       }
 
+      const categoryId = String(body?.expense_category_id || "");
+      let category = null;
+      if (categoryId) {
+        if (direction !== "out") return Response.json({ error: "Kategoriya faqat chiqim uchun." }, { status: 400 });
+        // Existing financial requests must remain recoverable even if a category
+        // is renamed or removed. The journal owns the frozen historical snapshot.
+        const balances = await service.entities.BudgetBalance.list("account", 20);
+        const requestKey = financialRequestKey(body);
+        for (const balance of balances) {
+          const prior = readBankCardJournal(balance, "financial_operations_json")[requestKey];
+          if (prior?.actor === user.id && prior.expense_category_id === categoryId) {
+            category = { id: categoryId, name: prior.expense_category_name };
+            break;
+          }
+        }
+        if (!category) category = await service.entities.BudgetExpenseCategory.get(categoryId);
+        if (!category) return Response.json({ error: "Xarajat kategoriyasi topilmadi." }, { status: 400 });
+      }
       const adjust = account === "bank_card" ? runCombinedBankCardAdjustment : runBudgetAdjustment;
       const result = await adjust(service, user, {
         key: financialRequestKey(body), account, direction, amount, description,
+        ...(category ? { expense_category_id: category.id, expense_category_name: category.name } : {}),
       }, ACCOUNT_LABELS);
       return Response.json(result);
     }
