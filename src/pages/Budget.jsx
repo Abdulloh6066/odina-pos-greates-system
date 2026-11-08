@@ -9,6 +9,7 @@ import {
   Landmark,
   ArrowUpDown,
   Search,
+  Tags,
   ShieldCheck,
   Smartphone,
   WalletCards,
@@ -18,7 +19,7 @@ import { base44 } from "@/api/base44Client";
 import { odinaAlert } from "@/lib/odina-dialog";
 import { formatUZS } from "@/lib/pos";
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest } from "@/lib/order-request-retry";
-import { formatUzbekistanDateTime } from "@/lib/uzbekistan-time";
+import { formatUzbekistanDateTime, uzbekistanDateKey } from "@/lib/uzbekistan-time";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,11 @@ const TYPE_LABELS = {
   manual_withdrawal: "Qo‘lda chiqim",
 };
 
+// Older card reversals predate the explicit reference type. Their generated
+// request key and exact system prefix distinguish them from ordinary deposits.
+const isBudgetRefund = row => row.reference_type === "manual_adjustment_reversal"
+  || (row.idempotency_key?.startsWith("bc_") && row.description?.startsWith("Bank card amalini qaytarish · "));
+
 const errorText = (error) =>
   error?.response?.data?.error || error?.data?.error || error?.message || String(error || "Noma’lum xato");
 
@@ -63,6 +69,12 @@ export default function Budget() {
   const scopedShopId = user?.role === 'admin' && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '';
   const [balances, setBalances] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [accountFilter, setAccountFilter] = useState("all");
@@ -71,16 +83,18 @@ export default function Budget() {
 
   const load = async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const result = await base44.functions.invoke("budget-ledger", { action: "summary" });
       const payload = result?.data || result;
       if (!payload?.balances || !payload?.transactions) {
         throw new Error(payload?.error || "Budget ma’lumotlarini yuklab bo‘lmadi.");
       }
+      setCategories(payload.categories || []);
       setBalances(payload.balances);
       setTransactions(payload.transactions);
     } catch (error) {
-      void odinaAlert("Budget yuklanmadi: " + errorText(error));
+      setLoadError(errorText(error));
     } finally {
       setLoading(false);
     }
@@ -97,6 +111,12 @@ export default function Budget() {
   const visibleTransactions = useMemo(() => {
     const query = search.trim().toLowerCase();
     return transactions.filter((transaction) => {
+      if (transaction.status === "reversed") return false;
+      const day = uzbekistanDateKey(transaction.created_at || transaction.created_date);
+      if (dateFrom && (!day || day < dateFrom)) return false;
+      if (dateTo && (!day || day > dateTo)) return false;
+      if (categoryFilter === "uncategorized" && (transaction.expense_category_id || transaction.direction !== "out" && !isBudgetRefund(transaction))) return false;
+      if (!["all", "uncategorized"].includes(categoryFilter) && transaction.expense_category_id !== categoryFilter) return false;
       if (scopedShopId && transaction.shop_id !== scopedShopId) return false;
       if (accountFilter !== "all") {
         const target = DISPLAY_ACCOUNTS.find((item) => item.id === accountFilter);
@@ -109,10 +129,33 @@ export default function Budget() {
         transaction.shop_name,
         transaction.supplier_name,
         transaction.description,
+        transaction.expense_category_name,
         transaction.performed_by_name,
       ].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [transactions, accountFilter, typeFilter, search, scopedShopId]);
+  }, [transactions, accountFilter, typeFilter, search, scopedShopId, categoryFilter, dateFrom, dateTo]);
+
+  const reportCategories = useMemo(() => {
+    const options = new Map(categories.map(category => [category.id, category]));
+    for (const row of transactions) {
+      if (row.expense_category_id && !options.has(row.expense_category_id)) {
+        options.set(row.expense_category_id, { id: row.expense_category_id, name: row.expense_category_name || "Eski kategoriya" });
+      }
+    }
+    return [...options.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [categories, transactions]);
+
+  const expenseTotals = useMemo(() => {
+    const totals = new Map();
+    for (const row of visibleTransactions) {
+      if (row.direction !== "out" && !isBudgetRefund(row)) continue;
+      const key = row.expense_category_id || "uncategorized";
+      const prior = totals.get(key) || { id: key, name: row.expense_category_name || "Kategoriyasiz", amount: 0 };
+      prior.amount += (row.direction === "out" ? 1 : -1) * Number(row.amount || 0);
+      totals.set(key, prior);
+    }
+    return [...totals.values()];
+  }, [visibleTransactions]);
 
   if (user?.role !== "admin") return null;
 
@@ -124,6 +167,10 @@ export default function Budget() {
         subtitle="Smenalardan tushgan mablag‘lar va egasi tasdiqlagan chiqimlar"
         icon={WalletCards}
         actions={(
+          <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setCategoryOpen(true)} className="min-h-11 rounded-xl">
+            <Tags className="w-4 h-4 mr-1.5" /> Xarajat kategoriyasi
+          </Button>
           <Button
             type="button"
             onClick={() => setAdjustOpen(true)}
@@ -131,6 +178,7 @@ export default function Budget() {
           >
             <ArrowUpDown className="w-4 h-4 mr-1.5" /> Mablag‘ kiritish / chiqarish
           </Button>
+          </div>
         )}
       />
 
@@ -146,7 +194,12 @@ export default function Budget() {
         </div>
       </div>
 
-      {loading ? (
+      {loadError ? (
+        <div role="alert" className="rounded-xl border border-destructive p-4">
+          <p>Budget yuklanmadi: {loadError}</p>
+          <Button type="button" variant="outline" onClick={load}>Qayta yuklash</Button>
+        </div>
+      ) : loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="h-28 rounded-2xl bg-secondary animate-pulse" />
@@ -203,6 +256,26 @@ export default function Budget() {
             </div>
           </div>
 
+          <div className="odina-panel rounded-2xl border border-border bg-card p-4 mt-4 space-y-3">
+            <h3 className="font-semibold">Xarajat hisoboti</h3>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <label><span className="text-xs block mb-1.5">Xarajat kategoriyasi</span>
+                <OdinaSelect value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm">
+                  <option value="all">Barcha kategoriyalar</option>
+                  <option value="uncategorized">Kategoriyasiz</option>
+                  {reportCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </OdinaSelect>
+              </label>
+              <label><span className="text-xs block mb-1.5">Boshlanish sanasi</span><Input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} /></label>
+              <label><span className="text-xs block mb-1.5">Tugash sanasi</span><Input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} /></label>
+            </div>
+            {dateFrom && dateTo && dateFrom > dateTo ? <p role="alert" className="text-destructive text-sm">Boshlanish sanasi tugash sanasidan keyin bo‘lmasin.</p> : <>
+              <p className="font-semibold">Jami chiqim: {formatUZS(expenseTotals.reduce((sum, row) => sum + row.amount, 0))}</p>
+              <p className="text-xs text-muted-foreground">Tanlangan sana, kategoriya, hisob, amal turi va qidiruv bo‘yicha. Qaytarilgan kategoriyali mablag‘ ayriladi. Sanalar: Toshkent vaqti.</p>
+              <div className="flex flex-wrap gap-2">{expenseTotals.map(row => <span key={row.id} className="rounded-lg bg-secondary px-3 py-2 text-sm">{row.name}: {formatUZS(row.amount)}</span>)}</div>
+            </>}
+          </div>
+
           <div className="odina-ledger space-y-3 mt-4">
             {visibleTransactions.length === 0 ? (
               <div className="odina-panel rounded-2xl border border-dashed border-border bg-card py-14 text-center text-sm text-muted-foreground">
@@ -233,6 +306,7 @@ export default function Budget() {
                         Qabul qiluvchi: {transaction.supplier_name?.trim() || "Noma’lum"}
                       </p>
                     )}
+                    {transaction.expense_category_name && <p className="text-xs font-medium mt-2">Kategoriya: {transaction.expense_category_name}</p>}
                     <p className="text-sm mt-2">{transaction.description}</p>
                     <p className="text-xs text-muted-foreground mt-2">
                       {transaction.performed_by_name || "Noma’lum"} · {formatUzbekistanDateTime(transaction.created_at || transaction.created_date)}
@@ -249,10 +323,15 @@ export default function Budget() {
         </>
       )}
 
+      <CategoryDialog open={categoryOpen} onClose={() => setCategoryOpen(false)} onSaved={category => {
+        setCategories(previous => [...previous.filter(row => row.id !== category.id), category].sort((a, b) => a.name.localeCompare(b.name)));
+        setCategoryOpen(false);
+      }} />
       <AdjustmentDialog
         actorId={user?.id}
         open={adjustOpen}
         balances={balanceMap}
+        categories={categories}
         onClose={() => setAdjustOpen(false)}
         onSaved={() => { setAdjustOpen(false); load(); }}
       />
@@ -260,11 +339,12 @@ export default function Budget() {
   );
 }
 
-function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
+function AdjustmentDialog({ actorId, open, balances, categories = [], onClose, onSaved }) {
   const [direction, setDirection] = useState("in");
   const [account, setAccount] = useState("cash");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [ownerPin, setOwnerPin] = useState("");
   const [saving, setSaving] = useState(false);
   const requestScope = orderRequestScope(actorId, "manual_adjustment");
@@ -280,6 +360,7 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
     setAccount(saved && BANK_CARD_ACCOUNTS.includes(saved.account) ? "bank_card" : saved?.account || "cash");
     setAmount(saved ? String(saved.amount) : "");
     setDescription(saved?.description || "");
+    setCategoryId(saved?.expense_category_id || "");
     setOwnerPin("");
   }, [open, requestScope]);
 
@@ -298,6 +379,7 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
       requestRef.current = retainOrderRequest(requestScope, requestRef.current || {
         action: "manual_adjustment", direction, account, amount: value,
         description: description.trim(), idempotency_key: crypto.randomUUID(),
+        ...(direction === "out" && categoryId ? { expense_category_id: categoryId } : {}),
       });
       setRetryPending(true);
       const result = await base44.functions.invoke("budget-ledger", { ...requestRef.current, owner_pin: ownerPin });
@@ -345,6 +427,14 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
           </OdinaSelect>
         </div>
 
+        {direction === "out" && <div>
+          <Label className="text-xs mb-1.5 block">Xarajat kategoriyasi</Label>
+          <OdinaSelect value={categoryId} onChange={event => setCategoryId(event.target.value)} disabled={saving || retryPending} className="w-full h-10 rounded-lg border border-input bg-card px-3 text-sm">
+            <option value="">Kategoriyasiz</option>
+            {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </OdinaSelect>
+        </div>}
+
         <div>
           <Label className="text-xs mb-1.5 block">Summa</Label>
           <Input data-money type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0" disabled={saving || retryPending} />
@@ -379,4 +469,37 @@ function AdjustmentDialog({ actorId, open, balances, onClose, onSaved }) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function CategoryDialog({ open, onClose, onSaved }) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const busy = useRef(false);
+  useEffect(() => { if (open) setName(""); }, [open]);
+  const submit = async () => {
+    if (busy.current || !name.trim() || name.trim().length > 80) return;
+    busy.current = true;
+    setSaving(true);
+    try {
+      const result = await base44.functions.invoke("budget-ledger", { action: "create_expense_category", name: name.trim() });
+      const payload = result?.data || result;
+      if (!payload?.category) throw new Error(payload?.error || "Kategoriya saqlanmadi.");
+      onSaved(payload.category);
+    } catch (error) {
+      void odinaAlert("Kategoriya saqlanmadi: " + errorText(error));
+    } finally { busy.current = false; setSaving(false); }
+  };
+  return <Dialog open={open} onOpenChange={value => !value && !busy.current && onClose()}>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader><DialogTitle>Xarajat kategoriyasi yaratish</DialogTitle></DialogHeader>
+      <label><span className="text-xs block mb-1.5">Kategoriya nomi</span>
+        <Input value={name} onChange={event => setName(event.target.value)} maxLength={80} placeholder="Masalan: Ishchilar uchun xarid" disabled={saving} />
+      </label>
+      <p className="text-xs text-muted-foreground">Keyin chiqim kiritishda shu kategoriyani tanlang. Hisobotda alohida topish mumkin.</p>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Bekor qilish</Button>
+        <Button type="button" onClick={submit} disabled={saving || !name.trim()}>{saving ? "Saqlanmoqda…" : "Saqlash"}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }

@@ -87,6 +87,12 @@
     },
     "request_fingerprint": {
       "type": "string"
+    },
+    "expense_category_id": {
+      "type": "string"
+    },
+    "expense_category_name": {
+      "type": "string"
     }
   },
   "required": [
