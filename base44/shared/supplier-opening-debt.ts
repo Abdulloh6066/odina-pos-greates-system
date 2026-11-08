@@ -36,11 +36,11 @@ export async function listOpeningDebts(service: any, user: any, locationId?: unk
   const payments: any[] = [];
   const paymentDebtIds = new Set();
   // Page all opening payment evidence once, including non-budget/legacy rows.
-  // Only Budget opening payments are returned to the owner's payment panel.
+  // The owner sees both Budget and Kassa payments against the same liability.
   if (openingIds.size) for (let skip = 0; ; skip += 500) {
     const page = await service.entities.SupplierPayment.filter({ opening_debt_id: { $in: [...openingIds] } }, '-paid_at', 500, skip);
     for (const row of page) paymentDebtIds.add(row.opening_debt_id);
-    payments.push(...page.filter(row => row.debt_type === 'opening' && row.payment_source === 'budget')
+    payments.push(...page.filter(row => row.debt_type === 'opening' && ['budget', 'shift_cash'].includes(row.payment_source))
       .map(({ request_fingerprint: _fingerprint, ...row }: any) => row));
     if (page.length < 500) break;
   }

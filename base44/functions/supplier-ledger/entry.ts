@@ -3,7 +3,7 @@ import { assignOpeningDebtLocation, correctOpeningDebtAmount, createOpeningDebt,
 import { resolveAppUser } from "../../shared/user-helpers.ts";
 import { assertManagerRequestScope } from "../../shared/manager-request-scope.ts";
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { financialRequestKey, runSupplierPayment } from "../../shared/supplier-payment-recovery.ts";
+import { financialRequestKey, runSupplierPayment, supplierPaymentDebts } from "../../shared/supplier-payment-recovery.ts";
 import { assertSupplierIngredientAssignment, assertSupplierLocation } from "../../shared/ingredient-requests.ts";
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
@@ -135,12 +135,10 @@ export default async function(req) {
       if (!["admin", "manager", "cashier", "warehouse", "accountant"].includes(user.role)) {
         return Response.json({ error: "Qarzlarni ko‘rishga ruxsat yo‘q." }, { status: 403 });
       }
-      const openReceipts = (await service.entities.SupplierReceipt.filter(
-        { remaining_debt: { $gt: 0 }, ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500,
-      )) || [];
+      const payableDebts = await supplierPaymentDebts(service, user);
       const totals: Record<string, number> = {};
-      for (const receipt of openReceipts) {
-        totals[receipt.supplier_id] = money(totals[receipt.supplier_id] || 0) + money(receipt.remaining_debt);
+      for (const debt of payableDebts) {
+        totals[debt.supplier_id] = money(totals[debt.supplier_id] || 0) + money(debt.remaining_debt);
       }
       return Response.json({ debts: totals });
     }

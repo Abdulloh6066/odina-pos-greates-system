@@ -230,3 +230,54 @@ test('category dialog cancels without writes, resets on reopen, and prevents rep
   assert.equal(saved, 1);
   await act(async () => { tree.unmount(); });
 });
+
+test('actual Kassa dialog offers opening-only suppliers, caps debt/cash and keeps cashier PIN required', async () => {
+  const Component = dialog('src/components/pos/KassaActionDialogs.jsx', 'CashWithdrawalDialog', {});
+  const calls = []; let tree;
+  const props = { open: true, shift: { id: 'shift', expected_cash: 3000 }, user: { id: 'cashier', role: 'cashier' },
+    recipients: [{ id: 'opening-only', name: 'Opening supplier' }, { id: 'paid', name: 'Paid supplier' },
+      { id: 'cancelled', name: 'Cancelled supplier' }], supplierDebts: { 'opening-only': 5000 },
+    onClose: () => {}, onConfirm: payload => calls.push(payload), loading: false };
+  await act(async () => { tree = create(React.createElement(Component, props)); });
+  await act(async () => { enter(tree.root.findByType('select'), 'goods_payment'); });
+  const suppliers = tree.root.findAllByType('select')[1];
+  assert.deepEqual(suppliers.findAllByType('option').map(n => n.props.value), ['', 'opening-only']);
+  await act(async () => { enter(suppliers, 'opening-only'); enter(input(tree, 'number'), '1000'); });
+  assert.equal(input(tree, 'number').props.max, 3000);
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true, 'missing owner PIN blocks cashier');
+  await act(async () => { enter(input(tree, 'password'), '2468'); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, false);
+  await act(async () => { enter(input(tree, 'number'), '3001'); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true, 'cash cap enforced');
+  await act(async () => { tree.update(React.createElement(Component, { ...props, shift: { id: 'shift', expected_cash: 10000 } })); });
+  assert.equal(input(tree, 'number').props.max, 5000);
+  await act(async () => { enter(input(tree, 'number'), '5001'); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true, 'debt cap enforced');
+  await act(async () => { enter(input(tree, 'number'), '1000'); });
+  await act(async () => { await submit(tree); });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].recipient_id, 'opening-only'); assert.equal(calls[0].amount, 1000);
+  assert.equal(calls[0].owner_pin, '2468');
+  await act(async () => { tree.unmount(); });
+});
+
+test('POS cash refresh reads only and ignores an older response after newer debt totals arrive', async () => {
+  const source = readFileSync('src/pages/POS.jsx', 'utf8');
+  const start = source.indexOf('  const loadCashData = async');
+  const end = source.indexOf('\n  const loadWasteAlerts', start);
+  assert.ok(start >= 0 && end > start);
+  const pending = [], calls = [], state = {};
+  const context = { loadGenerationRef: { current: 1 }, cashDataReadGenerationRef: { current: 0 },
+    setCashDataLoading: value => { state.loading = value; }, setCashDataError: value => { state.error = value; },
+    setCashRecipients: value => { state.recipients = value; }, setSupplierDebts: value => { state.debts = value; },
+    base44: { entities: { CashRecipient: { list: async () => [{ id: 'supplier', active: true }] } },
+      functions: { invoke: (name, payload) => { calls.push([name, payload]); return new Promise(resolve => pending.push(resolve)); } } } };
+  const load = vm.runInNewContext(source.slice(start, end) + '\nloadCashData;', context);
+  const old = load(); const fresh = load();
+  pending[1]({ data: { debts: { supplier: 4000 } } }); await fresh;
+  pending[0]({ data: { debts: { supplier: 5000 } } }); await old;
+  assert.equal(state.debts.supplier, 4000); assert.equal(state.loading, false);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(([name, payload]) => name === 'supplier-ledger' && payload.action === 'get_debts'));
+  assert.match(source, /onClick=\{\(\) => \{ void loadCashData\(\); setCashWithdrawalOpen\(true\); \}\}/);
+});

@@ -126,13 +126,14 @@ test('mixed payment allocates opening before purchase, without confusing payment
   assert.equal(f.db.SupplierPayment.length, 2);
 });
 
-test('overpayment and shift payment cannot consume unallocated opening liability', async () => {
+test('overpayment is rejected and shift payment can consume unallocated opening liability', async () => {
   const f = make(); await create(f);
   await assert.rejects(pay(f, { amount: 5001 }), e => e.status === 400);
   const cash = await f.invoke(file, { action: 'pay_debt', supplier_id: 'supplier', shift_id: 'shift', amount: 1000, idempotency_key: 'shift-opening-test' });
-  assert.equal(cash.status, 400); assert.equal(f.db.SupplierOpeningDebt[0].remaining_debt, 5000);
-  assert.equal(f.db.BudgetBalance[0].balance, 10000); assert.equal(f.db.Shift[0].expected_cash, 10000);
-  assert.deepEqual((await f.invoke(file, { action: 'get_debts' })).data.debts, {});
+  assert.equal(cash.status, 200); assert.equal(f.db.SupplierOpeningDebt[0].remaining_debt, 4000);
+  assert.equal(f.db.BudgetBalance[0].balance, 10000); assert.equal(f.db.Shift[0].expected_cash, 9000);
+  assert.equal(f.db.Shift[0].cash_removed, 1000);
+  assert.deepEqual((await f.invoke(file, { action: 'get_debts' })).data.debts, { supplier: 4000 });
 });
 
 test('lost payment/debt update replies recover once, including opening target', async () => {

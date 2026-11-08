@@ -405,6 +405,24 @@ export async function runBudgetAdjustment(service: any, user: any, input: any, l
   }
 }
 
+// Kassa pays the same opening liability from either shop; its location is
+// attribution, not a second balance or a restriction on the source of cash.
+// Return only payable rows and use the same scope for the picker, plan and reply.
+export async function supplierPaymentDebts(service: any, user: any, options: any = {}) {
+  const supplier = options.supplier_id ? { supplier_id: options.supplier_id } : {};
+  const payable = { ...supplier, remaining_debt: { $gt: 0 }, status: { $nin: ["cancelled", "cancelling"] } };
+  const receipts: any[] = [];
+  for (let skip = 0; ; skip += 500) {
+    const page = await service.entities.SupplierReceipt.filter({ ...payable,
+      ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500, skip);
+    receipts.push(...page);
+    if (page.length < 500) break;
+  }
+  const includeOpening = options.budget ? user.role === "admin" : ["admin", "manager", "cashier"].includes(user.role);
+  const opening = includeOpening ? await allOpeningDebts(service, payable) : [];
+  return [...opening.map((debt: any) => ({ ...debt, opening_debt_id: debt.id })), ...receipts];
+}
+
 export async function runSupplierPayment(service: any, user: any, input: any, labels: any = {}) {
   const budget = input.action === "pay_supplier";
   const targeted = input.opening_debt_id !== undefined;
@@ -452,15 +470,8 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
       }
       if (["cancelled", "cancelling"].includes(selected.status)) throw notStarted("Tanlangan boshlang‘ich qarz bekor qilingan.", 409);
     }
-    const receipts = targeted ? [] : await service.entities.SupplierReceipt.filter({ supplier_id: supplier.id,
-      remaining_debt: { $gt: 0 }, status: { $nin: ["cancelled", "cancelling"] },
-      ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500);
-    // Opening liabilities are owner-only and repayable from global Budget.
-    // Cashier/shift flows retain their existing purchase-only scope.
-    const opening = targeted ? [selected] : budget && user.role === "admin" ? await allOpeningDebts(service, {
-      supplier_id: supplier.id, remaining_debt: { $gt: 0 },
-    }) : [];
-    const debts = [...opening.map((debt: any) => ({ ...debt, opening_debt_id: debt.id })), ...receipts];
+    const debts = targeted ? [{ ...selected, opening_debt_id: selected.id }]
+      : await supplierPaymentDebts(service, user, { supplier_id: supplier.id, budget });
     const total = debts.reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
     if (input.amount > total || total <= 0) throw targeted
       ? notStarted(`To‘lov tanlangan qarzdan oshmasligi kerak: ${total} UZS.`)
@@ -472,7 +483,7 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
       const amount = Math.min(money(receipt.remaining_debt), remaining);
       allocations.push(receipt.opening_debt_id
         ? { opening_debt_id: receipt.id, opening_debt_number: receipt.debt_number, amount,
-          ...(targeted ? { targeted_opening: true, supplier_id: supplier.id, location_id: String(selected.location_id || "") } : {}) }
+          targeted_opening: true, supplier_id: supplier.id, location_id: String(receipt.location_id || "") }
         : { receipt_id: receipt.id, receipt_number: receipt.receipt_number, amount });
       remaining -= amount;
     }
@@ -540,12 +551,8 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
         action: budget ? "supplier_debt_paid_from_budget" : "supplier_debt_paid",
         details: `${operation.payment_number}. ${operation.supplier.name}. ${operation.shop_name}. ${input.amount} UZS.` }).catch(() => {});
     }
-    const receipts = await service.entities.SupplierReceipt.filter({ supplier_id: input.supplier_id,
-      remaining_debt: { $gt: 0 }, ...(user.role === "manager" ? { location_id: user.shop_id } : {}) }, "received_at", 500);
-    const opening = budget && user.role === "admin" ? await allOpeningDebts(service, {
-      supplier_id: input.supplier_id, remaining_debt: { $gt: 0 },
-    }) : [];
-    const remaining = [...receipts, ...opening].reduce((sum: number, receipt: any) => sum + money(receipt.remaining_debt), 0);
+    const remainingDebts = await supplierPaymentDebts(service, user, { supplier_id: input.supplier_id, budget });
+    const remaining = remainingDebts.reduce((sum: number, debt: any) => sum + money(debt.remaining_debt), 0);
     const latest = await source.entity.get(row.id);
     const selected = targeted ? await service.entities.SupplierOpeningDebt.get(operation.opening_debt_id) : null;
     if (targeted && (!selected || sourceLedger.request_fingerprint !== fingerprint

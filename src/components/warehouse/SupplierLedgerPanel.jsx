@@ -305,7 +305,7 @@ export default function SupplierLedgerPanel({
         )}
       </div>
 
-      {canViewOpening && <p className="rounded-xl border border-border p-4 text-sm">{globalView ? "Barcha do‘konlar · kirimlar ko‘rish uchun. Boshlang‘ich qarzlarni Budgetdan to‘lash mumkin." : "Tanlangan omborga biriktirilgan boshlang‘ich qarzlar."} Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
+      {canViewOpening && <p className="rounded-xl border border-border p-4 text-sm">{globalView ? "Barcha do‘konlar · kirimlar ko‘rish uchun. Boshlang‘ich qarzlarni Budgetdan yoki ikkala do‘kon kassasidan to‘lash mumkin." : "Tanlangan omborga biriktirilgan boshlang‘ich qarzlar."} Sana filtri faqat kirimlarga qo‘llanadi. Boshlang‘ich qarzlar oldingi sanalardan qolgan qoldiq sifatida doimo hisobga olinadi.</p>}
       {user?.role === "admin" && !globalView && <p className="text-sm text-muted-foreground">Omborga biriktirilmagan qarzlar faqat “Barcha do‘konlar”da ko‘rinadi.</p>}
       <div className="odina-panel rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -613,7 +613,7 @@ function PaymentCard({ payment }) {
           {payment.payment_number} · {payment.opening_debt_id ? "Boshlang‘ich qarz to‘lovi" : payment.receipt_number_snapshot}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          {payment.shop_name_snapshot} · {payment.user_name} · {formatUzbekistanDateTime(
+          {payment.payment_source === "shift_cash" ? "Kassa · " : payment.payment_source === "budget" ? "Budget · " : ""}{payment.shop_name_snapshot} · {payment.user_name} · {formatUzbekistanDateTime(
             payment.paid_at || payment.created_date,
           )}
         </p>
