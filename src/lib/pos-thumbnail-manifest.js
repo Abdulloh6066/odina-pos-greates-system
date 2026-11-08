@@ -32,16 +32,392 @@ export const POS_THUMBNAILS = Object.freeze({
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8626ae888_spartak.png",
     "thumbnail": "/images/pos-v2/6ab546e601804895b9374e80-26e6cfa67c1b.webp"
   },
+  "6ab603b78213ed9af8654dc4": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e9481f0fd_broniqora10mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603b78213ed9af8654dc4-69bf55ba7188.webp"
+  },
+  "6ab603b90494c05e6c943757": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e83842836_bumer25mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603b90494c05e6c943757-4c3fc60c26ed.webp"
+  },
+  "6ab603bafb01eee0ff7c34b7": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9c2adcf9e_matildameva30mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603bafb01eee0ff7c34b7-deae7c0025c9.webp"
+  },
+  "6ab603bc0f60d55360ab9cdc": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/019ed685f_matilda25mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603bc0f60d55360ab9cdc-d006cdf65a06.webp"
+  },
+  "6ab603be2575cf3487a0148e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9cb139dc0_medavik3burchak20mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603be2575cf3487a0148e-63b395658943.webp"
+  },
+  "6ab603bfdd294f69966af5b9": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/615a713ea_medavikcheasekrem20mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603bfdd294f69966af5b9-b97c585d746d.webp"
+  },
+  "6ab603c19f2733d8229c00a8": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b9765a6b5_opera20mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603c19f2733d8229c00a8-f0ae476adb34.webp"
+  },
   "6ab603c210352ffe2f0d90fa": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b4eb02112_sansebastian30mingsom.png",
     "thumbnail": "/images/pos-v2/6ab603c210352ffe2f0d90fa-a52e5a7539a4.webp"
+  },
+  "6ab603c49f12026d6300049e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0079d4091_snikers20mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603c49f12026d6300049e-33221f5859d1.webp"
+  },
+  "6ab603c67bf992512eb15c85": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b6beb505f_ulitka25mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab603c67bf992512eb15c85-f26972dcb822.webp"
+  },
+  "6ab6155bfe99e0794014f6d8": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/d0e54a26c_malakolipirog10mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab6155bfe99e0794014f6d8-ea553f364ebd.webp"
+  },
+  "6ab6155e68fcd43ac78d3659": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/46dca2d46_chakchak12mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab6155e68fcd43ac78d3659-f59233e2e603.webp"
+  },
+  "6ab6155f02f5293efe57c980": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/72857076d_kurasannutella20mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab6155f02f5293efe57c980-e4f70766a367.webp"
+  },
+  "6ab61561e09748aca1f0c9ce": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/a17567cd7_markovniy10mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61561e09748aca1f0c9ce-aa2fc0cfa2b3.webp"
+  },
+  "6ab6156240e7248714d440eb": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/5bb4446b3_paxlava6mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab6156240e7248714d440eb-086e99f79ccc.webp"
+  },
+  "6ab61564c85590e7ff55fd0d": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/841df918f_sochnik5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61564c85590e7ff55fd0d-74b351b1616f.webp"
+  },
+  "6ab61566fd194ab9c20a3b53": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/3b3e04a22_paxlavakunjutli6mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61566fd194ab9c20a3b53-abdd5feb4f50.webp"
+  },
+  "6ab61567e2111ab812579d52": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/52b095740_olmalipirog15mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61567e2111ab812579d52-cbf7a2b1c768.webp"
+  },
+  "6ab6156956395ece61f30105": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/455057394_ragalittvarog3mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab6156956395ece61f30105-e12277c439ec.webp"
+  },
+  "6ab615783e8135ef9de34085": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/3a4bf941b_vatrushkakichik3mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab615783e8135ef9de34085-6e39dd55c4a3.webp"
+  },
+  "6ab61a777be03472cdb0654d": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/ac95dc62f_kestikkatta6mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a777be03472cdb0654d-cc4fbcc0f2cb.webp"
+  },
+  "6ab61a79100ff5c634b7988b": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/f3001050d_sutlikeks10mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a79100ff5c634b7988b-85a86655f824.webp"
+  },
+  "6ab61a7bee39fd30867dc115": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/461b1e649_krestikkichik3mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a7bee39fd30867dc115-b0cf606a4e94.webp"
+  },
+  "6ab61a7c0d273449b3f01be5": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/276bbfca1_hurasankichi3mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a7c0d273449b3f01be5-7c71242552e3.webp"
+  },
+  "6ab61a7ea0f8ff7759003be8": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1aa3f3c70_hurasan6mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a7ea0f8ff7759003be8-33c51320852e.webp"
+  },
+  "6ab61a7f8be37dd26837d99f": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9c5a30885_chiyalilapux4mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a7f8be37dd26837d99f-696a5c006d11.webp"
+  },
+  "6ab61a815719002763bbad3d": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/ffcd1554c_ragolit3mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a815719002763bbad3d-b6edd7d78207.webp"
+  },
+  "6ab61a82f3c1f8000351f490": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/43ac4b919_xvors4mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a82f3c1f8000351f490-a0a1c3e60588.webp"
+  },
+  "6ab61a845b676c38d041a9e2": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8d0f2d28c_malinapirog15mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a845b676c38d041a9e2-c8ef6ac39908.webp"
+  },
+  "6ab61a86b1b021b0438f1de3": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/b4e3644c1_vatrushka6mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61a86b1b021b0438f1de3-3dec78dc6ea4.webp"
+  },
+  "6ab61f88ea271cf2ae8fe97a": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0007bd906_lapux4mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61f88ea271cf2ae8fe97a-8f5f6c75c69e.webp"
+  },
+  "6ab61f8a29577a1b6aa432cc": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/201e6e9b4_beze4mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61f8a29577a1b6aa432cc-218c4a0d5417.webp"
+  },
+  "6ab61f8b9116217b39d5298e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/a4650d28e_tvaroglipirog15mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab61f8b9116217b39d5298e-f78abbd52469.webp"
+  },
+  "6ab622d4444e89704246ad67": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/897a20547_twixmini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622d4444e89704246ad67-ec1a42f49e35.webp"
+  },
+  "6ab622d520298e35d7c5d94e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/2e3adb9a4_tartsnikers8mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622d520298e35d7c5d94e-be08640a50d7.webp"
+  },
+  "6ab622d7d8ded7455d92d0b6": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/23677173a_chesscakemini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622d7d8ded7455d92d0b6-88ea0431666e.webp"
+  },
+  "6ab622d964ceb41af7b569cc": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/cd8f2bd10_ptichimalakomini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622d964ceb41af7b569cc-14174a719006.webp"
+  },
+  "6ab622dad492a2c69388692e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/5716b51a7_lastishko6mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622dad492a2c69388692e-f7cbb22ef657.webp"
+  },
+  "6ab622dccfa3c3e0c06cd8c0": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/cbeb77315_medovikmini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622dccfa3c3e0c06cd8c0-a1dc0b235b8f.webp"
+  },
+  "6ab622def4094b5df3c300d0": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/406a3700a_tvarijnimini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab622def4094b5df3c300d0-1de88b975544.webp"
+  },
+  "6ab625031a010e12f5824903": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/54f3b95fb_marojnimini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab625031a010e12f5824903-92066a5ab77e.webp"
+  },
+  "6ab625055815c6df86501e20": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/77103c82a_snikersmini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab625055815c6df86501e20-e1e0b0910612.webp"
+  },
+  "6ab62506b88490dc78ae13fb": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9c02f05fe_shkalatniytvarojnimini5mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab62506b88490dc78ae13fb-58688812fbcf.webp"
+  },
+  "6ab62508b1da9319508d0eb5": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1a2afe25a_tartfistashka8mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab62508b1da9319508d0eb5-379de8d4bae3.webp"
+  },
+  "6ab6250a6c0f6ff933e086d4": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/272d8669f_blumb8mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab6250a6c0f6ff933e086d4-38ca07e18990.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5e8": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/81b4435eb_01-Espresso-20000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5e8-baf80ff1509b.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5e9": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/a25739c97_02-Amerikano-22000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5e9-80a544117fc7.webp"
   },
   "6ab66ca8ae6223ce0f93e5ea": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/31dee9a49_03-Kapuchino-28000-UZS.png",
     "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ea-52f8273950ae.webp"
   },
+  "6ab66ca8ae6223ce0f93e5eb": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/070d5efd0_04-Latte-28000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5eb-b51261cbdf9e.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5ec": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/57c2e303a_05-Flet-Uayt-25000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ec-576def5483a5.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5ed": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/01ea40855_06-Mokko-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ed-68349fd38e2b.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5ee": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/816346196_07-Raf-malina-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ee-64ccdd8b33f6.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5ef": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/c2efad197_08-Issiq-shokolad-28000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ef-938c83f3f822.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f0": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/57aa10e6d_01-Espresso-tonik-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f0-6382b8eaca21.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f1": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/60cce8c0c_02-Ays-amerikano-25000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f1-d1a20f14b195.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f2": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e5ca0ff13_03-Ays-latte-28000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f2-0b2556b668ed.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f3": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/c0a540841_04-Bambl-35000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f3-5855704d1184.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f4": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/eebb655c7_05-Frappe-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f4-e288e697777b.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f5": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/ab84a1645_06-Ays-mokko-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f5-5b50e53f6f13.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f6": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/bf27bb703_01-Yagodniy-limonad-28000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f6-f4a08f1fbc07.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f7": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/c7e6dfe9c_02-Moxito-classik-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f7-aa8905082063.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f8": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/0cee25adf_03-Moxito-klubnika-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f8-942f263ea1d0.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5f9": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/90eedf718_04-Mango-marakuya-limonad-30000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5f9-b0cd9b12e3e5.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5fa": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/85d5f9357_05-Rayhon-uzum-25000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5fa-8b4ac31060a4.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5fb": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1ee12b851_06-Bazilik-28000-UZS.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5fb-436bc907b6be.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5fe": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1224fab1d_milkshake-vanil.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5fe-49bde1cb3738.webp"
+  },
+  "6ab66ca8ae6223ce0f93e5ff": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/06685be51_01.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e5ff-ee23b6d48027.webp"
+  },
+  "6ab66ca8ae6223ce0f93e600": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8b127c15a_02.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e600-0c817cb6b43d.webp"
+  },
+  "6ab66ca8ae6223ce0f93e601": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/e1a186aea_03.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e601-54f55db7269c.webp"
+  },
+  "6ab66ca8ae6223ce0f93e602": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/2292334fd_04.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e602-1a96adc4e63d.webp"
+  },
+  "6ab66ca8ae6223ce0f93e603": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/6414705ed_05.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e603-cd35596be4f8.webp"
+  },
+  "6ab66ca8ae6223ce0f93e604": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/960972eee_06.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e604-3ec55224ccfd.webp"
+  },
+  "6ab66ca8ae6223ce0f93e605": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/35c26568d_07.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e605-5b62299ddcda.webp"
+  },
+  "6ab66ca8ae6223ce0f93e606": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/7efb593d6_08.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e606-32816beab0a8.webp"
+  },
+  "6ab66ca8ae6223ce0f93e608": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/630fa2528_anchan-mango.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e608-414852f1a112.webp"
+  },
+  "6ab66ca8ae6223ce0f93e609": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/4a6d7c640_matcha-mango.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e609-a6823b1a88fc.webp"
+  },
+  "6ab66ca8ae6223ce0f93e60a": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/06fa78942_matcha-qulupnay.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e60a-bd3d457a6aed.webp"
+  },
+  "6ab66ca8ae6223ce0f93e60b": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/8061dbd71_anchan-qulupnay.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e60b-846c89a2708c.webp"
+  },
+  "6ab66ca8ae6223ce0f93e60e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/69ea7bd16_choy-mango-marakuya.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e60e-8084a63c684a.webp"
+  },
+  "6ab66ca8ae6223ce0f93e60f": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/6fec62213_choy-imbir.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e60f-66874bee1402.webp"
+  },
+  "6ab66ca8ae6223ce0f93e610": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/d174eb92b_choy-oblepixa.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e610-775f82cac126.webp"
+  },
+  "6ab66ca8ae6223ce0f93e611": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/9879fd8e0_choy-marokash.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e611-33a4c41c191b.webp"
+  },
+  "6ab66ca8ae6223ce0f93e612": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/5ddb2c4fa_smuzi-mango-marakuya.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e612-f519df68a1de.webp"
+  },
+  "6ab66ca8ae6223ce0f93e613": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/593d5f964_smuzi-rezavorli.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e613-f1eebc742405.webp"
+  },
+  "6ab66ca8ae6223ce0f93e614": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/4d9e7dc4f_smuzi-ananas.png",
+    "thumbnail": "/images/pos-v2/6ab66ca8ae6223ce0f93e614-56759c81be25.webp"
+  },
+  "6ab6b03dfa815d9efa74363e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/dbea70a9d_Limonchoy.png",
+    "thumbnail": "/images/pos-v2/6ab6b03dfa815d9efa74363e-6da9246e5c0f.webp"
+  },
   "6ab747c5c1c33517e6eea448": {
     "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/84425d13b_Burger_classic__42000.png",
     "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea448-c9eef7134c2b.webp"
+  },
+  "6ab747c5c1c33517e6eea449": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1c3609199_burdermini55mingsom.png",
+    "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea449-6cfec2e6dd62.webp"
+  },
+  "6ab747c5c1c33517e6eea44a": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/d29e9d8e4_Hot_dog_classic__15000.png",
+    "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea44a-8e2b9008cdb0.webp"
+  },
+  "6ab747c5c1c33517e6eea44b": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/d455847cc_Hot_dog_ostry__25000.png",
+    "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea44b-eba2a8d836d9.webp"
+  },
+  "6ab747c5c1c33517e6eea44c": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/1eed895da_Hot_dog_double__20000.png",
+    "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea44c-6a4dd7815ad5.webp"
+  },
+  "6ab747c5c1c33517e6eea44d": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/a6344b9ef_Hot_dog_ostry_double__30000.png",
+    "thumbnail": "/images/pos-v2/6ab747c5c1c33517e6eea44d-90d95b7f4bd5.webp"
+  },
+  "6ab950bc4e5042cfdfbbe40a": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/07be00ed2_Olive.png",
+    "thumbnail": "/images/pos-v2/6ab950bc4e5042cfdfbbe40a-6bff8c7b97eb.webp"
+  },
+  "6ab950bc4e5042cfdfbbe40b": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/78b3935bc_Orama_baqlajon.png",
+    "thumbnail": "/images/pos-v2/6ab950bc4e5042cfdfbbe40b-5b35a4540b7c.webp"
+  },
+  "6ab950bc4e5042cfdfbbe40c": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/7990c3370_Norin.png",
+    "thumbnail": "/images/pos-v2/6ab950bc4e5042cfdfbbe40c-411a002a9f86.webp"
+  },
+  "6ab950bc4e5042cfdfbbe40d": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/07ee9752f_Mujskoy_kapriz.png",
+    "thumbnail": "/images/pos-v2/6ab950bc4e5042cfdfbbe40d-078ee33b4eb3.webp"
+  },
+  "6ab950bc4e5042cfdfbbe40e": {
+    "source": "https://base44.app/api/apps/6a96eb22a9fd2b34081eb2dd/files/mp/public/6a96eb22a9fd2b34081eb2dd/71503a354_Gribnoy.png",
+    "thumbnail": "/images/pos-v2/6ab950bc4e5042cfdfbbe40e-d1d91e05215c.webp"
   }
 });
