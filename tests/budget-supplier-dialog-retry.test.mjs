@@ -43,6 +43,73 @@ const input = (tree, type) => tree.root.findAllByType('input').find(node => node
 const enter = (node, value) => node.props.onChange({ target: { value } });
 const withoutPin = payload => { const { owner_pin: _pin, ...rest } = payload; return rest; };
 
+test('Budget shows existing card and bank money once in a single Bank card and filter', async () => {
+  const Component = dialog('src/pages/Budget.jsx', 'Budget', { functions: { invoke: async () => ({ data: {
+    balances: [{ account: 'cash', balance: 135793443 }, { account: 'uzcard', balance: 36000000 },
+      { account: 'humo', balance: 477000 }, { account: 'bank', balance: 0 }, { account: 'online', balance: 500 }],
+    transactions: [
+      { id: 'legacy', transaction_number: 'OLD-UZCARD', account: 'uzcard', type: 'shift_deposit', direction: 'in', amount: 5, balance_before: 10, balance_after: 15 },
+      { id: 'pooled', transaction_number: 'POOLED-BANK', account: 'bank', type: 'manual_withdrawal', direction: 'out', amount: 25 },
+      { id: 'cash-only', transaction_number: 'CASH-ONLY', account: 'cash', type: 'shift_deposit', direction: 'in', amount: 10 },
+    ],
+  } }) } });
+  let tree; await act(async () => { tree = create(React.createElement(Component)); });
+  const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : node?.children ? text(node.children) : '';
+  const cards = tree.root.findAll(node => typeof node.type === 'string' && node.props.className?.includes('odina-budget-account '));
+  assert.equal(cards.length, 3);
+  assert.ok(cards.some(node => text(node) === 'Bank36477000 UZS'));
+  assert.ok(text(tree.toJSON()).includes('172270943 UZS'));
+  const filter = tree.root.findAllByType('select')[0];
+  assert.deepEqual(filter.findAllByType('option').map(node => node.props.value), ['all', 'cash', 'bank_all', 'online']);
+  await act(async () => { enter(filter, 'bank_all'); });
+  const history = text(tree.toJSON());
+  assert.match(history, /OLD-UZCARD/); assert.match(history, /POOLED-BANK/);
+  assert.match(history, /Uzcard qoldig‘i: 10 UZS → 15 UZS/);
+  assert.doesNotMatch(history, /CASH-ONLY|0 UZS → 0 UZS/);
+  await act(async () => { tree.unmount(); });
+});
+
+test('Bank withdrawal dialog uses the combined balance and sends the logical Bank contract', async () => {
+  globalThis.sessionStorage = storage(); const sent = [];
+  const Component = dialog('src/pages/Budget.jsx', 'AdjustmentDialog', { functions: { invoke: async (_name, payload) => {
+    sent.push(structuredClone(payload)); return { data: { transaction: { id: 'offline-history' } } };
+  } } });
+  let tree; await act(async () => { tree = create(React.createElement(Component, { actorId: 'owner', open: true,
+    categories: [{ id: 'workers', name: 'Offline category' }],
+    balances: { bank: 40, uzcard: 50, humo: 30 }, onClose() {}, onSaved() {} })); });
+  await act(async () => {
+    tree.root.findAllByType('button')[1].props.onClick();
+    enter(tree.root.findAllByType('select')[0], 'bank_all'); enter(input(tree, 'number'), '100');
+    enter(tree.root.findByType('textarea'), 'Offline withdrawal'); enter(input(tree, 'password'), '2468');
+  });
+  await act(async () => { enter(tree.root.findAllByType('select')[1], 'workers'); });
+  assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, false);
+  await act(async () => { await submit(tree); });
+  assert.equal(sent.length, 1); assert.equal(sent[0].account, 'bank_all'); assert.equal(sent[0].amount, 100);
+  await act(async () => { tree.unmount(); });
+});
+
+test('old pending Bank and card adjustments keep their saved account while the UI shows Bank', async () => {
+  for (const account of ['bank', 'uzcard', 'humo', 'bank_card']) {
+    globalThis.sessionStorage = storage(); const sent = [];
+    const scope = retry.orderRequestScope('owner', 'manual_adjustment');
+    const saved = { action: 'manual_adjustment', account, direction: 'out', amount: 20,
+      description: 'Offline frozen legacy request', idempotency_key: 'legacy-bank-key' };
+    retry.retainOrderRequest(scope, saved);
+    const Component = dialog('src/pages/Budget.jsx', 'AdjustmentDialog', { functions: { invoke: async (_name, payload) => {
+      sent.push(structuredClone(payload)); return { data: { transaction: { id: 'offline-history' } } };
+    } } });
+    let tree; await act(async () => { tree = create(React.createElement(Component, { actorId: 'owner', open: true,
+      balances: {}, onClose() {}, onSaved() {} })); });
+    assert.equal(tree.root.findAllByType('select')[0].props.value, 'bank_all');
+    assert.equal(tree.root.findAllByType('select')[0].props.disabled, true);
+    await act(async () => { enter(input(tree, 'password'), '2468'); });
+    await act(async () => { await submit(tree); });
+    assert.deepEqual(withoutPin(sent[0]), saved);
+    await act(async () => { tree.unmount(); });
+  }
+});
+
 test('actual Budget adjustment dialog keeps its request through timeout/unmount and stale balance', async () => {
   globalThis.sessionStorage = storage(); const sent = []; let saved = 0;
   const backend = { functions: { invoke: async (_name, payload) => {

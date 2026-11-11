@@ -7,9 +7,11 @@ const JOURNAL = "financial_operations_json";
 const SHIFT_JOURNAL = "supplier_payment_operations_json";
 const DEBT_JOURNAL = "payment_operations_json";
 const INIT_JOURNAL = "budget_account_initialization_json";
+const BANK_ACCOUNTS = ["bank", "uzcard", "humo"];
 
 const fail = (message: string, status = 503, pending = true) =>
   Object.assign(new Error(message), { status, operation_pending: pending });
+const missingBankParent = () => fail("Avvalgi Bank amali topilmadi. Egasi tekshirishi kerak.", 409);
 const journal = (row: any, field: string) => {
   if (!row?.[field]) return {};
   try {
@@ -138,6 +140,7 @@ async function claim(source: any, field: string, key: string, fingerprint: strin
   actor: string, create: () => Promise<any>) {
   const token = crypto.randomUUID();
   const initial = journal(await source.entity.get(source.row.id), field)[key];
+  if (source.bankWallet && source.bankParentBound && !initial) throw missingBankParent();
   if (initial && (initial.fingerprint !== fingerprint || initial.actor !== actor)) {
     throw fail("Bu so‘rov kaliti boshqa to‘lov ma’lumotlari uchun ishlatilgan.", 409, false);
   }
@@ -188,7 +191,80 @@ async function stage(source: any, field: string, key: string, token: string, val
   });
 }
 
+async function bankWalletRows(source: any) {
+  const rows = await source.service.entities.BudgetBalance.filter({ account: { $in: BANK_ACCOUNTS } }, "account", 20);
+  for (const account of BANK_ACCOUNTS) {
+    const matching = rows.filter((row: any) => row.account === account);
+    if (matching.length > 1 || matching.some((row: any) => !Number.isSafeInteger(Number(row.balance || 0)))) {
+      throw fail("Bank qoldig‘ini egasi tekshirishi kerak.", 409);
+    }
+  }
+  const total = rows.reduce((sum: number, row: any) => sum + Number(row.balance || 0), 0);
+  if (!Number.isSafeInteger(total)) throw fail("Bank qoldig‘i noto‘g‘ri.", 409);
+  return { rows, total };
+}
+
+// A logical Bank keeps old account records and request journals in place. Each
+// backing delta and its marker share one CAS; retries never replay a delta.
+async function bankWalletPart(source: any, operation: any, part: any, reverse = false) {
+  const marker = "bank_source:" + operation.marker;
+  return mutate(source.entity, part.id, JOURNAL, marker, (prior: any, row: any) => {
+    if (row.account !== part.account || !BANK_ACCOUNTS.includes(row.account)
+      || (prior && (prior.delta !== part.delta || prior.parent !== operation.marker))) {
+      throw fail("Bank operatsiyasi manbasi mos emas.", 409);
+    }
+    if (reverse && prior?.state !== "applied") {
+      if (prior?.state === "reversed") return { skip: true };
+      // Fence an unconfirmed conditional debit even if it has not landed yet.
+      // A concurrent shift credit can restore the old balance, but cannot
+      // restore the old journal precondition after this terminal marker.
+      return { operation: { parent: operation.marker, delta: part.delta, state: "reversed" },
+        query: { account: part.account } };
+    }
+    if (!reverse && prior?.state === "applied") return { skip: true };
+    if (!reverse && prior?.state === "reversed") throw fail("Bank operatsiyasi qaytarilmoqda.");
+    const before = Number(row.balance || 0);
+    const delta = reverse ? -part.delta : part.delta;
+    if (!Number.isSafeInteger(before) || !Number.isSafeInteger(before + delta)) throw fail("Bank qoldig‘i noto‘g‘ri.", 409);
+    if (before + delta < 0) throw fail(reverse
+      ? "Bank qaytarilishi uchun mablag‘ yetarli emas. Shu so‘rovni tekshiring."
+      : "Bank hisobida mablag‘ yetarli emas.", reverse ? 503 : 400, reverse);
+    return { operation: { parent: operation.marker, delta: part.delta, state: reverse ? "reversed" : "applied" },
+      query: { account: part.account, balance: before }, inc: { balance: delta },
+      set: { updated_at: new Date().toISOString(), updated_by_id: source.user.id,
+        updated_by_name: source.user.full_name || source.user.email } };
+  });
+}
+
+async function debitBankWallet(source: any, field: string, key: string, token: string) {
+  let operation = journal(await source.entity.get(source.row.id), field)[key];
+  own(operation, token);
+  if (operation.source_applied) return { operation };
+  if (!operation.bank_parts) {
+    const { rows, total } = await bankWalletRows(source);
+    const delta = operation.direction === "in" ? operation.amount : -operation.amount;
+    if (!Number.isSafeInteger(total + delta) || total + delta < 0) throw fail("Bank hisobida mablag‘ yetarli emas.", 400, false);
+    const parts = [];
+    if (delta > 0) parts.push({ id: source.row.id, account: "bank", delta });
+    else {
+      let remaining = operation.amount;
+      for (const account of BANK_ACCOUNTS) {
+        const row = rows.find((row: any) => row.account === account);
+        const amount = Math.min(remaining, Math.max(0, Number(row?.balance || 0)));
+        if (amount) parts.push({ id: row.id, account, delta: -amount });
+        remaining -= amount;
+      }
+      if (remaining) throw fail("Bank hisobida mablag‘ yetarli emas.", 400, false);
+    }
+    const planned = await stage(source, field, key, token, { bank_parts: parts });
+    operation = planned.operation;
+  }
+  for (const part of operation.bank_parts) await bankWalletPart(source, operation, part);
+  return stage(source, field, key, token, { source_applied: true });
+}
+
 async function debit(source: any, field: string, key: string, token: string, user: any) {
+  if (source.bankWallet) return debitBankWallet(source, field, key, token);
   return mutate(source.entity, source.row.id, field, key, (operation: any, row: any) => {
     own(operation, token);
     if (operation.source_applied) return { skip: true };
@@ -284,6 +360,12 @@ async function compensate(service: any, source: any, field: string, key: string,
   for (const allocation of [...(operation.allocations || [])].reverse()) {
     await debtDelta(service, allocation, operation.marker, true);
   }
+  if (source.bankWallet) {
+    // A failure can occur before source_applied is set. Reverse every saved
+    // part marker, including a debit whose successful reply was lost.
+    for (const part of [...(operation.bank_parts || [])].reverse()) await bankWalletPart(source, operation, part, true);
+    return stage(source, field, key, token, { source_applied: false, status: "reversed", worker: "" });
+  }
   return mutate(source.entity, source.row.id, field, key, (current: any, row: any) => {
     own(current, token);
     if (source.kind === "shift" && row.status !== "open") {
@@ -327,42 +409,80 @@ async function release(source: any, field: string, key: string, token: string) {
 
 const paymentNumber = (prefix: string) => `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-async function claimRequestScope(service: any, key: string, fingerprint: string, actor: string) {
+async function requestDigest(value: string) {
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))))
+    .map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function claimRequestScope(service: any, key: string, fingerprint: string, actor: string,
+  bankParent?: { id: string; marker: string }) {
   const settings = await service.entities.Settings.list("created_date", 2);
   if (settings.length !== 1) throw fail("Moliyaviy so‘rov uchun ilova sozlamasini egasi tekshirishi kerak.", 409, false);
   // Settings is readable by staff. Store only a one-way digest here; amounts,
   // accounts, notes and supplier snapshots remain on restricted source records.
-  const digest = Array.from(new Uint8Array(await crypto.subtle.digest(
-    "SHA-256", new TextEncoder().encode(fingerprint),
-  ))).map(byte => byte.toString(16).padStart(2, "0")).join("");
-  await mutate(service.entities.Settings, settings[0].id, INIT_JOURNAL, `request:${key}`, (operation: any) => {
+  const digest = await requestDigest(fingerprint);
+  const bankParentDigest = bankParent ? await requestDigest(JSON.stringify([bankParent.id, bankParent.marker])) : "";
+  const result = await mutate(service.entities.Settings, settings[0].id, INIT_JOURNAL, `request:${key}`, (operation: any) => {
     if (operation) {
       if (operation.actor !== actor || operation.digest !== digest) {
         throw fail("Bu so‘rov kaliti boshqa moliyaviy amal uchun ishlatilgan.", 409, false);
       }
+      if (bankParentDigest) {
+        if (operation.bank_parent && operation.bank_parent !== bankParentDigest) throw missingBankParent();
+        if (!operation.bank_parent) return { operation: { ...operation, bank_parent: bankParentDigest } };
+      }
       return { skip: true };
     }
-    return { operation: { actor, digest } };
+    return { operation: { actor, digest, ...(bankParentDigest ? { bank_parent: bankParentDigest } : {}) } };
   });
+  return result.operation;
 }
 
-export async function runBudgetAdjustment(service: any, user: any, input: any, labels: any) {
+async function budgetSource(service: any, user: any, input: any, labels: any, fingerprint: string) {
   const key = input.key;
-  const fingerprint = JSON.stringify(["manual_adjustment", user.id, input.account, input.direction, input.amount, input.description,
-    ...(input.expense_category_id ? [input.expense_category_id] : [])]);
   // Detect reuse across Budget accounts before selecting the source row.
   const balances = await service.entities.BudgetBalance.list("account", 20);
   for (const balance of balances) {
     const prior = journal(balance, JOURNAL)[key];
     if (prior && (prior.actor !== user.id || prior.fingerprint !== fingerprint)) throw fail("Bu so‘rov kaliti boshqa Budget amali uchun ishlatilgan.", 409, false);
   }
-  await claimRequestScope(service, key, fingerprint, user.id);
-  const row = await ensureBudgetAccount(service, input.account, labels[input.account], user);
-  const source = { row, entity: service.entities.BudgetBalance, kind: "budget" };
+  const guard = await claimRequestScope(service, key, fingerprint, user.id);
+  const bankWallet = input.account === "bank_all";
+  const bankParentBound = bankWallet && Boolean(guard.bank_parent);
+  let row;
+  if (bankParentBound) {
+    const current = await service.entities.BudgetBalance.filter({ account: "bank" });
+    if (current.length !== 1) throw missingBankParent();
+    row = current[0];
+  } else row = await ensureBudgetAccount(service, bankWallet ? "bank" : input.account, labels[input.account], user);
+  return { row, entity: service.entities.BudgetBalance, kind: "budget", service, user, bankWallet, bankParentBound };
+}
+
+async function bindBankWalletRequest(source: any, field: string, key: string, claimed: any) {
+  if (!source.bankWallet) return;
+  try {
+    const { marker, fingerprint, actor } = claimed.operation;
+    if (typeof marker !== "string" || !marker) throw missingBankParent();
+    // Check even if the source debit, compensation or transaction was already
+    // applied. A copied journal on a replacement account is not that source.
+    await claimRequestScope(source.service, key, fingerprint, actor, { id: source.row.id, marker });
+  } catch (error) {
+    if (!claimed.already) await release(source, field, key, claimed.token).catch(() => {});
+    throw error;
+  }
+}
+
+export async function runBudgetAdjustment(service: any, user: any, input: any, labels: any) {
+  const key = input.key;
+  const fingerprint = JSON.stringify(["manual_adjustment", user.id, input.account, input.direction, input.amount, input.description,
+    ...(input.expense_category_id ? [input.expense_category_id] : [])]);
+  const source = await budgetSource(service, user, input, labels, fingerprint);
+  const { row } = source;
   const claimed = await claim(source, JOURNAL, key, fingerprint, user.id, async () => ({
     ...input, created_at: new Date().toISOString(), payment_number: paymentNumber(input.direction === "in" ? "BK" : "BC"), marker: crypto.randomUUID(),
   }));
   const token = claimed.token;
+  await bindBankWalletRequest(source, JOURNAL, key, claimed);
   await resumeCompensation(service, source, JOURNAL, key, claimed);
   try {
     if (!claimed.already) await debit(source, JOURNAL, key, token, user);
@@ -372,8 +492,10 @@ export async function runBudgetAdjustment(service: any, user: any, input: any, l
     if (claimed.already) transaction = (await service.entities.BudgetTransaction.filter(query, "created_date", 2))[0];
     else transaction = await ledger(source, JOURNAL, key, token, "transaction", service.entities.BudgetTransaction, query, () => ({
       transaction_number: operation.payment_number, type: input.direction === "in" ? "manual_deposit" : "manual_withdrawal",
-      direction: input.direction, account: input.account, amount: input.amount,
-      balance_before: operation.balance_before, balance_after: operation.balance_after,
+      direction: input.direction, account: source.bankWallet ? "bank" : input.account, amount: input.amount,
+      // Different physical writers can interleave; the pooled plan does not
+      // claim an exact combined running balance in immutable history.
+      ...(!source.bankWallet ? { balance_before: operation.balance_before, balance_after: operation.balance_after } : {}),
       reference_type: operation.is_budget_refund ? "manual_adjustment_reversal" : "manual_adjustment", description: input.description, performed_by_id: user.id,
       ...(operation.expense_category_id ? { expense_category_id: operation.expense_category_id,
         expense_category_name: operation.expense_category_name } : {}),
@@ -387,7 +509,9 @@ export async function runBudgetAdjustment(service: any, user: any, input: any, l
         action: input.direction === "in" ? "budget_manual_deposit" : "budget_manual_withdrawal",
         details: `${labels[input.account]} · ${input.amount} UZS · ${input.description}` }).catch(() => {});
     }
-    return { transaction, balance: await source.entity.get(row.id), already_processed: claimed.already };
+    const balance = await source.entity.get(row.id);
+    return { transaction, balance: source.bankWallet ? { ...balance, balance: (await bankWalletRows(source)).total } : balance,
+      already_processed: claimed.already };
   } catch (error) {
     const recorded = await service.entities.BudgetTransaction.filter({ idempotency_key: key, performed_by_id: user.id }, "created_date", 1).catch(() => null);
     if (rejected(error) && recorded && recorded.length === 0) {
@@ -441,22 +565,17 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
   // Only the opt-in row-targeted contract adds scope to the request identity.
   const fingerprint = JSON.stringify([input.action, user.id, input.supplier_id, input.shift_id || "", input.account || "", input.amount, input.notes,
     ...(targeted ? ["opening_debt", input.opening_debt_id, input.location_id || ""] : [])]);
-  let row;
+  let source;
   if (budget) {
-    const balances = await service.entities.BudgetBalance.list("account", 20);
-    for (const balance of balances) {
-      const prior = journal(balance, field)[key];
-      if (prior && (prior.actor !== user.id || prior.fingerprint !== fingerprint)) throw fail("Bu so‘rov kaliti boshqa Budget amali uchun ishlatilgan.", 409, false);
-    }
-    await claimRequestScope(service, key, fingerprint, user.id);
-    row = await ensureBudgetAccount(service, input.account, labels[input.account], user);
+    source = await budgetSource(service, user, input, labels, fingerprint);
   } else {
-    row = await service.entities.Shift.get(input.shift_id);
+    const row = await service.entities.Shift.get(input.shift_id);
     if (!row || row.user_id !== user.id) throw fail("Bu smena boshqa xodimga tegishli yoki topilmadi.", 403, false);
     if (["cashier", "manager"].includes(user.role) && user.shop_id !== row.shop_id) throw fail("Bu smena boshqa do‘konga tegishli.", 403, false);
     await claimRequestScope(service, key, fingerprint, user.id);
+    source = { row, entity: service.entities.Shift, kind: "shift", service, user, bankWallet: false, bankParentBound: false };
   }
-  const source = { row, entity: budget ? service.entities.BudgetBalance : service.entities.Shift, kind: budget ? "budget" : "shift" };
+  const { row } = source;
   const claimed = await claim(source, field, key, fingerprint, user.id, async () => {
     if (!budget && row.status !== "open") throw fail("Smena ochiq emas.", 409, false);
     const supplier = await service.entities.CashRecipient.get(input.supplier_id);
@@ -493,6 +612,7 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
       payment_number: paymentNumber(budget ? "BQ" : "QT"), allocations, marker: crypto.randomUUID() };
   });
   const token = claimed.token;
+  await bindBankWalletRequest(source, field, key, claimed);
   await resumeCompensation(service, source, field, key, claimed);
   try {
     if (!claimed.already) await debit(source, field, key, token, user);
@@ -508,8 +628,9 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
     const sourceQuery = budget ? { idempotency_key: key, performed_by_id: user.id } : { ...query, shift_id: row.id };
     if (claimed.already) sourceLedger = (await sourceEntity.filter(sourceQuery, "created_date", 2))[0];
     else sourceLedger = await ledger(source, field, key, token, "source_ledger", sourceEntity, sourceQuery, () => budget ? {
-      transaction_number: operation.payment_number, type: "supplier_payment", direction: "out", account: input.account,
-      amount: input.amount, balance_before: operation.balance_before, balance_after: operation.balance_after,
+      transaction_number: operation.payment_number, type: "supplier_payment", direction: "out", account: source.bankWallet ? "bank" : input.account,
+      amount: input.amount,
+      ...(!source.bankWallet ? { balance_before: operation.balance_before, balance_after: operation.balance_after } : {}),
       supplier_id: operation.supplier.id, supplier_name: operation.supplier.name, reference_id: operation.payment_number,
       ...(targeted ? { shop_id: operation.shop_id, shop_name: operation.shop_name } : {}),
       reference_type: "supplier_payment", description: input.notes || `${operation.supplier.name} qarzini to‘lash`,
@@ -538,7 +659,7 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
         supplier_name_snapshot: operation.supplier.name, amount: allocation.amount, shop_id: operation.shop_id,
         shop_name_snapshot: operation.shop_name, shift_id: budget ? "" : row.id,
         cash_movement_id: budget ? "" : sourceLedger.id, payment_source: budget ? "budget" : "shift_cash",
-        ...(budget ? { budget_account: input.account, budget_transaction_id: sourceLedger.id, authorized_by_id: user.id, authorized_by_name: user.full_name || user.email } : {}),
+        ...(budget ? { budget_account: source.bankWallet ? "bank" : input.account, budget_transaction_id: sourceLedger.id, authorized_by_id: user.id, authorized_by_name: user.full_name || user.email } : {}),
         user_id: user.id, user_name: user.full_name || user.email, notes: input.notes || undefined,
         paid_at: operation.created_at, idempotency_key: key, request_fingerprint: fingerprint,
       }));
@@ -564,7 +685,8 @@ export async function runSupplierPayment(service: any, user: any, input: any, la
       payments, remaining_debt: remaining, already_processed: claimed.already,
       ...(targeted ? { opening_debt_id: operation.opening_debt_id, amount: operation.amount,
         account: operation.account, location_id: operation.shop_id, opening_remaining_debt: selected.remaining_debt } : {}),
-      ...(budget ? { transaction: sourceLedger, budget_balance: latest.balance } : { cash_movement: sourceLedger, shift: latest }) };
+      ...(budget ? { transaction: sourceLedger, budget_balance: source.bankWallet ? (await bankWalletRows(source)).total : latest.balance }
+        : { cash_movement: sourceLedger, shift: latest }) };
   } catch (error) {
     // Before any ledger saved, a definite validation rejection can be safely
     // compensated. Once a ledger exists, preserve it and complete forward on retry.

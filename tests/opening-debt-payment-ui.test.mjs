@@ -82,6 +82,24 @@ async function fixture({ invoke = confirmed, readSummary = summary, stored = new
   };
 }
 
+test('opening debt Bank selection reviews and spends the combined existing Bank and card balance', async () => {
+  const f = await fixture({ readSummary: () => ({ data: { balances: [
+    { account: 'bank', balance: 0 }, { account: 'uzcard', balance: 30 }, { account: 'humo', balance: 20 },
+  ] } }) });
+  try {
+    const options = f.tree.root.findByProps({ id: 'opening-payment-account' }).findAllByType('option');
+    assert.deepEqual(options.map(option => option.props.value), ['cash', 'bank_all', 'online']);
+    assert.ok(options.some(option => text(option) === 'Bank · 50 UZS'));
+    await f.fill('40', 'bank_all');
+    assert.equal(button(f.tree, 'To‘lovni ko‘rib chiqish').props.disabled, false);
+    await f.review(); assert.match(text(f.tree.toJSON()), /Bank: 50 UZS → 10 UZS/);
+    await f.pin(); await f.submit();
+    assert.equal(f.payments().length, 1);
+    assert.equal(f.payments()[0].payload.account, 'bank_all');
+    assert.equal(f.payments()[0].payload.amount, 40); assert.equal(f.saved(), 1);
+  } finally { await f.close(); }
+});
+
 test('selected debt requires valid amount, sufficient Budget, review and ephemeral PIN before paying', async () => {
   const f = await fixture();
   try {

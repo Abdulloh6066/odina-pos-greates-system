@@ -9,6 +9,7 @@ const ACCOUNT_LABELS: Record<string, string> = {
   humo: "Humo",
   online: "Onlayn",
   bank: "Bank",
+  bank_all: "Bank",
 };
 
 const money = (value: unknown) => Math.round(Number(value) || 0);
@@ -313,7 +314,7 @@ export default async function(req) {
       const direction = String(body?.direction || "");
       const amount = money(body?.amount);
       const description = String(body?.description || "").trim();
-      if ((!ACCOUNTS.has(account) && account !== "bank_card") || !["in", "out"].includes(direction) || !Number.isSafeInteger(amount) || amount <= 0 || description.length < 3) {
+      if ((!ACCOUNTS.has(account) && !["bank_card", "bank_all"].includes(account)) || !["in", "out"].includes(direction) || !Number.isSafeInteger(amount) || amount <= 0 || description.length < 3) {
         return Response.json({ error: "Hisob, amal, musbat summa va izoh majburiy." }, { status: 400 });
       }
 
@@ -358,7 +359,7 @@ export default async function(req) {
         || (body?.location_id !== undefined && (!targeted || typeof body.location_id !== "string" || !body.location_id.trim()))) {
         return Response.json({ error: "Boshlang‘ich qarz, joylashuv yoki to‘lov ma’lumotlari noto‘g‘ri." }, { status: 400 });
       }
-      if (!ACCOUNTS.has(account) || !supplierId || !Number.isSafeInteger(amount) || amount <= 0) {
+      if ((!ACCOUNTS.has(account) && account !== "bank_all") || !supplierId || !Number.isSafeInteger(amount) || amount <= 0) {
         return Response.json({ error: "Yetkazib beruvchi, Budget hisobi va musbat summa majburiy." }, { status: 400 });
       }
 

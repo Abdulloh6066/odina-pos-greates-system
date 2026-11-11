@@ -35,19 +35,19 @@ const ACCOUNTS = [
   { id: "bank", label: "Bank", icon: Landmark, tone: "bg-secondary text-brand-ink" },
 ];
 
-// Budget ko‘rinishida HUMO va UZCARD bitta «Bank card» hisobi sifatida chiqadi.
-const BANK_CARD_ACCOUNTS = ["uzcard", "humo"];
+// Oldingi hisoblar/tarix saqlanadi; yangi amallar yagona Bank hamyonidan ishlaydi.
+const BANK_ACCOUNTS = ["bank", "uzcard", "humo"];
 const DISPLAY_ACCOUNTS = [
   { id: "cash", label: "Naqd pul", icon: Banknote, tone: "bg-secondary text-brand-ink", accounts: ["cash"] },
-  { id: "bank_card", label: "Bank card", icon: CreditCard, tone: "bg-secondary text-brand-ink", accounts: BANK_CARD_ACCOUNTS },
+  { id: "bank_all", label: "Bank", icon: Landmark, tone: "bg-secondary text-brand-ink", accounts: BANK_ACCOUNTS },
   { id: "online", label: "Online", icon: Smartphone, tone: "bg-secondary text-brand-ink", accounts: ["online"] },
-  { id: "bank", label: "Bank", icon: Landmark, tone: "bg-secondary text-brand-ink", accounts: ["bank"] },
 ];
 
 const accountLabel = (id) => {
-  if (BANK_CARD_ACCOUNTS.includes(id)) return "Bank card";
+  if (BANK_ACCOUNTS.includes(id)) return "Bank";
   return ACCOUNTS.find((item) => item.id === id)?.label || id;
 };
+const physicalBalanceLabel = { bank: "Bank (alohida hisob)", uzcard: "Uzcard qoldig‘i", humo: "Humo qoldig‘i" };
 
 const TYPE_LABELS = {
   shift_deposit: "Smena topshirig‘i",
@@ -188,6 +188,7 @@ export default function Budget() {
           <p className="font-semibold text-sm">Faqat egasi ko‘radi</p>
           <p className="text-xs text-muted-foreground mt-1">
             Smena yopilganda topshirilgan naqd pul va elektron tushumlar avtomatik qo‘shiladi.
+            Humo, Uzcard va bank o‘tkazmalari bitta Bank hisobiga jamlanadi.
             Eski mablag‘ni boshlang‘ich kirim sifatida bir marta kiritish mumkin.
             {scopedShopId && ' Budget qoldiqlari barcha do‘konlar uchun umumiy. Faqat quyidagi tarix tanlangan do‘kon bo‘yicha ko‘rsatiladi.'}
           </p>
@@ -312,9 +313,11 @@ export default function Budget() {
                       {transaction.performed_by_name || "Noma’lum"} · {formatUzbekistanDateTime(transaction.created_at || transaction.created_date)}
                       {transaction.shop_name ? ` · ${transaction.shop_name}` : ""}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Qoldiq: {formatUZS(transaction.balance_before)} → {formatUZS(transaction.balance_after)}
-                    </p>
+                    {transaction.balance_before != null && transaction.balance_after != null && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {physicalBalanceLabel[transaction.account] || "Qoldiq"}: {formatUZS(transaction.balance_before)} → {formatUZS(transaction.balance_after)}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -357,7 +360,8 @@ function AdjustmentDialog({ actorId, open, balances, categories = [], onClose, o
     requestRef.current = saved;
     setRetryPending(Boolean(saved));
     setDirection(saved?.direction || "in");
-    setAccount(saved && BANK_CARD_ACCOUNTS.includes(saved.account) ? "bank_card" : saved?.account || "cash");
+    // The frozen requestRef retains its original account/key on a legacy retry.
+    setAccount(saved && [...BANK_ACCOUNTS, "bank_card"].includes(saved.account) ? "bank_all" : saved?.account || "cash");
     setAmount(saved ? String(saved.amount) : "");
     setDescription(saved?.description || "");
     setCategoryId(saved?.expense_category_id || "");
@@ -365,7 +369,7 @@ function AdjustmentDialog({ actorId, open, balances, categories = [], onClose, o
   }, [open, requestScope]);
 
   const value = Math.round(Number(amount) || 0);
-  // «Bank card» bitta hamyon: UZCARD va HUMO qoldiqlari birga hisoblanadi.
+  // Server ham aynan shu Bank qoldig‘idan tekshirib yechadi.
   const available = (DISPLAY_ACCOUNTS.find((item) => item.id === account)?.accounts || [account])
     .reduce((sum, key) => sum + Number(balances[key] || 0), 0);
   const invalidWithdrawal = direction === "out" && value > available;

@@ -19,9 +19,12 @@ const DialogTitle = /** @type {React.ComponentType<React.ComponentPropsWithRef<t
 const DialogDescription = /** @type {React.ComponentType<React.ComponentPropsWithRef<typeof import('@radix-ui/react-dialog').Description>>} */ (SharedDialogDescription);
 const OdinaSelect = /** @type {React.ComponentType<React.SelectHTMLAttributes<HTMLSelectElement> & { contentClassName?: string; placeholder?: string }>} */ (SharedOdinaSelect);
 const ACCOUNTS = [
-  { id: 'cash', label: 'Naqd pul' }, { id: 'uzcard', label: 'Bank card' }, { id: 'humo', label: 'Humo' },
-  { id: 'online', label: 'Online' }, { id: 'bank', label: 'Bank' },
+  { id: 'cash', label: 'Naqd pul' }, { id: 'bank_all', label: 'Bank' }, { id: 'online', label: 'Online' },
 ];
+const BANK_ACCOUNTS = ['bank', 'uzcard', 'humo'];
+const paymentAccount = account => ['cash', 'online', 'bank_all', ...BANK_ACCOUNTS].includes(account);
+const accountBalance = (balances, account) => (account === 'bank_all' ? BANK_ACCOUNTS : [account])
+  .reduce((sum, key) => sum + Number(balances?.[key] || 0), 0);
 const requestScope = (user, debt) => orderRequestScope(user?.id, 'pay_opening_debt', debt?.id);
 export const hasPendingOpeningDebtPayment = (user, debt) => user?.role === 'admin' && Boolean(user?.id && debt?.id && readOrderRequest(requestScope(user, debt)));
 const errorText = error => error?.response?.data?.error || error?.data?.error || error?.message || 'To‘lov natijasi tasdiqlanmadi.';
@@ -80,13 +83,16 @@ export default function OpeningDebtPaymentDialog({ debt, user, allowed, onClose,
 
   const value = Number(amount);
   const remaining = Number(debt?.remaining_debt);
-  const available = Number(balances?.[account] || 0);
+  const available = accountBalance(balances, account);
   const validAmount = /^\d+$/.test(String(amount)) && Number.isSafeInteger(value) && value > 0;
   const valid = validAmount && value <= remaining && balances !== null && value <= available
     && ACCOUNTS.some(item => item.id === account) && ['unpaid', 'partial'].includes(debt?.status);
   const validPin = /^\d{4,8}$/.test(ownerPin);
   const locked = reviewing || saving || Boolean(pending);
-  const accountLabel = ACCOUNTS.find(item => item.id === account)?.label || account;
+  // An older pending intent must keep its exact physical account and key.
+  const accountOptions = pending && !ACCOUNTS.some(item => item.id === pending.account)
+    ? [...ACCOUNTS, { id: pending.account, label: BANK_ACCOUNTS.includes(pending.account) ? 'Bank' : pending.account }] : ACCOUNTS;
+  const accountLabel = accountOptions.find(item => item.id === account)?.label || account;
   const close = () => { if (!flight.current) { setOwnerPin(''); onClose(); } };
 
   const submit = async () => {
@@ -103,7 +109,7 @@ export default function OpeningDebtPaymentDialog({ debt, user, allowed, onClose,
       });
       pendingRef.current = payload; setPending(payload);
       if (payload.action !== 'pay_supplier' || payload.opening_debt_id !== debt.id || payload.supplier_id !== debt.supplier_id
-        || (!hadPending && (payload.location_id || '') !== (debt.location_id || '')) || !ACCOUNTS.some(item => item.id === payload.account)) {
+        || (!hadPending && (payload.location_id || '') !== (debt.location_id || '')) || !paymentAccount(payload.account)) {
         throw new Error('Saqlangan to‘lov ushbu qarz yoki omborga mos emas. Yangi to‘lov yuborilmadi.');
       }
       if (!hadPending && (payload.amount !== value || payload.account !== account || payload.notes !== notes.trim())) {
@@ -146,7 +152,7 @@ export default function OpeningDebtPaymentDialog({ debt, user, allowed, onClose,
       {balanceError && <div className="space-y-2"><p role="alert" className="text-sm text-destructive">Budget yuklanmadi: {balanceError}</p><Button type="button" variant="outline" disabled={saving} onClick={() => setBalanceRefresh(value => value + 1)} className="min-h-11">Budgetni qayta yuklash</Button></div>}
       <fieldset disabled={locked} className="space-y-4">
         <div><Label htmlFor="opening-payment-account">Budget hisobi</Label><OdinaSelect id="opening-payment-account" value={account} disabled={locked} onChange={event => !locked && setAccount(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
-          {ACCOUNTS.map(item => <option key={item.id} value={item.id}>{item.label}{balances !== null ? ` · ${formatUZS(balances[item.id] || 0)}` : ''}</option>)}
+          {accountOptions.map(item => <option key={item.id} value={item.id}>{item.label}{balances !== null ? ` · ${formatUZS(accountBalance(balances, item.id))}` : ''}</option>)}
         </OdinaSelect></div>
         <div><Label htmlFor="opening-payment-amount">To‘lov summasi (UZS)</Label><Input data-money id="opening-payment-amount" inputMode="numeric" value={amount} disabled={locked} onChange={event => !locked && setAmount(event.target.value)} placeholder="Butun musbat summa" className="mt-1 min-h-11" />
           {!pending && validAmount && value > remaining && <p className="mt-1 text-sm text-destructive">Summa qolgan qarzdan oshmasligi kerak.</p>}
