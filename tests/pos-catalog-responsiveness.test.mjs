@@ -154,15 +154,16 @@ test('category and search changes stay inside the catalogue, retain product refe
   try {
     const cartCount = f.cartRenders, reads = f.reads.length;
     const cake = f.gridProps.products.find(product => product.id === 'cake');
-    const cakeRenders = f.cardRenders.get('cake');
     await act(async () => button(f.tree, 'Tortlar').props.onClick());
     assert.equal(f.cartRenders, cartCount, 'switching a category must not render the cart again');
     assert.strictEqual(f.gridProps.products.find(product => product.id === 'cake'), cake);
-    assert.equal(f.cardRenders.get('cake'), cakeRenders, 'a retained unchanged product card stays memoized');
-    await act(async () => f.tree.root.findByProps({ 'aria-label': 'Mahsulotlarni qidirish' }).props.onChange({ target: { value: 'Cake' } }));
+    assert.deepEqual(structuredClone(f.gridProps.products.map(product => product.id)), ['branch-only', 'cake']);
+    const retainedRenders = f.cardRenders.get('branch-only');
+    await act(async () => f.tree.root.findByProps({ 'aria-label': 'Mahsulotlarni qidirish' }).props.onChange({ target: { value: 'Branch cake' } }));
     assert.equal(f.cartRenders, cartCount, 'search must not render the cart again');
     assert.equal(f.reads.length, reads);
-    assert.deepEqual(structuredClone(f.gridProps.products.map(product => product.id)), ['branch-only', 'cake']);
+    assert.equal(f.cardRenders.get('branch-only'), retainedRenders, 'a retained unchanged product card stays memoized');
+    assert.deepEqual(structuredClone(f.gridProps.products.map(product => product.id)), ['branch-only']);
   } finally { await f.close(); }
 });
 
@@ -240,26 +241,39 @@ test('image warmup receives only the viewed shop catalogue and sits immediately 
   } finally { await f.close(); }
 });
 
-test('opening Pishiriqlar requests all 27 photos before a product is selected', async () => {
-  const pastries = Array.from({ length: 27 }, (_, index) => {
-    const source = `/images/pastry-${index}.png`;
-    return { id: `pastry-${index}`, name: `Pastry ${index}`, category_id: 'pastry', active: true, price: 5000,
-      image_url: source, ...(index < 24 ? { pos_thumbnail_url: `/images/pastry-${index}.webp`, pos_thumbnail_source: source } : {}) };
-  });
-  const f = await fixture({ extraProducts: pastries, extraCategories: [{ id: 'pastry', name: 'Pishiriqlar', active: true }] });
+test('opening any product category requests its photos before a product is selected', async () => {
+  const groups = [
+    { id: 'pastry', name: 'Pishiriqlar', count: 27 },
+    { id: 'cakes', name: 'Tortlar', count: 95 },
+    { id: 'salads', name: 'Salatlar', count: 12 },
+  ];
+  const extraProducts = groups.flatMap(({ id, count }) => Array.from({ length: count }, (_, index) => {
+    const productId = `${id}-${index}`;
+    const source = `/images/${productId}.png`;
+    return { id: productId, name: `Photo ${productId}`, category_id: id, active: true, price: 5000,
+      is_favorite: id === 'pastry', image_url: source,
+      ...(index < count - 3 ? { pos_thumbnail_url: `/images/${productId}.webp`, pos_thumbnail_source: source } : {}) };
+  }));
+  const extraCategories = groups.filter(({ id }) => id !== 'cakes').map(({ id, name }) => ({ id, name, active: true }));
+  const f = await fixture({ extraProducts, extraCategories });
   try {
-    const photos = () => f.tree.root.findAllByType('img').filter(({ props }) => props.alt?.startsWith('Pastry '));
+    const photos = () => f.tree.root.findAllByType('img').filter(({ props }) => props.alt?.startsWith('Photo '));
     const cartRenders = f.cartRenders;
     assert.ok(photos().some(({ props }) => props.loading === 'lazy'));
-    await act(async () => button(f.tree, 'Pishiriqlar').props.onClick());
-    assert.equal(photos().length, 27);
-    assert.ok(photos().every(({ props }) => props.loading === 'eager'));
-    assert.equal(photos().filter(({ props }) => props.decoding === 'sync' && props.src.endsWith('.webp')).length, 24);
-    assert.equal(photos().filter(({ props }) => props.decoding === 'async' && props.src.endsWith('.png')).length, 3);
+    for (const { name, count } of groups) {
+      await act(async () => button(f.tree, name).props.onClick());
+      const categoryPhotos = photos();
+      assert.equal(categoryPhotos.length, count);
+      assert.ok(categoryPhotos.every(({ props }) => props.loading === 'eager'), `${name} should request every photo on selection`);
+      assert.equal(categoryPhotos.filter(({ props }) => props.decoding === 'sync' && props.src.endsWith('.webp')).length, count - 3);
+      assert.equal(categoryPhotos.filter(({ props }) => props.decoding === 'async' && props.src.endsWith('.png')).length, 3);
+    }
     assert.equal(f.cartRenders, cartRenders);
     assert.equal(f.tree.root.findByType('cart-view').props.cart.length, 0);
-    await act(async () => button(f.tree, 'Barchasi').props.onClick());
-    assert.ok(photos().some(({ props }) => props.loading === 'lazy'));
-    assert.ok(photos().every(({ props }) => props.decoding === 'async'));
+    for (const filter of ['Sevimlilar', 'Barchasi']) {
+      await act(async () => button(f.tree, filter).props.onClick());
+      assert.ok(photos().some(({ props }) => props.loading === 'lazy'));
+      assert.ok(photos().every(({ props }) => props.decoding === 'async'));
+    }
   } finally { await f.close(); }
 });
