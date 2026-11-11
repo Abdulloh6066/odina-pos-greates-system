@@ -41,7 +41,8 @@ export function preloadPosThumbnails(products) {
     index += 1;
     const image = new window.Image();
     image.decoding = 'async';
-    image.loading = 'lazy';
+    // Detached images need eager loading to start the background request.
+    image.loading = 'eager';
     try {
       image.fetchPriority = 'low';
     } catch {
