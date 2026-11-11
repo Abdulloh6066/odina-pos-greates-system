@@ -101,8 +101,6 @@
     "direction",
     "account",
     "amount",
-    "balance_before",
-    "balance_after",
     "performed_by_id",
     "created_at"
   ],
