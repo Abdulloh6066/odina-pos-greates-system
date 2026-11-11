@@ -17,8 +17,7 @@ const PosCatalog = forwardRef(function PosCatalog({ products, categories, visibl
     [pricedProducts, categories, shopId, productOrder]);
   const filtered = useMemo(() => selectPosProducts(catalog, { activeCat, showFav, search }),
     [catalog, activeCat, showFav, search]);
-  const eagerImages = !showFav && activeCat !== 'all' && visibleCategories.some(category =>
-    category.id === activeCat && category.name?.trim().toLowerCase() === 'pishiriqlar');
+  const eagerImages = !showFav && activeCat !== 'all';
 
   useEffect(() => {
     if (activeCat !== 'all' && categories.length && !visibleCategories.some(category => category.id === activeCat)) setActiveCat('all');
