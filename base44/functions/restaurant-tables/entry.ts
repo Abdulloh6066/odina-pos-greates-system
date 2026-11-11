@@ -2,7 +2,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
 import { allocateServiceTicketNumber } from "../../shared/shift-close-helpers.ts";
 import { validateFriesOption, friesSurcharge, burgerOptionName } from "../../shared/burger-fries.js";
-import { saleLineKey, saleOptionFields } from "../../shared/sale-options.js";
+import { saleLineKey, saleOptionFields, canChooseCakeExtra, validateCakeExtra, cakeExtraSurcharge } from "../../shared/sale-options.js";
 import { validateTeaOption, teaServingPrice, teaOptionName } from "../../shared/tea-options.js";
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
@@ -465,6 +465,7 @@ Deno.serve(async (req) => {
         const quantity = row?.quantity;
         const option = validateFriesOption(row, shop.id);
         const teaOption = validateTeaOption(row);
+        const cakeExtra = validateCakeExtra(row);
         const key = saleLineKey(row);
         if (!productId || seen.has(key) || !Number.isInteger(quantity) || quantity < 1 || quantity > 1000000) {
           return Response.json({ error: "Takroriy mahsulot yoki dona soni noto‘g‘ri." }, { status: 400 });
@@ -478,7 +479,11 @@ Deno.serve(async (req) => {
         if (!previous && product?.available_shop_ids?.length && !product.available_shop_ids.includes(shop.id)) {
           return Response.json({ error: "Bu mahsulot ushbu do‘konda sotilmaydi." }, { status: 403 });
         }
-        const price = previous ? previous.price : teaServingPrice(product?.shop_prices?.[shop.id] ?? product.price, teaOption) + friesSurcharge(row);
+        if (!previous && cakeExtra && !canChooseCakeExtra(product, shop.id)) {
+          return Response.json({ error: "Tort qo‘shimchasi faqat dona bilan sotiladigan tortga qo‘shiladi." }, { status: 400 });
+        }
+        const price = previous ? previous.price : teaServingPrice(product?.shop_prices?.[shop.id] ?? product.price, teaOption)
+          + friesSurcharge(row) + cakeExtraSurcharge(row);
         if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(price * quantity)) {
           return Response.json({ error: "Mahsulot narxi yoki miqdori noto‘g‘ri." }, { status: 400 });
         }

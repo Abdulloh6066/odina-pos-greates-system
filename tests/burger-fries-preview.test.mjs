@@ -5,13 +5,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as helpers from '../src/lib/burger-fries.js';
 import * as teaHelpers from '../src/lib/tea-options.js';
+import * as saleOptions from '../src/lib/sale-options.js';
 
 const source = readFileSync('src/pages/POS.jsx', 'utf8');
 const callbacks = source.slice(source.indexOf('  const addToCart = useStableEvent((product) => {'),
   source.indexOf('  useEffect(() => { setTeaProduct(null);'));
 const [classicId, miniId] = helpers.BURGER_PRODUCT_IDS;
 function harness(shift = null) {
-  const ctx = { ...helpers, ...teaHelpers, catalogShopId: shift?.shop_id, shift, user: { role: 'admin' }, cart: [], burgerProduct: null, teaProduct: null,
+  const ctx = { ...helpers, ...teaHelpers, ...saleOptions, catalogShopId: shift?.shop_id, shift, user: { role: 'admin' }, cart: [], burgerProduct: null, teaProduct: null,
     setTeaProduct: value => { ctx.teaProduct = value; },
     useStableEvent: callback => callback,
     tableLocked: false, paying: false, payOpen: false, stockChecking: false,

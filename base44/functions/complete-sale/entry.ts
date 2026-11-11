@@ -41,7 +41,7 @@ import { loadIngredientCosts, recipeCostFromMap, costPerPiece, num } from "../..
 import { createCheckoutRecipeLoader, type CheckoutRecipeLoader } from "../../shared/checkout-recipes.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
 import { validateFriesOption, friesSurcharge, burgerOptionName, costWithBurgerFries, FRIES_INGREDIENT_ID } from "../../shared/burger-fries.js";
-import { saleLineKey, saleOptionFields } from "../../shared/sale-options.js";
+import { saleLineKey, saleOptionFields, canChooseCakeExtra, validateCakeExtra, cakeExtraSurcharge } from "../../shared/sale-options.js";
 import { validateTeaOption, teaServingPrice, teaOptionName } from "../../shared/tea-options.js";
 import {
   prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
@@ -155,13 +155,15 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     const productId = String(requested?.product_id || "");
     const option = validateFriesOption(requested, shopId);
     const teaOption = validateTeaOption(requested);
+    const cakeExtra = validateCakeExtra(requested);
     if (!productId || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) {
       throw httpError("Har bir mahsulotda to‘g‘ri dona soni bo‘lishi kerak.", 400);
     }
     const key = saleLineKey(requested);
     const combined = (requestedLines.get(key)?.quantity || 0) + quantity;
     if (!Number.isSafeInteger(combined) || combined > 1000000) throw httpError("Mahsulot miqdori chegaradan oshdi.", 400);
-    requestedLines.set(key, { product_id: productId, quantity: combined, ...saleOptionFields({ fries_option: option, tea_option: teaOption }) });
+    requestedLines.set(key, { product_id: productId, quantity: combined,
+      ...saleOptionFields({ fries_option: option, tea_option: teaOption, cake_extra: cakeExtra }) });
   }
   const entries = [...requestedLines.values()];
   const savedItems = entries.map((row) =>
@@ -181,8 +183,12 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     if (!savedItem && product.available_shop_ids?.length && !product.available_shop_ids.includes(shopId)) {
       throw httpError("Bu mahsulot ushbu do‘konda sotilmaydi.", 403);
     }
+    if (!savedItem && row.cake_extra && !canChooseCakeExtra(product, shopId)) {
+      throw httpError("Tort qo‘shimchasi faqat dona bilan sotiladigan tortga qo‘shiladi.", 400);
+    }
     if (!savedItem) productsAtSale?.set(productId, product);
-    const unitPrice = savedItem ? savedItem.price : teaServingPrice(money(priceForShop(product, shopId)), row.tea_option) + friesSurcharge(row);
+    const unitPrice = savedItem ? savedItem.price : teaServingPrice(money(priceForShop(product, shopId)), row.tea_option)
+      + friesSurcharge(row) + cakeExtraSurcharge(row);
     if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(unitPrice * quantity)) {
       throw httpError("Stol buyurtmasining narxi noto‘g‘ri.", 409);
     }
@@ -356,13 +362,15 @@ function saleNumberFor(idempotencyKey: string, soldAt: string) {
 function canonicalSaleRequest(body: any) {
   const quantities = new Map<string, any>();
   for (const item of Array.isArray(body?.items) ? body.items : []) {
+    const cakeExtra = validateCakeExtra(item);
     const productId = String(item?.product_id || "");
     const key = saleLineKey(item);
     const quantity = Math.floor(Number(item?.quantity));
     quantities.set(key, { product_id: productId,
       quantity: (quantities.get(key)?.quantity || 0) + quantity,
       ...(item?.fries_option === "with" ? { fries_option: "with" } : {}),
-      ...(item?.tea_option === "cup" ? { tea_option: "cup" } : {}) });
+      ...(item?.tea_option === "cup" ? { tea_option: "cup" } : {}),
+      ...(cakeExtra ? { cake_extra: true } : {}) });
   }
   const items = Array.from(quantities.values())
     .sort((left, right) => saleLineKey(left).localeCompare(saleLineKey(right)));

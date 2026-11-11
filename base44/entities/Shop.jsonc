@@ -245,6 +245,10 @@
                   ],
                   "description": "Burger fri tanlovi; eski savdolarda bo‘sh qoladi"
                 },
+                "cake_extra": {
+                  "type": "boolean",
+                  "description": "Tort narxiga bir dona uchun 5 000 UZS qo‘shilgan."
+                },
                 "tea_option": {
                   "type": "string",
                   "enum": [
