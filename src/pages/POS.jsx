@@ -11,7 +11,7 @@ import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift, openPosShift, invokePosRead } from '@/lib/current-pos-shift';
 import { canPreviewBurgerFries, repriceBurgerCartForShop, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
-import { saleLineKey, saleOptionFields } from '@/lib/sale-options';
+import { saleLineKey, saleOptionFields, canChooseCakeExtra, cakeExtraSurcharge, cakeExtraName, CAKE_EXTRA_AMOUNT, repriceCakeCartForShop } from '@/lib/sale-options';
 import { canChooseTeaServing, teaServingPrice, teaOptionName, repriceTeaCartForShop } from '@/lib/tea-options';
 import { catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
@@ -94,6 +94,7 @@ export default function POS() {
   const [keyboardProductId, setKeyboardProductId] = useState(null);
   const [weightProduct, setWeightProduct] = useState(null);
   const [burgerProduct, setBurgerProduct] = useState(null);
+  const [cakeExtraProduct, setCakeExtraProduct] = useState(null);
   const [teaProduct, setTeaProduct] = useState(null);
   const [grams, setGrams] = useState('');
   const [shops, setShops] = useState([]);
@@ -955,6 +956,10 @@ export default function POS() {
       setTeaProduct({ ...product, shopId: catalogShopId });
       return;
     }
+    if (canChooseCakeExtra(product, catalogShopId)) {
+      setCakeExtraProduct({ ...product, shopId: catalogShopId });
+      return;
+    }
     setKeyboardProductId(product.id);
     if (product.sale_unit === 'gram') { openWeight(product); return; }
     setCart((prev) => {
@@ -983,6 +988,22 @@ export default function POS() {
     });
     setBurgerProduct(null);
   };
+  const saveCakeExtraChoice = (extra) => {
+    if (!cakeExtraProduct || typeof extra !== 'boolean' || tableLocked || paying || payOpen || stockChecking
+      || cakeExtraProduct.shopId !== catalogShopId) return;
+    const product = cakeExtraProduct;
+    const choice = extra ? { cake_extra: true } : {};
+    const price = Number(product.price) + cakeExtraSurcharge(choice);
+    const row = { product_id: product.id, product_name: cakeExtraName(product.name, choice),
+      image_url: product.image_url, price, subtotal: price, sale_unit: 'piece', quantity: 1, ...choice };
+    const key = saleLineKey(row);
+    setKeyboardProductId(key);
+    setCart((previous) => previous.some(item => saleLineKey(item) === key)
+      ? previous.map(item => saleLineKey(item) === key
+        ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.price } : item)
+      : [...previous, row]);
+    setCakeExtraProduct(null);
+  };
   const saveTeaChoice = (option) => {
     if (!teaProduct || !['cup', 'pot'].includes(option) || tableLocked || paying || payOpen || stockChecking
       || teaProduct.shopId !== catalogShopId) return;
@@ -1000,12 +1021,14 @@ export default function POS() {
     setTeaProduct(null);
   };
   useEffect(() => { setTeaProduct(null); }, [tableKey, catalogShopId]);
+  useEffect(() => { setCakeExtraProduct(null); }, [tableKey, catalogShopId]);
   useEffect(() => { setBurgerProduct(null); }, [tableKey, shift?.shop_id, user?.shop_id]);
   // Pre-shift preview uses catalogue prices; apply Branch prices when its shift opens.
   // Server-saved unpaid orders keep their original immutable price snapshots.
   useEffect(() => {
     if (!shift?.shop_id || selectedTable || takeawayOrder) return;
-    setCart((rows) => repriceTeaCartForShop(repriceBurgerCartForShop(rows, products, shift.shop_id), products, shift.shop_id));
+    setCart((rows) => repriceCakeCartForShop(
+      repriceTeaCartForShop(repriceBurgerCartForShop(rows, products, shift.shop_id), products, shift.shop_id), products, shift.shop_id));
   }, [shift?.shop_id, products, tableKey, takeawayOrder]);
 
   useEffect(() => {
@@ -2295,6 +2318,25 @@ export default function POS() {
         activeShopId={shopScope ? scopedShopId : shift?.shop_id || user?.shop_id}
         onSelect={(shopId, number, payDirect) => { void selectTableFromPicker(shopId, number, payDirect); }}
       />
+      <Dialog open={Boolean(cakeExtraProduct)} onOpenChange={(open) => !open && setCakeExtraProduct(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{cakeExtraProduct?.name}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Qo‘shimcha kerakmi?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" variant="outline" className="h-auto min-h-16 flex-col gap-1 whitespace-normal"
+              disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveCakeExtraChoice(false)}>
+              <span className="font-semibold">Qo‘shimchasiz</span><span>{formatUZS(cakeExtraProduct?.price || 0)}</span>
+            </Button>
+            <Button type="button" className="h-auto min-h-16 flex-col gap-1 whitespace-normal"
+              disabled={tableLocked || paying || payOpen || stockChecking} onClick={() => saveCakeExtraChoice(true)}>
+              <span className="font-semibold">+{formatUZS(CAKE_EXTRA_AMOUNT)}</span>
+              <span>{formatUZS(Number(cakeExtraProduct?.price || 0) + CAKE_EXTRA_AMOUNT)}</span>
+            </Button>
+          </div>
+          <Button type="button" variant="ghost" onClick={() => setCakeExtraProduct(null)}>Bekor qilish</Button>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(burgerProduct)} onOpenChange={(open) => !open && setBurgerProduct(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>{burgerProduct?.name}</DialogTitle></DialogHeader>
