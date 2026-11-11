@@ -15,7 +15,6 @@ export function validateCakeExtra(row) {
 }
 
 export const cakeExtraSurcharge = row => row?.cake_extra === true ? CAKE_EXTRA_AMOUNT : 0;
-export const cakeExtraName = (name, row) => row?.cake_extra === true ? name + ' — Qo‘shimcha bilan' : name;
 
 export const saleLineKey = (row) =>
   String(row?.product_id || '')

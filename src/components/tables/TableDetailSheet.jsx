@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { formatUZS } from '@/lib/pos';
+import { saleLineKey } from '@/lib/sale-options';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -186,7 +187,7 @@ export default function TableDetailSheet({
                   </div>
                 ) : (
                   items.map((item, idx) => (
-                    <div key={item.product_id || idx} className="p-3 flex items-center justify-between gap-3 text-sm">
+                    <div key={saleLineKey(item) || idx} className="p-3 flex items-center justify-between gap-3 text-sm">
                       <div className="min-w-0">
                         <div className="font-semibold text-foreground truncate">{item.product_name}</div>
                         <div className="text-xs text-muted-foreground">

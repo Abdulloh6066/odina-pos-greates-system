@@ -2,7 +2,7 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 import { resolveStoredAppUser, userRole, userShopId, userLabel } from "../../shared/user-helpers.ts";
 import { allocateServiceTicketNumber } from "../../shared/shift-close-helpers.ts";
 import { validateFriesOption, friesSurcharge, burgerOptionName } from "../../shared/burger-fries.js";
-import { saleLineKey, saleOptionFields, canChooseCakeExtra, validateCakeExtra, cakeExtraSurcharge, cakeExtraName } from "../../shared/sale-options.js";
+import { saleLineKey, saleOptionFields, canChooseCakeExtra, validateCakeExtra, cakeExtraSurcharge } from "../../shared/sale-options.js";
 import { validateTeaOption, teaServingPrice, teaOptionName } from "../../shared/tea-options.js";
 
 // Shop-specific floor plans and server-persisted unpaid table orders.
@@ -490,7 +490,7 @@ Deno.serve(async (req) => {
         const saleUnit = (previous || product).sale_unit === "gram" ? "gram" : "piece";
         if (saleUnit !== "gram" && quantity > 1000) return Response.json({ error: "Dona soni chegaradan oshdi." }, { status: 400 });
         items.push({ product_id: productId,
-          product_name: previous?.product_name || cakeExtraName(teaOptionName(burgerOptionName(String(product.name || "Mahsulot"), option), teaOption), row),
+          product_name: previous?.product_name || teaOptionName(burgerOptionName(String(product.name || "Mahsulot"), option), teaOption),
           ...saleOptionFields(previous || row),
           image_url: previous?.image_url || String(product.image_url || ""),
           price, quantity, sale_unit: saleUnit, subtotal: Math.round(price * quantity / (saleUnit === "gram" ? 1000 : 1)),

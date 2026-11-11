@@ -41,7 +41,7 @@ import { loadIngredientCosts, recipeCostFromMap, costPerPiece, num } from "../..
 import { createCheckoutRecipeLoader, type CheckoutRecipeLoader } from "../../shared/checkout-recipes.ts";
 import { priceForShop } from "../../shared/shop-pricing.ts";
 import { validateFriesOption, friesSurcharge, burgerOptionName, costWithBurgerFries, FRIES_INGREDIENT_ID } from "../../shared/burger-fries.js";
-import { saleLineKey, saleOptionFields, canChooseCakeExtra, validateCakeExtra, cakeExtraSurcharge, cakeExtraName } from "../../shared/sale-options.js";
+import { saleLineKey, saleOptionFields, canChooseCakeExtra, validateCakeExtra, cakeExtraSurcharge } from "../../shared/sale-options.js";
 import { validateTeaOption, teaServingPrice, teaOptionName } from "../../shared/tea-options.js";
 import {
   prepareSaleIngredientDeduction, applySaleIngredientDeduction, restoreSaleIngredientsOnRefund,
@@ -196,7 +196,7 @@ async function normalizeSaleItems(service: any, requestedItems: any[], shopId: s
     const tracked = saleUnit !== "gram" && (product.stock_tracked !== undefined ? product.stock_tracked : product.track_stock !== false);
     normalizedItems.push({
       product_id: product.id || product.product_id,
-      product_name: savedItem ? savedItem.product_name : cakeExtraName(teaOptionName(burgerOptionName(product.name, row.fries_option), row.tea_option), row),
+      product_name: savedItem ? savedItem.product_name : teaOptionName(burgerOptionName(product.name, row.fries_option), row.tea_option),
       ...saleOptionFields(savedItem || row),
       image_url: product.image_url || "",
       price: unitPrice,

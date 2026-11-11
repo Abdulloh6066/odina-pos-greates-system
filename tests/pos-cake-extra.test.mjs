@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import { memoryBackend } from './helpers/memory-backend.mjs';
 import { buildPendingSale } from '../src/lib/offline-sales.js';
@@ -23,7 +24,7 @@ function fixture() {
       restaurant_table_count: 5, restaurant_table_orders: [], restaurant_table_orders_version: 0 }],
     Product: [{ id: cake, name: 'Offline Tort', category_id: category, sale_unit: 'piece',
       price: 120000, active: true, source_type: 'central_produced', track_stock: true }],
-    ProductStock: [{ id: 'cake-stock', location_id: shop, product_id: cake, quantity: 10 }],
+    ProductStock: [{ id: 'cake-stock', location_id: shop, product_id: cake, product_name: 'Offline Tort', quantity: 10 }],
     Recipe: [{ id: 'recipe', product_id: cake, active: true, version: 1, output_quantity: 1, output_unit: 'piece' }],
     RecipeItem: [{ id: 'ingredient-row', recipe_id: 'recipe', product_id: cake, ingredient_id: 'ingredient', quantity: 1, unit: 'piece' }],
     SupplierReceipt: [{ id: 'receipt', status: 'completed' }],
@@ -149,4 +150,45 @@ test('the current shop price is authoritative for a cake with the fixed extra', 
   assert.equal(result.status, 200, JSON.stringify(result.data));
   assert.equal(f.db.SaleItem[0].unit_price, 135000);
   assert.equal(f.db.Product[0].price, 120000); assert.equal(f.db.Product[0].shop_prices[shop], 130000);
+});
+
+test('cake sale and refund keep canonical product labels and restore exactly one unit', async () => {
+  const f = fixture(); const pin = '2468'; const salt = 'offline-only';
+  const key = await webcrypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await webcrypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: 100000 }, key, 256);
+  f.db.SecuritySettings = [{ id: 'pin', key: 'owner_approval_pin', pin_salt: salt,
+    pin_hash: Buffer.from(bits).toString('hex'), pin_algorithm: 'PBKDF2-SHA256', pin_iterations: 100000 }];
+  const completed = await f.invoke(endpoint, request([line(true)], 125000));
+  assert.equal(completed.status, 200, JSON.stringify(completed.data));
+  assert.equal(f.db.ProductStock[0].product_name, 'Offline Tort');
+  assert.equal(f.db.ProductStock[0].quantity, 9);
+  const snapshot = structuredClone(f.db.SaleItem[0]);
+  assert.equal(snapshot.product_name_snapshot, 'Offline Tort');
+  assert.equal(snapshot.unit_price, 125000); assert.equal(snapshot.cake_extra, true);
+  const refund = await f.invoke(endpoint, { action: 'refund_sale', sale_id: f.db.Sale[0].id, owner_pin: pin, reason: 'Offline return' });
+  assert.equal(refund.status, 200, JSON.stringify(refund.data));
+  assert.equal(f.db.ProductStock[0].product_name, 'Offline Tort'); assert.equal(f.db.ProductStock[0].quantity, 10);
+  assert.equal(f.db.Shift[0].expected_cash, 0);
+  assert.deepEqual(f.db.SaleItem[0], snapshot);
+  assert.deepEqual(f.db.StockMovement.filter(row => row.item_id === cake).map(row => row.item_name), ['Offline Tort', 'Offline Tort']);
+});
+
+test('offline checkout compares plain and extra cake quantities with one stock balance', async () => {
+  const source = readFileSync(new URL('../src/pages/POS.jsx', import.meta.url), 'utf8');
+  const warning = source.slice(source.indexOf('  const confirmStockWarnings = async'), source.indexOf('  const openPayment = (offline)'));
+  const checkout = source.slice(source.indexOf('  const openOfflinePayment = async'), source.indexOf('  const openCheckout = async'));
+  const alerts = [], opened = [];
+  const ctx = { selectedTable: null, takeawayOrder: null, takeawayRequestIdRef: { current: '' }, discountCode: '', roundingTarget: null,
+    cart: [{ ...line(false), product_name: 'Offline Tort' }, { ...line(true), product_name: 'Offline Tort' }],
+    productsById: { [cake]: { name: 'Offline Tort', track_stock: true } }, stockByProduct: { [cake]: 1 },
+    settings: { allow_negative_stock: false }, SHOW_NEGATIVE_STOCK_CONFIRMATION: false,
+    odinaAlert: async (_message, options) => { alerts.push(options); }, openPayment: value => opened.push(value),
+  };
+  vm.runInNewContext(warning + checkout + '\nglobalThis.checkout = openOfflinePayment;', ctx);
+  assert.equal(await ctx.checkout(), false); assert.deepEqual(opened, []);
+  assert.match(alerts[0].details, /2 ta kerak, 1 ta mavjud/);
+  ctx.stockByProduct[cake] = 2;
+  assert.equal(await ctx.checkout(), true); assert.deepEqual(opened, [true]);
+  ctx.stockByProduct[cake] = 1; ctx.settings.allow_negative_stock = true;
+  assert.equal(await ctx.checkout(), true); assert.deepEqual(opened, [true, true]);
 });

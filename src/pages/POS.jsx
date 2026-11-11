@@ -11,7 +11,7 @@ import { toast } from '@/components/ui/use-toast';
 import { formatUZS } from '@/lib/pos';
 import { fetchCurrentPosShift, openPosShift, invokePosRead } from '@/lib/current-pos-shift';
 import { canPreviewBurgerFries, repriceBurgerCartForShop, friesSurcharge, burgerOptionName, FRIES_SURCHARGE } from '@/lib/burger-fries';
-import { saleLineKey, saleOptionFields, canChooseCakeExtra, cakeExtraSurcharge, cakeExtraName, CAKE_EXTRA_AMOUNT, repriceCakeCartForShop } from '@/lib/sale-options';
+import { saleLineKey, saleOptionFields, canChooseCakeExtra, cakeExtraSurcharge, CAKE_EXTRA_AMOUNT, repriceCakeCartForShop } from '@/lib/sale-options';
 import { canChooseTeaServing, teaServingPrice, teaOptionName, repriceTeaCartForShop } from '@/lib/tea-options';
 import { catalogForShop } from '@/lib/shop-category';
 import { formatUzbekistanDateTime } from '@/lib/uzbekistan-time';
@@ -994,7 +994,7 @@ export default function POS() {
     const product = cakeExtraProduct;
     const choice = extra ? { cake_extra: true } : {};
     const price = Number(product.price) + cakeExtraSurcharge(choice);
-    const row = { product_id: product.id, product_name: cakeExtraName(product.name, choice),
+    const row = { product_id: product.id, product_name: product.name,
       image_url: product.image_url, price, subtotal: price, sale_unit: 'piece', quantity: 1, ...choice };
     const key = saleLineKey(row);
     setKeyboardProductId(key);
@@ -1287,15 +1287,20 @@ export default function POS() {
       return false;
     }
 
-    const shortages = cart
-      .filter((item) => productsById[item.product_id]?.track_stock !== false)
-      .map((item) => ({
-        product_id: item.product_id,
-        product_name: item.product_name,
-        requested: Number(item.quantity || 0),
-        available: Number(stockByProduct[item.product_id] ?? 0),
-      }))
-      .filter((item) => item.requested > item.available);
+    // Different prices/serving choices still spend the same product balance.
+    const requestedByProduct = new Map();
+    for (const item of cart) {
+      const product = productsById[item.product_id];
+      if (product?.track_stock === false) continue;
+      const existing = requestedByProduct.get(item.product_id);
+      const requested = Number(item.quantity || 0);
+      if (existing) existing.requested += requested;
+      else requestedByProduct.set(item.product_id, {
+        product_id: item.product_id, product_name: product?.name || item.product_name,
+        requested, available: Number(stockByProduct[item.product_id] ?? 0),
+      });
+    }
+    const shortages = [...requestedByProduct.values()].filter(item => item.requested > item.available);
 
     const accepted = await confirmStockWarnings(shortages, settings?.allow_negative_stock !== false);
     if (!accepted) return false;
