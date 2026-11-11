@@ -4,7 +4,7 @@ import { formatUZS } from '@/lib/pos';
 import { posThumbnailFor } from '@/lib/pos-thumbnails';
 import { productPhotoFallbackFor } from '@/lib/product-photos';
 
-function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false, priority = false }) {
+function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = false, priority = false, eagerImages = false }) {
   const [failedThumbnail, setFailedThumbnail] = React.useState(null);
   const thumbnail = posThumbnailFor(product, shopId);
   const useThumbnail = Boolean(thumbnail && thumbnail !== failedThumbnail);
@@ -23,8 +23,8 @@ function ProductCard({ product, shopId, stockQuantity = null, onAdd, disabled = 
         {imageSrc ? (
           <Image
             src={imageSrc}
-            loading={priority ? 'eager' : 'lazy'}
-            decoding="async"
+            loading={priority || eagerImages ? 'eager' : 'lazy'}
+            decoding={eagerImages && useThumbnail ? 'sync' : 'async'}
             onError={useThumbnail ? () => setFailedThumbnail(thumbnail) : undefined}
             alt={product.name}
             fittingType={fallbackPhoto ? 'fit' : 'fill'}

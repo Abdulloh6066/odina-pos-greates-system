@@ -14,6 +14,7 @@ import * as productOrder from '../src/lib/pos-product-order.js';
 import * as burgers from '../src/lib/burger-fries.js';
 import * as teaOptions from '../src/lib/tea-options.js';
 import * as catalogHelpers from '../src/lib/pos-catalog.js';
+import * as thumbnails from '../src/lib/pos-thumbnails.js';
 
 const text = node => typeof node === 'string' ? node : Array.isArray(node)
   ? node.map(text).join('') : node?.props ? text(node.props.children) : '';
@@ -21,15 +22,16 @@ const button = (tree, label) => tree.root.findAllByType('button').find(node => t
 const wrap = tag => ({ children, ...props }) => React.createElement(tag, props, children);
 const empty = Object.freeze([]);
 
-async function fixture({ role = 'cashier', selectedShop = 'branch' } = {}) {
+async function fixture({ role = 'cashier', selectedShop = 'branch', extraProducts = [], extraCategories = [] } = {}) {
   const products = [
     { id: 'cake', name: 'Cake', category_id: 'cakes', active: true, price: 75000,
       shop_prices: { branch: 65000, other: 70000 }, sale_unit: 'piece', is_favorite: true },
     { id: 'tea', name: 'Tea', category_id: 'drinks', active: true, price: 10000, sale_unit: 'piece' },
     { id: 'branch-only', name: 'Branch cake', category_id: 'cakes', active: true, price: 5000,
       available_shop_ids: ['branch'], sale_unit: 'piece' },
+    ...extraProducts,
   ];
-  const cats = [{ id: 'cakes', name: 'Tortlar', active: true }, { id: 'drinks', name: 'Ichimliklar', active: true }];
+  const cats = [{ id: 'cakes', name: 'Tortlar', active: true }, { id: 'drinks', name: 'Ichimliklar', active: true }, ...extraCategories];
   const shops = [{ id: 'branch', name: 'Branch', active: true }, { id: 'other', name: 'Other', active: true }];
   const stock = [{ id: 'stock', product_id: 'cake', location_id: 'branch', quantity: 9 }];
   const sourceSnapshot = structuredClone({ products, stock });
@@ -71,7 +73,7 @@ async function fixture({ role = 'cashier', selectedShop = 'branch' } = {}) {
     '@/lib/sale-options': saleOptions, '@/lib/pos-stock-events': stockEvents,
     '@/lib/pos': { formatUZS: value => `${value} UZS` },
     '@/lib/product-photos': { productPhotoFallbackFor: () => null },
-    '@/lib/pos-thumbnails': { posThumbnailFor: () => null },
+    '@/lib/pos-thumbnails': thumbnails,
     '@/lib/pos-thumbnail-preload': { preloadPosThumbnails: () => () => {} },
     '@/lib/odina-dialog': { odinaAlert: async () => {}, odinaConfirm: async () => false },
     '@/lib/burger-fries': burgers,
@@ -235,5 +237,29 @@ test('image warmup receives only the viewed shop catalogue and sits immediately 
     assert.ok(!controls[0].props.products.some(row => row.id === 'branch-only'));
     assert.equal(controls[0].props.scopeKey, 'cashier:other');
     assert.equal(controls[0].props.online, true);
+  } finally { await f.close(); }
+});
+
+test('opening Pishiriqlar requests all 27 photos before a product is selected', async () => {
+  const pastries = Array.from({ length: 27 }, (_, index) => {
+    const source = `/images/pastry-${index}.png`;
+    return { id: `pastry-${index}`, name: `Pastry ${index}`, category_id: 'pastry', active: true, price: 5000,
+      image_url: source, ...(index < 24 ? { pos_thumbnail_url: `/images/pastry-${index}.webp`, pos_thumbnail_source: source } : {}) };
+  });
+  const f = await fixture({ extraProducts: pastries, extraCategories: [{ id: 'pastry', name: 'Pishiriqlar', active: true }] });
+  try {
+    const photos = () => f.tree.root.findAllByType('img').filter(({ props }) => props.alt?.startsWith('Pastry '));
+    const cartRenders = f.cartRenders;
+    assert.ok(photos().some(({ props }) => props.loading === 'lazy'));
+    await act(async () => button(f.tree, 'Pishiriqlar').props.onClick());
+    assert.equal(photos().length, 27);
+    assert.ok(photos().every(({ props }) => props.loading === 'eager'));
+    assert.equal(photos().filter(({ props }) => props.decoding === 'sync' && props.src.endsWith('.webp')).length, 24);
+    assert.equal(photos().filter(({ props }) => props.decoding === 'async' && props.src.endsWith('.png')).length, 3);
+    assert.equal(f.cartRenders, cartRenders);
+    assert.equal(f.tree.root.findByType('cart-view').props.cart.length, 0);
+    await act(async () => button(f.tree, 'Barchasi').props.onClick());
+    assert.ok(photos().some(({ props }) => props.loading === 'lazy'));
+    assert.ok(photos().every(({ props }) => props.decoding === 'async'));
   } finally { await f.close(); }
 });

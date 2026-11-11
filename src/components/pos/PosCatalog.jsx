@@ -17,6 +17,8 @@ const PosCatalog = forwardRef(function PosCatalog({ products, categories, visibl
     [pricedProducts, categories, shopId, productOrder]);
   const filtered = useMemo(() => selectPosProducts(catalog, { activeCat, showFav, search }),
     [catalog, activeCat, showFav, search]);
+  const eagerImages = !showFav && activeCat !== 'all' && visibleCategories.some(category =>
+    category.id === activeCat && category.name?.trim().toLowerCase() === 'pishiriqlar');
 
   useEffect(() => {
     if (activeCat !== 'all' && categories.length && !visibleCategories.some(category => category.id === activeCat)) setActiveCat('all');
@@ -56,7 +58,7 @@ const PosCatalog = forwardRef(function PosCatalog({ products, categories, visibl
       </div>
       <div role="region" aria-label="Kassadagi mahsulotlar" tabIndex={0} className="odina-product-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin px-4 sm:px-5 pb-20 lg:pb-6">
         <ProductGrid products={filtered} shopId={shopId} stockByProduct={stockByProduct} showStock={showStock}
-          onAdd={onAdd} disabled={disabled} loading={loading} />
+          onAdd={onAdd} disabled={disabled} loading={loading} eagerImages={eagerImages} />
       </div>
     </div>
   </div>;

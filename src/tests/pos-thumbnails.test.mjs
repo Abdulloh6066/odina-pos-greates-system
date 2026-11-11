@@ -87,11 +87,10 @@ test('an existing manifest thumbnail keeps priority over the product thumbnail',
   assert.equal(posThumbnailFor(product), entry.thumbnail);
 });
 
-test('POS images decode asynchronously, prioritize only the first eight and retain error fallback', () => {
+test('POS images prioritize the first eight by default and retain thumbnail error fallback', () => {
   const card = readFileSync(new URL('src/components/pos/ProductCard.jsx', root), 'utf8');
   const grid = readFileSync(new URL('src/components/pos/ProductGrid.jsx', root), 'utf8');
-  assert.match(card, /loading=\{priority \? 'eager' : 'lazy'\}/);
-  assert.match(card, /decoding="async"/);
+  assert.match(card, /loading=\{priority \|\| eagerImages \? 'eager' : 'lazy'\}/);
   assert.match(card, /const imageSrc = useThumbnail \? thumbnail : product\.image_url/);
   assert.match(card, /onError=\{useThumbnail \? \(\) => setFailedThumbnail\(thumbnail\) : undefined\}/);
   assert.match(grid, /priority=\{index < 8\}/);
