@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { Search } from 'lucide-react';
 import ProductCard from './ProductCard';
 
-function ProductGrid({ products, shopId, stockByProduct, showStock, onAdd, disabled, loading }) {
+function ProductGrid({ products, shopId, stockByProduct, showStock, onAdd, disabled, loading, eagerImages }) {
   if (loading) {
     return (
       <div className="odina-product-grid grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
@@ -22,7 +22,7 @@ function ProductGrid({ products, shopId, stockByProduct, showStock, onAdd, disab
   return (
     <div className="odina-product-grid grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2.5">
       {products.map((product, index) => (
-        <ProductCard key={product.id} product={product} shopId={shopId} priority={index < 8}
+        <ProductCard key={product.id} product={product} shopId={shopId} priority={index < 8} eagerImages={eagerImages}
           stockQuantity={product.track_stock === false || !showStock ? null : Number(stockByProduct[product.id] || 0)}
           onAdd={onAdd} disabled={disabled} />
       ))}
