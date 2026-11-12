@@ -10,9 +10,9 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['wholesale', 'admin', 'dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
-  manager: ['dashboard', 'pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
-  cashier: ['pos', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'sales', 'shifts', 'cashouts'],
+  admin: ['wholesale', 'admin', 'dashboard', 'pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  manager: ['dashboard', 'pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
+  cashier: ['pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
   production: ['wholesale', 'warehouse', 'products', 'customers', 'screens'],
   warehouse: ['warehouse'],
@@ -28,6 +28,7 @@ export const ROLE_HOME = {
 };
 
 export const MENU_ITEMS = [
+  { key: 'blankform', label: 'Mahsulot blankasi', path: '/product-form', icon: 'ClipboardList' },
   { key: 'admin', label: 'Admin panel', path: '/admin', icon: 'ShieldCheck' },
   { key: 'dashboard', label: 'Bosh sahifa', path: '/', icon: 'LayoutDashboard' },
   { key: 'wholesale', label: 'Mahsulotlar', path: '/wholesale-products', icon: 'ShoppingCart' },

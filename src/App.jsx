@@ -21,6 +21,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import Layout from '@/components/Layout';
 const Dashboard = lazy(() => preloadPage('dashboard'));
 const AdminPanel = lazy(() => preloadPage('admin'));
+const BlankProductForm = lazy(() => preloadPage('blankform'));
 const POS = lazy(() => preloadPage('pos'));
 const Orders = lazy(() => preloadPage('orders'));
 const RestaurantTables = lazy(() => preloadPage('tables'));
@@ -53,6 +54,7 @@ const ROUTE_TITLES = {
   '/forgot-password': 'Parolni tiklash',
   '/reset-password': 'Yangi parol',
   '/pos': 'Kassa',
+  '/product-form': 'Mahsulot blankasi',
   '/orders': 'Buyurtmalar',
   '/tables': 'Stollar',
   '/customers': 'Mijozlar',
@@ -156,6 +158,7 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<RoleRoute pageKey="dashboard"><Dashboard /></RoleRoute>} />
                 <Route path="/admin" element={<RoleRoute pageKey="admin"><AdminPanel /></RoleRoute>} />
+                <Route path="/product-form" element={<RoleRoute pageKey="blankform"><BlankProductForm /></RoleRoute>} />
                 <Route path="/pos" element={<RoleRoute pageKey="pos"><POS /></RoleRoute>} />
                 <Route path="/orders" element={<RoleRoute pageKey="orders"><Orders /></RoleRoute>} />
                 <Route path="/tables" element={<RoleRoute pageKey="tables"><RestaurantTables /></RoleRoute>} />
