@@ -18,7 +18,7 @@ const ICONS = {
   Ombor: Warehouse, Xodimlar: Users, Sozlamalar: Settings,
 };
 
-const KASSA_CHILD_KEYS = ['categories', 'sales', 'cashouts', 'recipients'];
+const KASSA_CHILD_KEYS = ['categories', 'sales', 'cashouts', 'recipients', 'blankform'];
 const SCREENS_CHILDREN = [
   { key: 'launch-pos', label: 'Kassada ochish', path: '/pos?screen=1', icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
   { key: 'launch-warehouse', label: 'Omborda ochish', path: '/warehouse', icon: Warehouse, roles: ['admin', 'manager', 'cashier', 'accountant', 'production', 'warehouse'] },
@@ -49,7 +49,7 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
     || scopedLocation?.allows_pos === false;
   const items = MENU_ITEMS.filter((item) => canAccess(role, item.key)
     && (item.key !== 'wholesale' || canUseWholesaleWorkspace(user, adminShopScope))
-    && !(warehouseWorkspace && ['pos', 'sales', 'cashouts', 'recipients'].includes(item.key)));
+    && !(warehouseWorkspace && ['pos', 'sales', 'cashouts', 'recipients', 'blankform'].includes(item.key)));
   const hasKassa = items.some((item) => item.key === 'pos');
   const kassaChildren = hasKassa ? items.filter((item) => KASSA_CHILD_KEYS.includes(item.key)) : [];
   const topItems = items.filter((item) => !hasKassa || !KASSA_CHILD_KEYS.includes(item.key));
