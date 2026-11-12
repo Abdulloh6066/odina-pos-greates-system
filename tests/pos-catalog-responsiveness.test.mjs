@@ -97,7 +97,9 @@ async function fixture({ role = 'cashier', selectedShop = 'branch', extraProduct
   };
   function load(path) {
     if (cache.has(path)) return cache.get(path);
-    const code = transformSync(readFileSync(path, 'utf8'), { loader: 'jsx', format: 'cjs', jsx: 'transform' }).code;
+    // On-demand imports (the reorder dialog) resolve through the same in-memory doubles as static ones.
+    const code = transformSync(readFileSync(path, 'utf8'), { loader: 'jsx', format: 'cjs', jsx: 'transform',
+      supported: { 'dynamic-import': false } }).code;
     const module = { exports: {} };
     const require = name => {
       if (name === '@/components/pos/ProductGrid') {
@@ -127,6 +129,8 @@ async function fixture({ role = 'cashier', selectedShop = 'branch', extraProduct
     const events = { addEventListener() {}, removeEventListener() {} };
     vm.runInNewContext('(function(require,module,exports){' + code + '\n})', {
       console, URLSearchParams, performance, navigator: { onLine: true },
+      // The idle warm-up of the on-demand reorder dialog never fires here; the button loads it.
+      setTimeout: () => 1, clearTimeout() {},
       window: { ...events, location: { origin: 'https://offline.test' }, setInterval: () => 1, clearInterval() {},
         matchMedia: () => ({ ...events, matches: false }) }, document: events,
     })(require, module, module.exports);

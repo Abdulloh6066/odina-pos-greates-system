@@ -24,7 +24,6 @@ import useCheckoutTiming from '@/hooks/useCheckoutTiming';
 import { createCheckoutTimingEventId, reportCheckoutTiming, flushCheckoutTimings } from '@/lib/checkout-timing-outbox';
 import useStableEvent from '@/hooks/use-stable-event';
 import { mergePosStockEvent } from '@/lib/pos-stock-events';
-import ProductOrderDialog from '@/components/pos/ProductOrderDialog';
 import usePosProductOrder from '@/hooks/usePosProductOrder';
 import { preloadPosThumbnails } from '@/lib/pos-thumbnail-preload';
 import Cart, { DiscountRow, RoundingRow } from '@/components/pos/Cart';
@@ -58,6 +57,16 @@ import {
   waitForSaleResponse,
   releaseSaleRequest,
 } from '@/lib/offline-sales';
+
+// Drag-and-drop is used only by the admin/manager product-order dialog. Loading it on
+// demand keeps that library out of the code every cashier downloads to open Kassa.
+let productOrderDialogComponent = null;
+const loadProductOrderDialog = async () => {
+  if (!productOrderDialogComponent) {
+    productOrderDialogComponent = (await import('@/components/pos/ProductOrderDialog')).default;
+  }
+  return productOrderDialogComponent;
+};
 
 // Temporary business choice: sell through without the negative-stock confirmation.
 // Set to true when the owner wants the warning restored.
@@ -1195,7 +1204,42 @@ export default function POS() {
   const { order: shopProductOrder, accept: acceptProductOrder } = usePosProductOrder(catalogShopId, user?.id);
   const [productOrderOpen, setProductOrderOpen] = useState(false);
   const [productOrderCategory, setProductOrderCategory] = useState('all');
+  const [ProductOrderDialog, setProductOrderDialog] = useState(() => productOrderDialogComponent);
+  const productOrderLoadingRef = useRef(false);
   const canEditProductOrder = ['admin', 'manager'].includes(user?.role) && (!shopScope || Boolean(shopScope.ready && scopedShopId));
+  // Once Kassa is on screen, fetch the dialog in idle time for the staff who can open it,
+  // so the button responds at once. Skipped while offline: browsers remember a failed
+  // module download until the page is reloaded, so do not spend the attempt needlessly.
+  useEffect(() => {
+    if (!canEditProductOrder || loadingData || ProductOrderDialog) return undefined;
+    let active = true;
+    const warm = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      loadProductOrderDialog().then((component) => { if (active) setProductOrderDialog(() => component); }).catch(() => {});
+    };
+    const idle = typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function';
+    const handle = idle ? window.requestIdleCallback(warm, { timeout: 3000 }) : setTimeout(warm, 1500);
+    return () => {
+      active = false;
+      if (idle) window.cancelIdleCallback?.(handle); else clearTimeout(handle);
+    };
+  }, [canEditProductOrder, loadingData, ProductOrderDialog]);
+  const openProductOrder = async () => {
+    if (productOrderLoadingRef.current) return;
+    setProductOrderCategory(catalogRef.current?.getInitialCategory() || 'all');
+    productOrderLoadingRef.current = true;
+    try {
+      const component = await loadProductOrderDialog();
+      setProductOrderDialog(() => component);
+      setProductOrderOpen(true);
+    } catch {
+      // Kassa keeps working; only this dialog is unavailable. The browser will not download
+      // the same module again in this page, so the user is asked to refresh once online.
+      void odinaAlert('Tartib oynasini yuklab bo‘lmadi. Internet aloqasini tekshirib, sahifani yangilang.');
+    } finally {
+      productOrderLoadingRef.current = false;
+    }
+  };
 
   const queuedForCurrentShift = useMemo(
     () => offlineSales.filter((record) => record.shift_id === shift?.id && record.status !== 'confirmed'),
@@ -2037,7 +2081,7 @@ export default function POS() {
 
   return (
     <div className={`odina-pos odina-pos-workbench ${posCompact ? 'odina-pos-compact' : ''} flex flex-1 flex-col min-h-0 w-full max-w-full bg-background overflow-hidden`}>
-      {productOrderOpen && canEditProductOrder && catalogShopId && <ProductOrderDialog
+      {productOrderOpen && canEditProductOrder && catalogShopId && ProductOrderDialog && <ProductOrderDialog
         key={catalogShopId} shopId={catalogShopId}
         shopName={shops.find(shop => shop.id === catalogShopId)?.name || shift?.shop_name || user?.shop_name || 'Do‘kon'}
         products={catalogProducts} categories={visibleCategories} initialCategory={productOrderCategory}
@@ -2067,7 +2111,7 @@ export default function POS() {
         {canEditProductOrder && <Button type="button" variant="outline" size="icon"
           title={catalogShopId ? 'Mahsulotlar tartibini tahrirlash' : 'Avval do‘kon smenasini oching'}
           aria-label="Mahsulotlar tartibini tahrirlash" disabled={!catalogShopId || loadingData}
-          onClick={() => { setProductOrderCategory(catalogRef.current?.getInitialCategory() || 'all'); setProductOrderOpen(true); }} className="h-11 w-10 shrink-0 rounded-xl touch-manipulation">
+          onClick={openProductOrder} className="h-11 w-10 shrink-0 rounded-xl touch-manipulation">
           <ListOrdered className="h-4 w-4" />
         </Button>}
         {!screenMode && <Button asChild variant="outline" size="sm"

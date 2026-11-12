@@ -1,6 +1,5 @@
 import React from "react";
 import OdinaBrand from "./brand/OdinaBrand";
-import odinaMark from "./brand/odina-mark";
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
@@ -13,7 +12,8 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
             <p>Mahsulotdan mijozgacha — kundalik ishlaringiz bir joyda.</p>
           </div>
           <span className="odina-auth-story-caption">ODINA CAKE · ISH MAYDONI</span>
-          <img className="odina-auth-watermark" src={odinaMark} alt="" aria-hidden="true" />
+          {/* Shown at 330 px, so it uses the full-size original instead of the small embedded mark. */}
+          <img className="odina-auth-watermark" src="/odina-mark.png" alt="" aria-hidden="true" loading="lazy" decoding="async" />
         </aside>
         <div className="odina-auth-form">
           <div className="odina-auth-mobile-brand"><OdinaBrand /></div>
