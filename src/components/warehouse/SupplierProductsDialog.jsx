@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
+import { isCentralSupplierLocation, supplierCatalogForLocation } from '@/lib/central-supplier-catalog';
+
 const PAGE_SIZE = 500;
 const ingredientIds = value => [...new Set(Array.isArray(value) ? value.filter(id => typeof id === 'string' && id) : [])];
 const errorText = error => error?.response?.data?.error || error?.message || 'Amal bajarilmadi.';
@@ -28,11 +30,13 @@ async function readIngredients() {
   throw new Error('Mahsulotlar ro‘yxati juda katta. To‘liq yuklanmagani uchun saqlash yopildi.');
 }
 
-export default function SupplierProductsDialog({ supplier, user, onClose, onSaved }) {
+export default function SupplierProductsDialog({ supplier, user, location, onClose, onSaved }) {
   const canManage = user?.role === 'admin';
   const [ingredients, setIngredients] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const central = isCentralSupplierLocation(location);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -45,8 +49,9 @@ export default function SupplierProductsDialog({ supplier, user, onClose, onSave
   useEffect(() => {
     setSelectedIds(ingredientIds(supplier?.supplied_ingredient_ids));
     setSearch('');
+    setShowAll(false);
     setSaveError('');
-  }, [supplier?.id]);
+  }, [supplier?.id, location?.id]);
 
   useEffect(() => {
     if (!canManage || !supplier?.id) return;
@@ -64,9 +69,9 @@ export default function SupplierProductsDialog({ supplier, user, onClose, onSave
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return [...ingredients].sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), 'uz'))
+    return [...supplierCatalogForLocation(ingredients, location, selectedIds, showAll)].sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), 'uz'))
       .filter(item => !query || `${item.name || ''} ${categoryName(item.category)}`.toLocaleLowerCase().includes(query));
-  }, [ingredients, search]);
+  }, [ingredients, search, location, selectedIds, showAll]);
   const knownIds = useMemo(() => new Set(ingredients.map(item => item.id)), [ingredients]);
   const unseenCount = selectedIds.filter(id => !knownIds.has(id)).length;
   const initialIds = ingredientIds(supplier?.supplied_ingredient_ids);
@@ -111,6 +116,12 @@ export default function SupplierProductsDialog({ supplier, user, onClose, onSave
           <DialogDescription>{supplier.name} uchun masalliq va qadoqlarni tanlang. Bir mahsulot bir nechta yetkazib beruvchiga biriktirilishi mumkin.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {central && <div className="rounded-xl border border-border p-3 space-y-2">
+            <p className="text-xs text-muted-foreground">Central uchun tasdiqlangan mahsulotlar va oldingi biriktirishlar ko‘rsatiladi. Boshqa mahsulotlar o‘chirilmagan.</p>
+            <Button type="button" variant="outline" disabled={loading || saving} onClick={() => setShowAll(value => !value)} aria-pressed={showAll}>
+              {showAll ? 'Faqat Central ro‘yxati' : 'Boshqa mahsulot qo‘shish'}
+            </Button>
+          </div>}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input aria-label="Yetkazib beruvchi mahsulotlarini qidirish" value={search} onChange={event => setSearch(event.target.value)}
