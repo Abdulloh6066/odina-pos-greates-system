@@ -372,14 +372,14 @@ export default function SupplierLedgerPanel({
         <p className="text-sm text-muted-foreground">Bu qarzlar filtrga kirmaydi, lekin avvalgi to‘lov natijasini tekshirish kerak. Quyidagi yozuvlar filtrlangan jami summalarga qo‘shilmagan.</p>
         {hiddenPaymentRecoveries.map(debt => <OpeningDebtCard key={debt.id} debt={debt} user={user} canPay={canViewOpening} paymentScope={scopeKey} onPaid={load} />)}
       </section>}
-      {canViewOpening && visibleOpeningDebts.length > 0 && <section aria-label="Boshlang‘ich qarzlar"><h3 className="font-semibold mb-3">Boshlang‘ich qarzlar</h3><div className="space-y-3">{visibleOpeningDebts.map(debt => <OpeningDebtCard key={debt.id} debt={debt} user={user} canPay={canViewOpening} paymentScope={scopeKey} onPaid={load} />)}</div></section>}
+      {/* Opening-debt details and payment controls remain in each supplier dialog. */}
 
       {supplierRows.length > 0 && (
         <section>
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
               <h3 className="font-semibold">Yetkazib beruvchilar</h3>
-              <p className="text-xs text-muted-foreground">Ustiga bosib to‘liq kirim va to‘lov tarixini ko‘ring.</p>
+              <p className="text-xs text-muted-foreground">Ustiga bosib boshlang‘ich qarz, kirim va to‘lov tarixini ko‘ring yoki to‘lov qiling.</p>
             </div>
             <span className="text-xs text-muted-foreground">{formatNum(supplierRows.length)} ta</span>
           </div>
