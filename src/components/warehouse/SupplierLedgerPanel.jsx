@@ -1181,7 +1181,7 @@ function ReceiptDialog({ open, user, location, ingredients, recipients, onClose,
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <SupplierProductsDialog supplier={editingSupplier} user={user} onClose={() => setEditingSupplier(null)} onSaved={updated => {
+    <SupplierProductsDialog supplier={editingSupplier} user={user} location={location} onClose={() => setEditingSupplier(null)} onSaved={updated => {
       setSupplierRecords(current => current.map(item => item.id === updated.id ? updated : item));
       setLines([{ ingredient_id: "", purchase_quantity: "", unit_price: "" }]);
       setEditingSupplier(null);
