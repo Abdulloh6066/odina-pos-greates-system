@@ -380,6 +380,7 @@ export default function SupplierLedgerPanel({
             <div>
               <h3 className="font-semibold">Yetkazib beruvchilar</h3>
               <p className="text-xs text-muted-foreground">Ustiga bosib boshlang‘ich qarz, kirim va to‘lov tarixini ko‘ring yoki to‘lov qiling.</p>
+              <p className="text-xs text-muted-foreground mt-1">Berilgan pul: filtrdagi kirimlar va boshlang‘ich qarzlarga shu paytgacha to‘langan summa. Sana filtri to‘lov sanasiga emas, kirim sanasiga tegishli.</p>
             </div>
             <span className="text-xs text-muted-foreground">{formatNum(supplierRows.length)} ta</span>
           </div>
@@ -401,7 +402,7 @@ export default function SupplierLedgerPanel({
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
                   <MiniCell label="Kirim" value={formatUZS(supplier.purchases)} />
-                  <MiniCell label="To‘langan" value={formatUZS(supplier.paid)} />
+                  <MiniCell label="Berilgan pul" value={formatUZS(supplier.paid)} />
                 </div>
                 <div className={"mt-2 rounded-xl px-3 py-2 " + (
                   supplier.debt > 0 ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"
@@ -734,12 +735,12 @@ function SupplierDetailDialog({ supplier, user, canPay, paymentScope, onPaid, on
       <DialogContent className="warehouse-dialog sm:max-w-3xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">{supplier.name}</DialogTitle>
-          <p className="text-sm text-muted-foreground">Yetkazib beruvchining to‘liq tarixi</p>
+          <p className="text-sm text-muted-foreground">Yetkazib beruvchining to‘liq tarixi · barcha vaqt</p>
         </DialogHeader>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <MiniSummary label="Jami kirim" value={formatUZS(purchases)} />
-          <MiniSummary label="To‘langan" value={formatUZS(paid)} />
+          <MiniSummary label="Berilgan pul" value={formatUZS(paid)} />
           <MiniSummary label="Qolgan qarz" value={formatUZS(debt)} warning={debt > 0} />
           <MiniSummary label="Kirimlar" value={formatNum(supplier.receipts.length)} />
         </div>
