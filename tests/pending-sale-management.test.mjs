@@ -31,6 +31,96 @@ function fixture(status = 'open') {
     original_request: request(), owner_pin: '1234', reason: 'Central order review', ...extra });
   return { ...f, call, inspect, resolve };
 }
+test('PIN removal archives stuck requests without changing server financial records', async () => {
+  for (const partial of [false, true]) {
+    const f = fixture('closed');
+    f.db.Shift[0].sale_request_keys.push(request().idempotency_key);
+    if (partial) {
+      f.db.Sale = [{ id: 'partial', user_id: 'staff', shift_id: 'shift', shop_id: 'shop',
+        idempotency_key: request().idempotency_key, financial_records_version: 3, total: 65000 }];
+      f.db.Payment = [{ id: 'payment', sale_id: 'partial', amount: 65000 }];
+    }
+    const before = structuredClone({ sales: f.db.Sale, payments: f.db.Payment, stocks: f.db.ProductStock });
+    const result = await f.resolve('remove');
+    assert.equal(result.status, 200, JSON.stringify(result.data));
+    assert.equal(result.data.state, 'removed');
+    assert.equal(result.data.financial_records_unchanged, true);
+    assert.deepEqual({ sales: f.db.Sale, payments: f.db.Payment, stocks: f.db.ProductStock }, before);
+    assert.equal(f.db.Shift[0].total_sales, 0);
+    assert.equal(f.db.Shift[0].sale_request_keys.length, 1);
+    assert.equal((await f.resolve('remove')).data.state, 'removed');
+    assert.equal((await f.inspect()).data.state, 'removed');
+    const journal = JSON.parse(f.db.Shift[0].pos_queue_resolutions_json)[request().idempotency_key];
+    assert.equal(journal.original_request_json, result.data.original_request_json);
+    assert.equal(journal.reason, 'Central order review');
+    assert.equal((await f.call(request())).status, 410, 'original cannot be retried as a new sale');
+  }
+});
+test('queue removal still rejects wrong PIN, missing reason and foreign ownership', async () => {
+  for (const kind of ['pin', 'reason', 'staff', 'shop']) {
+    const f = fixture();
+    f.db.Shift[0].sale_request_keys.push(request().idempotency_key);
+    if (kind === 'staff') f.db.Shift[0].user_id = 'other';
+    if (kind === 'shop') f.db.Shift[0].shop_id = 'other-shop';
+    const result = await f.resolve('remove', kind === 'pin' ? { owner_pin: '0000' } : kind === 'reason' ? { reason: '' } : {});
+    assert.ok([400, 403].includes(result.status), JSON.stringify(result.data));
+    assert.equal(f.db.Shift[0].pos_queue_resolutions_json, undefined);
+  }
+});
+test('completed sales are reconciled and unclaimed sales use the existing cancellation fence', async () => {
+  const complete = fixture();
+  complete.db.Sale = [{ id: 'complete', user_id: 'staff', shift_id: 'shift', shop_id: 'shop',
+    idempotency_key: request().idempotency_key, financial_records_version: 3, total: 65000 }];
+  complete.db.Shift[0].sale_request_keys.push(request().idempotency_key, 'sale-completed:' + request().idempotency_key);
+  assert.equal((await complete.resolve('remove')).data.state, 'confirmed');
+  assert.equal(complete.db.Shift[0].pos_queue_resolutions_json, undefined);
+  const pending = fixture();
+  assert.equal((await pending.resolve('remove')).data.state, 'cancelled');
+  assert.equal((await pending.call(request())).status, 410);
+});
+test('stuck removal does not overwrite another concurrently saved journal decision', async () => {
+  const f = fixture();
+  f.db.Shift[0].sale_request_keys.push(request().idempotency_key);
+  const update = f.entities.Shift.updateMany;
+  f.entities.Shift.updateMany = async (query, ops) => {
+    if (ops.$set?.pos_queue_resolutions_json) f.db.Shift[0].pos_queue_resolutions_json = '{"other":{"state":"cancelled"}}';
+    return update(query, ops);
+  };
+  assert.equal((await f.resolve('remove')).status, 409);
+  assert.deepEqual(JSON.parse(f.db.Shift[0].pos_queue_resolutions_json), { other: { state: 'cancelled' } });
+});
+test('bulk queue removal supports processing entries after one PIN approval', async () => {
+  const f = fixture();
+  const second = { ...request(), idempotency_key: 'pos-central-pending-000002' };
+  f.db.Shift[0].sale_request_keys.push(request().idempotency_key, second.idempotency_key);
+  const result = await f.call({ action: 'cancel_pending_sales', operation: 'remove',
+    original_requests: [request(), second], owner_pin: '1234', reason: 'Stuck queue' });
+  assert.equal(result.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.errors.length, 0);
+  assert.deepEqual(result.data.results.map(row => row.state), ['removed', 'removed']);
+});
+test('client archives removed entries with original payload and does not resolve without approval', async () => {
+  const record = { id: request().idempotency_key, user_id: 'staff', shift_id: 'shift',
+    status: 'failed', request: request() };
+  const decision = { state: 'removed', original_key: record.id, reason: 'Stuck queue' };
+  const [archive] = queue.resolvedPendingRecords(record, decision);
+  assert.equal(archive.status, 'removed');
+  assert.deepEqual(archive.request, record.request);
+  assert.equal(archive.resolution.reason, 'Stuck queue');
+  let applied = 0;
+  const storage = { list: async () => [record], resolve: async () => { applied++; } };
+  await assert.rejects(queue.managePendingSale({ userId: 'staff', id: record.id, storage,
+    lock: work => work(), authorize: async () => { throw new Error('PIN rejected'); } }));
+  assert.equal(applied, 0);
+  await queue.managePendingSale({ userId: 'staff', id: record.id, storage,
+    lock: work => work(), authorize: async () => decision });
+  assert.equal(applied, 1);
+  const result = await queue.managePendingSales({ userId: 'staff', ids: [record.id], storage,
+    lock: work => work(), authorize: async () => ({ results: [decision], errors: [] }) });
+  assert.equal(result.results[0].state, 'removed');
+  assert.equal(applied, 2);
+});
+
 test('staff can inspect the full price mismatch without a PIN or financial writes', async () => {
   const f = fixture(); const result = await f.inspect();
   assert.equal(result.status, 200, JSON.stringify(result.data));
