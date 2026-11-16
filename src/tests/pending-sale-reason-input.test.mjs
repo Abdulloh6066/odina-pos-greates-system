@@ -42,11 +42,11 @@ for (const state of [{ online: false, syncing: false }, { online: true, syncing:
     act(() => view.root.findAllByType('button').find(button =>
       button.children.some(child => typeof child === 'string' && child.includes('Hammasini bekor qilish'))
     ).props.onClick());
+    act(() => view.root.findByProps({ id: 'pending-sale-pin' }).props.onChange({ target: { value: '1234' } }));
     await act(async () => { view.update(React.createElement(PendingSalesDialog, { ...props, ...state })); });
     assert.equal(field().props.disabled, false);
     act(() => field().props.onChange({ target: { value: 'Takroriy savdo 123' } }));
     assert.equal(field().props.value, 'Takroriy savdo 123');
-    act(() => view.root.findByProps({ id: 'pending-sale-pin' }).props.onChange({ target: { value: '1234' } }));
     assert.equal(submit().props.disabled, true);
     await act(async () => { form().props.onSubmit({ preventDefault() {} }); });
     assert.equal(calls, 0, 'blocked submit must not call the cancellation handler');
