@@ -630,13 +630,22 @@ async function archiveLocalPendingSales(records, approval, isCurrent) {
 }
 
 export async function removeLocalPendingSales({ userId, ids, authorize, isCurrent = () => true,
+  authorizationTimeoutMs = 15000, timers = globalThis,
   storage = { list: listPendingSales, archive: archiveLocalPendingSales } }) {
   if (!userId || !Array.isArray(ids) || !ids.length || ids.length > 10000
     || new Set(ids).size !== ids.length) throw new Error('Navbat yozuvlarini tanlang.');
   const requested = new Set(ids);
   const records = (await storage.list(userId)).filter(row => row.user_id === userId && requested.has(row.id));
   if (!records.length) return { results: [], errors: [] };
-  const response = await authorize(records.map(row => row.id));
+  let response, timer;
+  try {
+    response = await Promise.race([
+      Promise.resolve().then(() => authorize(records.map(row => row.id))),
+      new Promise((_, reject) => {
+        timer = timers.setTimeout(() => reject(new Error('PIN tekshiruvi javob bermadi. Navbat saqlanib qoldi. Qayta urinib ko‘ring.')), authorizationTimeoutMs);
+      }),
+    ]);
+  } finally { timers.clearTimeout(timer); }
   const approval = response?.data || response;
   if (!isCurrent() || !approval?.authorized || approval.action !== 'local_queue_removal'
     || approval.user_id !== userId || !approval.approval_id
