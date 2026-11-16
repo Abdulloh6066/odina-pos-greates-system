@@ -314,7 +314,9 @@ export async function savePendingSale(record) {
   const database = await openDatabase();
   await new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).put(record);
+    const store = transaction.objectStore(STORE_NAME);
+    const read = store.get(record.id);
+    read.onsuccess = () => { if (!isResolved(read.result)) store.put(record); };
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error || new Error('Offline savdoni saqlab bo‘lmadi.'));
     transaction.onabort = () => reject(transaction.error || new Error('Offline savdo saqlanmadi.'));
@@ -345,7 +347,9 @@ async function removePendingSale(id) {
   const database = await openDatabase();
   await new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).delete(id);
+    const store = transaction.objectStore(STORE_NAME);
+    const read = store.get(id);
+    read.onsuccess = () => { if (read.result && !isResolved(read.result)) store.delete(id); };
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error || new Error('Offline savdoni navbatdan olib bo‘lmadi.'));
     transaction.onabort = () => reject(transaction.error || new Error('Offline savdo navbatda qoldi.'));
@@ -403,7 +407,9 @@ export function pendingSaleRetryDelay(records, now = Date.now()) {
 // Storage injection is used by memory-only regression tests; production defaults
 // remain IndexedDB. Failed records are retained until an explicit manual retry.
 export async function syncPendingSales({ userId, send, retryFailed = false, recordId = '', onConfirmed,
-  storage = { list: listPendingSales, update: updatePendingSale, remove: removePendingSale },
+  storage = { list: listPendingSales, update: updatePendingSale, remove: removePendingSale,
+    isActive: async (id, owner) => (await listPendingSales(owner)).some(row => row.id === id) },
+  shouldStop = () => false,
   lock = withSyncLock, now = () => Date.now(),
 }) {
   if (!userId || typeof send !== 'function') {
@@ -418,7 +424,7 @@ export async function syncPendingSales({ userId, send, retryFailed = false, reco
       ? { id: priorFailure.id, retryable: false, message: priorFailure.last_error } : null;
 
     for (const record of records.filter((row) => !recordId || row.id === recordId)) {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
+      if (shouldStop() || (typeof navigator !== 'undefined' && navigator.onLine === false)) break;
       if (!retryFailed && record.status === 'failed') continue;
       if (!retryFailed && Date.parse(record.next_retry_at || '') > now()) break;
 
@@ -433,6 +439,8 @@ export async function syncPendingSales({ userId, send, retryFailed = false, reco
         if (String(record.id) !== String(record.request?.idempotency_key || '')) {
           throw Object.assign(new Error('Saqlangan savdo so‘rov kaliti mos emas.'), { status: 400 });
         }
+        if (shouldStop()) break;
+        if (storage.isActive && !await storage.isActive(record.id, userId)) continue;
         flight = startSaleRequest(record.request, send, { userId });
         const outcome = await waitForSaleResponse(flight, { timeoutMs: POS_QUEUE_RESPONSE_BUDGET_MS });
         if (outcome.pending) {
@@ -576,6 +584,71 @@ export async function managePendingSale({ userId, id, authorize, lock = withSync
     return { ...payload, record };
   });
   if (result?.skipped) throw new Error('Boshqa oynada savdo yuborilmoqda. Bir ozdan keyin qayta tekshiring.');
+  return result;
+}
+
+// Archive the selected device entries atomically. The original request and receipt
+// remain in IndexedDB for recovery; no Sale/Payment/Stock endpoint is called.
+async function archiveLocalPendingSales(records, approval, isCurrent) {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    let failure;
+    const results = [];
+    const transaction = database.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const abort = message => { failure = new Error(message); transaction.abort(); };
+    const read = store.getAll();
+    read.onsuccess = () => {
+      if (!isCurrent()) { abort('Hisob o‘zgardi. Navbat saqlanib qoldi.'); return; }
+      const currentRows = new Map((read.result || []).map(row => [row.id, row]));
+      // Validate the whole batch before writing any row.
+      for (const record of records) {
+        const current = currentRows.get(record.id);
+        if (!current || isResolved(current)) continue; // already synced/removed
+        if (current.user_id !== approval.user_id
+          || (approval.shop_id && current.shop_id !== approval.shop_id)
+          || JSON.stringify(current.request) !== JSON.stringify(record.request)) {
+          abort('Tanlangan savdo o‘zgardi. Navbat saqlanib qoldi.'); return;
+        }
+      }
+      for (const record of records) {
+        const current = currentRows.get(record.id);
+        if (!current || isResolved(current)) continue;
+        const decision = { state: 'removed', original_key: current.id, local_only: true,
+          reason: approval.reason, approval_id: approval.approval_id,
+          approved_at: approval.approved_at, user_id: approval.user_id,
+          financial_records_unchanged: true };
+        store.put({ ...current, status: 'removed', resolution: decision,
+          updated_at: new Date().toISOString() });
+        results.push({ ...decision, record: current });
+      }
+    };
+    transaction.oncomplete = () => { notifyQueueChanged(); resolve({ results, errors: [] }); };
+    transaction.onerror = () => reject(failure || transaction.error || new Error('Navbatni saqlab bo‘lmadi.'));
+    transaction.onabort = () => reject(failure || transaction.error || new Error('Navbat o‘zgarishsiz qoldi.'));
+  });
+}
+
+export async function removeLocalPendingSales({ userId, ids, authorize, isCurrent = () => true,
+  storage = { list: listPendingSales, archive: archiveLocalPendingSales } }) {
+  if (!userId || !Array.isArray(ids) || !ids.length || ids.length > 10000
+    || new Set(ids).size !== ids.length) throw new Error('Navbat yozuvlarini tanlang.');
+  const requested = new Set(ids);
+  const records = (await storage.list(userId)).filter(row => row.user_id === userId && requested.has(row.id));
+  if (!records.length) return { results: [], errors: [] };
+  const response = await authorize(records.map(row => row.id));
+  const approval = response?.data || response;
+  if (!isCurrent() || !approval?.authorized || approval.action !== 'local_queue_removal'
+    || approval.user_id !== userId || !approval.approval_id
+    || !String(approval.reason || '').trim()
+    || !Array.isArray(approval.ids) || approval.ids.length !== records.length
+    || new Set(approval.ids).size !== records.length
+    || records.some(row => !approval.ids.includes(row.id)
+      || (approval.shop_id && row.shop_id !== approval.shop_id))) {
+    throw new Error('Egasi tasdig‘i tanlangan navbatga mos emas. Navbat saqlanib qoldi.');
+  }
+  const result = await storage.archive(records, approval, isCurrent);
+  for (const row of records) releaseSaleRequest(row.id, saleRequests.get(JSON.stringify([String(userId), row.id])));
   return result;
 }
 
