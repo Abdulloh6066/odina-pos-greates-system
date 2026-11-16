@@ -34,7 +34,7 @@ export async function managePendingSale(service: any, user: any, body: any, deps
   const fingerprint = await deps.fingerprint(original);
   const resolving = body.action === "resolve_pending_sale";
   const operation = String(body.operation || "");
-  if (resolving && !["edit", "cancel"].includes(operation)) throw fail("Amal noto‘g‘ri.", 400);
+  if (resolving && !["edit", "cancel", "remove"].includes(operation)) throw fail("Amal noto‘g‘ri.", 400);
   if (resolving && !await deps.verifyPin(service, body.owner_pin, user)) {
     throw fail("Tahrirlash yoki bekor qilish uchun egasi PIN-kodi kerak.", 403);
   }
@@ -42,7 +42,7 @@ export async function managePendingSale(service: any, user: any, body: any, deps
   const prior = resolutions[key];
   if (prior) {
     if (prior.original_fingerprint !== fingerprint || prior.user_id !== user.id
-      || (resolving && (prior.state !== (operation === "edit" ? "edited" : "cancelled")
+      || (resolving && (!(operation === "remove" ? ["removed", "cancelled"] : [operation === "edit" ? "edited" : "cancelled"]).includes(prior.state)
         || (operation === "edit" && prior.final_total !== body.final_total)))) {
       throw fail("Bu savdo uchun boshqa qaror saqlangan. Holatini qayta tekshiring.");
     }
@@ -56,11 +56,36 @@ export async function managePendingSale(service: any, user: any, body: any, deps
       || (sale.request_fingerprint && sale.request_fingerprint !== fingerprint)) {
       throw fail("Savdo kaliti boshqa yozuvga tegishli.", 403);
     }
-    if (resolving) throw fail("Savdo serverda mavjud. Uni navbatdan tahrirlab yoki bekor qilib bo‘lmaydi; savdolar tarixini tekshiring.");
+    if (resolving && operation !== "remove") throw fail("Savdo serverda mavjud. Uni navbatdan tahrirlab yoki bekor qilib bo‘lmaydi; savdolar tarixini tekshiring.");
     const complete = sale.financial_records_version < 3 || !sale.financial_records_version
       || (shift.sale_request_keys || []).includes("sale-completed:" + key);
-    return { state: complete ? "confirmed" : "processing", original_key: key,
+    if (operation !== "remove" || !resolving || complete) return { state: complete ? "confirmed" : "processing", original_key: key,
       shift_status: shift.status, ...(complete ? { sale, shift } : {}) };
+  }
+  // A PIN-approved removal archives only the device request. Existing server
+  // payments, stock movements and running workers are not reversed or deleted.
+  if (resolving && operation === "remove" && (sale || (shift.sale_request_keys || []).includes(key))) {
+    const reason = String(body.reason || "").trim();
+    if (!reason || reason.length > 500) throw fail("Sababni kiriting (500 belgigacha).", 400);
+    const result = { state: "removed", original_key: key,
+      original_fingerprint: fingerprint, original_request_json: deps.canonical(original),
+      user_id: user.id, user_name: userLabel(user), shop_id: shift.shop_id, shift_id: shift.id,
+      reason, resolved_at: new Date().toISOString(), shift_status: shift.status,
+      server_sale_id: sale?.id || null, server_state_at_removal: "processing",
+      financial_records_unchanged: true };
+    const journalQuery = shift.pos_queue_resolutions_json == null
+      ? { $or: [{ pos_queue_resolutions_json: { $exists: false } }, { pos_queue_resolutions_json: null }] }
+      : { pos_queue_resolutions_json: shift.pos_queue_resolutions_json };
+    const claimed = (shift.sale_request_keys || []).includes(key);
+    const saved = await service.entities.Shift.updateMany({
+      id: shift.id, user_id: user.id, shop_id: shift.shop_id,
+      sale_request_keys: claimed ? key : { $ne: key }, ...journalQuery,
+    }, {
+      ...(!claimed ? { $push: { sale_request_keys: key } } : {}),
+      $set: { pos_queue_resolutions_json: JSON.stringify({ ...resolutions, [key]: result }) },
+    });
+    if (!saved?.success || Number(saved.updated) !== 1) throw fail("Navbat holati o‘zgardi. Qayta urinib ko‘ring.");
+    return result;
   }
   if ((shift.sale_request_keys || []).includes(key)) {
     if (resolving) throw fail("Savdo serverda yakunlanmoqda yoki tekshiruv talab qiladi. Hozir tahrirlamang yoki bekor qilmang.");
@@ -152,14 +177,14 @@ export async function cancelPendingSales(service: any, user: any, body: any, dep
     const originalKey = String(original?.idempotency_key || "");
     try {
       results.push(await managePendingSale(service, user, { action: "resolve_pending_sale",
-        operation: "cancel", original_request: original, reason }, approved));
+        operation: body.operation === "remove" ? "remove" : "cancel", original_request: original, reason }, approved));
     } catch (error) {
       // A committed request is reconciled, never deleted from server history.
       try {
         const state = await managePendingSale(service, user, {
           action: "inspect_pending_sale", original_request: original,
         }, approved);
-        if (["confirmed", "cancelled"].includes(state.state)) { results.push(state); continue; }
+        if (["confirmed", "cancelled", "removed"].includes(state.state)) { results.push(state); continue; }
       } catch { /* Keep the original rejection below. */ }
       errors.push({ original_key: originalKey,
         error: error instanceof Error ? error.message : "Savdo bekor qilinmadi.", status: Number(error?.status || 500) });
