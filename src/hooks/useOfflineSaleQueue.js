@@ -4,6 +4,7 @@ import {
   listPendingSales,
   managePendingSale,
   managePendingSales,
+  removeLocalPendingSales,
   pendingSaleRetryDelay,
   savePendingSale,
   subscribePendingSales,
@@ -19,7 +20,9 @@ import {
   probePosConnection,
 } from '@/lib/pos-network';
 
-export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onConfirmed) {
+export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onConfirmed, { paused = false } = {}) {
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   const [browserOnline, setBrowserOnline] = useState(() => (
     typeof navigator === 'undefined' ? true : navigator.onLine !== false
   ));
@@ -156,9 +159,9 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     } catch { failed(); }
   }, [userId]);
 
-  const syncNow = useCallback(async ({ retryFailed = true, recordId = '' } = {}) => {
+  const syncNow = useCallback(async ({ retryFailed = true, recordId = '', automatic = false } = {}) => {
     const session = sessionRef.current;
-    if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+    if (!userId || (automatic && pausedRef.current) || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       const current = await refresh();
       return { synced: 0, remaining: current.length, failed: null, skipped: true };
     }
@@ -181,6 +184,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
         userId,
         retryFailed,
         recordId,
+        shouldStop: () => sessionRef.current !== session || (automatic && pausedRef.current),
         onConfirmed: (event) => {
           if (sessionRef.current === session) reconcileConfirmed(event);
         },
@@ -220,7 +224,30 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     }
   }, [refresh, userId, probeConnection, reportRequestSuccess, reportRequestError, reconcileConfirmed]);
 
+  const removeRecords = useCallback(async (ids, { reason, pin }) => {
+    if (!userId || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      throw new Error('Egasi PIN-kodini tekshirish uchun internet kerak.');
+    }
+    const session = sessionRef.current;
+    const isCurrent = () => mountedRef.current && sessionRef.current === session && userRef.current === userId;
+    const result = await removeLocalPendingSales({ userId, ids, isCurrent,
+      authorize: selectedIds => base44.functions.invoke('complete-sale', {
+        action: 'authorize_local_queue_removal', ids: selectedIds, reason, owner_pin: pin,
+      }),
+    });
+    if (isCurrent()) {
+      for (const row of result.results) reconcilingRef.current.delete(row.original_key);
+      setSyncError('');
+      await refresh();
+    }
+    return result;
+  }, [userId, refresh]);
+
   const resolveRecord = useCallback(async (id, { operation, finalTotal, reason, pin } = {}) => {
+    if (operation === 'remove') {
+      const result = await removeRecords([id], { reason, pin });
+      return result.results[0] || { state: 'removed', original_key: id };
+    }
     if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       throw new Error('Yuborish tugashini yoki internet ulanishini kuting.');
     }
@@ -245,9 +272,10 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
         if (mountedRef.current) setSyncing(false);
       }
     }
-  }, [userId, refresh, reconcileConfirmed]);
+  }, [userId, refresh, reconcileConfirmed, removeRecords]);
 
   const resolveRecords = useCallback(async (ids, { reason, pin, operation }) => {
+    if (operation === 'remove') return removeRecords(ids, { reason, pin });
     if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       throw new Error('Yuborish tugashini yoki internet ulanishini kuting.');
     }
@@ -274,7 +302,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
         if (mountedRef.current) { setSyncing(false); void refresh(); }
       }
     }
-  }, [userId, refresh, reconcileConfirmed]);
+  }, [userId, refresh, reconcileConfirmed, removeRecords]);
 
   const enqueue = useCallback(async (record) => {
     const session = sessionRef.current;
@@ -316,8 +344,8 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
   }, [probeConnection]);
 
   useEffect(() => {
-    if (isOnline && userId) void syncNow({ retryFailed: false });
-  }, [isOnline, syncNow, userId]);
+    if (isOnline && userId && !paused) void syncNow({ retryFailed: false, automatic: true });
+  }, [isOnline, syncNow, userId, paused]);
 
   useEffect(() => {
     if (!browserOnline || !connection.offline || !userId) return undefined;
@@ -332,16 +360,16 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
   }, [browserOnline, connection.offline, userId, probeConnection]);
 
   useEffect(() => {
-    if (!isOnline || !userId || syncing || storageError) return undefined;
+    if (!isOnline || !userId || syncing || storageError || paused) return undefined;
     const queueDelay = pendingSaleRetryDelay(records.filter((row) => row.status !== 'confirmed'));
     const reconciliationDelays = records.filter((row) => row.status === 'confirmed')
       .map((row) => Math.max(1000, (Date.parse(row.next_retry_at || '') || Date.now()) - Date.now()));
     const delays = [...(queueDelay === null ? [] : [queueDelay]), ...reconciliationDelays];
     if (!delays.length) return undefined;
     const delay = Math.min(...delays);
-    const timer = window.setTimeout(() => { void syncNow({ retryFailed: false }); }, delay);
+    const timer = window.setTimeout(() => { void syncNow({ retryFailed: false, automatic: true }); }, delay);
     return () => window.clearTimeout(timer);
-  }, [isOnline, userId, syncing, storageError, records, syncNow]);
+  }, [isOnline, userId, syncing, storageError, records, syncNow, paused]);
 
   return {
     isOnline,
