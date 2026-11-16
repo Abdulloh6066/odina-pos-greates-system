@@ -2053,6 +2053,26 @@ async function entry_default(req) {
       return Response.json({ error: "Your role cannot complete Kassa sales." }, { status: 403 });
     }
     if (user.role === "manager") await assertManagerRequestScope(service, user, body);
+    if (action === "authorize_local_queue_removal") {
+      const ids = body.ids;
+      const reason = String(body.reason || "").trim();
+      if (!Array.isArray(ids) || !ids.length || ids.length > 10000
+        || ids.some(id => typeof id !== "string" || !IDEMPOTENCY_KEY_PATTERN.test(id))
+        || new Set(ids).size !== ids.length || !reason || reason.length > 500) {
+        return Response.json({ error: "Navbat yozuvlari va sababni tekshiring." }, { status: 400 });
+      }
+      const shopId = user.role === "admin" ? null : userShopId(user);
+      if (user.role !== "admin" && !shopId) {
+        return Response.json({ error: "Xodim ish joyiga biriktirilmagan." }, { status: 403 });
+      }
+      if (!await verifyOwnerPin(service, body.owner_pin, user)) {
+        return Response.json({ error: "Navbatdan olib tashlash uchun egasi PIN-kodi kerak." }, { status: 403 });
+      }
+      // Local-device approval only: never inspect or mutate sales/stock/shifts.
+      return Response.json({ authorized: true, action: "local_queue_removal",
+        approval_id: crypto.randomUUID(), user_id: user.id, shop_id: shopId,
+        ids, reason, approved_at: new Date().toISOString() });
+    }
     if (action === "inspect_pending_sale" || action === "resolve_pending_sale") {
       return Response.json(await managePendingSale(service, user, body, {
         verifyPin: verifyOwnerPin,
