@@ -160,7 +160,7 @@ async function managePendingSale(service, user, body, deps) {
       id: shift.id,
       user_id: user.id,
       shop_id: shift.shop_id,
-      sale_request_keys: claimed ? key : { $ne: key },
+      sale_request_keys: claimed ? { $in: [key] } : { $ne: key },
       ...journalQuery2
     }, {
       ...!claimed ? { $push: { sale_request_keys: key } } : {},
