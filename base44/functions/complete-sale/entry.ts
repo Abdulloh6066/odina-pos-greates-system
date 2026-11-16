@@ -2920,6 +2920,11 @@ async function entry_default(req) {
         }
         const existingShift = shiftRead.status === "fulfilled" ? shiftRead.value : null;
         if (existingSale.financial_records_version >= 3 && !(existingShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
+          if (existingShift?.user_id === user.id
+            && (user.role === "admin" || existingShift.shop_id === user.shop_id)
+            && pendingSaleResolutions(existingShift)[idempotencyKey]?.state === "removed") {
+            return Response.json({ error: "Bu savdo egasi PIN-kodi bilan offline navbatdan olib tashlangan. Server yozuvlari saqlangan.", queue_resolution: true }, { status: 410 });
+          }
           return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi." }, { status: 503 });
         }
         let tableReleased2 = true;
