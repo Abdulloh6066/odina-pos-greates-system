@@ -50,6 +50,21 @@ async function fixture({ state = 'pending', shiftStatus = 'open', online = true,
   const edit = (id, value) => act(() => renderer.root.findByProps({ id }).props.onChange({ target: { value } }));
   return { renderer, button, click, edit, retries, resolutions, reads, unmount: () => act(() => renderer.unmount()) };
 }
+test('processing request can be removed from queue with reason and owner PIN', async () => {
+  const f = await fixture({ state: 'processing' });
+  try {
+    await f.click('Navbatdan olib tashlash');
+    assert.ok(f.button('PIN bilan olib tashlash').props.disabled);
+    f.edit('pending-sale-reason', 'Stuck sale'); f.edit('pending-sale-pin', '1234');
+    assert.equal(f.button('PIN bilan olib tashlash').props.disabled, false);
+    await act(async () => { f.renderer.root.findByType('form').props.onSubmit({ preventDefault() {} }); });
+    assert.equal(f.resolutions[0][1].operation, 'remove');
+    assert.equal(f.resolutions[0][1].reason, 'Stuck sale');
+    assert.equal(f.resolutions[0][1].pin, '1234');
+    assert.equal(f.retries.length, 0);
+  } finally { f.unmount(); }
+});
+
 test('staff sees the full rejection, 65000 amount and can retry just that sale without PIN', async () => {
   const f = await fixture();
   try {
