@@ -6,7 +6,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'pending_sales';
 const QUEUE_EVENT = 'odina:offline-sales-changed';
 const SYNC_LOCK = 'odina-pos-offline-sales-sync';
-const isResolved = row => ['cancelled', 'superseded', 'reconciled'].includes(row?.status);
+const isResolved = row => ['cancelled', 'superseded', 'reconciled', 'removed'].includes(row?.status);
 
 let databasePromise;
 let broadcastChannel;
@@ -499,11 +499,11 @@ export async function syncPendingSales({ userId, send, retryFailed = false, reco
 
 export function resolvedPendingRecords(record, result) {
   if (!record?.id || result?.original_key !== record.id
-    || !['cancelled', 'edited', 'confirmed'].includes(result?.state)) {
+    || !['cancelled', 'edited', 'confirmed', 'removed'].includes(result?.state)) {
     throw new Error('Server qarori savdo kalitiga mos kelmadi. Navbat o‘zgartirilmadi.');
   }
   const archived = { ...record, status: result.state === 'edited' ? 'superseded'
-    : result.state === 'confirmed' ? 'reconciled' : 'cancelled',
+    : result.state === 'confirmed' ? 'reconciled' : result.state === 'removed' ? 'removed' : 'cancelled',
   resolution: result, updated_at: new Date().toISOString() };
   if (result.state !== 'edited') return [archived];
   const request = result.request;
@@ -564,7 +564,7 @@ export async function managePendingSale({ userId, id, authorize, lock = withSync
     if (!record) throw new Error('Savdo navbatda topilmadi. Ro‘yxatni yangilang.');
     const response = await authorize(record);
     const payload = response?.data || response;
-    if (payload?.original_key !== record.id || !['cancelled', 'edited', 'confirmed'].includes(payload?.state)) {
+    if (payload?.original_key !== record.id || !['cancelled', 'edited', 'confirmed', 'removed'].includes(payload?.state)) {
       throw new Error(payload?.error || 'Server qarori hali tasdiqlanmadi.');
     }
     if (payload.state === 'confirmed' && (!payload.sale?.id || payload.sale.idempotency_key !== record.id
@@ -599,7 +599,7 @@ export async function managePendingSales({ userId, ids, authorize, lock = withSy
       const seen = new Set();
       for (const decision of payload.results) {
         const record = batch.find(row => row.id === decision.original_key);
-        if (!record || seen.has(record.id) || !['confirmed', 'cancelled'].includes(decision.state)
+        if (!record || seen.has(record.id) || !['confirmed', 'cancelled', 'removed'].includes(decision.state)
           || (decision.state === 'confirmed' && (!decision.sale?.id || decision.sale.idempotency_key !== record.id
             || decision.sale.user_id !== record.user_id || decision.sale.shift_id !== record.shift_id))) {
           throw new Error('Server qarori tanlangan savdoga mos kelmadi. Navbat saqlanib turadi.');
