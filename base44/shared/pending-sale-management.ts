@@ -79,7 +79,7 @@ export async function managePendingSale(service: any, user: any, body: any, deps
     const claimed = (shift.sale_request_keys || []).includes(key);
     const saved = await service.entities.Shift.updateMany({
       id: shift.id, user_id: user.id, shop_id: shift.shop_id,
-      sale_request_keys: claimed ? key : { $ne: key }, ...journalQuery,
+      sale_request_keys: claimed ? { $in: [key] } : { $ne: key }, ...journalQuery,
     }, {
       ...(!claimed ? { $push: { sale_request_keys: key } } : {}),
       $set: { pos_queue_resolutions_json: JSON.stringify({ ...resolutions, [key]: result }) },
