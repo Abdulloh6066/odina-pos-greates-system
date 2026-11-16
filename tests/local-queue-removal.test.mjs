@@ -71,6 +71,8 @@ test('failed PIN, changed user, wrong scope, and failed transaction keep queued 
     await assert.rejects(f.queue.removeLocalPendingSales({ ...options, authorize: async () => { throw new Error('503'); } }));
     await assert.rejects(f.queue.removeLocalPendingSales({ ...options, authorize: async ids => ({ ...f.approval(ids), shop_id: 'other' }) }));
     await assert.rejects(f.queue.removeLocalPendingSales({ ...options, isCurrent: () => false, authorize: async ids => f.approval(ids) }));
+    await assert.rejects(f.queue.removeLocalPendingSales({ ...options, authorizationTimeoutMs: 5,
+      authorize: async () => new Promise(() => {}) }), /PIN tekshiruvi/);
     f.failWrites(true);
     await assert.rejects(f.queue.removeLocalPendingSales({ ...options, authorize: async ids => f.approval(ids) }));
     f.failWrites(false);
