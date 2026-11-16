@@ -40,6 +40,7 @@ test('PIN removal archives stuck requests without changing server financial reco
         idempotency_key: request().idempotency_key, financial_records_version: 3, total: 65000 }];
       f.db.Payment = [{ id: 'payment', sale_id: 'partial', amount: 65000 }];
     }
+    f.db.Sale ??= []; f.db.Payment ??= [];
     const before = structuredClone({ sales: f.db.Sale, payments: f.db.Payment, stocks: f.db.ProductStock });
     const result = await f.resolve('remove');
     assert.equal(result.status, 200, JSON.stringify(result.data));
