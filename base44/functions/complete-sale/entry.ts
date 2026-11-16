@@ -77,7 +77,7 @@ var resolveAppUser = async (service, authenticatedUser) => {
 };
 
 // base44/shared/pending-sale-management.ts
-var fail = (message, status = 409) => Object.assign(new Error(message), { status });
+const fail = (message, status = 409) => Object.assign(new Error(message), { status });
 function pendingSaleResolutions(shift) {
   const raw = shift?.pos_queue_resolutions_json;
   if (!raw) return {};
@@ -107,14 +107,14 @@ async function managePendingSale(service, user, body, deps) {
   const fingerprint = await deps.fingerprint(original);
   const resolving = body.action === "resolve_pending_sale";
   const operation = String(body.operation || "");
-  if (resolving && !["edit", "cancel"].includes(operation)) throw fail("Amal noto\u2018g\u2018ri.", 400);
+  if (resolving && !["edit", "cancel", "remove"].includes(operation)) throw fail("Amal noto\u2018g\u2018ri.", 400);
   if (resolving && !await deps.verifyPin(service, body.owner_pin, user)) {
     throw fail("Tahrirlash yoki bekor qilish uchun egasi PIN-kodi kerak.", 403);
   }
   const resolutions = pendingSaleResolutions(shift);
   const prior = resolutions[key];
   if (prior) {
-    if (prior.original_fingerprint !== fingerprint || prior.user_id !== user.id || resolving && (prior.state !== (operation === "edit" ? "edited" : "cancelled") || operation === "edit" && prior.final_total !== body.final_total)) {
+    if (prior.original_fingerprint !== fingerprint || prior.user_id !== user.id || resolving && (!(operation === "remove" ? ["removed", "cancelled"] : [operation === "edit" ? "edited" : "cancelled"]).includes(prior.state) || operation === "edit" && prior.final_total !== body.final_total)) {
       throw fail("Bu savdo uchun boshqa qaror saqlangan. Holatini qayta tekshiring.");
     }
     return { ...prior, original_key: key, shift_status: shift.status };
@@ -126,14 +126,48 @@ async function managePendingSale(service, user, body, deps) {
     if (sale.user_id !== user.id || sale.shift_id !== shift.id || sale.shop_id !== shift.shop_id || sale.request_fingerprint && sale.request_fingerprint !== fingerprint) {
       throw fail("Savdo kaliti boshqa yozuvga tegishli.", 403);
     }
-    if (resolving) throw fail("Savdo serverda mavjud. Uni navbatdan tahrirlab yoki bekor qilib bo\u2018lmaydi; savdolar tarixini tekshiring.");
+    if (resolving && operation !== "remove") throw fail("Savdo serverda mavjud. Uni navbatdan tahrirlab yoki bekor qilib bo\u2018lmaydi; savdolar tarixini tekshiring.");
     const complete = sale.financial_records_version < 3 || !sale.financial_records_version || (shift.sale_request_keys || []).includes("sale-completed:" + key);
-    return {
+    if (operation !== "remove" || !resolving || complete) return {
       state: complete ? "confirmed" : "processing",
       original_key: key,
       shift_status: shift.status,
       ...complete ? { sale, shift } : {}
     };
+  }
+  if (resolving && operation === "remove" && (sale || (shift.sale_request_keys || []).includes(key))) {
+    const reason2 = String(body.reason || "").trim();
+    if (!reason2 || reason2.length > 500) throw fail("Sababni kiriting (500 belgigacha).", 400);
+    const result2 = {
+      state: "removed",
+      original_key: key,
+      original_fingerprint: fingerprint,
+      original_request_json: deps.canonical(original),
+      user_id: user.id,
+      user_name: userLabel(user),
+      shop_id: shift.shop_id,
+      shift_id: shift.id,
+      reason: reason2,
+      resolved_at: (/* @__PURE__ */ new Date()).toISOString(),
+      shift_status: shift.status,
+      server_sale_id: sale?.id || null,
+      server_state_at_removal: "processing",
+      financial_records_unchanged: true
+    };
+    const journalQuery2 = shift.pos_queue_resolutions_json == null ? { $or: [{ pos_queue_resolutions_json: { $exists: false } }, { pos_queue_resolutions_json: null }] } : { pos_queue_resolutions_json: shift.pos_queue_resolutions_json };
+    const claimed = (shift.sale_request_keys || []).includes(key);
+    const saved = await service.entities.Shift.updateMany({
+      id: shift.id,
+      user_id: user.id,
+      shop_id: shift.shop_id,
+      sale_request_keys: claimed ? key : { $ne: key },
+      ...journalQuery2
+    }, {
+      ...!claimed ? { $push: { sale_request_keys: key } } : {},
+      $set: { pos_queue_resolutions_json: JSON.stringify({ ...resolutions, [key]: result2 }) }
+    });
+    if (!saved?.success || Number(saved.updated) !== 1) throw fail("Navbat holati o\u2018zgardi. Qayta urinib ko\u2018ring.");
+    return result2;
   }
   if ((shift.sale_request_keys || []).includes(key)) {
     if (resolving) throw fail("Savdo serverda yakunlanmoqda yoki tekshiruv talab qiladi. Hozir tahrirlamang yoki bekor qilmang.");
@@ -254,7 +288,7 @@ async function cancelPendingSales(service, user, body, deps) {
     try {
       results.push(await managePendingSale(service, user, {
         action: "resolve_pending_sale",
-        operation: "cancel",
+        operation: body.operation === "remove" ? "remove" : "cancel",
         original_request: original,
         reason
       }, approved));
@@ -264,7 +298,7 @@ async function cancelPendingSales(service, user, body, deps) {
           action: "inspect_pending_sale",
           original_request: original
         }, approved);
-        if (["confirmed", "cancelled"].includes(state.state)) {
+        if (["confirmed", "cancelled", "removed"].includes(state.state)) {
           results.push(state);
           continue;
         }
