@@ -247,7 +247,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     }
   }, [userId, refresh, reconcileConfirmed]);
 
-  const resolveRecords = useCallback(async (ids, { reason, pin }) => {
+  const resolveRecords = useCallback(async (ids, { reason, pin, operation }) => {
     if (!userId || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       throw new Error('Yuborish tugashini yoki internet ulanishini kuting.');
     }
@@ -256,6 +256,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     try {
       const result = await managePendingSales({ userId, ids, authorize: records => base44.functions.invoke('complete-sale', {
         action: 'cancel_pending_sales', original_requests: records.map(record => record.request), reason, owner_pin: pin,
+        ...(operation === 'remove' ? { operation } : {}),
       }) });
       if (mountedRef.current && sessionRef.current === session && userRef.current === userId) {
         for (const decision of result.results) if (decision.state === 'confirmed') {
