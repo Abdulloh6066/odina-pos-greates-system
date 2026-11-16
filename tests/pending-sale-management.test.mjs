@@ -31,6 +31,34 @@ function fixture(status = 'open') {
     original_request: request(), owner_pin: '1234', reason: 'Central order review', ...extra });
   return { ...f, call, inspect, resolve };
 }
+test('one PIN approval for 50 local entries does not read stuck sales or shifts', async () => {
+  const f = fixture();
+  let pinReads = 0;
+  const readPin = f.entities.SecuritySettings.filter;
+  f.entities.SecuritySettings.filter = async (...args) => { pinReads++; return readPin(...args); };
+  for (const name of ['Sale', 'Shift', 'ProductStock', 'Payment', 'Product']) {
+    f.entities[name].get = f.entities[name].filter = f.entities[name].updateMany = async () => { throw new Error('No financial access allowed: ' + name); };
+  }
+  const ids = Array.from({ length: 50 }, (_, i) => 'pos-local-removal-' + String(i).padStart(6, '0'));
+  const result = await f.call({ action: 'authorize_local_queue_removal', ids, reason: 'Stuck queue', owner_pin: '1234' });
+  assert.equal(result.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.authorized, true);
+  assert.equal(result.data.user_id, 'staff');
+  assert.equal(result.data.shop_id, 'shop');
+  assert.deepEqual(result.data.ids, ids);
+  assert.equal(pinReads, 1);
+  assert.equal(JSON.stringify(result.data).includes('1234'), false);
+});
+test('local queue approval rejects incorrect PIN and invalid selection', async () => {
+  const f = fixture();
+  const base = { action: 'authorize_local_queue_removal', ids: [request().idempotency_key], reason: 'Stuck queue', owner_pin: '1234' };
+  assert.equal((await f.call({ ...base, owner_pin: '9999' })).status, 403);
+  assert.equal((await f.call({ ...base, reason: '' })).status, 400);
+  assert.equal((await f.call({ ...base, ids: [base.ids[0], base.ids[0]] })).status, 400);
+  f.db.User[0].active = false;
+  assert.equal((await f.call(base)).status, 403);
+});
+
 test('PIN removal archives stuck requests without changing server financial records', async () => {
   for (const partial of [false, true]) {
     const f = fixture('closed');
