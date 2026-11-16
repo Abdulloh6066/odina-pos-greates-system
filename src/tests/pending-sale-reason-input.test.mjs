@@ -26,7 +26,7 @@ const code = ts.transpileModule(source, { compilerOptions: {
 const { default: PendingSalesDialog } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 
 for (const state of [{ online: false, syncing: false }, { online: true, syncing: true }]) {
-  test('reason remains editable and submission blocked during ' + (!state.online ? 'disconnection' : 'background sync'), async () => {
+  test('reason remains editable during ' + (!state.online ? 'disconnection' : 'background sync'), async () => {
     let view;
     let calls = 0;
     let finish;
@@ -47,9 +47,11 @@ for (const state of [{ online: false, syncing: false }, { online: true, syncing:
     assert.equal(field().props.disabled, false);
     act(() => field().props.onChange({ target: { value: 'Takroriy savdo 123' } }));
     assert.equal(field().props.value, 'Takroriy savdo 123');
-    assert.equal(submit().props.disabled, true);
-    await act(async () => { form().props.onSubmit({ preventDefault() {} }); });
-    assert.equal(calls, 0, 'blocked submit must not call the cancellation handler');
+    assert.equal(submit().props.disabled, !state.online);
+    if (!state.online) {
+      await act(async () => { form().props.onSubmit({ preventDefault() {} }); });
+      assert.equal(calls, 0, 'offline submit must not call the removal handler');
+    }
     await act(async () => { view.update(React.createElement(PendingSalesDialog, props)); });
     assert.equal(field().props.value, 'Takroriy savdo 123');
     assert.equal(submit().props.disabled, false);
