@@ -752,7 +752,7 @@ export default function POS() {
     shiftMutationRef.current++;
     setShift(currentShift);
     setShiftReadState('ready');
-  }, confirmQueuedSale);
+  }, confirmQueuedSale, { paused: pendingSalesOpen });
   const isOnline = queueOnline && !catalogOffline;
   const queueEligible = canQueuePosSale({ selectedTable, takeawayOrder,
     takeawayRequestId: takeawayRequestIdRef.current, discountCode, roundingTarget });
