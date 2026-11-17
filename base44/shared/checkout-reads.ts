@@ -83,7 +83,7 @@ export function createCheckoutReadTracker(originalService: any) {
                   attempts++;
                   try { return await original.apply(record, args); }
                   catch (error) {
-                    if (attempts > 1 || retriesLeft === 0 || !isTransientCheckoutError(error)) throw error;
+                    if (Number(error?.response?.status || error?.status) === 429 || attempts > 1 || retriesLeft === 0 || !isTransientCheckoutError(error)) throw error;
                     retriesLeft--; retries++;
                     console.warn("[Odina database read retry]", JSON.stringify({ entity: entityName, method }));
                   }
