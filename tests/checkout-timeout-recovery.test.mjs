@@ -5,6 +5,59 @@ import { memoryBackend } from './helpers/memory-backend.mjs';
 import { checkoutFixture } from './checkout-read-latency.test.mjs';
 import { openPosShift, fetchCurrentPosShift, invokePosRead } from '../src/lib/current-pos-shift.js';
 const entry = 'base44/functions/complete-sale/entry.ts';
+
+test('claimed sale returns a scoped processing signal without catalog reads or any writes', async () => {
+  const f = checkoutFixture(1);
+  f.db.Shift[0].sale_request_keys = [f.request.idempotency_key];
+  for (const entity of ['Product', 'ProductStock', 'Recipe', 'Settings']) {
+    for (const method of ['get', 'filter', 'list']) f.entities[entity][method] = async () => { assert.fail('No catalog reads for claimed sale'); };
+  }
+  const result = await f.invoke(entry, f.request);
+  assert.equal(result.status, 503); assert.equal(result.data.code, 'SALE_PROCESSING');
+  assert.equal(result.data.retry_after_ms, 15000); assert.equal(f.calls.length, 0);
+  assert.deepEqual(f.db.Shift[0].sale_request_keys, [f.request.idempotency_key]);
+  f.db.User[0].shop_id = 'another-shop';
+  assert.equal((await f.invoke(entry, f.request)).status, 403);
+  assert.equal(f.calls.length, 0);
+});
+
+test('partial sale is never acknowledged or replayed and a failed completion read stays a global outage', async () => {
+  const f = checkoutFixture(1);
+  assert.equal((await f.invoke(entry, f.request)).status, 200);
+  f.db.Shift[0].sale_request_keys = [f.request.idempotency_key];
+  const snapshot = structuredClone(f.db), writes = f.calls.length;
+  const result = await f.invoke(entry, f.request);
+  assert.equal(result.status, 503); assert.equal(result.data.code, 'SALE_PROCESSING');
+  assert.deepEqual(f.db, snapshot); assert.equal(f.calls.length, writes);
+  f.entities.Shift.get = async () => { throw new Error('connection timed out'); };
+  const outage = await f.invoke(entry, f.request);
+  assert.equal(outage.status, 503); assert.equal(outage.data.code, undefined);
+  assert.equal(f.calls.length, writes);
+});
+
+test('provider throttling is not retried immediately and retains its cooldown for the queue', async () => {
+  for (const retryAfter of [undefined, 25000]) {
+    const f = checkoutFixture(1); let reads = 0;
+    f.entities.Sale.filter = async () => {
+      reads++; throw { response: { status: 429, data: { retry_after_ms: retryAfter } } };
+    };
+    const result = await f.invoke(entry, f.request);
+    assert.equal(result.status, 429);
+    assert.equal(result.data.retry_after_ms, retryAfter || 60000);
+    assert.equal(reads, 1); assert.equal(f.calls.length, 0);
+  }
+});
+
+test('shared checkout reader also leaves rate-limited reads to the durable queue', async () => {
+  const f = checkoutFixture(1);
+  const { createCheckoutReadTracker } = f.load('base44/shared/checkout-reads.ts');
+  let reads = 0;
+  f.entities.Shop.get = async () => { reads++; throw Object.assign(new Error('rate limit'), { status: 429 }); };
+  const tracker = createCheckoutReadTracker(f.service);
+  await assert.rejects(tracker.service.entities.Shop.get('shop'), { status: 429 });
+  assert.equal(reads, 1); assert.equal(tracker.snapshot().read_retries, 0);
+});
+
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 
 test('ordinary checkout overlaps shop contacts, verified products, and stock policy before writes', { timeout: 5000 }, async () => {
