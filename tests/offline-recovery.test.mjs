@@ -172,6 +172,39 @@ test('hook accepts many offline sales, keeps them across remount, then recovers 
   } finally { await f.unmount(); }
 });
 
+test('reconnect drains valid sales past processing and invalid entries, then retries only the processing sale', async () => {
+  const seed = Array.from({ length: 30 }, (_, i) => record(i));
+  let processing = true;
+  const f = mountHook({ connected: false, seed, transport: async (_, body) => {
+    if (body.action === 'get_current_shift') return { data: { ok: true, shift: { id: 'shift', status: 'open' } } };
+    if (body.idempotency_key === seed[0].id && processing) throw {
+      response: { status: 503, data: { code: 'SALE_PROCESSING', retry_after_ms: 15000 } },
+    };
+    if (body.idempotency_key === seed[1].id) throw error(409, 'Offline savdo smena ochilishidan oldin yozilgan.');
+    return { data: { sale: { id: body.idempotency_key } } };
+  } });
+  await f.mount();
+  try {
+    assert.equal(f.calls.length, 0);
+    f.nav.onLine = true;
+    await act(async () => { f.c.listeners.get('online')(); await tick(); await tick(); });
+    assert.equal(f.q.rows().length, 2);
+    assert.equal(f.q.rows()[1].status, 'failed');
+    assert.equal(f.calls.filter(([, body]) => body.action === 'complete_sale').length, 30);
+    // A regular checkout/refresh must neither bypass cooldown nor retry bad dates.
+    await act(async () => { await f.value().syncNow(); await tick(); });
+    assert.equal(f.calls.filter(([, body]) => body.action === 'complete_sale').length, 30);
+    processing = false;
+    await f.timer();
+    assert.equal(f.q.rows().length, 1);
+    assert.equal(f.q.rows()[0].id, seed[1].id);
+    assert.deepEqual(f.q.rows()[0].request, seed[1].request);
+    const sent = f.calls.filter(([, body]) => body.action === 'complete_sale').map(([, body]) => body);
+    assert.equal(sent.length, 31);
+    assert.deepEqual(sent.at(-1), seed[0].request);
+  } finally { await f.unmount(); }
+});
+
 test('two network failures while browser stays online pause writes; read-only recovery resumes the queue', async () => {
   let down = true;
   const f = mountHook({ seed: [record(0)], transport: async (_, body) => {
