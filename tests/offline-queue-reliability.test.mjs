@@ -17,6 +17,73 @@ const queue = (seed = ['bad', 'good']) => {
   return { storage, run, rows: () => rows };
 };
 const failure = status => Object.assign(new Error('Mock request failure'), { status });
+const processing = () => ({ response: { status: 503,
+  data: { code: 'SALE_PROCESSING', error: 'Still processing', retry_after_ms: 15000 } } });
+
+test('a processing sale backs off independently while later sales send, then confirms with its original key', async () => {
+  const q = queue(), requests = [];
+  const original = structuredClone(q.rows()[0].request);
+  await q.run(async req => {
+    requests.push(structuredClone(req));
+    if (req.idempotency_key === 'bad') throw processing();
+    return { sale: { id: 'saved-good' } };
+  });
+  assert.deepEqual(requests.map(req => req.idempotency_key), ['bad', 'good']);
+  assert.equal(q.rows().length, 1);
+  assert.equal(q.rows()[0].retry_scope, 'sale');
+  assert.equal(pendingSaleRetryDelay(q.rows(), timestamp), 15250);
+  await q.run(async () => { throw new Error('must wait'); });
+  assert.equal(q.rows()[0].attempts, 1);
+  const result = await q.run(async req => {
+    assert.deepEqual(req, original); return { sale: { id: 'saved-bad' } };
+  }, { now: () => timestamp + 15250 });
+  assert.equal(result.synced, 1); assert.equal(result.remaining, 0);
+});
+
+test('persistently processing entries stop automatic retries after six checks and remain recoverable', async () => {
+  const q = queue(['stuck']), original = structuredClone(q.rows()[0].request);
+  let current = timestamp, calls = 0;
+  for (let i = 0; i < 6; i++) {
+    await q.run(async () => { calls++; throw processing(); }, { now: () => current });
+    current += 61000;
+  }
+  assert.equal(calls, 6); assert.equal(q.rows()[0].status, 'failed');
+  assert.deepEqual(q.rows()[0].request, original);
+  assert.equal(pendingSaleRetryDelay(q.rows(), current), null);
+  await q.run(async () => { calls++; }, { now: () => current });
+  assert.equal(calls, 6);
+  const result = await q.run(async req => {
+    assert.deepEqual(req, original); return { sale: { id: 'completed-later' } };
+  }, { retryFailed: true, now: () => current });
+  assert.equal(result.remaining, 0);
+});
+
+test('a rate limit behind a processing entry pauses every retry including explicit retries and survives reload', async () => {
+  const q = queue(['stuck', 'limited', 'later']), sent = [];
+  await q.run(async req => {
+    sent.push(req.idempotency_key);
+    if (req.idempotency_key === 'stuck') throw processing();
+    throw { response: { status: 429, data: { retry_after_ms: 45000 } } };
+  });
+  assert.deepEqual(sent, ['stuck', 'limited']);
+  // Scheduler derives cooldown only from durable rows, no page-local state.
+  assert.equal(pendingSaleRetryDelay(structuredClone(q.rows()), timestamp), 45250);
+  for (const retryFailed of [false, true]) await q.run(async () => {
+    assert.fail('cooldown must not be bypassed');
+  }, { retryFailed, recordId: 'later' });
+  const result = await q.run(async () => ({ sale: { id: 'saved' } }), { now: () => timestamp + 45250 });
+  assert.equal(result.synced, 3); assert.equal(result.remaining, 0);
+});
+
+test('a new eligible sale schedules promptly behind a processing-only cooldown', async () => {
+  const q = queue();
+  await q.storage.update('bad', { retry_scope: 'sale', next_retry_at: new Date(timestamp + 60000).toISOString() });
+  assert.equal(pendingSaleRetryDelay(q.rows(), timestamp), 1000);
+  const sent = [];
+  await q.run(async req => { sent.push(req.idempotency_key); return { sale: { id: 'saved' } }; });
+  assert.deepEqual(sent, ['good']); assert.equal(q.rows()[0].id, 'bad');
+});
+
 
 test('permanently invalid sale is retained while a valid sale behind it synchronizes', async () => {
   const q = queue(); const sent = [];
