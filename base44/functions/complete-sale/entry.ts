@@ -2938,7 +2938,13 @@ async function entry_default(req) {
             error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan."
           }, { status: 409 });
         }
-        if (existingSale.financial_records_version >= 3 && shiftRead.status === "rejected") throw shiftRead.reason;
+        if (existingSale.financial_records_version >= 3 && shiftRead.status === "rejected") {
+          if (Number(shiftRead.reason?.response?.status || shiftRead.reason?.status) === 429) throw shiftRead.reason;
+          return Response.json({
+            error: "Savdo holatini hozir tekshirib bo‘lmadi. Shu kalit bilan qayta tekshiriladi.",
+            retry_after_ms: 15000
+          }, { status: 503 });
+        }
         const existingShift = shiftRead.status === "fulfilled" ? shiftRead.value : null;
         if (existingSale.financial_records_version >= 3 && !(existingShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
           if (existingShift?.user_id === user.id
@@ -3217,7 +3223,7 @@ async function entry_default(req) {
         );
         const completedSale = completedMatches?.[0];
         if (completedSale && completedSale.user_id === user.id && completedSale.shift_id === shift.id && (!completedSale.request_fingerprint || completedSale.request_fingerprint === requestFingerprint)) {
-          const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
+          const completedShift = await service.entities.Shift.get(shift.id);
           if (completedSale.financial_records_version >= 3 && !(completedShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
             return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi.", code: "SALE_PROCESSING", retry_after_ms: 15000 }, { status: 503 });
           }
