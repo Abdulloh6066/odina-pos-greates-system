@@ -159,7 +159,7 @@ export default function useOfflineSaleQueue(userId, onSynced, onRecovered, onCon
     } catch { failed(); }
   }, [userId]);
 
-  const syncNow = useCallback(async ({ retryFailed = true, recordId = '', automatic = false } = {}) => {
+  const syncNow = useCallback(async ({ retryFailed = false, recordId = '', automatic = false } = {}) => {
     const session = sessionRef.current;
     if (!userId || (automatic && pausedRef.current) || syncingRef.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       const current = await refresh();
