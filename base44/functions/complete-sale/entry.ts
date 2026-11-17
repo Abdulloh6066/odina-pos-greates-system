@@ -671,7 +671,7 @@ function createCheckoutReadTracker(originalService) {
                   try {
                     return await original.apply(record, args);
                   } catch (error) {
-                    if (attempts > 1 || retriesLeft === 0 || !isTransientCheckoutError(error)) throw error;
+                    if (Number(error?.response?.status || error?.status) === 429 || attempts > 1 || retriesLeft === 0 || !isTransientCheckoutError(error)) throw error;
                     retriesLeft--;
                     retries++;
                     console.warn("[Odina database read retry]", JSON.stringify({ entity: entityName, method }));
@@ -2938,6 +2938,7 @@ async function entry_default(req) {
             error: "Bu savdo kaliti boshqa savdo uchun ishlatilgan."
           }, { status: 409 });
         }
+        if (existingSale.financial_records_version >= 3 && shiftRead.status === "rejected") throw shiftRead.reason;
         const existingShift = shiftRead.status === "fulfilled" ? shiftRead.value : null;
         if (existingSale.financial_records_version >= 3 && !(existingShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
           if (existingShift?.user_id === user.id
@@ -2945,7 +2946,7 @@ async function entry_default(req) {
             && pendingSaleResolutions(existingShift)[idempotencyKey]?.state === "removed") {
             return Response.json({ error: "Bu savdo egasi PIN-kodi bilan offline navbatdan olib tashlangan. Server yozuvlari saqlangan.", queue_resolution: true }, { status: 410 });
           }
-          return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi." }, { status: 503 });
+          return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi.", code: "SALE_PROCESSING", retry_after_ms: 15000 }, { status: 503 });
         }
         let tableReleased2 = true;
         if (existingSale.table_order_id_snapshot) {
@@ -2992,6 +2993,14 @@ async function entry_default(req) {
     }
     if (["cashier", "manager"].includes(user.role) && user.shop_id !== shift.shop_id) {
       return Response.json({ error: "This cashier is assigned to a different shop." }, { status: 403 });
+    }
+    // An acknowledged claim is a fence, not permission to replay its writes.
+    // Check it before catalog/recipe reads so stuck entries cannot exhaust reads.
+    if (idempotencyKey && (shift.sale_request_keys || []).includes(idempotencyKey)) {
+      return Response.json({
+        error: "Savdo serverda yakunlanmoqda. Shu kalit bilan qayta tekshiriladi.",
+        code: "SALE_PROCESSING", retry_after_ms: 15000
+      }, { status: 503 });
     }
     const hasTable = body?.table_number !== void 0 && body?.table_number !== null;
     const hasTakeaway = Boolean(body?.takeaway_order_id);
@@ -3210,7 +3219,7 @@ async function entry_default(req) {
         if (completedSale && completedSale.user_id === user.id && completedSale.shift_id === shift.id && (!completedSale.request_fingerprint || completedSale.request_fingerprint === requestFingerprint)) {
           const completedShift = await service.entities.Shift.get(shift.id).catch(() => null);
           if (completedSale.financial_records_version >= 3 && !(completedShift?.sale_request_keys || []).includes(`sale-completed:${idempotencyKey}`)) {
-            return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi." }, { status: 503 });
+            return Response.json({ error: "Savdo yozuvlari hali yakunlanmagan. Shu kalit bilan qayta tekshiriladi.", code: "SALE_PROCESSING", retry_after_ms: 15000 }, { status: 503 });
           }
           let tableReleased2 = true;
           if (completedSale.table_order_id_snapshot) {
@@ -3244,7 +3253,8 @@ async function entry_default(req) {
           ).catch(() => false);
         }
         return Response.json({
-          error: "Savdo serverda yakunlanmoqda. Bir ozdan so\u2018ng avtomatik qayta yuboriladi."
+          error: "Savdo serverda yakunlanmoqda. Bir ozdan so\u2018ng avtomatik qayta yuboriladi.",
+          code: "SALE_PROCESSING", retry_after_ms: 15000
         }, { status: 503 });
       }
       idempotencyClaimed = true;
@@ -3639,6 +3649,15 @@ async function entry_default(req) {
       }
     }
     const transient = Boolean(trackedAction) && isTransientCheckoutError(error);
+    // Preserve throttling instead of hiding it behind a generic 503. Immediate
+    // retries during the provider's limit window only prolong the outage.
+    if (Number(error?.response?.status || error?.status) === 429) {
+      const retryAfter = Number(error?.response?.data?.retry_after_ms ?? error?.data?.retry_after_ms);
+      return Response.json({
+        error: "Server so‘rov chegarasiga yetdi. Savdolar saqlangan va kutishdan keyin avtomatik yuboriladi.",
+        retry_after_ms: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 60000
+      }, { status: 429 });
+    }
     return Response.json({
       error: transient ? "Server ma\u2019lumotlar bazasiga vaqtincha ulanib bo\u2018lmadi. Savdo holatini tekshiring va shu so\u2018rov bilan qayta urinib ko\u2018ring." : error instanceof Error ? error.message : "Savdoni yakunlab bo\u2018lmadi.",
       ...transient ? { server_recovery_attempted: readTracker.snapshot().read_retries > 0 } : {}
