@@ -371,11 +371,17 @@ export function isRetryableSyncError(error) {
   return !status || status === 408 || status === 429 || status >= 500;
 }
 
+export function isSaleProcessingError(error) {
+  const data = error?.response?.data || error?.data;
+  return Number(error?.response?.status || error?.status || 0) === 503
+    && data?.code === 'SALE_PROCESSING';
+}
+
 export function syncRetryDelay(error, attempts = 0) {
   const status = Number(error?.response?.status || error?.status || 0);
   if (status === 401 || status === 403) return 60000;
   const retryAfter = Number(error?.response?.data?.retry_after_ms ?? error?.data?.retry_after_ms);
-  if (status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) {
+  if ([429, 503].includes(status) && Number.isFinite(retryAfter) && retryAfter > 0) {
     return Math.min(600000, Math.max(1000, retryAfter + 250));
   }
   return Math.min(60000, 5000 * (2 ** Math.min(Number(attempts || 0), 4)));
@@ -398,10 +404,13 @@ async function withSyncLock(work) {
 export function pendingSaleRetryDelay(records, now = Date.now()) {
   const pending = (records || []).filter((row) => row.status !== 'failed');
   if (!pending.length) return null;
-  // Keep temporary outages ordered: a newer sale must not defeat the oldest
-  // pending request's backoff and cause repeated server calls every second.
-  const next = Date.parse(pending[0].next_retry_at || '');
-  return Math.max(1000, Number.isFinite(next) ? next - now : 1000);
+  // Outages/throttling pause every sale, even if a processing entry precedes
+  // the affected row. A single processing sale only delays its own retry.
+  const globalNext = Math.max(0, ...pending
+    .filter(row => row.retry_scope !== 'sale')
+    .map(row => Date.parse(row.next_retry_at || '') || 0));
+  const next = Math.min(...pending.map(row => Date.parse(row.next_retry_at || '') || now));
+  return Math.max(1000, globalNext - now, next - now);
 }
 
 // Storage injection is used by memory-only regression tests; production defaults
@@ -423,10 +432,17 @@ export async function syncPendingSales({ userId, send, retryFailed = false, reco
     let failed = priorFailure && !retryFailed
       ? { id: priorFailure.id, retryable: false, message: priorFailure.last_error } : null;
 
+    // Reconnect, another tab and new checkouts must not defeat an existing
+    // outage cooldown. Even explicit retries respect a server rate limit.
+    const cooling = records.find(row => row.status !== 'failed' && row.retry_scope !== 'sale'
+      && Date.parse(row.next_retry_at || '') > now()
+      && (!retryFailed || Number(row.last_error_status) === 429));
+    if (cooling) return { synced, remaining: records.length, failed };
+
     for (const record of records.filter((row) => !recordId || row.id === recordId)) {
       if (shouldStop() || (typeof navigator !== 'undefined' && navigator.onLine === false)) break;
       if (!retryFailed && record.status === 'failed') continue;
-      if (!retryFailed && Date.parse(record.next_retry_at || '') > now()) break;
+      if (!retryFailed && Date.parse(record.next_retry_at || '') > now()) continue;
 
       await storage.update(record.id, {
         status: 'syncing',
@@ -479,19 +495,30 @@ export async function syncPendingSales({ userId, send, retryFailed = false, reco
       } catch (error) {
         const status = Number(error?.response?.status || error?.status || 0);
         const sessionBlocked = status === 401 || status === 403;
-        const retryable = isRetryableSyncError(error) || sessionBlocked;
-        const message = syncErrorMessage(error);
-        const delay = syncRetryDelay(error, record.attempts);
+        const processing = isSaleProcessingError(error);
+        const processingAttempts = processing ? Number(record.processing_attempts || 0) + 1 : 0;
+        // Keep ambiguous sales intact for owner review after bounded checks.
+        // Never release their server claim or submit them with a new key.
+        const needsReview = processing && processingAttempts >= 6;
+        const retryable = !needsReview && (isRetryableSyncError(error) || sessionBlocked);
+        const message = needsReview
+          ? 'Savdo serverda yakunlangani tasdiqlanmadi. Egasi holatini tekshirishi kerak. Boshqa savdolar yuborilmoqda.'
+          : syncErrorMessage(error);
+        const delay = processing
+          ? Math.max(syncRetryDelay(error, 0), Math.min(60000, 15000 * processingAttempts))
+          : syncRetryDelay(error, record.attempts);
         await storage.update(record.id, {
           status: retryable ? 'pending' : 'failed',
           last_error: message,
           last_error_status: status,
+          retry_scope: processing ? 'sale' : 'queue',
+          processing_attempts: processingAttempts,
           next_retry_at: retryable ? new Date(now() + delay).toISOString() : '',
         });
         failed = failed || { id: record.id, retryable, message, status, network: isPosNetworkError(error) };
         // Connection, throttling and session errors affect the whole queue.
         // A permanently rejected independent POS sale must not block the rest.
-        if (retryable) break;
+        if (retryable && !processing) break;
       }
     }
 
