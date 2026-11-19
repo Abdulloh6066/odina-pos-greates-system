@@ -22,7 +22,7 @@ export default function AIHisobot(){
   const cutoff=new Date(),day=uzbekistanDateKey(cutoff);
   try{
    const shop=scope.shops.find(s=>s.id===shopId);if(!shop)throw Error('Do‘kon tanlanmagan.');
-   let lines=['ODINA · '+shop.name,'Asia/Tashkent · So‘rov vaqti: '+formatUzbekistanDateTime(cutoff)];
+   let lines=['ODINA · '+shop.name,'So‘rov vaqti: '+formatUzbekistanDateTime(cutoff)];
    if(mode==='today'){
     const res=await base44.functions.invoke('daily-sales-export',{action:'range',date_from:day,date_to:day});
     if(!Array.isArray(res.data?.shops))throw Error('Server hisoboti to‘liq kelmadi.');
