@@ -48,6 +48,7 @@ export default function Sidebar({ user, adminShopScope, mobileOpen, onClose, col
   const warehouseWorkspace = scopedLocation?.location_type === 'production'
     || scopedLocation?.allows_pos === false;
   const items = MENU_ITEMS.filter((item) => canAccess(role, item.key)
+    && (item.key !== 'aihisobot' || user?.is_owner === true || user?.data?.is_owner === true)
     && (item.key !== 'wholesale' || canUseWholesaleWorkspace(user, adminShopScope))
     && !(warehouseWorkspace && ['pos', 'sales', 'cashouts', 'recipients', 'blankform'].includes(item.key)));
   const hasKassa = items.some((item) => item.key === 'pos');
