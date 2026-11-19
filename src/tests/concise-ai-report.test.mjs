@@ -46,7 +46,9 @@ test('zero sales, no category clutter, no guessed test exclusions',()=>{
 });
 test('owner scope, live selection, copy and response guards stay read-only',()=>{
  const code=readFileSync(new URL('../pages/AIHisobot.jsx',import.meta.url),'utf8');
- assert.match(code,/if\(!owner\|\|!scope\?\.ready\|\|!shopId\)return/);
+ assert.match(code,/if\(!owner\|\|!scopeReady\|\|!shopId\|\|!shopName\)return/);
+ assert.match(code,/if\(owner&&scopeReady&&shopId&&shopName\)void load\(\)/);
+ assert.match(code,/\[owner,scopeReady,shopId,shopName,userId,userRole,mode\]/);
  assert.match(code,/shop_id:shopId,status/);assert.match(code,/s.shop_id===shopId/);assert.match(code,/version===request.current/);
  assert.match(code,/setText\(''\)/);assert.match(code,/created_date:\{\$lte:cutoffISO\}/);
  assert.equal((code.match(/clipboard.writeText/g)||[]).length,1);
