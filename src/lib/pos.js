@@ -10,7 +10,7 @@ export const PAYMENT_METHODS = [
 ];
 
 export const ROLE_MENU = {
-  admin: ['wholesale', 'admin', 'dashboard', 'pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
+  admin: ['aihisobot', 'wholesale', 'admin', 'dashboard', 'pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'security', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'budget', 'users', 'settings', 'screens'],
   manager: ['dashboard', 'pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'categories', 'reports', 'profit', 'audit', 'dailyexport', 'discounts', 'sales', 'shifts', 'cashouts', 'recipients', 'users'],
   cashier: ['pos', 'blankform', 'orders', 'tables', 'customers', 'waste', 'warehouse', 'products', 'sales', 'shifts', 'cashouts'],
   accountant: ['dashboard', 'customers', 'warehouse', 'products', 'categories', 'reports', 'profit', 'dailyexport', 'discounts', 'sales', 'shifts'],
@@ -42,6 +42,7 @@ export const MENU_ITEMS = [
   { key: 'products', label: '3D +', path: '/3d-plus', icon: 'Cake' },
   { key: 'categories', label: 'Kategoriyalar', path: '/categories', icon: 'Tags' },
   { key: 'reports', label: 'Hisobotlar', path: '/reports', icon: 'BarChart3' },
+  { key: 'aihisobot', label: 'AI Hisobot', path: '/ai-hisobot', icon: 'BarChart3' },
   { key: 'profit', label: 'Tannarx va foyda', path: '/profit', icon: 'TrendingUp' },
   { key: 'audit', label: 'Nazorat va eksport', path: '/audit', icon: 'ShieldCheck' },
   { key: 'dailyexport', label: 'Kunlik eksport', path: '/daily-export', icon: 'FileSpreadsheet' },
