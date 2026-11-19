@@ -2,6 +2,16 @@ import {categoryRank,reportNumber as n} from './ai-report.js';
 const number = v => v!==null && v!==undefined && v!=='' && typeof v!=='boolean' && Number.isFinite(Number(v)) ? Number(v) : null;
 const required = v => {const x=number(v);if(x===null||x<0)throw Error('Tarixiy qiymat yetishmaydi. Hisobot to‘liq emas.');return x;};
 const close = (a,b) => Math.abs(a-b)<0.01;
+// Match the accounting report: a raw refund row can exist before its sale is marked refunded.
+export function selectReportRefunds(refunds, originals){
+ const saleMap=new Map(originals.map(sale=>[sale.id,sale]));
+ return refunds.filter(refund=>{
+  const sale=saleMap.get(refund.sale_id);
+  if(!sale||sale.shop_id!==refund.shop_id)throw Error('Qaytarilgan savdoning asl yozuvi topilmadi. Hisobotni tekshiring.');
+  return sale.status==='refunded'&&(!sale.refund_id||sale.refund_id===refund.id);
+ });
+}
+
 export function conciseShiftReport({sales,items,products=[],categories=[],refunds=[]}){
  const valid=sales.filter(s=>['completed','refunded'].includes(s.status));
  const bySale=new Map();for(const i of items){const a=bySale.get(i.sale_id)||[];a.push(i);bySale.set(i.sale_id,a);}
