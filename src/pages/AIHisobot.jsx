@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button';
 import {readAllEntityPages,salesHistoryQuery} from '@/lib/history-pagination';
 import {formatUzbekistanDateTime,uzbekistanDateKey} from '@/lib/uzbekistan-time';
 import {isReportOwner} from '@/lib/ai-report';
-import {conciseShiftReport} from '@/lib/concise-ai-report';
+import {conciseShiftReport,selectReportRefunds} from '@/lib/concise-ai-report';
 
 export default function AIHisobot(){
  const {user,adminShopScope:scope}=useOutletContext();
@@ -44,7 +44,16 @@ export default function AIHisobot(){
    for(let start=0;start<sales.length&&isCurrent();start+=50){
     items.push(...await readAllEntityPages(base44.entities.SaleItem,{shop_id:shopId,sale_id:{$in:sales.slice(start,start+50).map(s=>s.id)}},'id',isCurrent));
    }
-   const result=conciseShiftReport({sales,items,products,categories,refunds:refunds.filter(r=>r.shop_id===shopId&&(!shift||r.shift_id===shift.id))});
+   const scopedRefunds=refunds.filter(r=>r.shop_id===shopId&&(!shift||r.shift_id===shift.id));
+   const saleIds=new Set(sales.map(s=>s.id));
+   const missingOriginalIds=[...new Set(scopedRefunds.map(r=>r.sale_id).filter(id=>id&&!saleIds.has(id)))];
+   const originals=[...sales];
+   // A refund can happen in a later shift than the original receipt.
+   for(let start=0;start<missingOriginalIds.length&&isCurrent();start+=50){
+    originals.push(...await readAllEntityPages(base44.entities.Sale,{shop_id:shopId,id:{$in:missingOriginalIds.slice(start,start+50)}},'id',isCurrent));
+   }
+   if(!isCurrent())return;
+   const result=conciseShiftReport({sales,items,products,categories,refunds:selectReportRefunds(scopedRefunds,originals)});
    if(isCurrent()){
     setText(result.text);
     setContext(shop.name+' · '+(shift?(mode==='open'?'Hozirgi ochiq smena':'Oxirgi yopilgan smena')+' · '+formatUzbekistanDateTime(shift.opened_at||shift.created_date)+' — '+formatUzbekistanDateTime(shift.closed_at||cutoff):'Bugun · '+day)+' · Yuklangan: '+formatUzbekistanDateTime(cutoff));
