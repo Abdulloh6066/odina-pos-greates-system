@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {conciseShiftReport} from '../lib/concise-ai-report.js';
+import {conciseShiftReport,selectReportRefunds} from '../lib/concise-ai-report.js';
 import {readFileSync} from 'node:fs';
 const receipt={id:'s',shop_id:'a',status:'completed',total:130000,payments:[{method:'cash',amount:80000},{method:'uzcard',amount:30000},{method:'online',amount:20000}],sale_items_count:2};
 const items=[{sale_id:'s',product_id:'b',product_name_snapshot:'Burger classic, frisiz',quantity:2,sale_unit:'piece',line_total:72879,category_name_snapshot:'FOOD'},{sale_id:'s',product_id:'c',product_name_snapshot:'Kapuchino',quantity:2,sale_unit:'piece',line_total:57121,category_name_snapshot:'Kofe'}];
@@ -29,6 +29,16 @@ test('weighed quantity is not mixed into piece count; refunds not silently alloc
  const r=conciseShiftReport({sales:[{id:'g',status:'refunded',total:20000,payments:[{method:'cash',amount:20000}]}],items:[{sale_id:'g',product_name_snapshot:'Cake',quantity:250,sale_unit:'gram',line_total:20000}],refunds:[{amount:10000}]});
  assert.equal(r.pieces,0);assert.equal(r.grams,250);assert.match(r.text,/250 g/);
  assert.match(r.text,/Qaytarishlar — 10 000 so‘m/);assert.match(r.text,/sof savdo — 10 000 so‘m/);assert.equal(r.payments.cash,20000);
+});
+test('refunds follow original sale status, linked ID and shop, including prior sales',()=>{
+ const current={id:'s',shop_id:'a',status:'completed'};
+ const prior={id:'old',shop_id:'a',status:'refunded',refund_id:'confirmed'};
+ const pending={id:'pending',sale_id:'s',shop_id:'a',amount:20};
+ const duplicate={id:'duplicate',sale_id:'old',shop_id:'a',amount:40};
+ const confirmed={id:'confirmed',sale_id:'old',shop_id:'a',amount:40};
+ assert.deepEqual(selectReportRefunds([pending,duplicate,confirmed],[current,prior]),[confirmed]);
+ assert.throws(()=>selectReportRefunds([confirmed],[current]));
+ assert.throws(()=>selectReportRefunds([confirmed],[{...prior,shop_id:'b'}]));
 });
 test('zero sales, no category clutter, no guessed test exclusions',()=>{
  const r=conciseShiftReport({sales:[],items:[]});assert.equal(r.total,0);assert.equal(r.receipts,0);assert.doesNotMatch(r.text,/FOOD|Kofe/);
