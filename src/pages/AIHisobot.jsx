@@ -29,7 +29,7 @@ export default function AIHisobot(){
     const row=res.data.shops.find(s=>s.shop_id===shopId);
     if(!row)throw Error('Bu do‘kon uchun server hisoboti qaytmadi. Nol deb ko‘rsatilmaydi.');
     const t=row.totals;
-    lines.push('Bugun: '+day+' · 00:00 dan so‘rov paytigacha','Serverga yetib kelgan ma’lumotlar. Sinxronlanmagan offline savdolar kirmaydi.','',
+    lines.push('Bugun: '+day+' · 00:00 dan server javobi paytigacha (jonli hisob)','Serverga yetib kelgan ma’lumotlar. Sinxronlanmagan offline savdolar kirmaydi.','',
      'Kassa sof savdo: '+n(t.revenue)+' so‘m','Savdolar: '+n(t.sales),
      'Buyurtma to‘lovlari: '+n(t.orderPayments)+' so‘m','Jami olingan pul: '+n(t.collections)+' so‘m',
      '','Bugungi mahsulotlar kesimi ushbu versiyada yo‘q. Mahsulotlar uchun “Oxirgi smena”ni tanlang.');
