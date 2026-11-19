@@ -27,7 +27,7 @@ export function historicalReceiptTotals(sales) {
   ? rows.reduce((total,s) => total + savedNumber(s[key]),0) : null;
  return {gross:sum('subtotal'),discount:sum('discount_amount'),net:sum('total')};
 }
-const categoryRank = name => /tort|cake/i.test(name) ? 0 : /ovqat|food|taom|fast.?food/i.test(name) ? 1 : /ichimlik|drink|choy|kofe|coffee|limonad|smuzi/i.test(name) ? 2 : 3;
+export const categoryRank = name => /tort|cake/i.test(name) ? 0 : /ovqat|food|taom|fast.?food/i.test(name) ? 1 : /ichimlik|drink|choy|kofe|coffee|limonad|smuzi/i.test(name) ? 2 : 3;
 export function shiftItemGroups(sales, items, products, categories) {
  const bySale = new Map(); for(const i of items) {const rows=bySale.get(i.sale_id)||[]; rows.push(i);bySale.set(i.sale_id,rows);}
  const ps=new Map(products.map(p=>[p.id,p])), cs=new Map(categories.map(c=>[c.id,c.name]));
