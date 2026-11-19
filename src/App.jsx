@@ -31,6 +31,7 @@ const WholesaleProducts = lazy(() => preloadPage('wholesale'));
 const Categories = lazy(() => preloadPage('categories'));
 const Users = lazy(() => preloadPage('users'));
 const Reports = lazy(() => preloadPage('reports'));
+const AIHisobot = lazy(() => import('@/pages/AIHisobot'));
 const DiscountCodes = lazy(() => preloadPage('discounts'));
 const Settings = lazy(() => preloadPage('settings'));
 const SalesHistory = lazy(() => preloadPage('sales'));
@@ -64,6 +65,7 @@ const ROUTE_TITLES = {
   '/categories': 'Kategoriyalar',
   '/users': 'Xodimlar',
   '/reports': 'Hisobotlar',
+  '/ai-hisobot': 'AI Hisobot',
   '/discounts': 'Chegirmalar',
   '/settings': 'Sozlamalar',
   '/sales': 'Savdolar tarixi',
@@ -169,6 +171,7 @@ function App() {
                 <Route path="/categories" element={<RoleRoute pageKey="categories"><Categories /></RoleRoute>} />
                 <Route path="/users" element={<RoleRoute pageKey="users"><Users /></RoleRoute>} />
                 <Route path="/reports" element={<RoleRoute pageKey="reports"><Reports /></RoleRoute>} />
+                <Route path="/ai-hisobot" element={<RoleRoute pageKey="aihisobot"><AIHisobot /></RoleRoute>} />
                 <Route path="/discounts" element={<RoleRoute pageKey="discounts"><DiscountCodes /></RoleRoute>} />
                 <Route path="/settings" element={<RoleRoute pageKey="settings"><Settings /></RoleRoute>} />
                 <Route path="/sales" element={<RoleRoute pageKey="sales"><SalesHistory /></RoleRoute>} />
