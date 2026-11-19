@@ -1,77 +1,67 @@
-import React, {useEffect,useRef,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {useOutletContext} from 'react-router-dom';
 import {base44} from '@/api/base44Client';
 import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {readAllEntityPages} from '@/lib/history-pagination';
+import {readAllEntityPages,salesHistoryQuery} from '@/lib/history-pagination';
 import {formatUzbekistanDateTime,uzbekistanDateKey} from '@/lib/uzbekistan-time';
-import {isReportOwner,reportIntent,reportNumber as n,shiftItemGroups,historicalReceiptTotals} from '@/lib/ai-report';
+import {isReportOwner} from '@/lib/ai-report';
+import {conciseShiftReport} from '@/lib/concise-ai-report';
 
 export default function AIHisobot(){
  const {user,adminShopScope:scope}=useOutletContext();
- const owner=isReportOwner(user), shopId=scope?.specificShopId||'';
- const [question,setQuestion]=useState('oxirgi smena');
- const [text,setText]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
+ const owner=isReportOwner(user),shopId=scope?.specificShopId||'';
+ const [mode,setMode]=useState('open'),[text,setText]=useState(''),[context,setContext]=useState('');
+ const [error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
  const request=useRef(0);
- useEffect(()=>{request.current++;setText('');setError('');setBusy(false);setCopied(false);return()=>{request.current++;};},[shopId,user?.id,owner,scope?.ready]);
- async function load(mode){
+ useEffect(()=>{request.current++;setText('');setContext('');setError('');setBusy(false);setCopied(false);return()=>{request.current++;};},[shopId,user?.id,owner,scope?.ready,mode]);
+ async function load(){
   if(!owner||!scope?.ready||!shopId)return;
-  if(!mode){setError('“Oxirgi smena” yoki “bugun” deb yozing. Boshqa savollar bu birinchi versiyada qo‘llanmaydi.');return;}
   const version=++request.current,isCurrent=()=>version===request.current;
-  setBusy(true);setText('');setError('');setCopied(false);
-  const cutoff=new Date(),day=uzbekistanDateKey(cutoff);
+  setBusy(true);setText('');setContext('');setError('');setCopied(false);
+  const cutoff=new Date(),cutoffISO=cutoff.toISOString(),day=uzbekistanDateKey(cutoff);
   try{
    const shop=scope.shops.find(s=>s.id===shopId);if(!shop)throw Error('Do‘kon tanlanmagan.');
-   let lines=['ODINA · '+shop.name,'So‘rov vaqti: '+formatUzbekistanDateTime(cutoff)];
-   if(mode==='today'){
-    const res=await base44.functions.invoke('daily-sales-export',{action:'range',date_from:day,date_to:day});
-    if(!Array.isArray(res.data?.shops))throw Error('Server hisoboti to‘liq kelmadi.');
-    const row=res.data.shops.find(s=>s.shop_id===shopId);
-    if(!row)throw Error('Bu do‘kon uchun server hisoboti qaytmadi. Nol deb ko‘rsatilmaydi.');
-    const t=row.totals;
-    lines.push('Bugun: '+day+' · 00:00 dan hisobot so‘rovi davomida o‘qilgan holatgacha (jonli hisob)','Serverga yetib kelgan ma’lumotlar. Sinxronlanmagan offline savdolar kirmaydi.','',
-     'Kassa sof savdo: '+n(t.revenue)+' so‘m','Savdolar: '+n(t.sales),
-     'Buyurtma to‘lovlari: '+n(t.orderPayments)+' so‘m','Jami olingan pul: '+n(t.collections)+' so‘m',
-     '','Bugungi mahsulotlar kesimi ushbu versiyada yo‘q. Mahsulotlar uchun “Oxirgi smena”ni tanlang.');
-   }else{
-    const shifts=await base44.entities.Shift.filter({shop_id:shopId,status:'closed'},'-closed_at',1);
-    const shift=shifts?.[0];if(!shift||shift.shop_id!==shopId||shift.status!=='closed'||!shift.closed_at)throw Error('Yopilgan smena topilmadi.');
-    const [sales,items,products,categories]=await Promise.all([
-     readAllEntityPages(base44.entities.Sale,{shift_id:shift.id,shop_id:shopId},'id',isCurrent),
-     readAllEntityPages(base44.entities.SaleItem,{shift_id:shift.id,shop_id:shopId},'id',isCurrent),
-     readAllEntityPages(base44.entities.Product,{},'id',isCurrent),
-     readAllEntityPages(base44.entities.Category,{},'id',isCurrent)]);
-    const scopedSales=sales.filter(s=>s.shift_id===shift.id&&s.shop_id===shopId);
-    const grouped=shiftItemGroups(scopedSales,items,products,categories);
-    const receipts=historicalReceiptTotals(scopedSales);
-    lines.push('Oxirgi yopilgan smena: '+formatUzbekistanDateTime(shift.opened_at||shift.created_date)+' — '+formatUzbekistanDateTime(shift.closed_at),
-     'Smena: '+shift.id,'','Yopilishdagi saqlangan jami savdo: '+n(shift.total_sales)+' so‘m',
-     'Saqlangan cheklar: '+n(shift.order_count),'Saqlangan qaytarishlar: '+n(shift.refunds_total)+' so‘m','',
-     'Cheklar bo‘yicha chegirmadan oldin: '+n(receipts.gross)+' so‘m',
-     'Cheklar bo‘yicha chegirma: '+n(receipts.discount)+' so‘m',
-     'Cheklar bo‘yicha chegirmadan keyin (qaytarishdan oldin): '+n(receipts.net)+' so‘m','',
-     'MAHSULOTLAR · CHEGIRMADAN OLDIN',
-     'Mahsulot summalari saqlangan tarixiy qiymatlardan, chegirmadan oldin ko‘rsatiladi. Chegirma alohida. Keyin qaytarilgan savdolarning asl qatorlari ham kiritilgan; qaytarish miqdor va summadan ayrilmagan. Chek jamlari yopilishdagi smena jami bilan bir xil bo‘lishi shart emas. Ishonchli tarixiy qiymat yetishmasa “noma’lum” ko‘rsatiladi.',
-     'Kategoriyalar tarixiy nom bo‘lmasa joriy katalogdan olinadi; noma’lumlar alohida.');
-    if(grouped.missing)lines.push('DIQQAT: '+grouped.missing+' ta savdoda mahsulot qatorlari yo‘q. Quyidagi ro‘yxat to‘liq emas.');
-    for(const group of grouped.groups){lines.push('',group.name);for(const r of group.rows)lines.push(r.name+' — '+(r.unknown?'ma’lumot yetishmaydi':n(r.quantity)+' '+r.unit+' — '+n(r.amount)+' so‘m'));lines.push('Chegirmadan oldingi jami: '+n(group.subtotal)+' so‘m');}
-    if(!grouped.groups.length)lines.push('Mahsulot qatorlari topilmadi.');
+   let shift=null;
+   if(mode!=='today'){
+    const status=mode==='open'?'open':'closed';
+    const shifts=await base44.entities.Shift.filter({shop_id:shopId,status},mode==='open'?'-opened_at':'-closed_at',mode==='open'?2:1);
+    if(!Array.isArray(shifts)||!shifts.length)throw Error(mode==='open'?'Ochiq smena topilmadi.':'Yopilgan smena topilmadi.');
+    if(mode==='open'&&shifts.length>1)throw Error('Bu do‘konda bir nechta ochiq smena bor. Avval Smenalar sahifasida aniqlashtiring.');
+    shift=shifts[0];
+    if(shift.shop_id!==shopId||shift.status!==status)throw Error('Smena do‘koni yoki holati mos kelmadi.');
    }
-   if(isCurrent())setText(lines.join('\n'));
+   const saleQuery=shift?{shop_id:shopId,shift_id:shift.id}:salesHistoryQuery({user,date:day,shop_id:shopId});
+   const refundQuery=shift?{shop_id:shopId,shift_id:shift.id}:{$and:[{shop_id:shopId},{$or:[{created_at:{$gte:new Date(day+'T00:00:00+05:00').toISOString(),$lte:cutoffISO}},{created_at:{$exists:false},created_date:{$gte:new Date(day+'T00:00:00+05:00').toISOString(),$lte:cutoffISO}}]}]};
+   const [loadedSales,products,categories,refunds]=await Promise.all([
+    readAllEntityPages(base44.entities.Sale,{$and:[saleQuery,{created_date:{$lte:cutoffISO}}]},'id',isCurrent),
+    readAllEntityPages(base44.entities.Product,{},'id',isCurrent),
+    readAllEntityPages(base44.entities.Category,{},'id',isCurrent),
+    readAllEntityPages(base44.entities.Refund,{$and:[refundQuery,{created_date:{$lte:cutoffISO}}]},'id',isCurrent)]);
+   if(!isCurrent())return;
+   const sales=loadedSales.filter(s=>s.shop_id===shopId&&(!shift||s.shift_id===shift.id));
+   const items=[];
+   // Bounded batches, complete pagination, no all-history SaleItem download.
+   for(let start=0;start<sales.length&&isCurrent();start+=50){
+    items.push(...await readAllEntityPages(base44.entities.SaleItem,{shop_id:shopId,sale_id:{$in:sales.slice(start,start+50).map(s=>s.id)}},'id',isCurrent));
+   }
+   const result=conciseShiftReport({sales,items,products,categories,refunds:refunds.filter(r=>r.shop_id===shopId&&(!shift||r.shift_id===shift.id))});
+   if(isCurrent()){
+    setText(result.text);
+    setContext(shop.name+' · '+(shift?(mode==='open'?'Hozirgi ochiq smena':'Oxirgi yopilgan smena')+' · '+formatUzbekistanDateTime(shift.opened_at||shift.created_date)+' — '+formatUzbekistanDateTime(shift.closed_at||cutoff):'Bugun · '+day)+' · Yuklangan: '+formatUzbekistanDateTime(cutoff));
+   }
   }catch(e){if(isCurrent())setError(e?.response?.data?.error||e.message||'Hisobot yuklanmadi.');}
   finally{if(isCurrent())setBusy(false);}
  }
  if(!owner)return <div className="p-8" role="alert">Bu sahifa faqat tasdiqlangan biznes egasi uchun.</div>;
- return <div className="odina-page p-5 sm:p-8 max-w-5xl mx-auto space-y-5">
- <header><p className="text-sm text-muted-foreground">FAQAT O‘QISH · EGASI UCHUN</p><h1 className="text-3xl font-bold mt-2">AI Hisobot</h1><p className="mt-3 text-muted-foreground">Oddiy so‘rovdan tekshiriladigan hisobot. Bu versiya qoidalar asosida ishlaydi, tashqi AI yoki pulli obuna ishlatilmaydi.</p></header>
- <section className="rounded-2xl border bg-card p-5 space-y-4">
- <p>Do‘kon: <strong>{scope?.shops?.find(s=>s.id===shopId)?.name||'Yuqoridagi ish joyi menyusidan bitta do‘konni tanlang'}</strong></p>
- <form className="flex flex-col sm:flex-row gap-3" onSubmit={e=>{e.preventDefault();void load(reportIntent(question));}}>
- <Input aria-label="Hisobot so‘rovi" value={question} onChange={e=>setQuestion(e.target.value)} placeholder="Masalan: oxirgi smena" maxLength={160}/>
- <Button disabled={busy||!shopId||!scope?.ready}>Hisobot olish</Button></form>
- <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy||!shopId} onClick={()=>{setQuestion('oxirgi smena');void load('shift');}}>Oxirgi yopilgan smena</Button><Button variant="outline" disabled={busy||!shopId} onClick={()=>{setQuestion('bugun');void load('today');}}>Bugungi server hisobi</Button></div>
- <p className="text-xs text-muted-foreground">Savdo, to‘lov, ombor va sozlamalar o‘zgartirilmaydi. Pul jamlari mavjud server hisoboti yoki smena yopilishidagi saqlangan qiymatlardan olinadi.</p></section>
- {busy&&<p role="status">Hisobot yuklanmoqda…</p>}{error&&<p role="alert" className="text-destructive">{error}</p>}
- {text&&<section className="rounded-2xl border bg-card p-5"><Button variant="outline" className="mb-5" onClick={async()=>{try{await navigator.clipboard.writeText(text);setCopied(true);}catch{setError('Nusxalab bo‘lmadi. Hisobot matnini belgilang va nusxalang.');}}}>{copied?'Nusxalandi':'Hisobotni nusxalash'}</Button><pre className="whitespace-pre-wrap break-words text-sm leading-7 font-sans">{text}</pre></section>}
+ return <div className="odina-page p-5 sm:p-8 max-w-4xl mx-auto space-y-5">
+ <header><h1 className="text-3xl font-bold">AI Hisobot</h1><p className="mt-2 text-muted-foreground">{scope?.shops?.find(s=>s.id===shopId)?.name||'Ish joyi menyusidan bitta do‘konni tanlang'}</p></header>
+ <div className="flex flex-wrap gap-2" aria-label="Hisobot davri">{[['open','Hozirgi smena'],['closed','Oxirgi yopilgan smena'],['today','Bugun']].map(([value,label])=><Button key={value} variant={mode===value?'default':'outline'} aria-pressed={mode===value} onClick={()=>setMode(value)}>{label}</Button>)}<Button variant="outline" disabled={busy||!shopId||!scope?.ready} onClick={()=>void load()}>{busy?'Yuklanmoqda…':'Hisobotni yangilash'}</Button></div>
+ {error&&<p role="alert" className="text-destructive">{error}</p>}
+ {text&&<section className="rounded-2xl border bg-card p-5 space-y-4">
+ <p className="text-xs text-muted-foreground">{context}</p>
+ <Button onClick={async()=>{try{await navigator.clipboard.writeText(text);setCopied(true);}catch{setError('Nusxalab bo‘lmadi. Matnni belgilang va nusxalang.');}}}>{copied?'Nusxalandi':'Hisobotni nusxalash'}</Button>
+ <pre className="whitespace-pre-wrap break-words text-sm leading-7 font-sans">{text}</pre>
+ </section>}
+ <p className="text-xs text-muted-foreground leading-5">Summalar chegirmadan keyin. Mahsulot va to‘lovlar asl cheklar bo‘yicha; qaytarish bo‘lsa alohida satrda va sof savdoda ko‘rsatiladi. Buyurtma avanslari va hali serverga yuborilmagan offline savdolar kirmaydi. Kategoriyalar tarixiy nom yo‘q bo‘lsa joriy katalogdan olinadi. Sinov cheklari avtomatik chiqarib tashlanmaydi. Faqat o‘qish, hech qanday yozuv o‘zgartirilmaydi.</p>
  </div>;
 }
