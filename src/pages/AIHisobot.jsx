@@ -13,7 +13,7 @@ export default function AIHisobot(){
  const [question,setQuestion]=useState('oxirgi smena');
  const [text,setText]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
  const request=useRef(0);
- useEffect(()=>{request.current++;setText('');setError('');setBusy(false);setCopied(false);return()=>{request.current++;};},[shopId,user?.id,owner]);
+ useEffect(()=>{request.current++;setText('');setError('');setBusy(false);setCopied(false);return()=>{request.current++;};},[shopId,user?.id,owner,scope?.ready]);
  async function load(mode){
   if(!owner||!scope?.ready||!shopId)return;
   if(!mode){setError('“Oxirgi smena” yoki “bugun” deb yozing. Boshqa savollar bu birinchi versiyada qo‘llanmaydi.');return;}
@@ -29,7 +29,7 @@ export default function AIHisobot(){
     const row=res.data.shops.find(s=>s.shop_id===shopId);
     if(!row)throw Error('Bu do‘kon uchun server hisoboti qaytmadi. Nol deb ko‘rsatilmaydi.');
     const t=row.totals;
-    lines.push('Bugun: '+day+' · 00:00 dan server javobi paytigacha (jonli hisob)','Serverga yetib kelgan ma’lumotlar. Sinxronlanmagan offline savdolar kirmaydi.','',
+    lines.push('Bugun: '+day+' · 00:00 dan hisobot so‘rovi davomida o‘qilgan holatgacha (jonli hisob)','Serverga yetib kelgan ma’lumotlar. Sinxronlanmagan offline savdolar kirmaydi.','',
      'Kassa sof savdo: '+n(t.revenue)+' so‘m','Savdolar: '+n(t.sales),
      'Buyurtma to‘lovlari: '+n(t.orderPayments)+' so‘m','Jami olingan pul: '+n(t.collections)+' so‘m',
      '','Bugungi mahsulotlar kesimi ushbu versiyada yo‘q. Mahsulotlar uchun “Oxirgi smena”ni tanlang.');
