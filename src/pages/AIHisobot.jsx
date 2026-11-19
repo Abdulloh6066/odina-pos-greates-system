@@ -60,7 +60,7 @@ export default function AIHisobot(){
  {text&&<section className="rounded-2xl border bg-card p-5 space-y-4">
  <p className="text-xs text-muted-foreground">{context}</p>
  <Button onClick={async()=>{try{await navigator.clipboard.writeText(text);setCopied(true);}catch{setError('Nusxalab bo‘lmadi. Matnni belgilang va nusxalang.');}}}>{copied?'Nusxalandi':'Hisobotni nusxalash'}</Button>
- <pre className="whitespace-pre-wrap break-words text-sm leading-7 font-sans">{text}</pre>
+ <div className="whitespace-pre-wrap break-words text-sm leading-7">{text.split('\n').map((line,index)=><div key={index} className={!line.startsWith('- ')&&!line.startsWith('Qatorlarda:')?'font-semibold':''}>{line||'\u00a0'}</div>)}</div>
  </section>}
  <p className="text-xs text-muted-foreground leading-5">Summalar chegirmadan keyin. Mahsulot va to‘lovlar asl cheklar bo‘yicha; qaytarish bo‘lsa alohida satrda va sof savdoda ko‘rsatiladi. Buyurtma avanslari va hali serverga yuborilmagan offline savdolar kirmaydi. Kategoriyalar tarixiy nom yo‘q bo‘lsa joriy katalogdan olinadi. Sinov cheklari avtomatik chiqarib tashlanmaydi. Faqat o‘qish, hech qanday yozuv o‘zgartirilmaydi.</p>
  </div>;
