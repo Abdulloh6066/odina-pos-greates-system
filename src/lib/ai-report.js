@@ -1,5 +1,5 @@
 // Read-only presentation of immutable historical rows; never a posting calculator.
-export const isReportOwner = u => u?.role === 'admin' && u.active !== false && (u.is_owner === true || u.data?.is_owner === true);
+export const isReportOwner = u => u?.role === 'admin' && u.active !== false && u.data?.active !== false && (u.is_owner === true || u.data?.is_owner === true);
 export function reportIntent(text) {
  const q=String(text||'').trim().toLowerCase();
  if (/^(bugun|bugungi (savdo|hisobot)|today|today report)$/.test(q)) return 'today';
