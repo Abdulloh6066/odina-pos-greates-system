@@ -36,14 +36,13 @@ test('legacy and weighed snapshots use genuine gross, never current catalog pric
 test('refunds retain original receipt and the page keeps shift values separate',()=>{
  assert.deepEqual(historicalReceiptTotals([{status:'refunded',subtotal:132000,discount_amount:2000,total:130000},{status:'cancelled',subtotal:999,discount_amount:999,total:999}]),{gross:132000,discount:2000,net:130000});
  const code=readFileSync(new URL('../pages/AIHisobot.jsx',import.meta.url),'utf8');
- assert.match(code,/n\(shift.total_sales\)/);assert.match(code,/n\(shift.refunds_total\)/);
- assert.match(code,/CHEGIRMADAN OLDIN/);assert.match(code,/qaytarishdan oldin/);
+ assert.match(code,/conciseShiftReport/);assert.match(code,/base44.entities.Refund/);
  assert.doesNotMatch(code,/Asia\/Tashkent ·/);
 });
 test('page uses existing read-only paths, guards and no AI transmission',()=>{
  const code=readFileSync(new URL('../pages/AIHisobot.jsx',import.meta.url),'utf8');
  assert.match(code,/if\(!owner\|\|!scope\?\.ready\|\|!shopId\)return/);
- assert.match(code,/version===request.current/);assert.match(code,/status:'closed'/);
- assert.match(code,/action:'range'/);assert.match(code,/navigator.clipboard.writeText/);
+ assert.match(code,/version===request.current/);assert.match(code,/mode==='open'\?'open':'closed'/);
+ assert.match(code,/salesHistoryQuery/);assert.match(code,/navigator.clipboard.writeText/);
  assert.doesNotMatch(code,/\.create\(|\.update\(|\.delete\(|asServiceRole|integrations|InvokeLLM|fetch\(/);
 });
