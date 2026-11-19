@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {readAllEntityPages} from '@/lib/history-pagination';
 import {formatUzbekistanDateTime,uzbekistanDateKey} from '@/lib/uzbekistan-time';
-import {isReportOwner,reportIntent,reportNumber as n,shiftItemGroups} from '@/lib/ai-report';
+import {isReportOwner,reportIntent,reportNumber as n,shiftItemGroups,historicalReceiptTotals} from '@/lib/ai-report';
 
 export default function AIHisobot(){
  const {user,adminShopScope:scope}=useOutletContext();
@@ -41,15 +41,20 @@ export default function AIHisobot(){
      readAllEntityPages(base44.entities.SaleItem,{shift_id:shift.id,shop_id:shopId},'id',isCurrent),
      readAllEntityPages(base44.entities.Product,{},'id',isCurrent),
      readAllEntityPages(base44.entities.Category,{},'id',isCurrent)]);
-    const grouped=shiftItemGroups(sales.filter(s=>s.shift_id===shift.id&&s.shop_id===shopId),items,products,categories);
+    const scopedSales=sales.filter(s=>s.shift_id===shift.id&&s.shop_id===shopId);
+    const grouped=shiftItemGroups(scopedSales,items,products,categories);
+    const receipts=historicalReceiptTotals(scopedSales);
     lines.push('Oxirgi yopilgan smena: '+formatUzbekistanDateTime(shift.opened_at||shift.created_date)+' — '+formatUzbekistanDateTime(shift.closed_at),
      'Smena: '+shift.id,'','Yopilishdagi saqlangan jami savdo: '+n(shift.total_sales)+' so‘m',
      'Saqlangan cheklar: '+n(shift.order_count),'Saqlangan qaytarishlar: '+n(shift.refunds_total)+' so‘m','',
-     'MAHSULOT QATORLARI',
-     'Yakunlangan va keyin qaytarilgan savdolarning asl qatorlari. Qaytarishlar miqdordan ayrilmagan. Qator summalari sof tushum bilan bir xil bo‘lishi shart emas.',
+     'Cheklar bo‘yicha chegirmadan oldin: '+n(receipts.gross)+' so‘m',
+     'Cheklar bo‘yicha chegirma: '+n(receipts.discount)+' so‘m',
+     'Cheklar bo‘yicha chegirmadan keyin (qaytarishdan oldin): '+n(receipts.net)+' so‘m','',
+     'MAHSULOTLAR · CHEGIRMADAN OLDIN',
+     'Mahsulot summalari saqlangan tarixiy qiymatlardan, chegirmadan oldin ko‘rsatiladi. Chegirma alohida. Keyin qaytarilgan savdolarning asl qatorlari ham kiritilgan; qaytarish miqdor va summadan ayrilmagan. Chek jamlari yopilishdagi smena jami bilan bir xil bo‘lishi shart emas. Ishonchli tarixiy qiymat yetishmasa “noma’lum” ko‘rsatiladi.',
      'Kategoriyalar tarixiy nom bo‘lmasa joriy katalogdan olinadi; noma’lumlar alohida.');
     if(grouped.missing)lines.push('DIQQAT: '+grouped.missing+' ta savdoda mahsulot qatorlari yo‘q. Quyidagi ro‘yxat to‘liq emas.');
-    for(const group of grouped.groups){lines.push('',group.name);for(const r of group.rows)lines.push(r.name+' — '+(r.unknown?'ma’lumot yetishmaydi':n(r.quantity)+' '+r.unit+' — '+n(r.amount)+' so‘m'));lines.push('Qatorlar jami: '+n(group.subtotal)+' so‘m');}
+    for(const group of grouped.groups){lines.push('',group.name);for(const r of group.rows)lines.push(r.name+' — '+(r.unknown?'ma’lumot yetishmaydi':n(r.quantity)+' '+r.unit+' — '+n(r.amount)+' so‘m'));lines.push('Chegirmadan oldingi jami: '+n(group.subtotal)+' so‘m');}
     if(!grouped.groups.length)lines.push('Mahsulot qatorlari topilmadi.');
    }
    if(isCurrent())setText(lines.join('\n'));
