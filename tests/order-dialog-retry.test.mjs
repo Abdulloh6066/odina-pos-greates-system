@@ -8,12 +8,13 @@ import React from 'react';
 import { create, act } from 'react-test-renderer';
 import * as retry from '../src/lib/order-request-retry.js';
 import * as timing from '../src/lib/order-action-timing.js';
+import * as orders from '../src/lib/orders.js';
 
 function storage() {
   const values = new Map();
   return { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
 }
-function dialog(name, backend, { clock = globalThis.performance, toasts = [] } = {}) {
+function dialog(name, backend, { clock = globalThis.performance, toasts = [], shopStamp = () => '2026-10-15 12:00', browser = {} } = {}) {
   const module = { exports: {} }; let keyCount = 0;
   const wrapper = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
   const require = (specifier) => {
@@ -24,11 +25,8 @@ function dialog(name, backend, { clock = globalThis.performance, toasts = [] } =
     if (specifier === '@/api/base44Client') return { base44: backend };
     if (specifier === '@/components/ui/use-toast') return { useToast: () => ({ toast: (value) => toasts.push(value) }) };
     if (specifier === '@/lib/pos') return { formatUZS: (amount) => `${amount} UZS`, PAYMENT_METHODS: [{ id: 'cash', label: 'Naqd' }] };
-    if (specifier === '@/lib/orders') return { displayOrderNumber: (order) => order?.order_number || '', buildIdempotencyKey: (kind) => `${kind}-key-${++keyCount}`,
-      ORDER_TYPES: [{ key: 'tugilgan_kun_va_boshqa', label: 'Buyurtma' }], FULFILMENT_TYPES: [], CAKE_SHAPES: [], MONTHS_UZ: [],
-      tashkentNowParts: () => ({ year: 2026, month: 10, day: 15 }), tashkentNowStamp: () => '2026-10-15',
-      composeRequiredDate: (year, month, day) => day ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '',
-      isFutureDateTime: () => true };
+    if (specifier === '@/lib/orders') return { ...orders, buildIdempotencyKey: (kind) => `${kind}-key-${++keyCount}`,
+      tashkentNowStamp: shopStamp, isFutureDateTime: (date, time) => `${date} ${time}` >= shopStamp() };
     if (specifier === '@/lib/shop-pricing') return { priceForShop: (product) => product.price };
     if (specifier.endsWith('/ProductCombobox') || specifier.endsWith('/ReferenceImageField')) return { default: wrapper('div') };
     if (specifier.endsWith('/odina-select')) return { default: wrapper('select') };
@@ -39,7 +37,7 @@ function dialog(name, backend, { clock = globalThis.performance, toasts = [] } =
   const code = ts.transpileModule(readFileSync(`src/components/orders/${name}.jsx`, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React },
   }).outputText;
-  vm.runInNewContext('(function(require,module,exports){' + code + '\n})', { console })(require, module, module.exports);
+  vm.runInNewContext('(function(require,module,exports){' + code + '\n})', { console, ...browser })(require, module, module.exports);
   return { Component: module.exports.default, keyCount: () => keyCount };
 }
 const order = { id: 'order', order_number: 'BO-1', remaining_balance: 10000, fulfilment_type: 'pickup' };
@@ -55,10 +53,70 @@ const formProps = {
     items: [{ product_id: 'cake', quantity: 1 }] },
 };
 const products = { Product: { list: async () => [{ id: 'cake', name: 'MINI tort', active: true, price: 20000, production_unit: 'piece' }] } };
-async function chooseFormDate(tree) {
-  const day = tree.root.findAllByType('select').find((select) => select.findAllByType('option').some((option) => option.props.children === 'Kun'));
-  await act(async () => { day.props.onChange({ target: { value: '20' } }); });
-}
+const dueSelect = (tree, part) => tree.root.findAllByType('select').find(node => node.props.id === 'order-due-' + part);
+const options = (tree, part) => dueSelect(tree, part).findAllByType('option').map(node => Number(node.props.value));
+const chooseDatePart = (tree, part, value) => act(async () => {
+  dueSelect(tree, part).props.onChange({ target: { value: String(value) } });
+});
+
+test('new orders start on November 23 and the picker lists only valid dates in each selected month and year', async () => {
+  globalThis.sessionStorage = storage();
+  const { Component } = dialog('OrderForm', { entities: products }, { shopStamp: () => '2026-11-23 13:16' });
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, { ...formProps, prefill: null })); });
+  try {
+    assert.equal(dueSelect(tree, 'day').props.value, '23');
+    assert.deepEqual(options(tree, 'day'), [23, 24, 25, 26, 27, 28, 29, 30]);
+    assert.deepEqual(options(tree, 'month'), [11, 12]);
+    await chooseDatePart(tree, 'month', 12);
+    assert.deepEqual(options(tree, 'day'), Array.from({ length: 31 }, (_, i) => i + 1));
+    await chooseDatePart(tree, 'day', 1);
+    await chooseDatePart(tree, 'month', 11);
+    assert.equal(dueSelect(tree, 'day').props.value, '23');
+    await chooseDatePart(tree, 'month', 12);
+    await chooseDatePart(tree, 'day', 31);
+    await chooseDatePart(tree, 'year', 2028);
+    assert.equal(options(tree, 'month')[0], 1);
+    await chooseDatePart(tree, 'month', 2);
+    assert.equal(dueSelect(tree, 'day').props.value, '29');
+    await chooseDatePart(tree, 'year', 2027);
+    assert.equal(dueSelect(tree, 'day').props.value, '28');
+    await chooseDatePart(tree, 'year', 2026);
+    assert.equal(dueSelect(tree, 'month').props.value, '11');
+    assert.equal(dueSelect(tree, 'day').props.value, '23');
+  } finally { await act(async () => tree.unmount()); }
+});
+
+test('an open repeat order follows Tashkent midnight and submits the displayed day without reselecting it', async (t) => {
+  globalThis.sessionStorage = storage();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-12-31T18:59:00Z') });
+  const sent = [];
+  const backend = { entities: products, functions: { invoke: async (_name, payload) => {
+    sent.push(structuredClone(payload)); return { data: { order, items: [] } };
+  } } };
+  let tick;
+  const browser = { window: new EventTarget(), document: new EventTarget(),
+    setTimeout: (callback) => { tick = callback; return 1; }, clearTimeout: () => { tick = null; } };
+  const { Component } = dialog('OrderForm', backend, { shopStamp: orders.tashkentNowStamp, browser });
+  const prefill = { ...formProps.prefill, order: { ...formProps.prefill.order, required_date: '2024-06-05' } };
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, { ...formProps, prefill })); });
+  try {
+    assert.deepEqual(options(tree, 'day'), [31]);
+    assert.deepEqual(options(tree, 'month'), [12]);
+    assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true, '18:00 has passed today');
+    t.mock.timers.tick(60000);
+    await act(async () => tick());
+    assert.equal(dueSelect(tree, 'year').props.value, '2027');
+    assert.equal(dueSelect(tree, 'month').props.value, '1');
+    assert.equal(dueSelect(tree, 'day').props.value, '1');
+    assert.equal(options(tree, 'day').length, 31);
+    await act(async () => { await submit(tree); });
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].required_date, '2027-01-01');
+    assert.equal(sent[0].required_time, '18:00');
+  } finally { await act(async () => tree.unmount()); }
+});
 
 test('actual payment dialog retains key, method and amount after a lost reply and unmount', async () => {
   globalThis.sessionStorage = storage(); const sent = [];
@@ -121,10 +179,13 @@ test('actual order form restores and retries its saved creation/advance request 
   retry.retainOrderRequest(retry.orderRequestScope('staff', 'create_order'), payload);
   const backend = { functions: { invoke: async (_name, body) => { sent.push(structuredClone(body)); throw new Error('still unknown'); } },
     entities: { Product: { list: async () => [{ id: 'cake', name: 'MINI tort', active: true, price: 20000, production_unit: 'piece' }] } } };
-  const loaded = dialog('OrderForm', backend); let tree;
+  const loaded = dialog('OrderForm', backend, { shopStamp: () => '2027-01-01 08:00' }); let tree;
   await act(async () => { tree = create(React.createElement(loaded.Component, { open: true, user: { id: 'staff', role: 'cashier', shop_id: 'shop' },
     shops: [{ id: 'shop', name: 'Odina' }], onClose: () => {}, onCreated: () => {} })); });
   assert.equal(tree.root.findByType('fieldset').props.disabled, true);
+  assert.deepEqual(options(tree, 'year'), [2026]);
+  assert.deepEqual(options(tree, 'month'), [10]);
+  assert.deepEqual(options(tree, 'day'), [20]);
   await act(async () => { await submit(tree); });
   assert.deepEqual(sent[0], payload); assert.equal(loaded.keyCount(), 0);
   await act(async () => { tree.unmount(); });
@@ -144,7 +205,7 @@ test('creation timing includes request preparation and response, excludes later 
       assert.equal(clock.reads(), 2, 'timing stops before parent refresh/printing callbacks');
       clock.advance(90000); created++;
     } })); });
-    await chooseFormDate(tree);
+    await chooseDatePart(tree, 'day', 20);
     assert.equal(clock.reads(), 0, 'rendering and editing do not read the action clock');
     await act(async () => { await submit(tree); });
     const success = toasts.find((toast) => toast.title === 'Buyurtma yaratildi');

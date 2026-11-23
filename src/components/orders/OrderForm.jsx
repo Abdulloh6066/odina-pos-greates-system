@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import OdinaSelect from '@/components/ui/odina-select';
 import { base44 } from '@/api/base44Client';
 import { formatUZS, PAYMENT_METHODS } from '@/lib/pos';
-import { displayOrderNumber, buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES, MONTHS_UZ, tashkentNowParts, tashkentNowStamp, composeRequiredDate, isFutureDateTime } from '@/lib/orders';
+import { displayOrderNumber, buildIdempotencyKey, ORDER_TYPES, FULFILMENT_TYPES, CAKE_SHAPES, MONTHS_UZ, tashkentNowStamp, composeRequiredDate, isFutureDateTime } from '@/lib/orders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,9 @@ import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequ
 import { startOrderActionTiming } from '@/lib/order-action-timing';
 
 const WEDDING_PCS = 40;
+
+const daysInMonth = (year, month) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+const range = (first, last) => Array.from({ length: last - first + 1 }, (_, index) => first + index);
 
 const ORDER_LIST_PRODUCT_NAMES = new Set([
   'МАЛАКОЛИ ПИРОГ', 'ГАШИРЛИ ПИРОГ', 'СУТЛИ ПИРОГ', 'БУРИНИ ПИРОГ',
@@ -84,7 +87,8 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState([]);
   const [acceptanceStamp, setAcceptanceStamp] = useState('');
-  const [dateParts, setDateParts] = useState({ day: '', month: '', year: '' });
+  const [shopStamp, setShopStamp] = useState(tashkentNowStamp);
+  const today = shopStamp.slice(0, 10);
   const [form, setForm] = useState(() => ({
     order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '',
     required_date: '', required_time: '18:00', shop_id: defaultShopId,
@@ -94,7 +98,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
     useAdvance: false, advance_method: 'cash', advance_amount: 0,
   }));
 
-  const dirty = Boolean(items.length || form.customer_name || form.customer_phone || dateParts.day
+  const dirty = Boolean(items.length || form.customer_name || form.customer_phone || form.required_date > today
     || form.required_time !== '18:00' || form.fulfilment_type !== 'pickup' || form.delivery_address || Number(form.delivery_fee)
     || form.cake_shape || form.reference_image || form.notes || form.adjustment_amount || form.adjustment_reason
     || form.useAdvance || form.order_type !== 'toy_va_bazmlar');
@@ -119,10 +123,23 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
   useEffect(() => {
     if (!open) return;
-    if (pendingRef.current) return;
-    setAcceptanceStamp(tashkentNowStamp());
-    const np = tashkentNowParts();
-    setDateParts({ day: '', month: String(np.month), year: String(np.year) });
+    const stamp = tashkentNowStamp();
+    setShopStamp(stamp);
+    if (!pendingRef.current) setAcceptanceStamp(stamp);
+    if (typeof window === 'undefined') return;
+    const refresh = () => setShopStamp(tashkentNowStamp());
+    let timer;
+    const tick = () => {
+      timer = setTimeout(() => { refresh(); tick(); }, 60000 - Date.now() % 60000);
+    };
+    tick();
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -131,8 +148,6 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
   useEffect(() => {
     if (!open || !pending || loadingProducts) return;
-    const [year, month, day] = pending.required_date.split('-');
-    setDateParts({ year, month: String(Number(month)), day: String(Number(day)) });
     setForm((current) => ({ ...current, ...pending,
       useAdvance: Boolean(pending.advance_payment), advance_method: pending.advance_payment?.method || 'cash',
       advance_amount: pending.advance_payment?.amount || 0 }));
@@ -150,7 +165,6 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
       if (appliedPrefillId.current === prefill.order.id) return;
       appliedPrefillId.current = prefill.order.id;
       hadPrefill.current = true;
-      const np = tashkentNowParts();
       setForm({
         order_type: prefill.order.order_type || 'toy_va_bazmlar',
         customer_name: prefill.order.customer_name || '',
@@ -167,14 +181,11 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
         adjustment_amount: '', adjustment_reason: '',
         useAdvance: false, advance_method: 'cash', advance_amount: 0,
       });
-      setDateParts({ day: '', month: String(np.month), year: String(np.year) });
       setItems(mapPrefillItems(prefill.items || [], products));
     } else if (hadPrefill.current) {
       hadPrefill.current = false;
       appliedPrefillId.current = '';
       setItems([]);
-      const np = tashkentNowParts();
-      setDateParts({ day: '', month: String(np.month), year: String(np.year) });
       setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
         shop_id: defaultShopId, fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
         cake_shape: '', reference_image: '', notes: '', adjustment_amount: '', adjustment_reason: '',
@@ -204,16 +215,21 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const removeItem = (id) => setItems((prev) => prev.filter((i) => i.product_id !== id));
 
   const isWedding = form.order_type === 'toy_va_bazmlar';
-  const composedDate = useMemo(() => composeRequiredDate(dateParts.year, dateParts.month, dateParts.day), [dateParts]);
-  const yearOptions = useMemo(() => { const np = tashkentNowParts(); return [np.year, np.year + 1, np.year + 2]; }, []);
-  const daysInMonth = useMemo(() => { const y = Number(dateParts.year); const m = Number(dateParts.month); return (y && m) ? new Date(y, m, 0).getDate() : 31; }, [dateParts.year, dateParts.month]);
-  const dateError = useMemo(() => {
-    if (!dateParts.day) return '';
-    if (!composedDate) return 'Noto‘g‘ri sana';
-    if (!isFutureDateTime(composedDate, form.required_time)) return 'O‘tib ketgan sana yoki vaqt';
-    return '';
-  }, [composedDate, dateParts.day, form.required_time]);
-  useEffect(() => { setForm((f) => ({ ...f, required_date: composedDate })); }, [composedDate]);
+  const requiredDate = pending?.required_date || (form.required_date > today ? form.required_date : today);
+  const [year, month, day] = requiredDate.split('-').map(Number);
+  const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
+  const firstMonth = year === todayYear ? todayMonth : 1;
+  const firstDay = year === todayYear && month === todayMonth ? todayDay : 1;
+  const yearOptions = pending ? [year] : range(todayYear, todayYear + 2);
+  const monthOptions = pending ? [month] : range(firstMonth, 12);
+  const dayOptions = pending ? [day] : range(firstDay, daysInMonth(year, month));
+  const changeDate = (nextYear, nextMonth, nextDay) => {
+    const clampedDay = Math.min(nextDay, daysInMonth(nextYear, nextMonth));
+    const nextDate = composeRequiredDate(nextYear, nextMonth, clampedDay);
+    update({ required_date: nextDate > today ? nextDate : '' });
+  };
+  const dateError = !pending && form.required_time && `${requiredDate} ${form.required_time}` < shopStamp
+    ? 'O‘tib ketgan sana yoki vaqt' : '';
   const currentShopId = isAdmin ? form.shop_id : user?.shop_id;
   const pricedProducts = useMemo(() => products.map((p) => ({ ...p, price: priceForShop(p, currentShopId) })), [products, currentShopId]);
   const currentItemPrice = (item) => {
@@ -229,7 +245,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const advanceAmount = form.useAdvance ? Math.min(Number(form.advance_amount || 0), total) : 0;
   const remaining = total - advanceAmount;
 
-  const valid = form.customer_name.trim() && form.customer_phone.trim() && form.required_date && form.required_time
+  const valid = form.customer_name.trim() && form.customer_phone.trim() && form.required_time
     && !dateError
     && items.length > 0 && (isAdmin || form.shop_id === user?.shop_id)
     && (adjustment === 0 || (isAdmin && form.adjustment_reason.trim().length >= 3))
@@ -238,6 +254,11 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const submit = async () => {
     if (submitting) return;
     if (!pendingRef.current && !valid) { toast({ title: 'Barcha majburiy maydonlarni to‘ldiring', variant: 'destructive' }); return; }
+    if (!pendingRef.current && !isFutureDateTime(requiredDate, form.required_time)) {
+      setShopStamp(tashkentNowStamp());
+      toast({ title: 'Topshirish sanasi yoki vaqtini tekshiring', variant: 'destructive' });
+      return;
+    }
     const checkingSavedRequest = Boolean(pendingRef.current);
     const elapsedSeconds = startOrderActionTiming();
     setSubmitting(true);
@@ -250,7 +271,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
           order_type: form.order_type,
           customer_name: form.customer_name.trim(),
           customer_phone: form.customer_phone.trim(),
-          required_date: form.required_date,
+          required_date: requiredDate,
           required_time: form.required_time,
           shop_id: isAdmin ? form.shop_id : user.shop_id,
           fulfilment_type: form.fulfilment_type,
@@ -291,9 +312,9 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
   const reset = () => {
     setItems([]);
-    const np = tashkentNowParts();
-    setDateParts({ day: '', month: String(np.month), year: String(np.year) });
-    setAcceptanceStamp(tashkentNowStamp());
+    const stamp = tashkentNowStamp();
+    setShopStamp(stamp);
+    setAcceptanceStamp(stamp);
     setForm({ order_type: 'toy_va_bazmlar', customer_name: '', customer_phone: '', required_date: '', required_time: '18:00',
       shop_id: defaultShopId, fulfilment_type: 'pickup', delivery_address: '', delivery_fee: 0,
       cake_shape: '', reference_image: '', notes: '', adjustment_amount: '', adjustment_reason: '',
@@ -350,21 +371,20 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             <div>
-              <Label>Topshirish kuni *</Label>
-              <OdinaSelect value={dateParts.day} onChange={(e) => setDateParts((d) => ({ ...d, day: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
-                <option value="">Kun</option>
-                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => <option key={d} value={String(d)}>{d}</option>)}
+              <Label htmlFor="order-due-day">Topshirish kuni *</Label>
+              <OdinaSelect id="order-due-day" value={String(day)} onChange={(e) => changeDate(year, month, Number(e.target.value))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+                {dayOptions.map((d) => <option key={d} value={String(d)}>{d}</option>)}
               </OdinaSelect>
             </div>
             <div>
-              <Label>Oy *</Label>
-              <OdinaSelect value={dateParts.month} onChange={(e) => setDateParts((d) => ({ ...d, month: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
-                {MONTHS_UZ.map((m, idx) => <option key={idx} value={String(idx + 1)}>{m}</option>)}
+              <Label htmlFor="order-due-month">Oy *</Label>
+              <OdinaSelect id="order-due-month" value={String(month)} onChange={(e) => changeDate(year, Number(e.target.value), day)} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+                {monthOptions.map((m) => <option key={m} value={String(m)}>{MONTHS_UZ[m - 1]}</option>)}
               </OdinaSelect>
             </div>
             <div>
-              <Label>Yil *</Label>
-              <OdinaSelect value={dateParts.year} onChange={(e) => setDateParts((d) => ({ ...d, year: e.target.value }))} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
+              <Label htmlFor="order-due-year">Yil *</Label>
+              <OdinaSelect id="order-due-year" value={String(year)} onChange={(e) => changeDate(Number(e.target.value), month, day)} className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm">
                 {yearOptions.map((y) => <option key={y} value={String(y)}>{y}</option>)}
               </OdinaSelect>
             </div>
