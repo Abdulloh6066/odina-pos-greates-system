@@ -1,7 +1,7 @@
 // Shared line identity and serialization for POS, saved orders and offline receipts.
 // Missing options keep their original meaning and request fingerprints.
 export const CAKE_EXTRA_AMOUNT = 5000;
-const CAKE_CATEGORY_ID = '6ab57e00ab3a0a5019ea99db';
+export const CAKE_CATEGORY_ID = '6ab57e00ab3a0a5019ea99db';
 
 export const canChooseCakeExtra = (product, shopId) => product?.sale_unit !== 'gram'
   && (product?.shop_category_ids?.[shopId] || product?.category_id) === CAKE_CATEGORY_ID;

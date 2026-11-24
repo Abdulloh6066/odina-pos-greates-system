@@ -15,7 +15,7 @@ const CATEGORY_LABELS = {
 
 const safeQty = (value) => Math.max(0, Math.floor(Number(value) || 0));
 
-export default function ProductCombobox({ products, onAdd, loading }) {
+export default function ProductCombobox({ products, onAdd, loading, cakeOnly = false }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -91,9 +91,9 @@ export default function ProductCombobox({ products, onAdd, loading }) {
           <PackagePlus className="h-5 w-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-semibold text-foreground">Mahsulot qo‘shish</span>
+          <span className="block font-semibold text-foreground">{cakeOnly ? 'Tort qo‘shish' : 'Mahsulot qo‘shish'}</span>
           <span className="block truncate text-xs text-muted-foreground">
-            Qidirish, miqdorni belgilash va bir nechta mahsulotni tanlash
+            {cakeOnly ? 'Kassadagi tortlardan tanlang' : 'Qidirish, miqdorni belgilash va bir nechta mahsulotni tanlash'}
           </span>
         </span>
         <span className="shrink-0 rounded-full border border-brand-olive/25 bg-card px-2.5 py-1 text-xs font-semibold text-brand-ink">
@@ -108,7 +108,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-olive/15 text-brand-ink">
                 <PackagePlus className="h-5 w-5" />
               </span>
-              Mahsulotlarni tanlash
+              {cakeOnly ? 'Tortlarni tanlash' : 'Mahsulotlarni tanlash'}
             </DialogTitle>
             <DialogDescription>
               Kerakli mahsulotlarni tanlang va har birining miqdorini kiriting.
@@ -121,7 +121,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Mahsulot nomini yozing..."
+                placeholder={cakeOnly ? 'Tort nomini yozing...' : 'Mahsulot nomini yozing...'}
                 className="h-12 rounded-xl bg-card pl-11 pr-11 text-base"
               />
               {search && (
@@ -136,7 +136,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
               )}
             </div>
 
-            <div className="-mx-1 flex min-w-0 max-w-full gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin">
+            {!cakeOnly && <div className="-mx-1 flex min-w-0 max-w-full gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin">
               <button
                 type="button"
                 onClick={() => setCategoryId('')}
@@ -154,7 +154,7 @@ export default function ProductCombobox({ products, onAdd, loading }) {
                   {category.name}
                 </button>
               ))}
-            </div>
+            </div>}
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{filtered.length} ta mahsulot</span>
@@ -179,8 +179,10 @@ export default function ProductCombobox({ products, onAdd, loading }) {
             {!loading && filtered.length === 0 && (
               <div className="flex min-h-52 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card p-6 text-center">
                 <Search className="h-8 w-8 text-brand-olive" />
-                <strong>Mahsulot topilmadi</strong>
-                <span className="text-sm text-muted-foreground">Qidiruv yoki kategoriyani o‘zgartirib ko‘ring.</span>
+                <strong>{cakeOnly ? 'Tort topilmadi' : 'Mahsulot topilmadi'}</strong>
+                <span className="text-sm text-muted-foreground">{cakeOnly
+                  ? (search.trim() ? 'Boshqa nom bilan qidirib ko‘ring.' : 'Bu do‘kon kassasining «Tortlar» bo‘limi bo‘sh.')
+                  : 'Qidiruv yoki kategoriyani o‘zgartirib ko‘ring.'}</span>
               </div>
             )}
 

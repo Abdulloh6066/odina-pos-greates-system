@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { CAKE_CATEGORY_ID } from '../base44/shared/shop-category.js';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { memoryBackend } from './helpers/memory-backend.mjs';
@@ -10,7 +11,8 @@ function fixture() {
     User: [{ id: 'staff', email: 'staff@example.test', role: 'cashier', shop_id: 'shop', active: true }],
     Settings: [{ id: 'settings', shop_name: 'Odina', customer_order_last_number: 0, allow_negative_stock: false }],
     Shop: [{ id: 'shop', name: 'Odina', active: true, location_type: 'shop' }],
-    Product: [{ id: 'cake', name: 'Tort', active: true, price: 10000, production_unit: 'piece', track_stock: true }],
+    Category: [{ id: CAKE_CATEGORY_ID, name: 'Tortlar', active: true }],
+    Product: [{ id: 'cake', category_id: CAKE_CATEGORY_ID, name: 'Tort', active: true, price: 10000, production_unit: 'piece', track_stock: true }],
     ProductStock: [{ id: 'stock', location_id: 'shop', product_id: 'cake', quantity: 20, unit: 'piece' }],
     Shift: [{ id: 'shift', user_id: 'staff', shop_id: 'shop', status: 'open', total_sales: 0, order_count: 0, cash_sales: 0, expected_cash: 0 }],
     CustomerOrder: [], CustomerOrderItem: [], OrderPayment: [], StockMovement: [], ProductionBatch: [], Customer: [], ActionHistory: [],

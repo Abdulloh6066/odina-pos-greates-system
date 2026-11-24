@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import * as shopCategory from '../src/lib/shop-category.js';
+import { loadAllInventoryItems } from '../src/lib/cake-stock-shelf.js';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -45,6 +47,7 @@ async function renderPage(path, { role = 'admin', shopId = 'branch', custom = {}
     subscribe: () => () => {} });
   const backend = { entities: {
     Shop: read(shops), Settings: read([{ id: 's', shop_name: 'GLOBAL-NAME' }]), Product: read([]),
+    Category: { get: async id => ({ id, name: 'Tortlar', active: true }) },
     CustomerOrder: read(orders), CustomerOrderItem: read([]), IngredientStock: read([]), Recipe: read([]), RecipeItem: read([]),
   }, functions: { invoke: async (name, payload) => {
     calls.push({ name, payload });
@@ -81,6 +84,8 @@ async function renderPage(path, { role = 'admin', shopId = 'branch', custom = {}
     if (specifier === '@/api/base44Client') return { base44: backend };
     if (specifier === '@/lib/uzbekistan-time' || specifier === './uzbekistan-time.js') return dateModule;
     if (specifier === '@/lib/orders') return orderModule;
+    if (specifier === '@/lib/shop-category') return shopCategory;
+    if (specifier === '@/lib/cake-stock-shelf') return { loadAllInventoryItems };
     if (specifier === '@/lib/pos') return { formatUZS: value => `${value} UZS`, logAction: empty, ROLE_HOME: {}, PAYMENT_METHODS: [] };
     if (specifier === '@/lib/shop-pricing') return { priceForShop: product => product.price || 0 };
     if (specifier === '@/lib/order-request-retry') return { orderRequestScope: () => 'offline', readOrderRequest: () => pending, retainOrderRequest: value => value, clearOrderRequest: empty };

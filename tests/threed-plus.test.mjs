@@ -1,6 +1,7 @@
 // Actual routes, permissions, cached preloader and Products UI with memory-only services.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as shopCategory from '../src/lib/shop-category.js';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
@@ -199,7 +200,7 @@ async function productsFixture(role = 'admin', { allowShopActions = false, produ
     '@/api/base44Client': { base44: backend }, '@/lib/odina-dialog': dialogService,
     '@/lib/pos': { formatUZS: String, logAction: async () => { throw Error('Page-opening tests must not log mutations'); } },
     '@/lib/shop-pricing': evaluate('src/lib/shop-pricing.js'),
-    '@/lib/shop-category': evaluate('src/lib/shop-category.js'),
+    '@/lib/shop-category': shopCategory,
     '@/lib/cake-stock-shelf': { loadAllInventoryItems: entity => entity.list('name', 500, 0) },
     '@/lib/product-photos': { productPhotoFallbackFor: () => null },
     '@/components/PageHeader': { default: ({ title, subtitle, actions }) => React.createElement('header', {},

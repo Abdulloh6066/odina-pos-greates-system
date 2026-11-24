@@ -9,6 +9,9 @@ import { create, act } from 'react-test-renderer';
 import * as retry from '../src/lib/order-request-retry.js';
 import * as timing from '../src/lib/order-action-timing.js';
 import * as orders from '../src/lib/orders.js';
+import * as shopCategory from '../src/lib/shop-category.js';
+import { loadAllInventoryItems } from '../src/lib/cake-stock-shelf.js';
+import { priceForShop } from '../src/lib/shop-pricing.js';
 
 function storage() {
   const values = new Map();
@@ -27,7 +30,10 @@ function dialog(name, backend, { clock = globalThis.performance, toasts = [], sh
     if (specifier === '@/lib/pos') return { formatUZS: (amount) => `${amount} UZS`, PAYMENT_METHODS: [{ id: 'cash', label: 'Naqd' }] };
     if (specifier === '@/lib/orders') return { ...orders, buildIdempotencyKey: (kind) => `${kind}-key-${++keyCount}`,
       tashkentNowStamp: shopStamp, isFutureDateTime: (date, time) => `${date} ${time}` >= shopStamp() };
-    if (specifier === '@/lib/shop-pricing') return { priceForShop: (product) => product.price };
+    if (specifier === '@/lib/shop-pricing') return { priceForShop };
+    if (specifier === '@/lib/shop-category') return shopCategory;
+    if (specifier === '@/lib/cake-stock-shelf') return { loadAllInventoryItems };
+    if (specifier === '@/lib/product-photos') return { productPhotoFallbackFor: () => '' };
     if (specifier.endsWith('/ProductCombobox') || specifier.endsWith('/ReferenceImageField')) return { default: wrapper('div') };
     if (specifier.endsWith('/odina-select')) return { default: wrapper('select') };
     if (specifier === 'lucide-react') return new Proxy({}, { get: () => wrapper('span') });
@@ -52,11 +58,107 @@ const formProps = {
   prefill: { order: { ...order, customer_name: 'Vali', customer_phone: '+998901234567', order_type: 'tugilgan_kun_va_boshqa' },
     items: [{ product_id: 'cake', quantity: 1 }] },
 };
-const products = { Product: { list: async () => [{ id: 'cake', name: 'MINI tort', active: true, price: 20000, production_unit: 'piece' }] } };
+const cakeCategory = { id: shopCategory.CAKE_CATEGORY_ID, name: 'Tortlar', active: true };
+const products = { Category: { get: async () => cakeCategory }, Product: { list: async () => [
+  { id: 'cake', category_id: cakeCategory.id, name: 'Bento', active: true, price: 20000, production_unit: 'piece' },
+] } };
 const dueSelect = (tree, part) => tree.root.findAllByType('select').find(node => node.props.id === 'order-due-' + part);
 const options = (tree, part) => dueSelect(tree, part).findAllByType('option').map(node => Number(node.props.value));
 const chooseDatePart = (tree, part, value) => act(async () => {
   dueSelect(tree, part).props.onChange({ target: { value: String(value) } });
+});
+
+test('the birthday picker mirrors the receiving shop’s POS cakes across pages, type changes and shop changes', async () => {
+  globalThis.sessionStorage = storage();
+  const base = { active: true, production_unit: 'piece', category_id: cakeCategory.id, price: 100000 };
+  const records = [
+    { ...base, id: 'sheet', name: 'MINI desert', category_id: 'dessert' },
+    { ...base, id: 'other', name: 'Other shop cake', available_shop_ids: ['other'] },
+    { ...base, id: 'moved-out', name: 'TORT 99999', shop_category_ids: { shop: 'dessert' } },
+    { ...base, id: 'inactive', name: 'Inactive cake', active: false },
+    { ...base, id: 'archived', name: 'Archived cake', archived: true },
+    ...Array.from({ length: 495 }, (_, i) => ({ ...base, id: 'drink-' + i, name: 'Choy', category_id: 'drinks' })),
+    { ...base, id: 'moved-in', name: 'Bento', category_id: 'dessert', category_name: 'Desertlar',
+      shop_category_ids: { shop: cakeCategory.id }, shop_prices: { shop: 55000 } },
+    { ...base, id: 'tier', name: 'TORT 100000' },
+  ];
+  const offsets = [];
+  const sent = [];
+  const backend = { entities: { Category: { get: async () => cakeCategory }, Product: { list: async (_sort, size, skip) => {
+    offsets.push(skip); return records.slice(skip, skip + size);
+  } } }, functions: { invoke: async (_name, payload) => { sent.push(structuredClone(payload)); return { data: { order } }; } } };
+  const { Component } = dialog('OrderForm', backend);
+  const prefill = { order: { ...formProps.prefill.order, order_type: 'toy_va_bazmlar', shop_id: 'shop' },
+    items: [{ product_id: 'sheet', quantity: 2 }] };
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, { ...formProps, prefill, user: { ...formProps.user, role: 'admin' },
+    shops: [...formProps.shops, { id: 'other', name: 'Other' }] })); });
+  const picker = () => tree.root.findAllByType('div').find(n => typeof n.props.onAdd === 'function').props;
+  const ids = () => Array.from(picker().products, p => p.id);
+  const select = (value) => tree.root.findAllByType('select').find(n => n.findAllByType('option').some(o => o.props.value === value));
+  const change = (selectNode, value) => act(async () => selectNode.props.onChange({ target: { value } }));
+  try {
+    assert.deepEqual(offsets, [0, 500]);
+    assert.deepEqual(ids(), ['sheet']);
+    await change(select('tugilgan_kun_va_boshqa'), 'tugilgan_kun_va_boshqa');
+    assert.deepEqual(ids(), ['moved-in', 'tier']);
+    assert.equal(picker().products[0].category_name, 'Tortlar');
+    assert.equal(picker().products[0].price, 55000);
+    assert.equal(picker().cakeOnly, true);
+    await act(async () => picker().onAdd(picker().products[0], 1));
+    await act(async () => submit(tree));
+    assert.equal(sent.length, 0, 'staff must review the previous draft item');
+    await change(select('other'), 'other');
+    assert.deepEqual(ids(), ['other', 'moved-out', 'tier']);
+    await change(select('other'), 'shop');
+    await act(async () => tree.root.findAllByType('button').find(n => n.props.children === 'Mos kelmaganlarini olib tashlash').props.onClick());
+    await act(async () => submit(tree));
+    assert.deepEqual(sent[0].items.map(i => i.product_id), ['moved-in']);
+    assert.equal(sent[0].shop_id, 'shop');
+  } finally { await act(async () => tree.unmount()); }
+});
+
+test('a failed cake category read offers a retry and never falls back to pastries', async () => {
+  globalThis.sessionStorage = storage();
+  let reads = 0;
+  const backend = { entities: { ...products, Category: { get: async () => {
+    if (++reads === 1) throw new Error('network'); return cakeCategory;
+  } } } };
+  const { Component } = dialog('OrderForm', backend);
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, formProps)); });
+  try {
+    assert.equal(tree.root.findAllByType('div').some(n => n.props.onAdd), false);
+    assert.equal(tree.root.findAllByType('button').at(-1).props.disabled, true);
+    await act(async () => tree.root.findAllByType('button').find(n => n.props.children === 'Qayta yuklash').props.onClick());
+    const picker = tree.root.findAllByType('div').find(n => n.props.onAdd);
+    assert.deepEqual(Array.from(picker.props.products, p => p.name), ['Bento']);
+    assert.equal(reads, 2);
+  } finally { await act(async () => tree.unmount()); }
+});
+
+test('the cake picker opens, searches and adds the selected cake and quantity', async () => {
+  const { Component } = dialog('ProductCombobox', {});
+  const chosen = [];
+  const rows = [
+    { id: 'bento', name: 'Bento', price: 55000, category_id: cakeCategory.id, category_name: 'Tortlar' },
+    { id: 'tier', name: 'TORT 100000', price: 100000, category_id: cakeCategory.id, category_name: 'Tortlar' },
+  ];
+  let tree;
+  await act(async () => { tree = create(React.createElement(Component, { products: rows, cakeOnly: true,
+    onAdd: (product, qty) => chosen.push([product.id, qty]) })); });
+  try {
+    await act(async () => tree.root.findAllByType('button')[0].props.onClick());
+    const search = tree.root.findAllByType('input').find(n => n.props.placeholder === 'Tort nomini yozing...');
+    await act(async () => search.props.onChange({ target: { value: 'bento' } }));
+    const pick = tree.root.findAllByType('button').find(n => n.props['aria-label'] === 'Bentoni tanlash');
+    assert.ok(pick);
+    assert.equal(tree.root.findAllByType('button').some(n => n.props['aria-label'] === 'TORT 100000ni tanlash'), false);
+    await act(async () => pick.props.onClick());
+    await act(async () => tree.root.findAllByType('button').find(n => n.props['aria-label'] === 'Miqdorni ko‘paytirish').props.onClick());
+    await act(async () => tree.root.findAllByType('button').at(-1).props.onClick());
+    assert.deepEqual(chosen, [['bento', 2]]);
+  } finally { await act(async () => tree.unmount()); }
 });
 
 test('new orders start on November 23 and the picker lists only valid dates in each selected month and year', async () => {
@@ -178,7 +280,7 @@ test('actual order form restores and retries its saved creation/advance request 
     fulfilment_type: 'pickup', items: [{ product_id: 'cake', quantity: 1 }], advance_payment: { method: 'cash', amount: 10000, idempotency_key: 'saved-advance-key' } };
   retry.retainOrderRequest(retry.orderRequestScope('staff', 'create_order'), payload);
   const backend = { functions: { invoke: async (_name, body) => { sent.push(structuredClone(body)); throw new Error('still unknown'); } },
-    entities: { Product: { list: async () => [{ id: 'cake', name: 'MINI tort', active: true, price: 20000, production_unit: 'piece' }] } } };
+    entities: { ...products, Category: { get: async () => ({ ...cakeCategory, active: false }) } } };
   const loaded = dialog('OrderForm', backend, { shopStamp: () => '2027-01-01 08:00' }); let tree;
   await act(async () => { tree = create(React.createElement(loaded.Component, { open: true, user: { id: 'staff', role: 'cashier', shop_id: 'shop' },
     shops: [{ id: 'shop', name: 'Odina' }], onClose: () => {}, onCreated: () => {} })); });

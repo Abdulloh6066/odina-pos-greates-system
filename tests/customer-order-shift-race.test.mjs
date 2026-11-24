@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { CAKE_CATEGORY_ID } from '../base44/shared/shop-category.js';
 import test from 'node:test';
 import { memoryBackend } from './helpers/memory-backend.mjs';
 
@@ -7,7 +8,8 @@ function fixture(closeHandler) {
     User: [{ id: 'staff', role: 'cashier', active: true, shop_id: 'shop', full_name: 'Kassir' }],
     Shop: [{ id: 'shop', name: 'Odina', active: true, location_type: 'shop', allows_pos: true }],
     Settings: [{ id: 'settings', customer_order_last_number: 0, allow_negative_stock: false }],
-    Product: [{ id: 'cake', name: 'Tort', price: 20000, active: true, track_stock: false }],
+    Category: [{ id: CAKE_CATEGORY_ID, name: 'Tortlar', active: true }],
+    Product: [{ id: 'cake', category_id: CAKE_CATEGORY_ID, name: 'Tort', price: 20000, active: true, track_stock: false }],
     Shift: [{ id: 'shift', user_id: 'staff', shop_id: 'shop', shop_name: 'Odina', status: 'open',
       opened_at: '2026-10-15T01:00:00.000Z', expected_cash: 0, cash_sales: 0, uzcard_sales: 0, humo_sales: 0,
       online_sales: 0, bank_transfer_sales: 0, total_sales: 0, order_count: 0 }],

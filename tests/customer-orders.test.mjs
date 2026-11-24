@@ -1,6 +1,7 @@
 // Offline regression tests for the Buyurtmalar (customer-orders) module.
 // No live data is read or changed — everything runs in an in-memory mock harness.
 import assert from 'node:assert/strict';
+import { CAKE_CATEGORY_ID } from '../base44/shared/shop-category.js';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -29,8 +30,9 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
       { id: 'shop-a', name: 'Filial A', active: true, allows_pos: true, location_type: 'shop' },
       { id: 'shop-b', name: 'Filial B', active: true, allows_pos: true, location_type: 'shop' },
     ],
+    Category: [{ id: CAKE_CATEGORY_ID, name: 'Tortlar', active: true }],
     Product: [
-      { id: 'cake-sheet', name: 'Tort varaq', category_name: 'Tortlar', production_unit: 'sheet',
+      { id: 'cake-sheet', name: 'Tort varaq', category_id: CAKE_CATEGORY_ID, category_name: 'Tortlar', production_unit: 'sheet',
         pieces_per_sheet: 20, sheet_price: 400000, price: 20000, active: true, archived: false },
       { id: 'cake-piece', name: 'Kapykeyk', category_name: 'Pishiriqlar', production_unit: 'piece',
         price: 15000, active: true, archived: false },
@@ -188,10 +190,52 @@ test('wedding sheet conversion is 40 pieces per sheet', async () => {
 test('non-wedding keeps the existing 20 pieces per sheet', async () => {
   const f = fixture();
   const call = loadHandler(harness(f.db));
-  const res = await call(baseOrder({ order_type: 'tugilgan_kun_va_boshqa' }));
+  const res = await call(baseOrder({ order_type: 'tugilgan_kun_va_boshqa', items: [{ product_id: 'cake-sheet', quantity: 2 }] }));
   assert.equal(res.status, 200, JSON.stringify(res));
   const sheetItem = f.db.CustomerOrderItem.find((i) => i.product_id === 'cake-sheet');
   assert.equal(sheetItem.event_pieces_per_sheet_snapshot, 20);
+});
+
+test('birthday creation checks the actual POS category and shop before accepting an advance or creating records', async () => {
+  const f = fixture();
+  const call = loadHandler(harness(f.db));
+  const product = f.db.Product.find(p => p.id === 'cake-piece');
+  product.name = 'TORT 100000';
+  product.category_name = 'Tortlar';
+  product.category_id = 'pastries';
+  const request = baseOrder({ order_type: 'tugilgan_kun_va_boshqa', shop_id: 'shop-b',
+    items: [{ product_id: product.id, quantity: 1, category_id: CAKE_CATEGORY_ID, unit_price_snapshot: 1 }],
+    advance_payment: { amount: 5000, method: 'cash', idempotency_key: 'cake-advance' } });
+  const reject = async () => {
+    const response = await call(request);
+    assert.equal(response.status, 409, JSON.stringify(response));
+    assert.equal(response.data.request_not_started, true);
+    for (const entity of ['CustomerOrder', 'CustomerOrderItem', 'OrderPayment', 'Customer']) assert.equal(f.db[entity].length, 0);
+    assert.equal(f.db.Settings[0].customer_order_last_number, 0);
+  };
+  await reject();
+  product.shop_category_ids = { 'shop-a': CAKE_CATEGORY_ID };
+  product.available_shop_ids = ['shop-b'];
+  await reject();
+  product.available_shop_ids = ['shop-a'];
+  f.db.Category[0].hidden_shop_ids = ['shop-a'];
+  await reject();
+  f.db.Category[0].hidden_shop_ids = [];
+  f.db.Category[0].active = false;
+  await reject();
+  f.db.Category[0].active = true;
+  product.shop_prices = { 'shop-a': 124000 };
+  product.category_name = 'Pishiriqlar';
+  const created = await call(request);
+  assert.equal(created.status, 200, JSON.stringify(created));
+  assert.equal(created.data.order.shop_id, 'shop-a');
+  assert.equal(created.data.items[0].unit_price_snapshot, 124000);
+  assert.equal(created.data.items[0].category_name_snapshot, 'Tortlar');
+  product.shop_category_ids = {};
+  const replay = await call(request);
+  assert.equal(replay.status, 200, JSON.stringify(replay));
+  assert.equal(replay.data.order.id, created.data.order.id);
+  assert.equal(f.db.OrderPayment.length, 1);
 });
 
 test('product prices are reloaded from the database, not trusted from client', async () => {

@@ -1,6 +1,7 @@
 // Offline regression tests for Phase 2B: Buyurtmalar complete_order action.
 // No live data is read or changed — everything runs in an in-memory mock harness.
 import assert from 'node:assert/strict';
+import { CAKE_CATEGORY_ID } from '../base44/shared/shop-category.js';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -29,8 +30,9 @@ function fixture(role = 'cashier', shopId = 'shop-a') {
       { id: 'shop-a', name: 'Filial A', active: true, allows_pos: true, location_type: 'shop' },
       { id: 'shop-b', name: 'Filial B', active: true, allows_pos: true, location_type: 'shop' },
     ],
+    Category: [{ id: CAKE_CATEGORY_ID, name: 'Tortlar', active: true }],
     Product: [
-      { id: 'cake-sheet', name: 'Tort varaq', category_name: 'Tortlar', production_unit: 'sheet',
+      { id: 'cake-sheet', name: 'Tort varaq', category_id: CAKE_CATEGORY_ID, category_name: 'Tortlar', production_unit: 'sheet',
         pieces_per_sheet: 20, sheet_price: 400000, price: 20000, active: true, archived: false, track_stock: true },
       { id: 'cake-piece', name: 'Kapykeyk', category_name: 'Pishiriqlar', production_unit: 'piece',
         price: 15000, active: true, archived: false, track_stock: true },
@@ -343,6 +345,7 @@ test('wedding order uses 40 pieces per sheet for stock deduction', async () => {
 
 test('non-wedding order uses 20 pieces per sheet for stock deduction', async () => {
   const f = fixture();
+  f.db.Product.find(p => p.id === 'cake-piece').shop_category_ids = { 'shop-a': CAKE_CATEGORY_ID };
   const call = loadHandler(harness(f.db));
   const order = await setupReadyOrder(call, f.db, {
     order_type: 'tugilgan_kun_va_boshqa', advance_payment: { method: 'uzcard', amount: 950000 },

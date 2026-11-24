@@ -1,6 +1,7 @@
 import { money, httpError } from "./shift-close-helpers.ts";
 import { ensureCustomer } from "./customer-helpers.ts";
 import { allocateCustomerOrderSequence } from "./customer-order-sequence.js";
+import { CAKE_CATEGORY_ID, isBirthdayOrderCake } from "./shop-category.js";
 
 const ORDER_RUNTIME_VERSION = "customer-orders-v6-2026-10-15";
 export const PAYMENT_METHODS = new Set([
@@ -299,6 +300,8 @@ export async function recordCustomerOrderPayment(service: any, user: any, body: 
 
 async function normalizeOrderItems(service: any, requestedItems: any[], orderType: string, shopId: string, botGuard: any = null) {
   const normalized: any[] = [];
+  const birthdayFromPos = !botGuard && orderType === "tugilgan_kun_va_boshqa";
+  const cakeCategory = birthdayFromPos ? await service.entities.Category.get(CAKE_CATEGORY_ID) : null;
   for (const requested of requestedItems) {
     const productId = String(requested?.product_id || "");
     const quantity = Number(requested?.quantity);
@@ -330,6 +333,9 @@ async function normalizeOrderItems(service: any, requestedItems: any[], orderTyp
     if (!product || product.active === false || product.archived === true) {
       throw httpError("Tanlangan mahsulot hozir sotuvda mavjud emas.", 409);
     }
+    if (birthdayFromPos && !isBirthdayOrderCake(product, shopId, cakeCategory)) {
+      throw httpError("Tug‘ilgan kun buyurtmasi uchun do‘kon kassasidagi «Tortlar» bo‘limidan tanlang.", 409);
+    }
     const isSheet = product.production_unit === "sheet";
     const unit = isSheet ? "sheet" : "piece";
     const unitPrice = isSheet ? money(product.sheet_price) : money(product?.shop_prices?.[shopId] ?? product.price);
@@ -346,7 +352,7 @@ async function normalizeOrderItems(service: any, requestedItems: any[], orderTyp
       product_id: product.id,
       product_name_snapshot: String(product.name || ""),
       product_image_snapshot: String(product.image_url || ""),
-      category_name_snapshot: String(product.category_name || ""),
+      category_name_snapshot: String(cakeCategory?.name || product.category_name || ""),
       unit_snapshot: unit,
       quantity: qty,
       event_pieces_per_sheet_snapshot: piecesPerSheet,
@@ -456,15 +462,14 @@ export async function createCustomerOrder(service: any, user: any, body: any, bo
         return Response.json({ request_not_started: !requestStarted, error: "Do‘kon topilmadi yoki faol emas." }, { status: 404 });
       }
 
-      const { customer_id: resolvedCustomerId } = await ensureCustomer(service, {
-        customer_id: String(body?.customer_id || ""), name: customerName, phone: customerPhone,
-      });
-
       const requestedItems = Array.isArray(body?.items) ? body.items : [];
       if (!requestedItems.length) {
         return Response.json({ request_not_started: !requestStarted, error: "Kamida bitta mahsulot qo‘shing." }, { status: 400 });
       }
       const normalizedItems = await normalizeOrderItems(service, requestedItems, orderType, shop.id, botGuard);
+      const { customer_id: resolvedCustomerId } = await ensureCustomer(service, {
+        customer_id: String(body?.customer_id || ""), name: customerName, phone: customerPhone,
+      });
       const subtotal = normalizedItems.reduce((sum, item) => sum + item.line_total, 0);
 
       let deliveryFee = 0;

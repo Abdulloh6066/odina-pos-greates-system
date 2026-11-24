@@ -11,6 +11,8 @@ import { Image } from '@/components/ui/image';
 import { Plus, Minus, Trash2, X, Loader2, Lock } from 'lucide-react';
 import ProductCombobox from '@/components/orders/ProductCombobox';
 import { priceForShop } from '@/lib/shop-pricing';
+import { CAKE_CATEGORY_ID, isBirthdayOrderCake } from '@/lib/shop-category';
+import { loadAllInventoryItems } from '@/lib/cake-stock-shelf';
 import ReferenceImageField from '@/components/orders/ReferenceImageField';
 import { useToast } from '@/components/ui/use-toast';
 import { orderRequestScope, readOrderRequest, retainOrderRequest, clearOrderRequest, orderRequestDefinitelyRejected } from '@/lib/order-request-retry';
@@ -83,7 +85,10 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const isAdmin = role === 'admin';
   const defaultShopId = (isAdmin && adminShopScope?.isAdmin ? adminShopScope.specificShopId : '') || user?.shop_id || '';
   const [products, setProducts] = useState([]);
+  const [cakeCategory, setCakeCategory] = useState(null);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState([]);
   const [acceptanceStamp, setAcceptanceStamp] = useState('');
@@ -114,12 +119,21 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
   useEffect(() => {
     if (!open) return;
+    let current = true;
     setLoadingProducts(true);
-    base44.entities.Product.list('name', 500)
-      .then((list) => setProducts((list || []).filter((p) => p.active !== false && p.archived !== true && isOrderCatalogProduct(p))))
-      .catch(() => setProducts([]))
-      .finally(() => setLoadingProducts(false));
-  }, [open]);
+    setCatalogError('');
+    Promise.allSettled([
+      loadAllInventoryItems(base44.entities.Product),
+      base44.entities.Category.get(CAKE_CATEGORY_ID),
+    ]).then(([catalog, category]) => {
+      if (!current) return;
+      setProducts(catalog.status === 'fulfilled' ? catalog.value.filter(p => p.active !== false && p.archived !== true) : []);
+      setCakeCategory(category.status === 'fulfilled' ? category.value : null);
+      setCatalogError(catalog.status === 'rejected' ? 'products' : category.status === 'rejected' ? 'cakes' : '');
+      setLoadingProducts(false);
+    });
+    return () => { current = false; };
+  }, [open, catalogAttempt]);
 
   useEffect(() => {
     if (!open) return;
@@ -197,6 +211,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const update = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   const addFromCombobox = (p, qty) => {
+    if (isBirthday && !availableIds.has(p.id)) return;
     const q = Math.max(1, Math.floor(Number(qty) || 0));
     setItems((prev) => {
       const existing = prev.find((i) => i.product_id === p.id);
@@ -215,6 +230,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const removeItem = (id) => setItems((prev) => prev.filter((i) => i.product_id !== id));
 
   const isWedding = form.order_type === 'toy_va_bazmlar';
+  const isBirthday = form.order_type === 'tugilgan_kun_va_boshqa';
   const requiredDate = pending?.required_date || (form.required_date > today ? form.required_date : today);
   const [year, month, day] = requiredDate.split('-').map(Number);
   const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
@@ -231,13 +247,23 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
   const dateError = !pending && form.required_time && `${requiredDate} ${form.required_time}` < shopStamp
     ? 'O‘tib ketgan sana yoki vaqt' : '';
   const currentShopId = isAdmin ? form.shop_id : user?.shop_id;
-  const pricedProducts = useMemo(() => products.map((p) => ({ ...p, price: priceForShop(p, currentShopId) })), [products, currentShopId]);
+  const pricedProducts = useMemo(() => {
+    if (!isBirthday) return products.filter(isOrderCatalogProduct).map(p => ({ ...p, price: priceForShop(p, currentShopId) }));
+    return products.filter(p => isBirthdayOrderCake(p, currentShopId, cakeCategory))
+      .map(p => ({ ...p, category_id: cakeCategory.id, category_name: cakeCategory.name, price: priceForShop(p, currentShopId) }))
+      .sort((a, b) => a.price - b.price);
+  }, [products, currentShopId, isBirthday, cakeCategory]);
+  const availableIds = useMemo(() => new Set(pricedProducts.map(p => p.id)), [pricedProducts]);
+  const catalogUnavailable = catalogError === 'products' || (isBirthday && catalogError === 'cakes');
+  const reviewBirthdayItems = isBirthday && !pending;
+  const selectedItems = reviewBirthdayItems ? items.filter(item => availableIds.has(item.product_id)) : items;
+  const excludedItems = reviewBirthdayItems ? items.filter(item => !availableIds.has(item.product_id)) : [];
   const currentItemPrice = (item) => {
     if (item.production_unit === 'sheet') return Number(item.sheet_price || 0);
     const product = products.find((p) => p.id === item.product_id);
     return product ? priceForShop(product, currentShopId) : Number(item.price || 0);
   };
-  const subtotal = items.reduce((sum, item) => sum + currentItemPrice(item) * item.quantity, 0);
+  const subtotal = selectedItems.reduce((sum, item) => sum + currentItemPrice(item) * item.quantity, 0);
 
   const deliveryFee = form.fulfilment_type === 'delivery' ? (isWedding ? 0 : Math.max(0, Number(form.delivery_fee || 0))) : 0;
   const adjustment = Number(form.adjustment_amount) || 0;
@@ -247,7 +273,8 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
   const valid = form.customer_name.trim() && form.customer_phone.trim() && form.required_time
     && !dateError
-    && items.length > 0 && (isAdmin || form.shop_id === user?.shop_id)
+    && selectedItems.length > 0 && (isAdmin || form.shop_id === user?.shop_id)
+    && (!isBirthday || (currentShopId && !loadingProducts && !catalogUnavailable && !excludedItems.length))
     && (adjustment === 0 || (isAdmin && form.adjustment_reason.trim().length >= 3))
     && (!form.useAdvance || (advanceAmount > 0 && advanceAmount <= total));
 
@@ -282,7 +309,7 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
           notes: form.notes,
           adjustment_amount: adjustment,
           adjustment_reason: form.adjustment_reason,
-          items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity, customization_note: i.customization_note })),
+          items: selectedItems.map((i) => ({ product_id: i.product_id, quantity: i.quantity, customization_note: i.customization_note })),
         };
         if (form.useAdvance && advanceAmount > 0) {
           payload.advance_payment = { method: form.advance_method, amount: advanceAmount, idempotency_key: buildIdempotencyKey('pay') };
@@ -426,15 +453,31 @@ export default function OrderForm({ open, onClose, onCreated, user, shops, prefi
 
           <div>
             <Label className="flex items-center justify-between">
-              <span>Mahsulotlar *</span>
-              <span className="text-xs font-normal text-muted-foreground">{items.length} ta</span>
+              <span>{isBirthday ? 'Tortlar' : 'Mahsulotlar'} *</span>
+              <span className="text-xs font-normal text-muted-foreground">{selectedItems.length} ta</span>
             </Label>
             <div className="mt-2">
-              <ProductCombobox products={pricedProducts} onAdd={addFromCombobox} loading={loadingProducts} />
+              {isBirthday && !currentShopId ? (
+                <p className="text-sm text-muted-foreground">Tortlarni ko‘rish uchun qabul qiluvchi do‘konni tanlang.</p>
+              ) : catalogUnavailable ? (
+                <div role="alert" className="flex items-center justify-between gap-2 text-sm">
+                  Katalogni yuklab bo‘lmadi.
+                  <Button type="button" variant="outline" onClick={() => setCatalogAttempt(n => n + 1)}>Qayta yuklash</Button>
+                </div>
+              ) : (
+                <ProductCombobox key={`${form.order_type}-${currentShopId}`} products={pricedProducts} onAdd={addFromCombobox} loading={loadingProducts} cakeOnly={isBirthday} />
+              )}
             </div>
 
+            {currentShopId && !loadingProducts && !catalogUnavailable && excludedItems.length > 0 && (
+              <div role="alert" className="mt-3 space-y-2 rounded-xl border border-border bg-secondary/30 p-3 text-sm">
+                <p>Quyidagi mahsulotlar bu do‘konning «Tortlar» bo‘limida yo‘q. Saqlash uchun ularni qoralamadan olib tashlang.</p>
+                <p className="font-medium">{excludedItems.map(item => item.name || 'Katalogdan tashqari mahsulot').join(', ')}</p>
+                <Button type="button" variant="outline" onClick={() => setItems(selectedItems)}>Mos kelmaganlarini olib tashlash</Button>
+              </div>
+            )}
             <div className="mt-3 space-y-2">
-              {items.map((i) => {
+              {selectedItems.map((i) => {
                 const isSheet = i.production_unit === 'sheet';
                 const unit = isSheet ? 'varaq' : 'dona';
                 const unitPrice = currentItemPrice(i);

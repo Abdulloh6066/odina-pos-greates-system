@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CAKE_CATEGORY_ID } from '../base44/shared/shop-category.js';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { webcrypto, randomUUID } from 'node:crypto';
@@ -38,6 +39,7 @@ function fixture(tier = 85000, products = []) {
     User: [{ id:'owner', role:'admin', is_owner:true, active:true, full_name:'Egasi' }],
     Shop: [{ id:'central', name:'Odina Central', active:true, allows_pos:true, location_type:'shop' },
       { id:'branch', name:'Odina Branch', active:true, allows_pos:true, location_type:'shop' }],
+    Category:[{id:CAKE_CATEGORY_ID,name:'Tortlar',active:true}],
     Product: products, Customer:[], CustomerOrder:[], CustomerOrderItem:[], ActionHistory:[],
     OrderPayment:[], Shift:[], ProductionBatch:[], ProductionBatchItem:[], StockMovement:[],
     ProductStock:[{id:'stock', location_id:'central', product_id:'cake', quantity:10, unit:'piece'}],
@@ -96,7 +98,7 @@ function fixture(tier = 85000, products = []) {
   const status=()=>bot.handle({update_id:++uid,message:{from:{id:+sender},chat:{id:+sender,type:'private'},text:'/holat'}});
   return {db,draft,create,bridge,call,callback,status,store,sender,binding,entities};
 }
-const catalog = (price=200000)=>({id:'cake',name:'TORT '+price,price,active:true,archived:false,
+const catalog = (price=200000)=>({id:'cake',name:'TORT '+price,price,active:true,archived:false,category_id:CAKE_CATEGORY_ID,
   production_unit:'piece',category_name:'Tortlar',track_stock:true,source_type:'central_produced'});
 
 test('order numbers persist across retry, next-day dates and both shops',async()=>{
